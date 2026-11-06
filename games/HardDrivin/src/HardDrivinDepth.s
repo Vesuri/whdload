@@ -36,8 +36,6 @@ _depth_collect:
 	moveq #0,d7			; records
 	lea _occ_nsolid(pc),a1
 	clr.w (a1)
-	lea _occ_nroad(pc),a1
-	clr.w (a1)
 	lea -25276(a4),a0		; surface polygons, both roads
 	movea.l -2168(a4),a1		; markings, road A
 	movea.l -5786(a4),a2		; flags
@@ -75,10 +73,6 @@ _depth_collect:
 	move.b d0,d2
 	andi.b #$f8,d2
 	beq.s .plain
-	btst #3,d0
-	bne.s .hidden
-	bsr .structure			; a structure's: kept for the repaint
-.hidden:
 	addq.l #4,sp			; a structure's or hidden: skip both
 	move.w (a1)+,d1
 	lsl.w #2,d1
@@ -156,33 +150,6 @@ _depth_collect:
 	bhi.s .swap
 .done:
 	rts
-; A structure's section: D0 its flags, 4(SP) its polygon less its count.
-.structure:
-	move.l a6,-(sp)
-	lea _occ_nroad(pc),a6
-	move.w (a6),d2
-	cmpi.w #OCC_ROADS,d2
-	bhs.s .s_full
-	addq.w #1,(a6)
-	mulu.w #OCC_ROAD,d2
-	movea.l _depth_mem(pc),a6
-	lea DM_ROADS(a6),a6
-	adda.w d2,a6
-	move.w d0,(a6)+			; flags
-	move.l 8(sp),d2
-	subq.l #2,d2
-	move.l d2,(a6)+			; polygon
-	moveq #0,d2
-	cmp.w d6,d4
-	bgt.s .s_mark
-	move.l a1,d2
-.s_mark:
-	move.l d2,(a6)+			; marking, or 0
-	move.l a3,(a6)			; strip points
-.s_full:
-	movea.l (sp)+,a6
-	rts
-
 ; Insertion sort, far depth descending. Scratch D0-D4/A0-A3.
 _depth_sort:
 	movea.l _depth_mem(pc),a0	; DM_RECS
@@ -245,6 +212,8 @@ _depth_object:
 	movea.l 36(a2),a0
 	bra.s .call
 .other:
+	cmpi.b #8,28(a2)		; a car: drawn, then the faces in front of it
+	bne.s .draw
 	lea _occ_car(pc),a0
 .call:
 	lea 24(sp),sp			; D0-D3/A0-A1: scratch for the draw
@@ -316,30 +285,26 @@ _depth_fill:
 	addq.w #2,sp
 	rts
 
-; Objects behind a solid's faces. A solid (an object drawn by $F792, classes
-; 4 and 16: barns, the hills by them, the stunt road's raised forks) is drawn
-; at its far side and the objects nearer than that after it, so a car or a
-; sign behind its slopes was drawn on them. After each other object, every
-; face of the solids drawn before it that faces the camera and has the whole
-; object behind its plane (the centre farther than the radius) is filled
-; again inside the object's box on the screen, and then the solid's own road
-; sections ($FA58) that have it wholly behind them. A face's polygon on the
-; screen is where its plane lies between the camera and the object, so the
-; fill hides only what the face hides.
+; Cars behind a solid's faces. A solid (an object drawn by $F792, classes 4
+; and 16: barns, the stunt road's raised forks) is drawn at its far side and
+; the cars nearer than that after it, so a car behind its slopes was drawn on
+; them. After each car, every face of the solids drawn before it that faces
+; the camera, is not ground, and has the whole car behind its plane (the
+; centre farther than the radius) is filled again inside the car's box on
+; the screen.
 OCC_FACES equ -32274		; the jump-table entry of $F792
 OCC_SOLIDS equ 8
-OCC_CARS equ 48
+OCC_CARS equ 16
 OCC_CAR equ 10			; object.l, centre X/Y/Z
-OCC_ROADS equ 64
-OCC_ROAD equ 14			; flags.w, polygon.l, marking.l, strip.l
 OCC_NEAR equ 32			; a car nearer than this is not tested
 
 ; Replaces MOVEM.L (SP)+,D4-D7/A2-A3; UNLK A5; RTS at the end of $97DC, an
-; object's transform, where D5-D7 are its origin in camera space: kept for
-; every object (OCC_CARS of them).
+; object's transform, where D5-D7 are its origin in camera space.
 _occ_centre:
 	movem.l d0/a0-a1,-(sp)
 	movea.l 8(a5),a0
+	cmpi.b #8,28(a0)
+	bne.s .done
 	lea _occ_ncar(pc),a1
 	move.w (a1),d0
 	cmpi.w #OCC_CARS,d0
@@ -359,8 +324,8 @@ _occ_centre:
 	unlk a5
 	rts
 
-; An object's draw (any but the solids), called as its routine (the object
-; at 4(SP)), then the faces in front of it. D0-D3/A0-A1 are scratch.
+; A car's draw, called as its routine (the object at 4(SP)), then the faces
+; in front of it. D0-D3/A0-A1 are scratch.
 _occ_car:
 	movea.l 4(sp),a0
 	move.l a0,-(sp)
@@ -434,8 +399,6 @@ _occ_car:
 	blt.s .restore
 	moveq #0,d0			; the margin: the whole car behind
 	move.w 6(a2),d0
-	lea _occ_radius(pc),a0
-	move.w d0,(a0)
 	moveq #12,d1
 	lsl.l d1,d0
 	lea _occ_margin(pc),a0
@@ -447,7 +410,6 @@ _occ_car:
 .solid:
 	movea.l (a3)+,a2
 	bsr _occ_solid
-	bsr _occ_road
 .solid_next:
 	dbf d4,.solid
 .restore:
@@ -468,8 +430,6 @@ _occ_car:
 ; is culled) to fill instead of the screen points.
 _occ_solid:
 	move.w d4,-(sp)
-	lea _occ_filled(pc),a0
-	sf (a0)
 	movea.l 52(a2),a5		; faces
 	movea.l 44(a2),a6		; rotated points
 	moveq #0,d3
@@ -484,6 +444,24 @@ _occ_solid:
 	move.b (a5)+,d1			; plane
 	mulu.w #6,d1
 	movem.w (a6,d1.w),d0-d1/a0	; the plane (A0 as a word)
+	; ground (Y over twice X and Z): the road is drawn over it, and a
+	; car in a cutting below it
+	move.w d1,d2
+	bpl.s .y
+	neg.w d2
+.y:	move.w d0,d4
+	bpl.s .x
+	neg.w d4
+.x:	add.w d4,d4
+	cmp.w d2,d4
+	bhi.s .steep
+	move.w a0,d4
+	bpl.s .z
+	neg.w d4
+.z:	add.w d4,d4
+	cmp.w d2,d4
+	bls .skip
+.steep:
 	moveq #0,d2
 	move.b (a5),d2			; the first vertex
 	mulu.w #6,d2
@@ -507,8 +485,6 @@ _occ_solid:
 	sub.l d4,d0			; B
 	add.l _occ_margin(pc),d0	; behind by more than its radius
 	bpl.s .skip			; the car is in front, or across the plane
-	lea _occ_filled(pc),a0
-	st (a0)
 	tst.b 34(a2)
 	bne.s .clipped
 	; fill the face again from its screen points
@@ -574,222 +550,7 @@ _occ_solid:
 	move.w (sp)+,d4
 	rts
 
-; A2 a solid, D5-D7 the object's centre: the sections of the solid's road
-; ($FA58 with its type's flag) on the object's box that have the whole
-; object behind them, the camera in front, filled again after its faces.
-; A section's plane is through its strip points I-1 left (P), I-1 right and
-; I left; its normal N is their cross product scaled to 12 bits. With
-; S = N.P and C = N.(centre-P) of the same sign (the camera and the centre
-; on opposite sides) and |C| over the radius times |N| (taken as the
-; largest component plus half the others) the object is behind it.
-OW_C equ 0			; centre X/Y/Z
-OW_U equ 6			; I-1 right - P
-OW_V equ 12			; I left - P
-OW_N equ 18			; sections left
-_occ_road:
-	lea _occ_filled(pc),a0		; its road lies on its faces
-	tst.b (a0)
-	beq.s .none
-	move.w _occ_nroad(pc),d0
-	bne.s .any
-.none:
-	rts
-.any:
-	movem.l d3-d7/a2-a3/a5-a6,-(sp)
-	movea.l _depth_mem(pc),a6
-	lea DM_WORK(a6),a6
-	movem.w d5-d7,OW_C(a6)
-	move.w d0,OW_N(a6)
-	move.b 25(a2),d1
-	moveq #$10,d4
-	cmpi.b #8,d1
-	beq.s .mask
-	moveq #$20,d4
-	cmpi.b #9,d1
-	beq.s .mask
-	move.w #$80,d4
-	cmpi.b #48,d1
-	beq.s .mask
-	moveq #$40,d4
-	cmpi.b #61,d1
-	bne .out
-.mask:
-	movea.l _depth_mem(pc),a3
-	lea DM_ROADS(a3),a3
-	bra .next
-.section:
-	move.w (a3),d0
-	and.w d4,d0
-	beq .skip
-	; the polygon's extent against the box
-	movea.l 2(a3),a0
-	move.w (a0)+,d0
-	cmpi.w #3,d0
-	blt .skip
-	subq.w #1,d0
-	move.w (a0),d1			; X least
-	move.w d1,d2			; X most
-	move.w 2(a0),d6			; Y least
-	move.w d6,d7			; Y most
-.extent:
-	move.w (a0)+,d5
-	cmp.w d1,d5
-	bge.s .e1
-	move.w d5,d1
-.e1:	cmp.w d2,d5
-	ble.s .e2
-	move.w d5,d2
-.e2:	move.w (a0)+,d5
-	cmp.w d6,d5
-	bge.s .e3
-	move.w d5,d6
-.e3:	cmp.w d7,d5
-	ble.s .e4
-	move.w d5,d7
-.e4:	dbf d0,.extent
-	cmp.w -27118(a4),d2		; X left
-	blt .skip
-	cmp.w -27120(a4),d1		; X right
-	bgt .skip
-	cmp.w -27122(a4),d7		; Y top
-	blt .skip
-	cmp.w -27124(a4),d6		; Y bottom
-	bgt .skip
-	; U and V
-	movea.l 10(a3),a0
-	moveq #2,d0
-	lea OW_U(a6),a1
-.uv:	move.w 6(a0),d1
-	sub.w (a0),d1
-	bvs .skip
-	move.w 12(a0),d2
-	sub.w (a0)+,d2
-	bvs .skip
-	move.w d1,(a1)
-	move.w d2,OW_V-OW_U(a1)
-	addq.l #2,a1
-	dbf d0,.uv
-	subq.l #6,a0			; P
-	; N = U x V
-	move.w OW_U+2(a6),d5
-	muls.w OW_V+4(a6),d5
-	move.w OW_U+4(a6),d0
-	muls.w OW_V+2(a6),d0
-	sub.l d0,d5
-	move.w OW_U+4(a6),d6
-	muls.w OW_V(a6),d6
-	move.w OW_U(a6),d0
-	muls.w OW_V+4(a6),d0
-	sub.l d0,d6
-	move.w OW_U(a6),d7
-	muls.w OW_V+2(a6),d7
-	move.w OW_U+2(a6),d0
-	muls.w OW_V(a6),d0
-	sub.l d0,d7
-	move.l d5,d0
-	bpl.s .a1
-	neg.l d0
-.a1:	move.l d6,d1
-	bpl.s .a2
-	neg.l d1
-.a2:	or.l d1,d0
-	move.l d7,d1
-	bpl.s .a3
-	neg.l d1
-.a3:	or.l d1,d0
-	beq .skip
-.scale:
-	cmpi.l #4096,d0
-	blo.s .scaled
-	asr.l #1,d5
-	asr.l #1,d6
-	asr.l #1,d7
-	lsr.l #1,d0
-	bra.s .scale
-.scaled:
-	; S = N.P, C = N.centre - S
-	move.w d5,d0
-	muls.w (a0),d0
-	move.w d6,d1
-	muls.w 2(a0),d1
-	add.l d1,d0
-	move.w d7,d1
-	muls.w 4(a0),d1
-	add.l d1,d0
-	beq .skip
-	move.w d5,d1
-	muls.w OW_C(a6),d1
-	move.w d6,d2
-	muls.w OW_C+2(a6),d2
-	add.l d2,d1
-	move.w d7,d2
-	muls.w OW_C+4(a6),d2
-	add.l d2,d1
-	sub.l d0,d1
-	tst.l d0
-	bmi.s .sign
-	neg.l d1
-.sign:
-	tst.l d1
-	bpl .skip			; on the camera's side
-	; |N|
-	move.w d5,d0
-	bpl.s .n1
-	neg.w d0
-.n1:	move.w d0,d2
-	move.w d0,d3
-	move.w d6,d0
-	bpl.s .n2
-	neg.w d0
-.n2:	add.w d0,d2
-	cmp.w d3,d0
-	ble.s .n3
-	move.w d0,d3
-.n3:	move.w d7,d0
-	bpl.s .n4
-	neg.w d0
-.n4:	add.w d0,d2
-	cmp.w d3,d0
-	ble.s .n5
-	move.w d0,d3
-.n5:	add.w d3,d2
-	lsr.w #1,d2
-	mulu.w _occ_radius(pc),d2
-	add.l d2,d1
-	bpl .skip			; across the plane
-	; fill it again, and its marking
-	moveq #20,d0
-	btst #0,1(a3)
-	beq.s .colour
-	moveq #10,d0
-.colour:
-	move.w d0,-(sp)
-	jsr -32508(a4)			; colour
-	addq.w #2,sp
-	movea.l 2(a3),a0
-	bsr _depth_fill
-	move.l 6(a3),d0
-	beq.s .skip
-	move.w #5,-(sp)
-	jsr -32508(a4)
-	addq.w #2,sp
-	movea.l 6(a3),a0
-	bsr _depth_fill
-.skip:
-	lea OCC_ROAD(a3),a3
-.next:
-	subq.w #1,OW_N(a6)
-	bpl .section
-.out:
-	movem.l (sp)+,d3-d7/a2-a3/a5-a6
-	rts
-
 _occ_margin: dc.l 0
-_occ_filled: dc.b 0
-	even
-_occ_radius: dc.w 0
-_occ_nroad: dc.w 0
-	even
 _occ_nsolid: dc.w 0
 _occ_ncar: dc.w 0
 	even
@@ -797,11 +558,9 @@ _occ_ncar: dc.w 0
 ; The arrays are allocated at install (_render_install): _depth_mem with
 ; CUSTOM1 nonzero.
 DM_RECS equ 0
-DM_ROADS equ DM_RECS+DEPTH_MAX*DEPTH_REC
-DM_CARS equ DM_ROADS+OCC_ROADS*OCC_ROAD
+DM_CARS equ DM_RECS+DEPTH_MAX*DEPTH_REC
 DM_SOLIDS equ DM_CARS+OCC_CARS*OCC_CAR
-DM_WORK equ DM_SOLIDS+OCC_SOLIDS*4
-DM_SIZE equ DM_WORK+20
+DM_SIZE equ DM_SOLIDS+OCC_SOLIDS*4
 _depth_mem: dc.l 0
 _depth_count: dc.w 0
 _depth_next: dc.w 0
