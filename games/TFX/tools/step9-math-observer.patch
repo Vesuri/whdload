@@ -1,0 +1,48 @@
+--- a/src/tfx_profile.h
++++ b/src/tfx_profile.h
+@@ -1,5 +1,8 @@
+ 
+ #include <map>
++#include <vector>
++#include <array>
++static std::vector<std::array<unsigned,7>> tfx_math;
+ #include <tuple>
+ #include <cstdio>
+ struct TfxStat { unsigned long long n=0, fetch=0, body=0, special=0, pad=0, reads=0, writes=0, rb=0, wb=0, chipr=0, chipw=0, chiprb=0, chipwb=0; };
+@@ -10,7 +13,7 @@
+ static std::map<std::pair<uae_u32,uae_u32>,unsigned long long> tfx_calls;
+ static std::map<std::tuple<unsigned,unsigned,unsigned,unsigned>,unsigned long long> tfx_exceptions;
+ static std::map<std::pair<unsigned,unsigned>,unsigned long long> tfx_cache;
+-void tfx_start(unsigned base) { tfx_stats.clear();tfx_calls.clear();tfx_exceptions.clear();tfx_cache.clear();tfx_base=base;tfx_frame=0;tfx_begin=get_cycles();tfx_on=true; }
++void tfx_start(unsigned base) { tfx_math.clear();tfx_stats.clear();tfx_calls.clear();tfx_exceptions.clear();tfx_cache.clear();tfx_base=base;tfx_frame=0;tfx_begin=get_cycles();tfx_on=true; }
+ static void tfx_mem(uae_u32 addr,unsigned bytes,bool wr) {
+  if(!tfx_on)return; auto &s=tfx_stats[tfx_pc];
+  if(wr){s.writes++;s.wb+=bytes;if(addr<0x200000){s.chipw++;s.chipwb+=bytes;}}
+@@ -23,5 +26,6 @@
+  for(auto &v:tfx_calls)fprintf(f,"call,%u,%u,%llu\n",v.first.first,v.first.second,v.second);
+  for(auto &v:tfx_exceptions)fprintf(f,"exception,%u,%u,%u,%u,%llu\n",std::get<0>(v.first),std::get<1>(v.first),std::get<2>(v.first),std::get<3>(v.first),v.second);
+  for(auto &v:tfx_cache)fprintf(f,"cache,%u,%u,%llu\n",v.first.first,v.first.second,v.second);
++ for(auto &r:tfx_math)fprintf(f,"math,%u,%u,%u,%u,%u,%u,%u\n",r[0],r[1],r[2],r[3],r[4],r[5],r[6]);
+  fclose(f);
+ }
+--- a/src/newcpu.cpp
++++ b/src/newcpu.cpp
+@@ -5975,7 +5975,17 @@
+                 tfx_pc=m68k_getpc();
+                 bool tp=tfx_on;
+                 TfxStat *ts=tp?&tfx_stats[tfx_pc]:nullptr;
+-                if(tp){ts->n++;if(tfx_pc==tfx_base+0x4c474)tfx_frame++;}
++                if(tp){
++ unsigned off=tfx_pc-tfx_base;
++ if(off==0x50f82 || off==0x5169e || off==0x516b6 || off==0x517a4 || off==0x517f2 || off==0x5183c) {
++  uae_u32 a,b,c; fpdata tmp=regs.fp[off==0x517a4?1:7]; fpp_from_exten_fmovem(&tmp,&a,&b,&c);
++  tfx_math.push_back({tfx_frame,off,0,a,b,c,regs.fpcr});
++ }
++ if(off==0x50f86 || off==0x516a2 || off==0x516ba || off==0x517a8 || off==0x517f6 || off==0x51840) {
++  uae_u32 a,b,c; fpdata tmp=regs.fp[off==0x517a8?5:0]; fpp_from_exten_fmovem(&tmp,&a,&b,&c);
++  tfx_math.push_back({tfx_frame,off-4,1,a,b,c,regs.fpcr});
++ }
++ ts->n++;if(tfx_pc==tfx_base+0x4c474)tfx_frame++;}
+ 				r->instruction_pc = m68k_getpc();
+ 				r->opcode = get_iword_cache_040(0);
+ 				// "prefetch"

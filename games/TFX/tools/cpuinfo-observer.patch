@@ -1,0 +1,17 @@
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -734,6 +734,14 @@
+ 											response += inputdevice_uaelib(name, value, 1, false) ? "OK" : "E02";
+ 										else
+ 											response += "E01";
++									} else if(cmd == "cpuinfo") {
++                                        // Read-only metadata; no guest instruction or cache operation.
++                                        char info[512];
++                                        snprintf(info, sizeof(info), "cpu=%d fpu=%d mmu=%d frequency=%d cycleunit=%d baseclock=%d cacr=%08x tc=%08x compatible=%d cycle_exact=%d memory_cycle_exact=%d\n",
++                                            currprefs.cpu_model, currprefs.fpu_model, currprefs.mmu_model,
++                                            currprefs.cpu_frequency, cpucycleunit, (int)baseclock, regs.cacr, regs.tcr,
++                                            currprefs.cpu_compatible, currprefs.cpu_cycle_exact, currprefs.cpu_memory_cycle_exact);
++                                        response += to_hex(info);
+ 									} else if(cmd == "harness") {
+ 										// AmigaXDev harness: capability list; builds without it reply E01.
+ 										response += to_hex("key fields mouse input\n");

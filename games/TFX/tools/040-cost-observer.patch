@@ -1,0 +1,162 @@
+--- a/src/newcpu.cpp
++++ b/src/newcpu.cpp
+@@ -223,6 +223,7 @@
+ 	}
+ };
+ // BARTO-END
++#include "tfx_profile.h"
+ 
+ const int areg_byteinc[] = { 1, 1, 1, 1, 1, 1, 1, 2 };
+ const int imm8_table[] = { 8, 1, 2, 3, 4, 5, 6, 7 };
+@@ -3471,6 +3472,7 @@
+ // address = format $2 stack frame address field
+ static void ExceptionX (int nr, uaecptr address, uaecptr oldpc)
+ {
++ if(tfx_on)tfx_exceptions[{tfx_frame,(unsigned)nr,regs.instruction_pc,(unsigned)regs.opcode}]++;
+ 	uaecptr pc = m68k_getpc();
+ 	regs.exception = nr;
+ 	regs.loop_mode = 0;
+@@ -5970,6 +5972,10 @@
+ 		TRY(prb) {
+ 			while (!exit) {
+ 				evt_t c = get_cycles();
++                tfx_pc=m68k_getpc();
++                bool tp=tfx_on;
++                TfxStat *ts=tp?&tfx_stats[tfx_pc]:nullptr;
++                if(tp){ts->n++;if(tfx_pc==tfx_base+0x4c474)tfx_frame++;}
+ 				r->instruction_pc = m68k_getpc();
+ 				r->opcode = get_iword_cache_040(0);
+ 				// "prefetch"
+@@ -5980,14 +5986,20 @@
+ 					debug_trainer_match();
+ 				}
+ 
+-				(*cpufunctbl_noret[r->opcode])(r->opcode);
++				evt_t tf=get_cycles();
++                if(tp && (r->opcode & 0xff00)==0xf400)tfx_cache[{tfx_frame,tfx_pc}]++;
++                unsigned top=r->opcode;
++                (*cpufunctbl_noret[r->opcode])(r->opcode);
++                evt_t tb=get_cycles();
++                if(tp && ((top&0xffc0)==0x4e80 || (top&0xff00)==0x6100))tfx_calls[{tfx_pc,m68k_getpc()}]++;
+ 
+ 				if (r->spcflags) {
+ 					if (do_specialties (0))
+ 						exit = true;
+ 				}
+ 
+-				// workaround for situation when all accesses are cached
++				evt_t tx=get_cycles();
++                // workaround for situation when all accesses are cached
+ 				if (c == get_cycles()) {
+ 					extracycles++;
+ 					if (extracycles >= 4) {
+@@ -5996,7 +6008,8 @@
+ 					}
+ 				}
+ 
+-				regs.instruction_cnt++;
++				if(tp){ts->fetch+=tf-c;ts->body+=tb-tf;ts->special+=tx-tb;ts->pad+=get_cycles()-tx;}
++                regs.instruction_cnt++;
+ 			}
+ 		} CATCH(prb) {
+ 			bus_error();
+@@ -9752,6 +9765,7 @@
+ 
+ void put_long_cache_040(uaecptr addr, uae_u32 v)
+ {
++ tfx_mem(addr,4,true);
+ 	int offset = addr & 15;
+ 	// access must not cross cachelines
+ 	if (offset < 13) {
+@@ -9767,6 +9781,7 @@
+ }
+ void put_word_cache_040(uaecptr addr, uae_u32 v)
+ {
++ tfx_mem(addr,2,true);
+ 	int offset = addr & 15;
+ 	if (offset < 15) {
+ 		write_dcache040(addr, v, 1, dcache_wput);
+@@ -9777,11 +9792,13 @@
+ }
+ void put_byte_cache_040(uaecptr addr, uae_u32 v)
+ {
++ tfx_mem(addr,1,true);
+ 	write_dcache040(addr, v, 0, dcache_bput);
+ }
+ 
+ uae_u32 get_long_cache_040(uaecptr addr)
+ {
++ tfx_mem(addr,4,false);
+ 	uae_u32 v;
+ 	int offset = addr & 15;
+ 	if (offset < 13) {
+@@ -9798,6 +9815,7 @@
+ }
+ uae_u32 get_word_cache_040(uaecptr addr)
+ {
++ tfx_mem(addr,2,false);
+ 	uae_u32 v;
+ 	int offset = addr & 15;
+ 	if (offset < 15) {
+@@ -9810,6 +9828,7 @@
+ }
+ uae_u32 get_byte_cache_040(uaecptr addr)
+ {
++ tfx_mem(addr,1,false);
+ 	return read_dcache040(addr, 0, dcache_bget);
+ }
+ uae_u32 next_iword_cache040(void)
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -99,6 +99,8 @@
+ // -s input.config=1 -s input.1.keyboard.0.button.41.GRAVE=SPC_SINGLESTEP.0    -s use_gui=no -s quickstart=a500,1 -s debugging_features=gdbserver -s filesystem=rw,dh0:c:\Users\Chuck\Documents\Visual_Studio_Code\amiga-debug\bin\dh0
+ // c:\Users\Chuck\Documents\Visual_Studio_Code\amiga-debug\bin\opt\bin> m68k-amiga-elf-gdb.exe -ex "set debug remote 1" -ex "target remote :2345" -ex "monitor profile xxx" ..\..\..\template\a.mingw.elf
+ 
++extern void tfx_start(unsigned);
++extern void tfx_save(const char*);
+ namespace barto_gdbserver {
+ 	bool is_connected();
+ 	bool data_available();
+@@ -734,7 +736,11 @@
+ 											response += inputdevice_uaelib(name, value, 1, false) ? "OK" : "E02";
+ 										else
+ 											response += "E01";
+-									} else if(cmd == "cpuinfo") {
++									} else if(cmd.find("tfxstart ")==0) {
++                                        ::tfx_start(strtoul(cmd.c_str()+9,nullptr,0)); response += "OK";
++                                    } else if(cmd.find("tfxsave ")==0) {
++                                        ::tfx_save(cmd.c_str()+8); response += "OK";
++                                    } else if(cmd == "cpuinfo") {
+                                         // Read-only metadata; no guest instruction or cache operation.
+                                         char info[512];
+                                         snprintf(info, sizeof(info), "cpu=%d fpu=%d mmu=%d frequency=%d cycleunit=%d baseclock=%d cacr=%08x tc=%08x compatible=%d cycle_exact=%d memory_cycle_exact=%d\n",
+--- /dev/null
++++ b/src/tfx_profile.h
+@@ -0,0 +1,27 @@
++
++#include <map>
++#include <tuple>
++#include <cstdio>
++struct TfxStat { unsigned long long n=0, fetch=0, body=0, special=0, pad=0, reads=0, writes=0, rb=0, wb=0, chipr=0, chipw=0, chiprb=0, chipwb=0; };
++static bool tfx_on=false;
++static uae_u32 tfx_pc=0,tfx_base=0,tfx_frame=0;
++static unsigned long long tfx_begin=0;
++static std::map<uae_u32,TfxStat> tfx_stats;
++static std::map<std::pair<uae_u32,uae_u32>,unsigned long long> tfx_calls;
++static std::map<std::tuple<unsigned,unsigned,unsigned,unsigned>,unsigned long long> tfx_exceptions;
++static std::map<std::pair<unsigned,unsigned>,unsigned long long> tfx_cache;
++void tfx_start(unsigned base) { tfx_stats.clear();tfx_calls.clear();tfx_exceptions.clear();tfx_cache.clear();tfx_base=base;tfx_frame=0;tfx_begin=get_cycles();tfx_on=true; }
++static void tfx_mem(uae_u32 addr,unsigned bytes,bool wr) {
++ if(!tfx_on)return; auto &s=tfx_stats[tfx_pc];
++ if(wr){s.writes++;s.wb+=bytes;if(addr<0x200000){s.chipw++;s.chipwb+=bytes;}}
++ else{s.reads++;s.rb+=bytes;if(addr<0x200000){s.chipr++;s.chiprb+=bytes;}}
++}
++void tfx_save(const char *path) {
++ tfx_on=false; FILE*f=fopen(path,"w");if(!f)return;
++ fprintf(f,"meta,%llu,%llu,%u,%d,%d\n",tfx_begin,(unsigned long long)get_cycles(),tfx_frame,cpucycleunit,currprefs.fpu_no_unimplemented);
++ for(auto &v:tfx_stats){auto&s=v.second;fprintf(f,"pc,%u,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n",v.first,s.n,s.fetch,s.body,s.special,s.pad,s.reads,s.writes,s.rb,s.wb,s.chipr,s.chipw,s.chiprb,s.chipwb);}
++ for(auto &v:tfx_calls)fprintf(f,"call,%u,%u,%llu\n",v.first.first,v.first.second,v.second);
++ for(auto &v:tfx_exceptions)fprintf(f,"exception,%u,%u,%u,%u,%llu\n",std::get<0>(v.first),std::get<1>(v.first),std::get<2>(v.first),std::get<3>(v.first),v.second);
++ for(auto &v:tfx_cache)fprintf(f,"cache,%u,%u,%llu\n",v.first.first,v.first.second,v.second);
++ fclose(f);
++}

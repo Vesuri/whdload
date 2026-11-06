@@ -1,0 +1,88 @@
+{
+ "description": "Views fixture: flight.tape.json enrolment and right-bank input, then F2/F3/F5/F6 view requests (4-swap holds) and F1 back to cockpit, by swap index.",
+ "enrolment": [
+  32,
+  53,
+  51
+ ],
+ "key_hold_fields": 8,
+ "key_release_fields": 20,
+ "flight_inputs": [
+  {
+   "swap": 10,
+   "event": "JOY2_RIGHT",
+   "value": 1
+  },
+  {
+   "swap": 20,
+   "event": "JOY2_RIGHT",
+   "value": 0
+  },
+  {
+   "swap": 60,
+   "event": "KEY",
+   "key": 81,
+   "value": 1
+  },
+  {
+   "swap": 64,
+   "event": "KEY",
+   "key": 81,
+   "value": 0
+  },
+  {
+   "swap": 160,
+   "event": "KEY",
+   "key": 82,
+   "value": 1
+  },
+  {
+   "swap": 164,
+   "event": "KEY",
+   "key": 82,
+   "value": 0
+  },
+  {
+   "swap": 260,
+   "event": "KEY",
+   "key": 84,
+   "value": 1
+  },
+  {
+   "swap": 264,
+   "event": "KEY",
+   "key": 84,
+   "value": 0
+  },
+  {
+   "swap": 360,
+   "event": "KEY",
+   "key": 85,
+   "value": 1
+  },
+  {
+   "swap": 364,
+   "event": "KEY",
+   "key": 85,
+   "value": 0
+  },
+  {
+   "swap": 460,
+   "event": "KEY",
+   "key": 80,
+   "value": 1
+  },
+  {
+   "swap": 464,
+   "event": "KEY",
+   "key": 80,
+   "value": 0
+  }
+ ],
+ "checkpoints": [
+  1,
+  10,
+  20,
+  30
+ ]
+}
