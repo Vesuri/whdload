@@ -16,8 +16,8 @@ meta=json.loads((a.capture/'state/metadata.json').read_text())
 code=meta['code_base']-a.base
 mem=(a.capture/'code.bin').read_bytes()
 cases=0
-lines=[] if a.render_only else (root/'whdload/simulation-patches.i').read_text().splitlines()
-lines += [line for line in (root/'whdload/TestDrive2HD.s').read_text().splitlines()
+lines=[] if a.render_only else (root/'src/simulation-patches.i').read_text().splitlines()
+lines += [line for line in (root/'src/TestDrive2HD.s').read_text().splitlines()
           if 'render_subunit_' in line and 'PL_' in line]
 for line in lines:
     m=re.search(r'PL_(PSS|PS|P|NOP|W|L|S)\s+\$([0-9a-f]+),([^;]+)',line)

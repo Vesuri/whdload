@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Read duel v1's data hunk at successive VBL entries; never write game memory.
 Run while td2 is stopped at the race anchor. All dumps go through a space-free
-private /tmp directory because the stub's gdb cannot quote dump file names.
+private temporary directory because the stub's gdb cannot quote dump file names.
   state_fields.py FIELDS OUTDIR CODE.bin BASE
 The first snapshot precedes field 0; subsequent snapshots are at VBL-server entry.
 """

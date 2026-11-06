@@ -1,8 +1,8 @@
-# WHDLoad 20.0 source baseline
+# WHDLoad source baseline
 
-Public-domain KickEmu sources and API headers from the official WHDLoad 20.0
-developer archive (https://www.whdload.de). The build takes them from the shared
-WHDLoad 20.0 tree (`$WHDLOAD`); the release's source/ ships verbatim copies of
+Public-domain KickEmu sources and API headers from the official WHDLoad developer
+archive (https://www.whdload.de). The build takes them from the WHDLoad tree it is
+built against (`$WHDLOAD`); the release's source/ ships verbatim copies of
 `kick13.s`, `kickfs.s`, `segtracker.s`, `kick.readme`, `include/whdload.i` and
 `include/whdmacros.i`. The small `include/lvo/` aliases adapt the official
 source's include names to the host NDK.

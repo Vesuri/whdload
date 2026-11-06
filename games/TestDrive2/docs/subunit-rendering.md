@@ -3,7 +3,7 @@
 Enhanced framerate (`CUSTOM2` nonzero) projects the road and cars at fractional positions in
 both views and smooths sideways motion and hill crests. `CUSTOM2=0` keeps original rendering.
 The optional hooks (nine calls and the walker branch) patch duel v1 only. Code:
-`whdload/render.s`. The original renderer is described in [game.md](game.md).
+`src/render.s`. The original renderer is described in [game.md](game.md).
 
 ## Road and first-segment integration
 

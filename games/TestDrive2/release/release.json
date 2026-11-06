@@ -1,0 +1,32 @@
+{
+  "archives": [
+    {
+      "input": "TestDrive2.lha",
+      "output": "TestDrive2Enhanced-{version}.lha",
+      "replace": {
+        "TestDrive2Install/TestDrive2.slave": "build:TestDrive2",
+        "TestDrive2Install/readme": "release/readme",
+        "TestDrive2Install/TestDrive2.exoticon": "release/TestDrive2.exoticon",
+        "TestDrive2Install/source/TestDrive2HD.s": "src/TestDrive2HD.s"
+      },
+      "add": {
+        "TestDrive2Install/source/simulation.s": "src/simulation.s",
+        "TestDrive2Install/source/simulation-patches.i": "src/simulation-patches.i",
+        "TestDrive2Install/source/simulation-verify.s": "src/simulation-verify.s",
+        "TestDrive2Install/source/render.s": "src/render.s",
+        "TestDrive2Install/source/include/lvo/dos.i": "src/include/lvo/dos.i",
+        "TestDrive2Install/source/include/lvo/exec.i": "src/include/lvo/exec.i",
+        "TestDrive2Install/source/include/lvo/expansion.i": "src/include/lvo/expansion.i",
+        "TestDrive2Install/source/include/lvo/graphics.i": "src/include/lvo/graphics.i",
+        "TestDrive2Install/source/include/whdload.i": "tmp/release/whdload/Include/whdload.i",
+        "TestDrive2Install/source/include/whdmacros.i": "tmp/release/whdload/Include/whdmacros.i",
+        "TestDrive2Install/source/whdload/kick13.s": "tmp/release/whdload/Src/sources/whdload/kick13.s",
+        "TestDrive2Install/source/whdload/kickfs.s": "tmp/release/whdload/Src/sources/whdload/kickfs.s",
+        "TestDrive2Install/source/whdload/segtracker.s": "tmp/release/whdload/Src/sources/whdload/segtracker.s",
+        "TestDrive2Install/source/whdload/kick.readme": "tmp/release/whdload/Src/sources/whdload/kick.readme",
+        "TestDrive2Install/source/whdload/README.md": "release/whdload-README.md"
+      },
+      "remove": []
+    }
+  ]
+}

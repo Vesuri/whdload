@@ -1,37 +1,36 @@
 # Running, tracing and testing
 
 How to run the game in FS-UAE, trace it cycle-exactly, capture game state and check a slave
-change. Shared files and their variables are listed in the [README](../README.md#setup). All
-output goes to the ignored `tmp/`; never commit traces, dumps or screenshots.
+change. The inputs and the build are in [development.md](development.md); the shared run
+options in the repository's `docs/running.md`. All output goes to the ignored `tmp/`; never
+commit traces, dumps or screenshots.
 
 ## Machines
 
-`amiga/run.sh` boots a Kickstart 3.1 host (`KICKSTART`) from a directory DH0 plus the
-Workbench 2.04 floppy (`WORKBENCH_ADF`) for `C:` and `Libs:`. DH0's startup-sequence runs
-`WHDLoad TestDrive2.slave PRELOAD SPLASHDELAY=0 NOREQ` on DH1, a fresh copy of
-`tmp/game/TestDrive2` plus `WHDLOAD_BINARY`. The slave is a KickEmu slave: WHDLoad boots
-Kickstart 1.3 (`KICKSTART13` + `RTB`, copied to `DH0:devs/Kickstarts`) and LoadSegs `duel`
-under it. The slave needs WHDLoad 17.2 or later.
+`make run` (the repository's `common/run.sh`) boots a Kickstart 3.1 host (`KICKSTART`)
+from a directory DH0 plus the Workbench 2.04 floppy (`WORKBENCH_ADF`) for `C:` and `Libs:`.
+DH0's startup-sequence runs `WHDLoad TestDrive2.slave PRELOAD SPLASHDELAY=0 NOREQ` on DH1, a
+fresh copy of `tmp/game/TestDrive2` plus `WHDLOAD_BINARY`, in `tmp/run/<instance>/.run`. The
+slave is a KickEmu slave: WHDLoad boots Kickstart 1.3 (`kick34005.A500` + `.RTB`, copied to
+`DH0:devs/Kickstarts`) and LoadSegs `duel` under it. The slave needs WHDLoad 17.2 or later.
 
-| Variable | run.sh default | Meaning |
-|---|---|---|
-| `AMIGA_MODEL` | A500 | FS-UAE model; set `CPU` too when changing it |
-| `CPU` | 68000 | |
-| `CHIP_KB` / `FAST_KB` | 1024 / 2048 | chip RAM / fast RAM at `$200000` |
-| `EXTRA_ARGS` | — | extra FS-UAE options, e.g. `--slow_memory=1536` |
-| `SLAVE` | the installed slave | run another build (absolute path) |
-| `WHD_ARGS` | — | WHDLoad options, e.g. `CUSTOM2=1` |
-| `WARP`, `SILENT`, `DEBUG`, `DETERMINISTIC` | 0 | warp speed, no audio, gdb stub, FS-UAE `--deterministic` |
-| `SOUND`, `WINDOW` | 1, `front`; 0, `back` with `DEBUG` or `WARP` | audio on/off; window in front, behind the others, or `none` (no video) |
-| `RECORD` | — | FS-UAE input recording file (see Input) |
+`make run` builds and runs the release slave; `SLAVE=original` runs the installed v1.5 slave
+and `SLAVE=path` any other. The default machine (`game.conf`) is an A500 (68000) with 1 MB
+chip, 2 MB fast at `$200000` and 512 KB slow RAM; `CPU`, `CHIP_KB`, `FAST_KB`, `SLOW_KB`,
+`EXTRA_ARGS` (extra FS-UAE options), `WHD_ARGS` (e.g. `CUSTOM2=1`), `WARP`, `DEBUG`,
+`DETERMINISTIC`, `SOUND`, `WINDOW` and `RECORD` are the shared run options.
 
-Reference machines (`tools/fixed_window.sh` uses the first by default):
+Reference machines (`TD_SETUP`, `game.sh`; `tools/fixed_window.sh` uses the first by default,
+with the variables below):
 
 | Machine | Settings |
 |---|---|
-| A500 | `CPU=68000 CHIP_KB=512 FAST_KB=0 EXTRA_ARGS=--slow_memory=1536`: every CPU access is on the chip bus, as on an A500. WHDLoad needs more than 1 MB in total, and slow RAM is contended like chip RAM, so this matches a stock A500's speed |
-| Expanded A1200 | `AMIGA_MODEL=A1200 CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 KICKSTART="$KICKSTART_A1200" EXTRA_ARGS=--slow_memory=0` (`amiga/run-a1200.sh` plays it) |
-| 68030/25 MHz | the A1200 settings with `CPU=68030 EXTRA_ARGS='--slow_memory=0 --uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency=25000000 --uae_cpu_cycle_exact=true'` (`amiga/run-68030.sh` plays it). This is an accelerated A1200, not an A4000 |
+| A500 (`TD_SETUP=a500`) | `CPU=68000 CHIP_KB=512 FAST_KB=0 SLOW_KB=1536`: every CPU access is on the chip bus, as on an A500. WHDLoad needs more than 1 MB in total, and slow RAM is contended like chip RAM, so this matches a stock A500's speed |
+| Expanded A1200 (`TD_SETUP=a1200`) | `AMIGA_MODEL=A1200 CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 SLOW_KB=0 KICKSTART="$KICKSTART_A1200"` |
+| 68030/25 MHz (`TD_SETUP=a1200-030`) | the A1200 settings with `CPU=68030 EXTRA_ARGS='--uae_cpu_speed=real --uae_cpu_multiplier=0 --uae_cpu_frequency=25000000 --uae_cpu_cycle_exact=true'`. This is an accelerated A1200, not an A4000 |
+
+`make run TD_SETUP=a1200 WHD_ARGS=CUSTOM2=1` plays the patched slave on the expanded A1200,
+`TD_SETUP=a1200-030` on the 68030.
 
 Each capture keeps the effective emulator configuration in `OUT/fsuae.log`; check CPU,
 frequency and timing mode there before reading anything into a frame rate.
@@ -39,7 +38,7 @@ frequency and timing mode there before reading anything into a frame rate.
 ## Driving the emulator: `tools/td2.py`
 
 ```sh
-WARP=1 python3 tools/td2.py serve > amiga/.run/serve.log 2>&1 &   # boots run.sh with DEBUG=1
+WARP=1 python3 tools/td2.py serve > tmp/serve.log 2>&1 &   # boots common/run.sh with DEBUG=1
 python3 tools/td2.py shot "$PWD/tmp/now.png"     # 1-field trace, keep its screenshot
 python3 tools/td2.py wait 2                      # let it run 2 s (wall)
 python3 tools/td2.py stop | cont
@@ -50,9 +49,10 @@ python3 tools/td2.py quit                        # kills gdb and our FS-UAE only
 ```
 
 The server holds one gdb on FS-UAE's Barto stub and serves one command per connection on
-`amiga/.run/td2.sock`. It is AmigaXDev's shared server (`amigaxdev.gdbserve`); the tools find
-that package through `tools/_amigaxdev.py`, and `python3 -m amigaxdev...` needs `. amiga/env.sh`
-first.
+`tmp/run/<instance>/.run/td2.sock`. It is AmigaXDev's shared server (`amigaxdev.gdbserve`)
+through the repository's `common/tools/game_server.py`; run it and the tools from the game
+directory. The tools find AmigaXDev's package through `tools/_amigaxdev.py`, and
+`python3 -m amigaxdev...` needs `. ../../common/env.sh` first.
 
 - **Attach within 20 s of launch.** With no trigger, the stub stops servicing its port for
   good after 20 s. `serve` connects as soon as the port listens, finds the CPU halted at the
@@ -61,11 +61,11 @@ first.
   measurements.
 - **The stub is read-only**: memory and register writes (`M`, `P`, `G`) are silently dropped.
   Input and patches come from the slave, never from gdb writes.
-- **gdb splits arguments at spaces**, and this repo's path has one: `dump binary memory`
-  writes through a space-free `/tmp` path and the tools move the file into `OUT`.
+- **gdb splits arguments at spaces**: `dump binary memory` paths must have none. The shell
+  tools dump straight into `OUT`, the Python ones through a private temporary directory.
 - `shot` is the only screenshot route: every trace field carries a PNG
   (`barto.Field.shot`). macOS denies this process screen capture and FS-UAE ignores posted
-  key events. F12+S in the emulator window saves to `amiga/.run/shots/`.
+  key events. F12+S in the emulator window saves to `tmp/shots/`.
 
 ## The profiler window fix (lldb)
 
@@ -147,7 +147,7 @@ and slave; `BOOT_HUNK` supplies a known address (checked against the dump).
 | `SERVE_WAIT=S` | boot timeout (default 180 s; 100 MHz emulated CPUs need ~1700) |
 | `ANCHOR=0x…` | diagnostic: a different hunk offset to stop at |
 
-For reproducible runs build `make -C whdload verify` and pass `WHD_ARGS=CUSTOM3=1`: the
+For reproducible runs build `make verify` and pass `WHD_ARGS=CUSTOM3=1`: the
 VERIFY patch removes the beam position from the RNG, so two boots give identical screenshots.
 Frame rates from windows that follow `STATE_FIELDS` samples describe that later interval.
 Treat differences under ±0.15 fps as noise and run each arm at least twice.
@@ -178,7 +178,8 @@ demos. Sample 0 of a capture can fall inside the demo's borrowed-state transacti
 Run what the change touches; a release runs all of it. `S` is the slave under test,
 `C="CUSTOM3=1"`.
 
-1. `make -C whdload` and `make -C whdload verify` assemble; `audit_simulation.py` reports no errors.
+1. `make check`: the release build matches `release/slaves.sha256`, `make verify` assembles
+   and `audit_simulation.py` reports no errors.
 2. VERIFY, `WHD_ARGS="CUSTOM2=1 $C CUSTOM5=16" STATE_FIELDS=100 STATE_ONLY=1`: `check_units.py` passes.
 3. VERIFY, `CUSTOM2=0 $C CUSTOM5=16`: `check_disabled.py` passes.
 4. Simulation: 1 800-field state captures (`CUSTOM5=1` tape, `CUSTOM5=3` damage) on the A500
@@ -203,7 +204,7 @@ Run what the change touches; a release runs all of it. `S` is the slave under te
 ## Input
 
 The attract demo drives itself, and VERIFY tapes cover scripted driving. FS-UAE input
-recordings also work (`RECORD=file amiga/run.sh`, forces `--deterministic=1`, written on
+recordings also work (`make run RECORD=file`, forces `--deterministic=1`, written on
 SIGTERM). The stream is big-endian uint32: per frame `0x80000000|frame`,
 `0x10000000|rand checksum`, `0x08000000|state checksum`; events `0x40000000|line` then
 `0x20000000|state<<16|event`. A rand-checksum mismatch invalidates playback, a state mismatch
@@ -213,10 +214,10 @@ only notifies, so events can be spliced into an idle recording. This binary's ev
 ## Traps
 
 - Read-only Kickstart files are copied with their mode; FS-UAE then exposes them
-  write-protected and WHDLoad loops on DOS error 223. `run.sh` does `chmod -R u+w`.
+  write-protected and WHDLoad loops on DOS error 223. `common/run.sh` does `chmod -R u+w`.
 - The WHDLoad splash stays up while PRELOAD reads the data; that is not a hang.
 - FS-UAE's default `Cache/Logs/fs-uae.log.txt` is shared by every FS-UAE instance and
-  block-buffered; our log is `amiga/.run/fsuae.log`.
+  block-buffered; ours is `tmp/run/<instance>/.run/fsuae.log`.
 - A trace that has left the demo (Accolade logo) genuinely idles; check screenshots and that
   PCs are present before trusting a trace.
 - Never `pkill fs-uae`: `fsuae_common.sh` kills only this checkout's emulator.

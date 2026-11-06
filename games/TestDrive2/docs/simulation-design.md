@@ -2,7 +2,7 @@
 
 Enhanced framerate (`CUSTOM2` nonzero) keeps the game's own priority-4 simulation process
 (see [game.md](game.md)) and changes how often it steps and how each step integrates. Code:
-`whdload/simulation.s`, patch list `whdload/simulation-patches.i`.
+`src/simulation.s`, patch list `src/simulation-patches.i`.
 
 ## Period
 
@@ -85,7 +85,7 @@ by design (recovery and clock). PAL is validated; NTSC is not (see [open-work.md
 
 ## Verification hooks
 
-`make -C whdload verify` adds `CUSTOM3` (reproducible RNG), `CUSTOM4` (deliberately slow
+`make verify` adds `CUSTOM3` (reproducible RNG), `CUSTOM4` (deliberately slow
 drawing) and `CUSTOM5` fixtures, all run inside the slave without debugger writes:
 
 | `CUSTOM5` bit | Fixture |

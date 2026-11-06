@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Benchmark window: trace FIELDS PAL fields from race-clock initialisation in duel v1.
 # tools/fixed_window.sh OUTDIR [SLAVE]
-# Build `make -C whdload verify`, use SLAVE=$PWD/whdload/TestDrive2.slave and
+# Build `make verify`, use SLAVE=$PWD/tmp/build/verify/TestDrive2.Slave and
 # WHD_ARGS=CUSTOM3=1 for the reproducibility study. ANCHOR overrides the hunk offset
 # for diagnostic windows only. See docs/testing.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+RUN="tmp/run/${INSTANCE:-default}/.run"; mkdir -p "$RUN"
 OUT=$1; mkdir -p "$OUT"; FIELDS=${FIELDS:-100}
 export CHIP_KB="${CHIP_KB:-512}" FAST_KB="${FAST_KB:-0}" EXTRA_ARGS="${EXTRA_ARGS---slow_memory=1536}"
 # Retain exactly the slave used by this capture; later builds must not change
@@ -17,6 +18,7 @@ fi
 export DETERMINISTIC=1 SLAVE="$PWD/$OUT/slave.slave" CPU="${CPU:-68000}"
 # The code is loaded into "other" memory: fast RAM at $200000 when there is any, else slow RAM.
 SLOW_KB=$(sed -n 's/.*--slow_memory=\([0-9]*\).*/\1/p' <<< "$EXTRA_ARGS")
+export SLOW_KB
 if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB * 1024))
 else BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024)); fi
 # Cache only the address, keyed by machine, arguments and slave build. A calibration
@@ -28,28 +30,28 @@ BOOT_HUNK=${BOOT_HUNK:-$(cat "$CACHE" 2>/dev/null || true)}
 if [ -n "$BOOT_HUNK" ]; then export BOOT_BREAK=$(printf '%#x' $((BOOT_HUNK + ${ANCHOR:-0xbbf8}))); fi
 td2() { python3 tools/td2.py "$@"; }
 retain_log() {
-  cp amiga/.run/fsuae.log "$OUT/fsuae-stdout.log"
+  cp $RUN/fsuae.log "$OUT/fsuae-stdout.log"
   local logfile
-  logfile=$(sed -n 's/^LOGFILE: //p' amiga/.run/fsuae.log | tail -1)
+  logfile=$(sed -n 's/^LOGFILE: //p' $RUN/fsuae.log | tail -1)
   if [ -n "$logfile" ] && [ -f "$logfile" ]; then
     cp "$logfile" "$OUT/fsuae.log"
   else
-    cp amiga/.run/fsuae.log "$OUT/fsuae.log"
+    cp $RUN/fsuae.log "$OUT/fsuae.log"
   fi
 }
-[ -S amiga/.run/td2.sock ] && { td2 quit > /dev/null 2>&1 || true; sleep 1; }
-rm -f amiga/.run/serve.log "$OUT/trace.bin"
-WARP=1 python3 tools/td2.py serve > amiga/.run/serve.log 2>&1 &
+[ -S "$RUN/td2.sock" ] && { td2 quit > /dev/null 2>&1 || true; sleep 1; }
+rm -f $RUN/serve.log "$OUT/trace.bin"
+WARP=1 python3 tools/td2.py serve > $RUN/serve.log 2>&1 &
 trap 'td2 quit > /dev/null 2>&1 || true' EXIT
 SERVER=$!
 for _ in $(seq 1 "${SERVE_WAIT:-180}"); do
-  grep -q serving amiga/.run/serve.log 2>/dev/null && break
-  kill -0 "$SERVER" 2>/dev/null || { cat amiga/.run/serve.log >&2; exit 1; }
+  grep -q serving $RUN/serve.log 2>/dev/null && break
+  kill -0 "$SERVER" 2>/dev/null || { cat $RUN/serve.log >&2; exit 1; }
   sleep 1
 done
-grep -q serving amiga/.run/serve.log || { echo "race breakpoint not reached" >&2; exit 1; }
+grep -q serving $RUN/serve.log || { echo "race breakpoint not reached" >&2; exit 1; }
 
-dump() { td2 gdb "dump binary memory /tmp/td2-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; mv /tmp/td2-code.bin "$OUT/code.bin"; }
+dump() { td2 gdb "dump binary memory $PWD/$OUT/code.bin $BASE $(printf '%#x' $((BASE + SIZE)))" > /dev/null; }
 hunk=
 for _ in $(seq 1 60); do
   [ -n "$BOOT_HUNK" ] || td2 wait 1 > /dev/null
