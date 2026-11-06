@@ -5,7 +5,9 @@ Duel*, built on JOTD's public-domain v1.5 slave. The "Enhanced framerate" option
 time independent of the CPU and draws the road and cars smoothly; the game itself is
 unchanged and the original remains one option away.
 
-Slave 1.6b (an unreleased beta of 1.6) runs with WHDLoad 17.2 or later.
+Slave 1.6b (an unreleased beta of 1.6) runs with WHDLoad 17.2 or later. JOTD merged this
+work upstream and released it as his 2.1 (11.10.2026), the same source with his version
+string ([open-work.md](open-work.md)).
 
 ## Enhanced framerate (`CUSTOM2`, duel v1)
 
@@ -14,8 +16,9 @@ WHDLoad options have no default, so the release's game icon carries the tooltype
 
 - The simulation runs on a fixed PAL period, independently of drawing: every 6 fields (8.33 Hz,
   the original) on a 68000, every 2 fields (25 Hz) on a 68020+. Race time follows real time.
-- A crash or engine damage costs 240 fields and a 20-second penalty while the opponent and the
-  clock keep running, instead of a recovery whose length depended on the CPU.
+- A crash or engine damage takes the original path: its screens, the lost life, the
+  acknowledgement and the 20-second penalty. The field-timed automatic recovery is a VERIFY
+  instrument only ([simulation-design.md](simulation-design.md#recovery)).
 - The blitter gets bus priority and unused blitter interrupts are suppressed.
 - Road and cars are projected at fractional positions in both views; steering, lane position,
   mountains and hill crests move smoothly.
@@ -23,8 +26,9 @@ WHDLoad options have no default, so the release's game icon carries the tooltype
 First race: A500 7.1 fps (original 6.1), A1200 16.7 fps, 68030/25 MHz 25 fps (the chip-bus
 cap). Independently of the option, the slave fixes an original bug in duel v1: each intro car
 jumped 16 pixels left for one frame, because the copper changed DDFSTOP after that line's stop
-had passed (`intro_ddfstop_close` in `src/TestDrive2HD.s`). `CUSTOM1=1` is JOTD's
-infinite-lives trainer.
+had passed (`intro_ddfstop_close` in `src/TestDrive2HD.s`), and it flushes the caches after
+the overlay manager rewrites its call stubs, which black-screened a 68040
+([game.md](game.md#overlay-loader-and-caches)). `CUSTOM1=1` is JOTD's infinite-lives trainer.
 
 ## Files
 

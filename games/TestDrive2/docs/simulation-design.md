@@ -59,8 +59,10 @@ original routine.
 ## Recovery
 
 The original nonfatal crash and engine-damage path blocks the simulation while it animates
-and waits for acknowledgement, so the CPU speed decided when motion resumed. The replacement
-is field-timed: 240 fields (4.8 s) with the player stopped and the engine idling, one life
+and waits for acknowledgement, so the CPU speed decided when motion resumed. Release builds
+keep it, with Enhanced framerate too: its screens, lives, acknowledgement and restart path
+are part of the game. The field-timed replacement is a VERIFY instrument, patched in only
+with `CUSTOM1` bit 1 (`CUSTOM1=2`, `CUSTOM1=3` with the trainer): 240 fields (4.8 s) with the player stopped and the engine idling, one life
 lost (none with the `CUSTOM1` trainer) and one 20-second penalty, while opponents, traffic
 and the clock keep running and the renderer shows the message. Terminal damage, a fatal crash
 or the last life take the original race-end path; a fatal crash overrides a recovery in

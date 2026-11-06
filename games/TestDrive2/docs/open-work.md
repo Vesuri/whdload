@@ -3,7 +3,9 @@
 The goal: game time (car motion, opponents, clock, sound) independent of the CPU, with
 rendering as fast and as smooth as the machine allows, shipped as WHDLoad slave patches for
 `duel` v1. Slave 1.6b (an unreleased beta of 1.6) does this behind "Enhanced framerate"
-(`CUSTOM2`). How it works: [simulation-design.md](simulation-design.md),
+(`CUSTOM2`). JOTD merged it upstream (with his version 2.0, then 2.1 for the cache flush) and
+released it as 2.1 (11.10.2026); `src/` is that source with the version string 1.6b, so
+there is nothing to release here unless new work follows. How it works: [simulation-design.md](simulation-design.md),
 [subunit-rendering.md](subunit-rendering.md); the game itself: [game.md](game.md).
 
 ## Working rules
@@ -31,9 +33,8 @@ rendering as fast and as smooth as the machine allows, shipped as WHDLoad slave 
    but the saved loader stack uses a byte of that JMP target as overlay index 205 and
    requests the invalid seek `$67504879`. See [game.md](game.md#overlay-loader-and-caches).
    The user confirmed that flushing caches at both overlay rewrite exits fixes the
-   real 68040. The production change is submitted as
-   [upstream PR #25](https://github.com/jotd666/whdload_slaves/pull/25), enabled automatically
-   for v1 independently of Enhanced framerate. Final PR builds reach the race with an
+   real 68040. The slave now flushes there for v1 independently of Enhanced framerate
+   (upstream [PR #25](https://github.com/jotd666/whdload_slaves/pull/25), released in JOTD's 2.1). Final PR builds reach the race with an
    emulated 68040/MMU in both modes; 129 VERIFY assertions and the timing check pass.
    The earlier A4000/68060 report affects both JOTD's original slave and 1.6b. Whether it
    has the same cause remains unverified; accelerator/ROM/WHDLoad details are still needed.

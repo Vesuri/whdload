@@ -133,6 +133,6 @@ The fix replaces the two six-byte restore/return sequences with slave helpers
 that call the official KickEmu `_flushcache` wrapper, then perform the displaced register
 restore and return. WHDLoad's `resload_FlushCache` preserves all registers and flushes both
 caches on 68040/68060. The user confirmed the diagnostic on the real A1200/68040.
-[Upstream PR #25](https://github.com/jotd666/whdload_slaves/pull/25) applies it automatically
-to v1 independently of Enhanced framerate; the diagnostic CUSTOM1 bit 2 toggle is removed.
+The slave applies it to v1 independently of Enhanced framerate (upstream
+[PR #25](https://github.com/jotd666/whdload_slaves/pull/25)); the diagnostic CUSTOM1 bit 2 toggle is removed.
 Real 68060 hardware remains unverified.

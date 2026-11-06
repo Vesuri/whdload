@@ -160,7 +160,7 @@ Treat differences under ±0.15 fps as noise and run each arm at least twice.
 | `check_disabled.py OUT [--render-only]` | with `CUSTOM2=0`, the 77 optional ranges (10 sub-unit) keep the original v1 bytes; needs `CUSTOM5` bit 0 off |
 | `audit_simulation.py tmp/game/TestDrive2/data/duel` | hook boundaries, overlaps and direct incoming branches (73 hooks); indirect entries need manual review |
 | `check_timing.py OUT/state --min-fields N [--period 6\|2] [--fatal-end]` | consecutive fields, deadline spacing, race clock against PAL time with penalties |
-| `check_recovery.py OUT/state [--trainer\|--damage]` | one life loss (none with the trainer), one penalty, 240 stationary fields at idle pitch |
+| `check_recovery.py OUT/state [--trainer\|--damage]` | the VERIFY automatic recovery (`CUSTOM1=2`, `3` with the trainer): one life loss (none with the trainer), one penalty, 240 stationary fields at idle pitch |
 | `check_terminal.py OUT/state` | the forced fatal crash takes the original terminal path |
 | `compare_state.py A/state B/state [--assert-core]` | raw state at identical VBL indices; `--assert-core` requires all 35 core variables to match |
 | `state_report.py`, `state_writers.py`, `state_watch.py`, `task_state.py` | inspect state, find writers in a trace, confirm them with watchpoints, read the Exec task nodes |
