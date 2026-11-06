@@ -8,10 +8,9 @@ Commands are the shared server's (AmigaXDev amigaxdev.gdbserve): stop, cont, gdb
 shot <png>, profile <fields> <bin>, wait <seconds>, until <addr>, quit.
 The run options of common/run.sh (SETUP, VARIANT, SLAVE, WHD_ARGS, INSTANCE, ...) apply to serve.
 """
-import os, subprocess, sys
+import os, sys
 from pathlib import Path
 import _amigaxdev  # noqa: F401 (finds amigaxdev)
-from amigaxdev.gdbserve import BASETEXT_VM
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
 from game_server import game_server  # noqa: E402
 
@@ -19,25 +18,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUN = os.path.join(ROOT, 'tmp/run', os.environ.get('INSTANCE') or 'default', '.run')
 SOCK = os.path.join(RUN, 'stellar7.sock')
 
-# The stub's profiler PC window (amigaxdev.gdbserve, BASETEXT_VM), set in one lldb attach.
-LLDB_FIX = (
-    'script t=lldb.debugger.GetSelectedTarget(); h=t.GetModuleAtIndex(0).GetObjectFileHeaderAddress(); '
-    'a=h.GetLoadAddress(t)-h.GetFileAddress()+%d; e=lldb.SBError(); p=t.GetProcess(); '
-    'p.WriteMemory(a, (0).to_bytes(4,"little")+(0x7fffffff).to_bytes(4,"little"), e); '
-    'print("WINDOW", p.ReadMemory(a, 8, e).hex())')
-
-
-def fix_profile_window(server):
-    # One attach that computes the slide and writes the window: each lldb attach to this
-    # x86_64 (Rosetta) process costs ~40 s, so the earlier image-list-then-write pair could
-    # exceed a 60 s timeout.
-    pid = open(os.path.join(RUN, 'fsuae.pid')).read().strip()
-    out = subprocess.run(['lldb', '-p', pid, '--batch', '-o', LLDB_FIX % BASETEXT_VM],
-                         capture_output=True, text=True, timeout=300).stdout
-    assert 'WINDOW 00000000ffffff7f' in out, out
-
-
-server = game_server('stellar7', profile_window=fix_profile_window)
+# The shared server fixes the stub's profiler PC window only for the x86_64 FS-UAE build;
+# the native build (it answers `monitor harness`) records PCs as it is.
+server = game_server('stellar7')
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])
