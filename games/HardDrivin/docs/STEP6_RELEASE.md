@@ -15,9 +15,11 @@ investigation. No game, Kickstart, WHDLoad or built-slave bytes are tracked.
   since 4.0b's release (2026-11-04, the user's choice; CUSTOM1=1 before); unchecked/0 restores
   the existing native simulation and renderer. Command-line use requires
   explicit CUSTOM1=1. No ambiguous distinction between absent and zero options.
-- CUSTOM2: existing frame delay, unchanged. The startup list offers 0 through 9;
-  existing numeric tooltypes remain supported. A nonzero delay retains the
-  original blitter-wait helper.
+- CUSTOM2: existing frame delay, listed as "Frame delay (Original simulation)". The
+  startup list offers 0 through 9; existing numeric tooltypes remain supported. It
+  applies with CUSTOM1=0 and on other editions; with the elapsed-time dispatcher
+  (CUSTOM1 nonzero) `_blitwait` skips the delay and the lean wait is selected
+  regardless of it. With CUSTOM1=0 a nonzero delay retains the original helper.
 - CUSTOM3 is ignored in release builds; it remains a development renderer mask.
 - New enhancements apply only to SPS 0126. Other editions keep their original
   patches. The installer retains all five editions, seven icon alternatives,
@@ -71,8 +73,8 @@ Additional checks:
   unchanged executable after gameplay and correct renderer patches. This is
   functional evidence only; its speed is not comparable with NOMMU timings.
 - Chip-only A1200: 200 fields, 33 swaps, native renderer selected despite
-  CUSTOM3=7. A Fast-RAM A1200 with CUSTOM2=1 retains the original wait helper
-  despite CUSTOM3=1; all 13 sites pass.
+  CUSTOM3=7. A Fast-RAM A1200 with CUSTOM2=1 retained the original wait helper
+  despite CUSTOM3=1 (before CUSTOM2 was ignored under CUSTOM1); all 13 sites pass.
 - Natural GAME OVER: 020 completes 105 presentation frames in exactly 280
   eligible fields; the final frame starts at field 277.
 - End-to-end 020 tape: 4,216 physics returns including 66 crash returns, replay

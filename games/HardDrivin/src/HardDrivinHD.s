@@ -1937,7 +1937,7 @@ slv_copy:	dc.b	"1989 Tengen / Atari / Domark",0
 
 slv_config:
 	dc.b "C1:L:Simulation:Original,Enhanced framerate,Enhanced framerate with arcade handling;"
-	dc.b "C2:L:Frame delay:None,1,2,3,4,5,6,7,8,9;"
+	dc.b "C2:L:Frame delay (Original simulation):None,1,2,3,4,5,6,7,8,9;"
 	IFD VERIFY_HANDLING
 	IFND VERIFY_SLOW
 	dc.b "C4:L:Arcade brake:Full,Soft;"

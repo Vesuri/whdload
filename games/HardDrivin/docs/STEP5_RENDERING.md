@@ -248,7 +248,8 @@ renderer while CUSTOM1 retains the accepted simulation. The measured policy is:
 
 These are the choices for step-6 patch-time CPU/memory selection, not new release
 options. The developer mask can still request an unselected experiment. CUSTOM2
-nonzero always retains the original wait. Other game versions and ordinary builds
+nonzero retains the original wait only with CUSTOM1=0; the dispatcher skips its
+delay, so with CUSTOM1 nonzero the lean wait is selected regardless. Other game versions and ordinary builds
 are unchanged. Fast edge-array placement is not selected on any profile.
 
 The final wait experiment has 42 runs: all seven profiles, both gameplay windows

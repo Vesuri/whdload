@@ -1,6 +1,7 @@
 ; SPS 0126 rendering optimizations, separately gated from elapsed-time physics.
 ; VERIFY_RENDER compiles the module. Developer CUSTOM3 bit 1 selects rotation
-; shortcuts; bit 2 selects lean blitter waits when CUSTOM2 is zero. Bit 0 is unused.
+; shortcuts; bit 2 selects lean blitter waits when CUSTOM2 is zero or the elapsed-time
+; dispatcher is on (it skips CUSTOM2's delay). Bit 0 is unused.
 ; Release builds select measured variants automatically under CUSTOM1.
 ; Other editions retain their original patches.
 
@@ -46,10 +47,19 @@ _render_install:
 	move.l _render_options(pc),d0
 	btst #2,d0
 	beq .restore
+	; CUSTOM2 slows only the original simulation: with the elapsed-time
+	; dispatcher on, _blitwait skips its delay, so it keeps no helper either.
+	IFD VERIFY_TIME_DISPATCH
+	lea _render_install(pc),a1
+	adda.l #_dispatch_state+DS_ENABLED-_render_install,a1
+	tst.b (a1)
+	bne.s .lean
+	ENDC
 	lea _render_install(pc),a1
 	adda.l #_ct_ct2-_render_install,a1
 	tst.l (a1)
 	bne .restore
+.lean:
 	; Redirect the existing game wait sites; do not patch WHDLoad slave memory.
 	lea _render_wait_patches(pc),a0
 	lea _render_install(pc),a1
@@ -172,7 +182,8 @@ _render_wait_patches:
 ; including CIA backoff while busy: tight polling slowed the A1200 blitter.
 ; Only the register spills and zero-delay option checks are removed. Final
 ; NZVC reflect the final DMACONR high byte; X remains unchanged. All CPUs use
-; 68000 instructions. CUSTOM2 nonzero retains the original helper.
+; 68000 instructions. CUSTOM2 nonzero retains the original helper only without the
+; elapsed-time dispatcher (CUSTOM1=0), where its delay is still applied.
 _render_wait:
 	BLITWAIT
 	rts

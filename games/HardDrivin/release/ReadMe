@@ -58,8 +58,10 @@
    Esc/F10 Quit to Workbench. F10 is the default WHDLoad QuitKey, which can
            be changed with the QuitKey tooltype.
 
- CUSTOM2 controls the existing frame delay: 0 gives maximum rendering speed;
- higher values slow rendering down.
+ Frame delay (CUSTOM2) slows a game that runs too fast on an accelerated
+ Amiga: 0 gives maximum speed; higher values slow the game down. It applies
+ to the original simulation and to other editions. The enhanced simulations
+ time the game by elapsed time and ignore it.
 
  The options below affect only the original SPS 0126 edition. Set them in
  the WHDLoad splash window or as tooltypes.
