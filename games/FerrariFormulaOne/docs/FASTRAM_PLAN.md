@@ -1904,8 +1904,10 @@ Tried for dense and dropped, against step 8:
   copy rose by the same; busy 20.8 ms both.
 - Two middle car words per longword step: 45.8 FPS, the draw 19.8 ms. About
   83 % of the middle words are opaque in the busiest variants, so this cut the
-  plane work in half where it runs, yet it lost; the bank and source pointers
-  are only word aligned (unverified cause). With it the fine payload grew
+  plane work in half where it runs, yet it lost. Not alignment: with the bank
+  long aligned on each row (one word first where needed; the longword path in
+  the eight variants dense uses) it was 45.66 FPS, the draw 19.9 ms. The cause
+  is unknown. With it the fine payload grew
   enough that `move.l public_table(pc),a0` in `FastRender.s` took the 32-bit
   displacement form in the second payload pass only (the build's bindings
   check stops); `(public_table.l,pc)` fixes that if the payload grows again.
