@@ -158,8 +158,6 @@
    through it
  - the frame delay (CUSTOM2) now applies only to the original simulation
  - fixed rare renderer crashes present in the original game
- - the installer is based on the WHDLoad Install Template and keeps all five
-   game editions and seven icon choices
 
  version 3.0 (23.03.2024) done by JOTD:
  - fixed keyboard on version SPS0126 (issue #0006342)
