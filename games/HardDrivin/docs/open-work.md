@@ -1,3 +1,44 @@
+# Cars and signs behind slopes, the car in replays (2026-11-06)
+
+The user's drives of 4.0b: on the stunt road past the barn (recording 09.28.11, 2:42-2:45)
+cars and a sign beyond the hill showed through its slope, and in replays (recording
+10.10.09, 1:17-1:30, 1:49-2:03) the player's car was often covered by blocks of the
+scenery's colour or vanished. Both are `_occ_car`/`_occ_solid` (4440c9fe), the repaint of a
+solid's faces after a car.
+
+- **Replays:** a face was filled when the car's centre was behind its plane at all, and for
+  a solid clipped at the camera whether or not the face was towards it, so a car on the road
+  across a coarse terrain face (1 to 58 units under it, radius 109) was covered by the face
+  clipped to its box. A face is now filled only when it is towards the camera and the whole
+  object is behind it (farther than its radius). The crash replay (`tmp/depth2/replay2.sh`:
+  A1200/040 NoMMU, the brown car hit at the top of the first hill, 36 frames) is now pixel
+  identical to the native draw order; the previous build differed in 13 frames.
+- **Slopes:** every object is tested, not only class 8 (`_occ_centre` keeps every
+  transformed object's centre), and the faces seen from above (ground) are no longer
+  skipped. The solid's own road sections ($FA58) are recorded by `_depth_collect`; after a
+  solid's faces are filled, its sections with the object wholly behind them (the same test
+  on the plane through three strip points) are filled again with their markings, which is
+  where the ground faces had been skipped for. Stopped at frames, `tmp/depth2/occtest.py`
+  prints each object's decision per face.
+- **Checked:** the stunt road drive past the barn (`tmp/depth2/drive.sh` with the plan in
+  `plan-t6.txt`: the right fork at field 260, the gas pulsed, off the road toward the barn
+  at field 600; A1200/040, 24 frames): 4.0b drew a grey car (2 frames) and a green car on
+  the slope that the build hides; the other 21 frames are identical. A car partly across a
+  face (63 of its 109 units under it) is still drawn as the native order draws it. The
+  straight drive along the main road past the barn is identical to 4.0b. The 2:45 sign was
+  not reproduced; signs now take the same test. The A500 drive was not run (the start
+  script's menu timing does not fit the A500).
+- **Cost (A500, CUSTOM1=2, fixtures padded to the same size, 4.0b's source against this):**
+  the depth and occlusion routines take 5.0 against 6.8 ms a frame in `lap-stunt` from field
+  600 (frames of about 200 ms) and 0.29 against 0.42 ms on C1c 60 (64.2 against 64.4 ms a
+  frame). The `lap-stunt` runs drift apart (45 and 50 frames), so whole frames are not
+  compared there. A first version without the two cuts (a face's facing tested before the
+  object's side; the road pass only after one of the solid's faces was filled) took 12.9 ms.
+- **Kept:** the skip of a car beyond the roads' last strip points (`_depth_extent`): it is
+  for cars on the grass past the road's end on the screen, not behind a solid.
+- **Seen, not changed:** in replays the orange centre markings appear only once the player
+  has passed them; the native draw order shows the same.
+
 # An access fault off the road (2026-11-06)
 
 Driving off the road up the slope after the barn (A1200/040, CUSTOM1=2, from the start with
