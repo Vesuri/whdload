@@ -1007,6 +1007,23 @@ _handling_reset:
 	movem.l (a7)+,d0/a1
 	rts
 
+; A new race or Phantom race ($59ba, $117f8 through _time_initial_scalars):
+; the state as at boot. The native engine's speedometer site (BA8A) publishes
+; HS_MPH and HS_TARGET on every pass, also before the model's first, so a race
+; aborted at speed (Q) showed its speed on the next race's gauges and drove
+; the car forward with its target speed before the start.
+_handling_new_race:
+	movem.l d0/a0,-(a7)
+	lea _handling_state(pc),a0
+	moveq #HS_SIZE/4-1,d0
+.clear:
+	clr.l (a0)+
+	dbf d0,.clear
+	lea _suspension_state(pc),a0
+	clr.w SU_VALID(a0)
+	movem.l (a7)+,d0/a0
+	rts
+
 ; A0 = state, HS_HELD set. With mouse control the right button is the gas
 ; and the left the brake, each a pedal that moves HANDLING_PEDAL (the
 ; brake _handling_brake_rate) of 100 a field towards fully down while its

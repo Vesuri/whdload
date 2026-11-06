@@ -1,3 +1,16 @@
+# Quitting a race at speed (2026-11-06)
+
+The user's drive of 4.0b (A1200/040, CUSTOM1=2 CUSTOM5=1): after Q at speed, the next race's
+start screen showed high RPM and MPH and the car crept forward before the engine started.
+The native engine's speedometer site `$BA8A` (`_handling_speedo`) runs before the model's
+first pass and published the aborted race's `HS_MPH` and `HS_TARGET` into G($992C) and the
+target speed G($9926). The new-race and Phantom sites (`$59ba`, `$117f8`,
+`_time_initial_scalars`) now return the handling state to its boot values
+(`_handling_new_race`). Repro `tmp/qbug/repro.sh` (A1200/040, gas held for 750 fields,
+Q, name entry, AUTO): 4.0b's slave starts the next race with speed 20 and target 19, and
+the car moves 85 units before the start; the fixed build has 0, 0 and no movement. The
+release slave no longer matches `release/slaves.sha256` (4.0b).
+
 # Release 4.0b (2026-11-04)
 
 The user chose to release r39 (H3c 2, ARCADE_HANDLING_PLAN.md) as 4.0b, dated 04.11.2026

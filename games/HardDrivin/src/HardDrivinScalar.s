@@ -300,6 +300,13 @@ _time_throttle_retention:
 
 _time_initial_scalars:
 	bsr _time_reset_scalars
+	IFD VERIFY_HANDLING
+	move.l a0,-(a7)			; beyond a BSR's reach
+	lea _time_initial_scalars(pc),a0
+	adda.l #_handling_new_race-_time_initial_scalars,a0
+	jsr (a0)
+	movea.l (a7)+,a0
+	ENDC
 	clr.w -$66d6(a4)
 	clr.w -$66d4(a4)
 	rts
