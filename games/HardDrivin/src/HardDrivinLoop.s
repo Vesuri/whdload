@@ -159,13 +159,25 @@ _loop_enter:
 	beq .no
 	; a native section search that finds no candidate ($de92) stores its
 	; uninitialised local, as _checkpoint_post notes: only a section in
-	; the road's list, with the two after it
+	; the road's list, with the two after it. Bound it at both ends and to
+	; a section's start before reading through it: off the road on a slope
+	; it held $252A009E, and reading its pitch was an access fault.
+	movea.l -$50da(a4),a1		; the road's last section
+	tst.b -$66b0(a4)
+	beq.s .last
+	movea.l -$50d6(a4),a1
+.last:
 	move.l -$671c(a4),d0
-	btst #0,d0
-	bne .no
 	movea.l d0,a0
-	cmpa.l -$6720(a4),a0		; first section G($98e0)
+	cmpa.l a1,a0
+	bhi .no
+	sub.l -$6720(a4),d0		; first section G($98e0)
 	blo .no
+	divu.w #20,d0
+	bvs .no
+	swap d0
+	tst.w d0
+	bne .no
 	moveq #0,d4			; the facet
 	move.w 14(a0),d0		; its pitch
 	beq.s .flat

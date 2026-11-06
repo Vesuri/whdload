@@ -1,3 +1,14 @@
+# An access fault off the road (2026-11-06)
+
+Driving off the road up the slope after the barn (A1200/040, CUSTOM1=2, from the start with
+the gas held and the mouse 40 counts left at field 450) ended in a WHDLoad access fault in
+4.0b's slave as well: `_loop_enter` read the section pitch through the road cursor G($98E4),
+which a native search that finds nothing leaves uninitialised ($252A009E here), checking only
+its lower bound before the read (since 3925c24c). It now bounds the cursor by the road's
+first and last sections and to a section's start before reading through it. The same drive
+no longer faults; `lap-loop` reports as before (flights, the 180 degree pitch, crash, replay
+and recovery within a field).
+
 # Quitting a race at speed (2026-11-06)
 
 The user's drive of 4.0b (A1200/040, CUSTOM1=2 CUSTOM5=1): after Q at speed, the next race's
