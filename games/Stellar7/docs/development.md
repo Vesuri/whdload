@@ -80,7 +80,7 @@ Keep a raw trace or capture listing only while its finding is still being
 analysed. Once its report is written, keep the report and reproduction settings
 and delete the trace, dumps and listing.
 
-## Release playtest still required
+## Release playtest
 
 Automated captures do not establish physical controls, audible output or
 acceptable gameplay pace. Use normal-speed launches with sound and real input,
@@ -120,9 +120,9 @@ preferences and actual observations for:
 
 Keep screenshots, recordings and raw notes in `tmp/`. Reconcile confirmed
 findings into internals and open-work; do not turn unchecked items into a pass.
-The current release decision is to keep SIM60 experimental and the normal
-loader unchanged until these observations and the remaining encounter checks
-support release.
+The step 10 playtest is done: it "seemed fine", without per-item notes. Repeat it
+after any change that reaches controls, sound or pace. Whether the normal loader
+gets SIM60 is a step 11 decision; until then it stays unchanged.
 
 ## Rendering validation
 
@@ -632,12 +632,12 @@ Physical input and audible output still need a separate check.
 with normal controls and sound. It selects `Stellar7-Sim68000.Slave` or
 `Stellar7-Sim60.Slave` and defaults to CUSTOM1=1; every `make run` option applies.
 To build without launching, run `make slave VARIANT=Stellar7-Sim60`.
-These builds contain no VERIFY fixtures. The selected N=3/N=12 launcher smoke
-checks reach the native menu with 107/106 installed hooks and release bytes
-matching the audited builds. They use debug/warp/silent mode and disconnected
-input; fresh results are under `tmp/release60/play60-smoke-68000` and
-`play60-smoke-68020`. The latter checks AMIGA_SETUP=a1200-fast overriding a
-contradictory CPU=68000 before build selection. They do not verify interactive gameplay or audible output.
+These builds contain no VERIFY fixtures. `tools/play60_smoke.py` ("Final build
+checks (step 9)") boots this launcher on each validation machine. On the step 8
+source it reaches the native menu with 109/108/108 installed hooks and release
+bytes matching the audited builds (`tmp/step9/play60-*`). It does not verify
+interactive gameplay or audible output. `test_play60_launcher.py` checks that a
+named preset overrides a contradictory CPU before the build is selected.
 If overriding WHD_ARGS, include CUSTOM1=1 to enable the replacement. Current
 selected-rate performance and its scene limits are recorded in internals.
 
@@ -779,6 +779,46 @@ mission?) or `$101b0` (Quit to DOS?) and `PAUSE_CHOICE=1|2` for the button
 returned through the native poll. Quit to DOS Yes is rejected at assembly
 because it leaves the game. Exit/Yes runs SIM60's quit path, which re-enters
 the loop once inactive (session 2), so the menu's new game is session 3.
+
+### Final build checks (step 9)
+
+Run these on the exact source to be released, after its last fix, one at a time
+(the capture tools share `tmp/rate-matrix.lock`). The step 9 results are under
+`tmp/step9` (internals, "Final build checks").
+
+```sh
+make check                                     # release bytes and the tool tests
+python3 tools/baseline_checks.py tmp/step9/checks builds --reference 52e52251 --changed Stellar7-Sim60 Stellar7-Sim68000
+python3 tools/baseline_checks.py tmp/step9/checks lifecycle
+python3 tools/define_sweep.py tmp/step9/define-sweep.json
+for setup in a500-1.5m a1200-fast a1200-060; do
+  python3 tools/play60_smoke.py $setup tmp/step9/checks/builds tmp/step9/play60-$setup
+done
+python3 tools/entry_traces.py tmp/step9/traces
+```
+
+`builds --changed` names the variants expected to differ from the reference; the
+others must be byte-identical. Without `--changed` only the 68000 slave may
+differ, as at step 7. `make check` fails after an intended release-byte change
+until `make record` rewrites `release/slaves.sha256`.
+
+`define_sweep.py` rebuilds each release variant with every conditional symbol
+in `src/` except VERIFY at 0 and at 1. Each symbol it lists as changing must be a
+production switch with its default in `sim60.s`, `motion60.s` or `sort60.s`.
+On the step 8 source these are the 38 switches SIM60, S60_SUBSTEPS, POLYGON_BLIT_IRQ,
+BLIT_IRQ_IDLE, SOUND_FAST, BUFFER_REUSE, LOADVIEW_COP2LC, SCRIPTED_WAIT,
+EXIT_GUARD, DIV_ZERO, HUD_CLOCK, RETICLE_CLOCK and the optimisation switches.
+A test, fixture, twin or `*_BAD` symbol in that list means VERIFY code reached a
+release build.
+
+`play60_smoke.py` boots the real `tools/play60.sh` (instance `smoke`, warp,
+silent, inputs disconnected). It checks the selected slave against the audited
+`builds` slave and its installed hooks, CUSTOM1=1 in the startup-sequence and the
+native menu without the menu fixture. `entry_traces.py` captures and checks ten
+100-field traces (SOL, late type-10, boss, level exit, death on `a500-1.5m` and
+`a1200-fast`). It reuses completed captures, and its `summary.json` lists the
+patches no trace entered. `a1200-060` has no CPU instruction records, so it is
+not traced.
 
 ### Interrupt and sound-timer checks
 

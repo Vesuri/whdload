@@ -18,8 +18,8 @@ cross-rate trajectory differences must be identified and explained.
 Each implementation step ends with measurements in `docs/internals.md`,
 commands in `docs/development.md` and a coherent commit following AGENTS.md.
 The source default remains N=12; the 68000 playable build explicitly selects
-N=3. Steps 1–8 are complete; step 6 retained two exact 68000 interrupt changes.
-Steps 9–11 remain, in order: final build checks, playtesting and the release.
+N=3. Steps 1–10 are complete; step 6 retained two exact 68000 interrupt changes.
+Step 11, the release, remains.
 
 ### Existing evidence and limitations
 
@@ -202,7 +202,7 @@ is a performance comparison; retain 60 Hz on the 68020+ path. Any unresolved A50
 
 ## Remaining work
 
-Steps 9–11 run in order; steps 6–8 are complete. Each change ends with its measurements in
+Step 11 remains; steps 6–10 are complete. Each change ends with its measurements in
 `docs/internals.md`, its commands in `docs/development.md` and its own commit.
 
 ### Validation machines
@@ -388,11 +388,34 @@ remaining transitions and the ending need coverage beyond the per-level visits.
 
 ### Step 9: Final build checks
 
-Status: not started; repeat after the last fix.
+Status: complete on the step 8 source; repeat after any later fix
+(development, "Final build checks"; results in internals, "Final build checks").
+
+- **Builds:** the original slave is unchanged (`418f86e4…`); both fixed-rate
+  slaves changed in step 8, and `release/slaves.sha256` records them.
+- **Disabled code** and the **lifecycle** scenes pass at both rates.
+- **Diagnostic exclusion:** only production switches change release bytes.
+- **Hooks:** static and installed audits pass on the release builds; the
+  `make play60` launcher selects, installs and reaches the menu on all three
+  machines; `test_play60_launcher.py` and the other tool tests pass.
+- **Entry traces** at both rates find no patch-interior entry. Still open:
+  exception and external returns, and 36 patches no trace window enters. These
+  matter only if step 11 puts SIM60 into the normal loader.
+
+1. Disabled-code preservation and the normal loader byte-identical to the
+   original timing (it stays without SIM60 unless step 11 decides otherwise).
+2. Hook and indirect-entry checks on the exact release builds. Static
+   patch-boundary checks and observed calls and returns leave exceptions,
+   external-source returns and unseen paths outside coverage; close what can be
+   closed before step 11 considers SIM60 in the normal loader.
+3. Diagnostic exclusion: no VERIFY-only code in the release builds.
+4. `make play60` launcher checks on all three machines and
+   `tools/test_play60_launcher.py`.
 
 ### Step 10: Playtest
 
-Status: not started; needs you to play. Automated checks cannot settle these.
+Status: complete. You played it and reported it "seemed fine"; nothing was
+reported per machine or per item below.
 
 1. On each machine, play `make play60 SETUP=<machine> WINDOW=front` with sound,
    and the original slave (`make run SLAVE=original`) on the same machine.

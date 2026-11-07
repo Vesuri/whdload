@@ -14,8 +14,8 @@ by named setup (tools/machines.py) and writes PREFIX/<check>/validation.json:
   buffers    displayed-buffer reuse on a1200-060: scanout stability and draw ordering
              with BUFFER_REUSE=1, the BUFFER_REUSE=0 control recorded beside it
   buffers_normal  the same two builds (after buffers) over 100 normal-speed fields
-  builds     release bytes against a reference revision, the off switches, diagnostic
-             exclusion and the release hook audits
+  builds     release bytes against a reference revision (--changed: the variants expected
+             to differ), the off switches, diagnostic exclusion and the release hook audits
 
 Completed captures are reused; an incomplete one stops the run. Mapped-state
 comparisons admit only deferred projection scratch.
@@ -267,7 +267,7 @@ def check_builds(out, args):
     subprocess.run(['tar', '-x', '-C', str(reference)], input=archive, check=True)
     old_game = reference/ROOT.relative_to(top)
     sha = lambda blob: hashlib.sha256(blob).hexdigest()
-    result = dict(reference=revision, releases={}, off_switches={}, exclusion={}, audits={})
+    result = dict(reference=revision, changed=args.changed, releases={}, off_switches={}, exclusion={}, audits={})
     releases = {}
     for variant in VARIANTS:
         blob = build(ROOT, variant)
@@ -284,9 +284,13 @@ def check_builds(out, args):
     off = build(ROOT, 'Stellar7-Sim68000', '-DBLIT_IRQ_IDLE=0 -DSOUND_FAST=0')
     old = build(old_game, 'Stellar7-Sim68000')
     result['off_switches']['Stellar7-Sim68000 -DBLIT_IRQ_IDLE=0 -DSOUND_FAST=0'] = dict(sha256=sha(off), identical=off == old)
-    for variant in ('Stellar7', 'Stellar7-Sim60'):
-        assert result['releases'][variant]['identical'], (variant, 'changed from the reference')
-    assert result['off_switches']['Stellar7-Sim68000 -DBLIT_IRQ_IDLE=0 -DSOUND_FAST=0']['identical']
+    # --changed names the variants a later fix deliberately changed; every other must match.
+    for variant in VARIANTS:
+        if variant not in args.changed:
+            assert result['releases'][variant]['identical'], (variant, 'changed from the reference')
+    # Only while the changes are 68000-only can the off switches rebuild the reference.
+    if 'Stellar7-Sim60' not in args.changed:
+        assert result['off_switches']['Stellar7-Sim68000 -DBLIT_IRQ_IDLE=0 -DSOUND_FAST=0']['identical']
     # The A500 rate override builds the same simulation at N=4.
     n4 = build(ROOT, 'Stellar7-Sim68000', substeps68000=4)
     result['rate_override'] = dict(sha256=sha(n4), differs_from_n3=n4 != releases['Stellar7-Sim68000'])
@@ -319,6 +323,8 @@ def main():
     parser.add_argument('checks', nargs='+', choices=CHECKS)
     parser.add_argument('--matrix', type=Path, help='rate matrix prefix for delayed (tools/rate_matrix.sh --selected-rates)')
     parser.add_argument('--reference', help='git revision whose release bytes builds compares against')
+    parser.add_argument('--changed', nargs='*', default=['Stellar7-Sim68000'], choices=VARIANTS,
+                        help='variants builds expects to differ from the reference (default: the 68000 slave)')
     args = parser.parse_args()
     if 'delayed' in args.checks and args.matrix is None:
         parser.error('delayed needs --matrix')

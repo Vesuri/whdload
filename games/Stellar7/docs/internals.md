@@ -12,10 +12,11 @@ The displayed-buffer reuse correction is enabled in both playable source paths.
 The step 7 matrix, extended-combat, input, delayed-draw, lifecycle, buffer and
 build checks pass on the three validation machines ("Three-machine baseline").
 Step 6 raises A500 presentations by 10–17% there. The actual-launcher smoke
-checks passed on the earlier configurations.
+checks passed on the earlier configurations; the step 9 final build checks
+pass on the step 8 source ("Final build checks").
 Fast-CPU timing diagnostics and extended-combat checks pass within the scopes below;
-the corrected selected-rate matrix and its 350 state comparisons pass. Broader encounters and physical-control
-playtesting remain open. The normal loader still omits this experimental conversion.
+the corrected selected-rate matrix and its 350 state comparisons pass. The step 8
+encounter coverage is complete and the playtest found nothing wrong. The normal loader still omits this conversion.
 
 ## Release validation
 
@@ -1069,10 +1070,71 @@ The A500 run covers the same 114.1 s as step 5's (3.93 presentations/s then).
 
 Flicker was reported while watching these warp-mode capture windows, in a
 full-screen ship explosion and in-game on `a1200-060`. None of the traced
-windows above shows it; it is open-work step 8, item 8.
+windows above shows it; step 8 found and fixed its causes ("Step 8 field captures").
 
 Evidence: `tmp/three/main` (matrix, `main-report.txt`), `control`, `n4`,
 `sustained` and `checks/{input,delayed,lifecycle,buffers,buffers_normal,builds}/validation.json`.
+
+## Final build checks
+
+Open-work step 9, run on the step 8 source (development, "Final build checks").
+Evidence is under `tmp/step9`.
+
+- **Release bytes:** the original slave is `418f86e4…`, byte-identical to steps 5
+  (`52e52251`) and 7 (`4a295dcd`). Step 8 changed both fixed-rate slaves:
+  Sim60 `591be19f…` → `b96b3731…`, Sim68000 `aacb8c97…` → `b8e8c699…`.
+  `release/slaves.sha256` now records these bytes; steps 6 and 7 had not
+  re-recorded it. The step 6 off switches no longer rebuild the step 5 68000
+  slave, because the step 8 fixes are in both fixed-rate paths.
+- **Disabled code:** with SIM60 built in and CUSTOM1 off, the original code hunk
+  is preserved at both rates: 151969 bytes checked, no unexpected byte, covering
+  109 (N=3) and 108 (N=12) compiled patch ranges.
+- **Lifecycle, repeated after the step 8 exit handoff:** death with Continue,
+  declining Continue, normal and early exit pass at both rates. All 16 endpoint
+  comparisons match.
+- **Diagnostic exclusion:** each release variant was rebuilt with every
+  conditional symbol in `src/` (except VERIFY) set to 0 and to 1. Only 38 symbols
+  change any release byte. All 38 are production switches whose defaults are in
+  `sim60.s`, `motion60.s` or `sort60.s`: SIM60, the rate and 68000-path selectors,
+  the step 8 LOADVIEW_COP2LC and SCRIPTED_WAIT controls, and the optimisation
+  switches. No test, fixture, twin or deliberately broken (`*_BAD`) symbol
+  changes a byte. The fixture builds of `baseline_checks.py builds` are
+  byte-identical to the release builds and carry no VERIFY marker.
+- **Hooks, static:** the release audits pass: Sim60 has 108 patches in 82
+  merged ranges, Sim68000 109 in 83. 9440 conservative direct-branch candidates
+  and 663 relocated code pointers enter no patch interior.
+- **Hooks, installed:** `play60_smoke.py` boots the real `make play60` launcher
+  on each machine. It selects Sim68000 at N=3 on `a500-1.5m` and Sim60 at N=12
+  on both A1200s. Each slave is the audited release build, every patch is
+  installed (109, 108, 108), WHDLoad gets CUSTOM1=1, and the native menu is
+  reached without the menu fixture.
+- **Entries, traced:** `entry_traces.py` traces 100 fields of SOL, late type-10,
+  boss, level exit and death at N=3 (`a500-1.5m`) and N=12 (`a1200-fast`).
+  - Across the 10 traces, 18.8 million observed PCs enter no patch interior.
+  - 48106 indirect JSR/JMP executions reach no interior.
+  - Of 287395 returns, 285751 are verified, 67275 of them across bridged gaps.
+    The other 1644 cross a register-discontinuous gap and stay unverified; 1620
+    of them are on `a1200-fast`, whose gameplay traces lose 20–25% of PC records.
+  - The traces enter 44 of 81 patches at N=3 and 43 of 80 at N=12. That includes
+    the step 8 LoadView patch ($1c97c) in the A500 exit trace.
+  - The 36 patches never entered at either rate are events none of these
+    windows contains: contact and collision damage (`contact60.s`, `knock60.s`,
+    `shake60.s`, terrain damage), the power pickups (`powers60.s`), the keyboard
+    history readers (the pilot uses the joystick), respawn, the beam, AI random
+    bytes, the dialog and preferences screens, the native distance routine at $4388 and
+    the one-time SIM60 entry at $2af6, which runs before any trace starts. The
+    scripted present at $108f2 is entered at N=12 only. The step 8 encounter
+    captures and the native-reference fixtures exercise these paths, but no
+    instruction trace checks their entries.
+  - `a1200-060` can't be traced: its non-cycle-exact profile records no CPU
+    instructions (`traces-060-no-cpu-records.log`).
+- **Still open:** exception returns, returns from external code (Kickstart),
+  and the entries of the 36 untraced patches. Static checks and these traces
+  can't prove them; they rest on the step 8 encounter coverage, the fixtures and
+  the playtest. This matters for step 11 only if the normal loader gets SIM60.
+
+The playtest (open-work step 10) found nothing wrong: in the user's words, "it seemed fine".
+No per-machine observations were recorded.
 
 ## Rendering cost and presentation
 
