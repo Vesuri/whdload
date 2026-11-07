@@ -1133,6 +1133,9 @@ Evidence is under `tmp/step9`.
   can't prove them; they rest on the step 8 encounter coverage, the fixtures and
   the playtest. This matters for step 11 only if the normal loader gets SIM60.
 
+Setting the version date to 07.11.2026 afterwards changed one byte in each slave, the
+date in its `$VER` string; `release/slaves.sha256` records the dated bytes.
+
 The playtest (open-work step 10) found nothing wrong: in the user's words, "it seemed fine".
 No per-machine observations were recorded.
 

@@ -40,11 +40,11 @@ Run `make dist` in this directory (or `make dist GAME=Stellar7` at the repositor
 `game.sh` hands it to `tools/package_release.py`). It forces fresh non-VERIFY builds,
 then creates `dist/Stellar7Enhanced-<version>-<YYYYMMDD>.lha` at the repository root
 with an adjacent `.sha256`. The version and date come from the release slaves' `$VER`
-strings (`$VER: <installed name> 2.0b (05.11.2026)`, each named as the installer ships it:
+strings (`$VER: <installed name> 2.0b (07.11.2026)`, each named as the installer ships it:
 `Stellar7.slave`, `Stellar7-Sim68000.Slave`, `Stellar7-Sim60.Slave`); all three must agree.
 The string ends the code hunk, so it is the only byte change from the builds the evidence
-in this document was recorded with. The 2.0b label and date are provisional: nothing is
-released until open-work step 11, which sets them.
+in this document was recorded with: setting 07.11.2026 changed one byte in each slave.
+Nothing is published until `make release`.
 
 Packaging starts with a fresh extraction of `tmp/archives/Stellar7.lha`. It replaces the
 normal slave, ReadMe (its `Short:` line and title read "Stellar 7 Enhanced", with a

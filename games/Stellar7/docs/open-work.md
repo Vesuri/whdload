@@ -428,11 +428,11 @@ reported per machine or per item below.
 
 ### Step 11: Release
 
-Status: not started.
+Status: in progress; item 3 is done.
 
 1. Remove tools no longer used by a current check; update the docs in place.
 2. Decide the release and whether the normal loader gets SIM60.
-3. The slaves' `$VER`, the ReadMe and the local
-   `dist/Stellar7Enhanced-2.0b-20261105.lha` carry a provisional 2.0b label dated
-   05.11.2026. Nothing is published. Set the version and date when releasing,
-   then `make dist`, and `make release` only on your go.
+3. Done: the slaves' `$VER` and the ReadMe say 2.0b (07.11.2026), and the ReadMe's
+   2.0b entry lists only user-visible changes since 1.0. `make dist` builds
+   `dist/Stellar7Enhanced-2.0b-20261107.lha`. Nothing is published:
+   `make release` runs only on your go.

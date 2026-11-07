@@ -152,13 +152,12 @@ def main():
             text = text.replace('WHDLoad 16+', 'WHDLoad 17+ (built with KickEmu 20.0)')
             text = text.replace('512 MB OtherMem', '512 KB OtherMem')
             note = f'''Version {version} ({date}) by Vesuri:
- - Fixed real-time simulation: 15 Hz for 68000/68010, 60 Hz for 68020+.
- - Rendering is independent, without interpolation; display-buffer reuse fix included.
- - Installer offers both CPU builds and the original-timing development loader.
- - The installed icon of a fixed-rate build has CUSTOM1=1, which enables the
-   simulation. The selected rate never switches at runtime.
- - Uses KickEmu 20.0; WHDLoad 17 is required.
- - Physical controls, sound, pace and broader encounter playtesting remain open.
+ - New fixed-rate builds keep the game at the same speed on every CPU:
+   Stellar7-Sim68000.Slave (15 Hz, 68000/68010) and Stellar7-Sim60.Slave
+   (60 Hz, 68020+). The screen redraws as fast as the machine allows.
+ - The installer asks which build to install and adds CUSTOM1=1 to the icon,
+   which enables it. The original-timing slave is still available.
+ - Requires WHDLoad 17 (built with KickEmu 20.0).
 
 Install using Install-Stellar7 on an Amiga with Installer and your original
 English NTSC disks. Choose the rate matching your CPU. Existing destination
