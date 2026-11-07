@@ -41,6 +41,16 @@ s60_modal_install:
         bne s60_bad
         ENDC
         ENDC
+        IFD VERIFY
+        IFD DEATH_RETRY
+        move.l a1,a0
+        adda.l #$6682,a0
+        cmp.l #$4eba43ca,(a0)
+        bne s60_bad
+        cmp.w #$4a40,(4,a0)
+        bne s60_bad
+        ENDC
+        ENDC
         lea (s60_modal_patches,pc),a0
         jsr (resload_Patch,a2)
         rts
@@ -52,6 +62,11 @@ s60_modal_patches:
         IFD VERIFY
         IFD PREFERENCES_TEST
         PL_PS $d43a,s60_test_preferences_poll
+        ENDC
+        ENDC
+        IFD VERIFY
+        IFD DEATH_RETRY
+        PL_PS $6682,s60_test_death_name
         ENDC
         ENDC
         IFD VERIFY
@@ -139,6 +154,26 @@ s60_modal_return:
         IFD VERIFY
         IFD S60_MODAL_TEST
 s60_test_pause_deadline: dc.l 0
+; PAUSE_HANDLER selects another native dialog entered from the same input
+; dispatcher: $10170 Exit this mission?, $101b0 Quit to DOS?. PAUSE_CHOICE is
+; the button returned through the native poll (1 = first, 2 = second).
+        IFND PAUSE_HANDLER
+PAUSE_HANDLER EQU $10268
+        ENDC
+        IFND PAUSE_CHOICE
+PAUSE_CHOICE EQU 1
+        ENDC
+        IFNE (PAUSE_HANDLER-$10268)*(PAUSE_HANDLER-$10170)*(PAUSE_HANDLER-$101b0)
+        FAIL "PAUSE_HANDLER must be $10268, $10170 or $101b0"
+        ENDC
+        IFNE (PAUSE_CHOICE-1)*(PAUSE_CHOICE-2)
+        FAIL "PAUSE_CHOICE must be 1 or 2"
+        ENDC
+        IFEQ PAUSE_HANDLER-$101b0
+        IFEQ PAUSE_CHOICE-1
+        FAIL "Quit to DOS Yes leaves the game; check it outside this fixture"
+        ENDC
+        ENDC
         IFD PAUSE_TEST
 s60_test_pause_observation:
         dc.b 'PH60'
@@ -157,7 +192,7 @@ PAUSE_FIELDS EQU 60
         lea (s60_test_pause_deadline,pc),a0
         move.l d0,(a0)
         S60_CALL $3148 ; native input dispatcher enters Forbid
-        S60_CALL $10268 ; native P handler and real pause dialog
+        S60_CALL PAUSE_HANDLER ; native P handler and real pause dialog, or another
         S60_CALL $312c ; native dispatcher resumes with Permit
 .done:  rts
         ENDC
@@ -177,7 +212,7 @@ s60_test_modal_poll:
         bhi .wait
         lea (s60_test_pause_deadline,pc),a0
         clr.l (a0)
-        moveq #1,d0 ; select the native dialog's Continue button
+        moveq #PAUSE_CHOICE,d0 ; Continue for pause; Yes 1 / No 2 otherwise
         move.l d0,d7
         rts
 .wait:  moveq #0,d0

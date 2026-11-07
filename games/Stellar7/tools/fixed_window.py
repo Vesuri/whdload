@@ -24,10 +24,13 @@ p.add_argument('--state-only',action='store_true')
 p.add_argument('--native-events',action='store_true',help='record every native presentation boundary between --frame and --checkpoints; requires --state-only')
 p.add_argument('--prebuilt', type=Path, help='capture this retained VERIFY slave instead of rebuilding; caller supplies matching flags/listing')
 p.add_argument('--boot-timeout', type=float, default=1800, help='seconds allowed for this boot to expose the loaded game')
+p.add_argument('--boundary-timeout', type=float, default=900, help='seconds allowed to reach the requested boundary after boot; above 540 s (tick boundaries) the wait resumes every 3000 fields')
 p.add_argument('--latency-listing', type=Path, help='exact VERIFY listing; observe update starts over --fields even with --state-only')
 p.add_argument('--presentation-listing', type=Path, help='exact retained SIM60 listing/binary; read-only rendering phase observer')
 p.add_argument('--stop-on-inactive', action='store_true', help='stop checkpoints at the first completed tick with inactive gameplay, before death/exit resets')
 p.add_argument('--raw-trace', action='store_true', help='retain Barto display/DMA trace without requiring CPU instruction records')
+p.add_argument('--shot-windows', type=int, default=0, help='after the boundary, trace this many consecutive --fields windows and keep only each field\'s screenshot, displayed bitplanes and audio DMA/register writes (shots/, shots.json; tools/paula_audio.py)')
+p.add_argument('--motion-ticks', type=int, default=0, help='after the tick boundary, record every active actor at each completed tick (before the world recenter) and the tick of each presentation, for this many ticks (motion.txt; tools/motion_check.py)')
 p.add_argument('--retain-command', action='store_true', default='--warp_mode=0' in os.environ.get('EXTRA_ARGS','').split(), help='retain the running project emulator command for frontend-option verification (automatic for explicit --warp_mode=0)')
 a=p.parse_args()
 if a.session is not None and (a.tick is None or a.session < 1):
@@ -38,6 +41,14 @@ if a.stop_on_inactive and (a.tick is None or not a.state_only or not a.tick_chec
     p.error('--stop-on-inactive requires --tick, --tick-checkpoints and --state-only without a field observer')
 if a.presentation_listing and (a.tick is None or a.latency_listing or a.swaps_only or a.native_events):
     p.error('--presentation-listing requires --tick and no other observer')
+if a.shot_windows and (a.raw_trace or a.state_only or a.swaps_only or a.latency_listing or a.presentation_listing or a.native_events or a.tick_checkpoints or a.checkpoints):
+    p.error('--shot-windows replaces the trace; use it without another observer or checkpoints')
+if a.motion_ticks and (a.tick is None or a.shot_windows or a.raw_trace or a.swaps_only or a.latency_listing or a.presentation_listing or a.native_events or a.tick_checkpoints):
+    p.error('--motion-ticks requires --tick and replaces the trace; use it without another observer or checkpoints')
+if a.motion_ticks < 0:
+    p.error('--motion-ticks must not be negative')
+if a.shot_windows < 0:
+    p.error('--shot-windows must not be negative')
 if a.boot_timeout <= 0:
     p.error('--boot-timeout must be positive')
 if not 1 <= a.fields <= 100:
@@ -154,7 +165,26 @@ try:
     count=boundary_count(mem)
     if level_matches(mem) and count>requested:raise RuntimeError(f'Already passed boundary {requested}: {count}')
     print(f'Waiting for gameplay {"tick" if a.tick is not None else "frame"} {requested}...',flush=True)
-    reply=cmd(f'gdb break *{anchor:#x}\ncondition $bpnum *({counter_type}*){counter:#x} >= {requested}{level_condition}\ncontinue\ndelete')
+    wait=f'gdb break *{anchor:#x}\ncondition $bpnum *({counter_type}*){counter:#x} >= {requested}{level_condition}'
+    if a.boundary_timeout <= 540 or a.tick is None:
+        reply=cmd(wait+'\ncontinue\ndelete', a.boundary_timeout)
+    else:
+        # One server gdb command may run 600 s. For longer routes (native level loads,
+        # menus) also stop on SIM60's per-field callback every 3000 fields, which runs
+        # outside gameplay too, and resume until the boundary is reached.
+        listing=(root/'tmp/build/verify/Stellar7.lst').read_text(encoding='latin1')
+        symbol=lambda name:int(re.search(r'^'+name+r'\s+00:([0-9A-F]+)',listing,re.M)[1],16)
+        watch=entry+symbol('s60_history_field')-symbol('s60_entry')
+        field=data+0x24a8
+        cmd(wait+f'\nbreak *{watch:#x}\ncondition $bpnum *(unsigned int*){field:#x} >= $limit')
+        deadline=time.monotonic()+a.boundary_timeout;reply=''
+        while True:
+            if time.monotonic()>deadline:raise TimeoutError(f'boundary not reached in {a.boundary_timeout:g} s')
+            reply=cmd(f'gdb set $limit = *(unsigned int*){field:#x} + 3000\ncontinue',600)
+            pc=re.findall(r'^Breakpoint \d+, (0x[0-9a-f]+)',reply,re.M)
+            if pc and int(pc[-1],16)==anchor:break
+            if not pc or int(pc[-1],16)!=watch:raise RuntimeError('unexpected stop: '+reply[-500:])
+        cmd('gdb delete')
     (out/'boundary-gdb.txt').write_text(reply)
     mem,ch=dump()
     count=boundary_count(mem)
@@ -176,7 +206,85 @@ try:
         assert actual and Path(actual.split()[0]).name.startswith('fs-uae'), 'recorded pid is not the project emulator'
         (out/'emulator-command.txt').write_text(actual+'\n')
     print(f'At {"tick" if a.tick is not None else "frame"} {count}; capturing {a.fields} fields...',flush=True)
-    if a.presentation_listing:
+    if a.motion_ticks:
+        # Read-only breakpoints. At s60_recenter entry this tick's movement and
+        # collisions are complete and the player still holds its displacement since
+        # the previous recenter, so world positions can be rebuilt across ticks.
+        # $6a0a is the native presentation entry: the frame shows the current tick.
+        listing=(a.prebuilt.with_suffix('.lst') if a.prebuilt else root/'tmp/build/verify/Stellar7.lst').read_text(encoding='latin1')
+        symbol=lambda name:int(re.search(r'^'+name+r'\s+00:([0-9A-F]+)',listing,re.M)[1],16)
+        recenter=entry+symbol('s60_recenter')-symbol('s60_entry')
+        actor=('printf "A %x %d %d %d %d %d %d %d %d %d %d %d %d %u %d %x\\n", $o, *(short*)($o+2), '
+               '*(int*)($o+8), *(int*)($o+12), *(int*)($o+16), *(short*)($o+20), *(short*)($o+22), *(short*)($o+24), '
+               '*(short*)($o+64), *(short*)($o+52), *(short*)($o+54), *(short*)($o+56), '
+               '*(signed char*)($o+0x55), *(unsigned char*)($o+0x54), *(int*)($o+4), *(unsigned int*)($o+106)')
+        cmd(f'''gdb break *{recenter:#x}
+commands
+silent
+set $p = *(unsigned int*){data+0x43c0:#x}
+printf "T %u %u %d %u %x %d %d\\n", *(unsigned int*){counter:#x}, *(unsigned int*){entry+100:#x}, *(short*){data+0x46a0:#x}, *(unsigned int*){data+0x24a8:#x}, $p, *(int*)($p+8), *(int*)($p+12)
+set $o = $p
+{actor.replace('"A ', '"P ', 1)}
+set $i = 0
+while $i < *(short*){data+0x43b2:#x} && $i < 256
+set $o = *(unsigned int*)({data+0x3fb2:#x}+4*$i)
+{actor}
+set $i = $i + 1
+end
+continue
+end
+break *{h+0x6a0a:#x}
+commands
+silent
+printf "R %u %u\\n", *(unsigned int*){counter:#x}, *(unsigned int*){data+0x24a8:#x}
+continue
+end
+break *{anchor:#x}
+condition $bpnum *(unsigned int*){counter:#x} >= $motion_end''')
+        lines=[f'# motion trace: field_hz={field_hz} substeps from VERIFY_FLAGS; T tick session level field player px pz; P/A ptr type x z y pitch bank yaw speed vpitch vbank vyaw health flags radius owner (P is the player); R tick field at each presentation']
+        done=requested
+        while done < requested+a.motion_ticks:
+            target=min(done+300, requested+a.motion_ticks)
+            reply=cmd(f'gdb set $motion_end = {target}\ncontinue', 600)
+            lines+=[x for x in reply.splitlines() if x[:2] in ('T ', 'P ', 'A ', 'R ')]
+            pc=re.findall(r'^Breakpoint \d+, (0x[0-9a-f]+)',reply,re.M)
+            if not pc or int(pc[-1],16)!=anchor:raise RuntimeError('unexpected stop: '+reply[-500:])
+            done=target
+        cmd('gdb delete')
+        (out/'motion.txt').write_text('\n'.join(lines)+'\n')
+    elif a.shot_windows:
+        from amigaxdev import barto
+        shots=out/'shots';shots.mkdir();summary=[]
+        for window in range(a.shot_windows):
+            cmd(f'profile {a.fields} {out}/window.bin')
+            t=barto.load(out/'window.bin')
+            if len(t.fields) != a.fields:raise RuntimeError(f'Requested {a.fields} fields, captured {len(t.fields)}')
+            for field in t.fields:
+                index=len(summary)
+                (shots/f'{index:05d}.png').write_bytes(field.shot)
+                # Lowest fetched address per bitplane register: the displayed bitmap.
+                # Audio: Paula DMA fetches (type 4) and CPU writes to the audio registers.
+                # CPU (type 2) and blitter (type 5) accesses are kept by address for the displayed check.
+                planes={};fetches=[];writes=[];access=[]
+                for at in range(0,len(field.dma),field.dma_size):
+                    kind=struct.unpack_from('<h',field.dma,at+29)[0]
+                    if kind not in (2,4,5,6):continue
+                    reg,value,_,address=struct.unpack_from('<HQHI',field.dma,at)
+                    slot=at//field.dma_size
+                    if kind in (2,5) and address<0x200000:access.append((slot,kind,reg,address))
+                    if kind==6:planes[reg]=min(planes.get(reg,address),address)
+                    elif kind==4:fetches.append([slot,(reg-0xaa)//16,value&0xffff,address])
+                    elif reg==0x1102 and 0xdff096<=address<0xdff0e0:writes.append([slot,address&0x1fe,value&0xffff])
+                # Accesses inside the bitmap this field displays: count and first beam slot per (type, reg).
+                shown=[(v,v+8000) for v in planes.values()];hits={}
+                for slot,kind,reg,address in access:
+                    if any(lo<=address<hi for lo,hi in shown):
+                        key=f'{kind}:{reg:#x}';n,first=hits.get(key,(0,slot));hits[key]=(n+1,first)
+                summary.append(dict(field=index,window=window,slots=len(field.dma)//field.dma_size,displayed_access=hits,
+                                    planes={f'{k:#x}':v for k,v in sorted(planes.items())},audio_fetches=fetches,audio_writes=writes))
+            (out/'window.bin').unlink()
+        (out/'shots.json').write_text(json.dumps(dict(fields=summary))+'\n')
+    elif a.presentation_listing:
         subprocess.run([sys.executable,'tools/presentation_fields.py',str(a.out),'--listing',str(a.presentation_listing),'--fields',str(a.fields)],check=True,env=env)
     elif a.latency_listing:
         symbols = a.latency_listing.read_text(encoding='latin1')

@@ -979,6 +979,11 @@ s60_update:
         ENDC
         ENDC
         ENDC
+        IFD VERIFY
+        IFD DEATH_RETRY
+        bsr s60_test_death_return
+        ENDC
+        ENDC
         rts
         IFNE EXIT_GUARD
 .inactive:

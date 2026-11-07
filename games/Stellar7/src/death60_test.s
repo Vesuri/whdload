@@ -16,6 +16,83 @@ s60_death_results:
         dc.l 0 ; session when armed (offset 70)
         dc.w 0 ; level when armed (offset 74)
         ENDC
+        IFD DEATH_RETRY
+        IFND DEATH_NATURAL
+        FAIL "DEATH_RETRY requires DEATH_NATURAL"
+        ENDC
+        IFD LEVEL_TEST
+        FAIL "DEATH_RETRY requests its own exits back to the highest level"
+        ENDC
+        IFD DEATH_DECLINE
+        FAIL "DEATH_RETRY answers Yes; DEATH_DECLINE answers No"
+        ENDC
+; Answer Yes to every natural death's Continue and re-validate each native
+; retry. Each death keeps its session, level and completed tick (offset 76).
+S60_DEATH_RETRIES EQU 32
+s60_death_retry_record:
+        dc.b 'RR60'
+        dc.w 0 ; deaths observed
+        ds.l 2*S60_DEATH_RETRIES ; session.w, level.w, tick.l per death
+; After a game over (no Continue left) the native menu's Begin restarts level
+; 0. Native exits are then requested, as LEVEL_TEST does, until the game is
+; back at the highest level reached; that level's waves and boss stay native.
+; The native Hall of Fame name entry is answered OK (offset 338).
+; CAMPAIGN_START=n seeds the highest level, so the same native exits take a
+; per-level campaign from SOL straight to level n before its waves begin.
+        IFND CAMPAIGN_START
+CAMPAIGN_START EQU 0
+        ENDC
+        IFLT CAMPAIGN_START
+        FAIL "CAMPAIGN_START must be 0..6"
+        ENDC
+        IFGT CAMPAIGN_START-6
+        FAIL "CAMPAIGN_START must be 0..6"
+        ENDC
+s60_death_return_record:
+        dc.b 'GO60'
+        dc.w CAMPAIGN_START ; highest level reached
+        dc.w 0 ; native exits requested to return to it
+        dc.w 0 ; Hall of Fame name entries answered
+s60_death_name_field: dc.l 0
+s60_test_death_return:
+        movem.l d0/a0,-(sp)
+        lea (s60_death_return_record+4,pc),a0
+        move.w ($46a0-S60_DATA,a4),d0
+        cmp.w (a0),d0
+        bls .lower
+        move.w d0,(a0)
+        bra .done
+.lower: bcc .done ; at the highest level
+        tst.b ($1e53-S60_DATA,a4)
+        beq .done ; already leaving
+        tst.w ($1e90-S60_DATA,a4)
+        bne .done
+        clr.b ($1e53-S60_DATA,a4) ; native exit at the end of this update
+        addq.w #1,(2,a0)
+.done:  movem.l (sp)+,d0/a0
+        rts
+s60_test_death_name:
+        ; Replaces the name entry's JSR $aa4e(PC) and TST.W D0 at $6682.
+        move.l a0,-(sp)
+        lea (s60_death_name_field,pc),a0
+        move.l ($24a8-S60_DATA,a4),d0
+        tst.l (a0)
+        bne .elapsed
+        move.l d0,(a0)
+.elapsed:
+        sub.l (a0),d0
+        cmp.l #60,d0
+        bcs .wait
+        clr.l (a0)
+        lea (s60_death_return_record+8,pc),a0
+        addq.w #1,(a0)
+        moveq #1,d0 ; the native OK button
+        bra .done
+.wait:  moveq #0,d0
+.done:  move.l (sp)+,a0
+        tst.w d0
+        rts
+        ENDC
         IFD DEATH_DECLINE
 s60_death_menu_record:
         dc.b 'ND60'
@@ -73,6 +150,23 @@ s60_test_death_exit:
         move.b ($1e53-S60_DATA,a4),d0
         move.w d0,(58,a2)
         move.w ($1e90-S60_DATA,a4),(60,a2)
+        IFD DEATH_RETRY
+        cmp.w #1,(60,a2)
+        bne .done ; a level exit or the ending: stay armed for the next death
+        move.l (s60_sessions,pc),(70,a2)
+        move.w ($46a0-S60_DATA,a4),(74,a2)
+        lea (s60_death_retry_record+4,pc),a0
+        move.w (a0),d0
+        addq.w #1,(a0)+
+        cmp.w #S60_DEATH_RETRIES,d0
+        bcc .full
+        lsl.w #3,d0
+        adda.w d0,a0
+        move.w (72,a2),(a0)+ ; low word of the dying session
+        move.w (74,a2),(a0)+
+        move.l (12,a2),(a0)
+.full:
+        ENDC
         cmp.l #DEATH_TEST+1,(12,a2)
         IFD DEATH_NATURAL
         bcs .bad
@@ -222,7 +316,16 @@ s60_test_death_resume:
         tst.w d1
         bne s60_death_error
         rts
-.done:  movem.l (sp)+,d0-d2/a0-a2
+.done:
+        IFD DEATH_RETRY
+        cmp.w #3,(4,a2)
+        bne .armed
+        move.w #1,(4,a2) ; arm again for the next natural death
+        clr.l (20,a2) ; its dialog waits another 60 fields
+        clr.w (64,a2)
+.armed:
+        ENDC
+        movem.l (sp)+,d0-d2/a0-a2
         rts
         ENDC
         ENDC

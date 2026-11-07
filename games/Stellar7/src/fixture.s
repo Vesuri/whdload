@@ -96,6 +96,11 @@ fixture_install:
         FAIL "POWER_TRIGGER_DISTANCE requires POWER_TRIGGER_TYPE"
         ENDC
         ENDC
+        IFD POWER_TRIGGER_ENERGY
+        IFND POWER_TRIGGER_TYPE
+        FAIL "POWER_TRIGGER_ENERGY requires POWER_TRIGGER_TYPE"
+        ENDC
+        ENDC
         IFD POWER_ROUTE
         IFND SIM60
         FAIL "POWER_ROUTE requires SIM60"
@@ -249,8 +254,44 @@ fixture_power_trigger_elapsed:
 .done:  move.l (sp)+,a1
         rts
         ENDC
+        IFD POWER_TRIGGER_ENERGY
+; Once per session, when player energy first drops below POWER_TRIGGER_ENERGY,
+; select and activate the shield alone (slot 1). Other powers wait for the
+; boss: a clone deployed during a wave stopped the boss carrier arriving.
+fixture_power_energy_session: dc.l 0
+fixture_power_energy_tick: dc.l 0
+fixture_power_energy_elapsed:
+        lea (fixture_power_energy_session,pc),a0
+        move.l (s60_sessions,pc),d0
+        cmp.l (a0),d0
+        beq .session
+        move.l d0,(a0)
+        clr.l (4,a0)
+.session:
+        move.l (s60_ticks,pc),d0
+        tst.l (4,a0)
+        bne .elapsed
+        cmp.w #POWER_TRIGGER_ENERGY,($46c4-$8000,a4)
+        bge .waiting
+        move.l d0,(4,a0)
+.elapsed:
+        sub.l (4,a0),d0
+        rts
+.waiting:
+        moveq #-1,d0
+        rts
+        ENDC
 fixture_power_route:
         movem.l d1-d2/a0,-(sp)
+        IFD POWER_TRIGGER_ENERGY
+        bsr fixture_power_energy_elapsed
+        cmp.l #S60_RATE,d0
+        bcc .boss_route ; not triggered (-1) or finished
+        divu #S60_RATE,d0
+        moveq #1,d2
+        bra .slot
+.boss_route:
+        ENDC
         IFD POWER_TRIGGER_TYPE
         bsr fixture_power_trigger_elapsed
         ELSE
@@ -265,6 +306,7 @@ fixture_power_route:
         lea (fixture_power_route_slots,pc),a0
         moveq #0,d2
         move.b (a0,d1.w),d2
+.slot:
         swap d0
         btst #0,d0
         bne .released
@@ -388,6 +430,21 @@ fixture_key:
         FAIL "APPROACH_STANDOFF must be 2000..30000"
         ENDC
         ENDC
+        IFD APPROACH_BOSS_STANDOFF
+        IFND APPROACH_STANDOFF
+        FAIL "APPROACH_BOSS_STANDOFF requires APPROACH_STANDOFF"
+        ENDC
+        ENDC
+        IFD APPROACH_REACH
+        IFND APPROACH_STANDOFF
+        FAIL "APPROACH_REACH requires APPROACH_STANDOFF"
+        ENDC
+        ENDC
+        IFD APPROACH_AVOID_WARP
+        IFND APPROACH_STANDOFF
+        FAIL "APPROACH_AVOID_WARP requires APPROACH_STANDOFF"
+        ENDC
+        ENDC
         IFD APPROACH_TYPE
         IFND SIM60
         FAIL "APPROACH_TYPE requires SIM60"
@@ -404,6 +461,11 @@ fixture_key:
 ; the type-25 exit when it exists. It never alters an actor or level flag.
 ; APPROACH_STANDOFF also tracks the carrier and backs away when too close;
 ; enemies are held within +/-1000 of the requested distance using native input.
+; APPROACH_BOSS_STANDOFF holds bosses at their own distance. APPROACH_REACH also
+; turns towards the nearest flyer when nothing grounded is left (without
+; driving), and fires at flyers and bosses only within a grounded shot's reach.
+; APPROACH_AVOID_WARP turns away from a type-26 warp within 5000 and drives off,
+; so no level is skipped.
         IFD APPROACH_FIRE
 fixture_approach_fire: dc.w 0
         ENDC
@@ -423,7 +485,7 @@ APPROACH_AIM EQU 2048
         FAIL "APPROACH_AIM must be 1..2048"
         ENDC
 fixture_approach:
-        movem.l d1-d2/a0-a2,-(sp)
+        movem.l d1-d4/a0-a3,-(sp)
         moveq #0,d0
         IFD APPROACH_FIRE
         lea (fixture_approach_fire,pc),a0
@@ -438,9 +500,21 @@ fixture_approach:
         IFEQ APPROACH_TYPE
         move.l #$7fffffff,d2
         suba.l a2,a2
+        IFD APPROACH_REACH
+        move.l d2,d4
+        suba.l a3,a3
+        ENDC
 .scan:  move.l (a0)+,a1
         cmp.w #25,(2,a1)
         beq .found
+        IFD APPROACH_AVOID_WARP
+        cmp.w #26,(2,a1)
+        bne .not_warp
+        cmp.l #5000,($50,a1)
+        ble .avoid
+        bra .scan_next
+.not_warp:
+        ENDC
         cmp.b #$ff,($54,a1)
         bne .scan_next
         tst.b ($55,a1)
@@ -454,7 +528,16 @@ fixture_approach:
         cmp.w #44,(2,a1)
         bge .candidate
         cmp.l #300,(16,a1)
+        IFD APPROACH_REACH
+        ble .candidate
+        cmp.l ($50,a1),d4 ; a flyer: only a fallback to track
+        ble .scan_next
+        move.l ($50,a1),d4
+        move.l a1,a3
+        bra .scan_next
+        ELSE
         bgt .scan_next
+        ENDC
 .candidate:
         IFD APPROACH_LOCK
         ; Retain a live target only while it is still in the active list and
@@ -473,8 +556,14 @@ fixture_approach:
 .scan_next:
         dbf d1,.scan
         move.l a2,d1
+        IFD APPROACH_REACH
+        bne .chosen
+        moveq #-1,d4 ; nothing grounded: face the nearest flyer without driving
+        move.l a3,d1
+        ENDC
         beq .done
-        move.l a2,a1
+.chosen:
+        move.l d1,a1
         bra .found
         ENDC
 .find:  move.l (a0)+,a1
@@ -526,9 +615,46 @@ fixture_approach:
         cmp.w #7,(2,a1)
         beq .spacing ; carrier is a spacing target, never a firing target
         ENDC
+        IFD APPROACH_REACH
+        ; Hold fire on flyers and bosses until a grounded shot can reach them. The
+        ; level 0 and 3 bosses ($10bf8/$10d2a) test hits at the projectile's height.
+        cmp.w #44,(2,a1)
+        bge .boss_reach
+        cmp.l #300,(16,a1)
+        ble .fire
+        bra .fire_reach
+.boss_reach:
+        cmp.w #0,($46a0-$8000,a4)
+        beq .fire
+        cmp.w #3,($46a0-$8000,a4)
+        beq .fire
+.fire_reach:
+        bsr .reach
+        blt .spacing
+.fire:
+        ENDC
         move.w #1,(a0)
         IFD APPROACH_STANDOFF
 .spacing:
+        IFD APPROACH_REACH
+        tst.l d4
+        bmi .done
+        ENDC
+        IFD APPROACH_BOSS_STANDOFF
+        ; A boss keeps its distance; close in further so its hits are reachable.
+        ; The level 2 boss only dives at a player more than 4000 away ($10ab0),
+        ; so it keeps the normal standoff.
+        cmp.w #44,(2,a1)
+        blt .standoff
+        cmp.w #2,($46a0-$8000,a4)
+        beq .standoff
+        cmp.l #APPROACH_BOSS_STANDOFF-1000,($50,a1)
+        blt .reverse
+        cmp.l #APPROACH_BOSS_STANDOFF+1000,($50,a1)
+        ble .done
+        bra .advance
+.standoff:
+        ENDC
         cmp.l #APPROACH_STANDOFF-1000,($50,a1)
         blt .reverse
         cmp.l #APPROACH_STANDOFF+1000,($50,a1)
@@ -552,8 +678,29 @@ fixture_approach:
         bra .done
 .negative:
         moveq #8,d0 ; native $fee6 decreases yaw velocity
-.done:  movem.l (sp)+,d1-d2/a0-a2
+        IFD APPROACH_AVOID_WARP
+        bra .done
+; A type-26 warp ($35e4/$360a) adds two levels on contact; face away and drive.
+.avoid: move.l ($43c0-$8000,a4),a2
+        move.w ($5e,a1),d2 ; warp-to-player heading points away from it
+        sub.w ($18,a2),d2
+        cmp.w #APPROACH_AIM,d2
+        bgt .positive
+        cmp.w #-APPROACH_AIM,d2
+        blt .negative
+        moveq #1,d0
+        ENDC
+.done:  movem.l (sp)+,d1-d4/a0-a3
         rts
+        IFD APPROACH_REACH
+; Native $85f6 hits when every axis differs by at most the mean radius (+4).
+; A grounded player projectile (radius 134) reaches A1 when d3 = r+134-2y >= 0.
+.reach: move.l (4,a1),d3
+        add.l #134,d3
+        sub.l (16,a1),d3
+        sub.l (16,a1),d3
+        rts
+        ENDC
         ENDC
 
 ; Native-timing performance scene. All hooks are VERIFY/CUSTOM5 only.
