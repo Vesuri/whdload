@@ -567,24 +567,6 @@ The presentation-only probe preserves the saved presentation field required by
 `BUFFER_REUSE`. To reproduce the retained pre-guard diagnostic binaries, pass
 `--define BUFFER_REUSE=0` to both arms. Neither arm is a playable renderer.
 
-`python3 tools/swap_only_probe.py tmp/swap-check/probe` builds a separate
-N=12 VERIFY diagnostic that calls native presentation at hunk $6a0a in place
-of full rendering. Additional `--define NAME=VALUE` arguments select scene
-fixtures. Build its matched full-render arm with `--control`; the two binaries
-must have identical size/layout and differ only in the two-byte NOP/branch
-word. Run both as retained `--prebuilt` captures with matching
-`--latency-listing` and compare their field/counter endpoints. The bypass
-deliberately presents stale pixels; it is a ceiling experiment, not
-an optimization or playable target.
-
-`python3 tools/cache_probe.py build tmp/cache-check/probe` generates a separate
-scratch-only VERIFY slave and listing. Capture that exact slave with
-`fixed_window.py --prebuilt tmp/cache-check/probe.slave --tick 201 --state-only`,
-using CUSTOM1 and the desired machine configuration. Read it with
-`cache_probe.py read CAPTURE --listing tmp/cache-check/probe.lst`. The probe
-records CACR after SetCPU and at tick 200; it changes no cache enables and must
-never be used for performance comparisons. Its 68000 guard is separately tested.
-
 Keep supplied archives and all derived game material in ignored `tmp/`.
 `inputs.sha256` pins the installer `Stellar7.lha` and the Retroplay pack
 `Stellar7_v1.0_NTSC_2026.lha`; `make unpack ARCHIVES=<directory>` copies them to
@@ -994,12 +976,6 @@ semantics require separate evidence.
 The 68020 configuration uses `AMIGA_MODEL=A1200 KICKSTART=$KICKSTART_A1200
 CHIP_KB=2048 FAST_KB=4096 CPU=68EC020 SLOW_KB=0` after sourcing
 `../../common/env.sh`. This is an A1200 with fast RAM, not a stock A1200.
-
-`tools/state_summary.py CAPTURE...` reports only mapped player/RNG/timer state.
-It is not a full-state equivalence test. `tools/compare_traces.py A/trace.bin
-B/trace.bin` checks whole screenshots, instruction records, DMA records and
-chip snapshots; it deliberately reports the known raw-register/DMA differences
-between the current repeated captures instead of masking them.
 
 
 ## Fixed-step timing tests
@@ -2522,7 +2498,8 @@ checks the advertised 60 Hz timestep under PAL fields, not audiovisual parity.
 
 `INPUT_NEUTRAL_TEST=100` checks fifteen signed neutral-turn velocities across
 all twelve starting phases against the original native braking fragment.
-`INPUT_NEUTRAL_OLD=1` is its VERIFY-only negative control. The native input
+`INPUT_NEUTRAL_OLD=1` is its VERIFY-only negative control. Read NI60 with
+`tools/input_neutral_state.py CAPTURE --listing LISTING`. The native input
 encounter uses `PREFERENCES_TEST=200 PREFERENCES_CHOICE=2 INPUT_NEUTRAL_PLAY=300`
 (with each option passed as an assembler `-D` flag), releasing direction at
 completed tick 420. Choice 2 disables the native joystick fallback needed to

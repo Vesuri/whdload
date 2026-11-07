@@ -637,6 +637,7 @@ the same wrapper and all code. Each retained pair differs in exactly one
 two-byte instruction: a NOP for full rendering or a short branch to the
 presentation-only path. The control, not the ordinary differently laid-out
 slave, is the timing reference. The bypass deliberately displays stale pixels.
+The probe builder (`swap_only_probe.py`) was removed once the experiment was done.
 
 | CPU / scene | Matched full-render control FPS | Presentation-only FPS |
 |---|---:|---:|
@@ -787,7 +788,8 @@ the emulator's MOVEC masks and cache-enable checks in `newcpu.cpp` and
 `newcpu_common.cpp`. The observed enable bits do not establish hardware cache
 coherency or validate the emulator's fast-CPU instruction timing.
 Evidence: `tmp/fast60/cache/validation.json`, the separate captures and the
-exact scratch probe listing/binary under `tmp/fast60/cache-build`.
+exact scratch probe listing/binary under `tmp/fast60/cache-build`. The probe tool (`cache_probe.py`) was removed
+once these readings were recorded.
 
 ## A500 interrupts and the sound timer
 

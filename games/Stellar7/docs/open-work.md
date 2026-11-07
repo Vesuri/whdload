@@ -428,10 +428,17 @@ reported per machine or per item below.
 
 ### Step 11: Release
 
-Status: in progress; item 3 is done.
+Status: in progress; items 1 and 3 are done.
 
-1. Remove tools no longer used by a current check; update the docs in place.
-2. Decide the release and whether the normal loader gets SIM60.
+1. Done: the two scratch probes (`swap_only_probe.py`, `cache_probe.py`/`.s`) and
+   the first-baseline `state_summary.py` and `compare_traces.py` are removed.
+   Every remaining tool is a current check, or the reader of a fixture still in
+   the source.
+2. Decide the release and whether the normal loader gets SIM60. Today the normal
+   `Stellar7.slave` still contains the pre-SIM60 timing prototype (`timing.s`):
+   CUSTOM1=1 enables it at 5 Hz by default, or 1–25 Hz with CUSTOM2. The plan
+   rejects 5 Hz, and the ReadMe doesn't mention the prototype. Decide whether to
+   remove it from the normal loader, which changes its bytes.
 3. Done: the slaves' `$VER` and the ReadMe say 2.0b (07.11.2026), and the ReadMe's
    2.0b entry lists only user-visible changes since 1.0. `make dist` builds
    `dist/Stellar7Enhanced-2.0b-20261107.lha`. Nothing is published:
