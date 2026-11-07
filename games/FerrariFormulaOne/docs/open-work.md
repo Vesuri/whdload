@@ -16,6 +16,23 @@
   reserve what the FR path needs (1 MiB ExpMem, 768 KiB pool), which drops the A500 with
   1.5 MiB Slow and the chip-only A1200. It goes into the release slave with the FR path at
   FR10; until then the release slave has no use for it, and it keeps the `9008bdb0…` pin.
+- **Release blocker: hangs on a real A1200/040 (2026-11-07, the user's report).** On an
+  A1200 with a 68040, MMU and 32 MB, performance mode hung every time on Esc to pause then
+  Esc to resume, and in collisions with the track edges: the game stops with the clock
+  sample looping. Not reproduced in the emulator (`a1200-040` with 32 MB Zorro III,
+  data-cache emulation on, the 2.0b release slave `9008bdb0…`, `CUSTOM2=1`). The user's
+  emulator recording of the same situations (running off track; contact in the start
+  pack) shows the view swinging from far right to far left within a few frames, the car
+  bouncing, a white strip at the bottom edge and, for one frame, a large red wedge at the
+  bottom left. Suspected, not tested: the 20 ms player simulation applies native
+  collision impulses undivided (`FerrariFormulaOne_Velocity.s`), so a contact seen on
+  several 20 ms steps kicks the car several times, into positions the original never
+  reaches, where projection and polygon code can break. The only wall-contact test is one
+  synthetic contact on the native paths (GAME_TIME.md). Ruled out: pause writes no game
+  code (its sites are patched at install), and the opponents' pose blending never moves
+  the player's view. Next: the same situations with `CUSTOM2=0` in the emulator and on
+  the real machine; then a repeated-contact check on the 20 ms path against the native
+  response. Do not publish the release until this is understood.
 - **Fast RAM rendering (`make build BUILD=fast`, docs/FASTRAM_PLAN.md),** development only:
   FR1–FR8 and FR12 (draw speed) done: 030-50 BCE 49.9 FPS (every field) against
   24.6 native, 040-40 BCE 29.8 against 24.5 (FR12 checkpoint `376d1164…`, 2026-11-06). FR8 showed the draw is the limit. The work concentrates on the 68030 (below); FR0h is still open. FR builds
