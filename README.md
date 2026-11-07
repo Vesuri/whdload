@@ -27,7 +27,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Prince of Persia Enhanced | JOTD | released upstream as JOTD's 5.2 (24.10.2026) |
 | Red Baron Enhanced | JOTD | [3.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/RedBaronEnhanced-3.0b-20261013) |
 | Road Rash Enhanced | JOTD | [3.0b (22.10.2026)](https://github.com/Vesuri/whdload/releases/tag/RoadRashEnhanced-3.0b-20261022) |
-| Stellar 7 Enhanced | Psygore | not yet released |
+| Stellar 7 Enhanced | Psygore | [2.0b (07.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Stellar7Enhanced-2.0b-20261107) |
 | Test Drive Enhanced | JOTD | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/TestDriveEnhanced-2.0b-20261013) |
 | Test Drive II Enhanced | JOTD | released upstream as JOTD's 2.1 (11.10.2026) |
 | TFX Enhanced | JOTD | not yet released; merged upstream, not released there |
