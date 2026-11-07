@@ -20,7 +20,7 @@ blitter-finished interrupt and runs an exact faster pass of the music driver's c
 update, freeing 4–7% of the A500's cycles in gameplay; the step 7 baseline on the three
 validation machines measures 10–17% more A500 presentations from it, and its
 regression checks pass. Encounter coverage, the final build checks and the playtest
-are done; the release remains (`docs/open-work.md`).
+are done, and 2.0b is released (`docs/open-work.md`).
 
 Play the release slave from this directory:
 
@@ -40,7 +40,7 @@ the release slave's copies are checked byte for byte against them.
 To try 20 Hz on the 68000, use `make play60 SIM68000_SUBSTEPS=4`.
 Without that override the next launch rebuilds the selected 15 Hz default.
 
-Build the installer archive, Stellar 7 Enhanced 2.0b (not yet published), with
+Build the installer archive, Stellar 7 Enhanced 2.0b (published on GitHub), with
 `make dist`: the repository's `dist/Stellar7Enhanced-2.0b-20261107.lha` and its
 checksum. It ships the one slave; the installer asks for the fixed-rate simulation
 or the original timing and sets `CUSTOM1=1` in the icon for the former. Original

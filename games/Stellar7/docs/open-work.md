@@ -19,7 +19,7 @@ Each implementation step ends with measurements in `docs/internals.md`,
 commands in `docs/development.md` and a coherent commit following AGENTS.md.
 The source default remains N=12; the 68000 playable build explicitly selects
 N=3. Steps 1–10 are complete; step 6 retained two exact 68000 interrupt changes.
-Step 11, the release, remains.
+Step 11, the release, is complete: 2.0b is published.
 
 ### Existing evidence and limitations
 
@@ -202,7 +202,7 @@ is a performance comparison; retain 60 Hz on the 68020+ path. Any unresolved A50
 
 ## Remaining work
 
-Step 11 remains; steps 6–10 are complete. Each change ends with its measurements in
+Steps 6–11 are complete; 2.0b is published. Each change ends with its measurements in
 `docs/internals.md`, its commands in `docs/development.md` and its own commit.
 
 ### Validation machines
@@ -427,7 +427,8 @@ reported per machine or per item below.
 
 ### Step 11: Release
 
-Status: in progress; items 1–3 are done.
+Status: complete. Stellar 7 Enhanced 2.0b (07.11.2026) is published as the GitHub
+release `Stellar7Enhanced-2.0b-20261107`, tagged on `17bc6a73`.
 
 1. Done: the two scratch probes (`swap_only_probe.py`, `cache_probe.py`/`.s`) and
    the first-baseline `state_summary.py` and `compare_traces.py` are removed.
@@ -443,5 +444,5 @@ Status: in progress; items 1–3 are done.
    simulation or the original timing.
 3. Done: the slaves' `$VER` and the ReadMe say 2.0b (07.11.2026), and the ReadMe's
    2.0b entry lists only user-visible changes since 1.0. `make dist` builds
-   `dist/Stellar7Enhanced-2.0b-20261107.lha` with the one slave. Nothing is
-   published: `make release` runs only on your go.
+   `dist/Stellar7Enhanced-2.0b-20261107.lha` with the one slave, published with
+   `make release PUBLISH=1`.

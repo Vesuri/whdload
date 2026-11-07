@@ -12,7 +12,7 @@ Read `docs/open-work.md` first.
 
 | Doc | Read it for |
 |---|---|
-| `docs/open-work.md` | the plan, where it stands and the remaining step 11, the release (steps 1–10 are done) |
+| `docs/open-work.md` | the plan and where it stands (steps 1–11 are done; 2.0b is published) |
 | `docs/development.md` | variants, builds and VERIFY fixtures, the fixed-window driver, rate matrices, packaging, traps |
 | `docs/internals.md` | the program, game time, every slave patch, measurements, limitations |
 | `README.md` | the summary and how to play the conversion |
