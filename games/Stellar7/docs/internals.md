@@ -186,8 +186,24 @@ one damage at tick 354 (N=3) or 1387 (N=12), within the same update; the mine
 inventory charge is consumed. Exact-build and installed-hook checks pass.
 Wrong actor type, nonlethal damage, unspent inventory and wrong return-address
 controls are rejected. Evidence: `tmp/release60/mine-shoot-events/n*-validation.json`
-and `negative-validation.json`. These checks establish contact kills and mine
-destruction, not the rendered explosion or audible detonation.
+and `negative-validation.json`.
+
+The same two routes were captured at normal speed on `a500-1.5m` and
+`a1200-fast`, saving every field and Paula's audio DMA (`--shot-windows 4`,
+400 fields each). The emulator can't record its sound, so `paula_audio.py`
+rebuilds it from the fetched words:
+
+| Route | Channel 3 sample | Words played | Sound starts | Picture |
+|---|---|---|---|---|
+| Mine shot, 15 Hz | $45530, 4127 words, period 539, volume 64 | all 4127, once | field 96 | flash from field 94, debris follows |
+| Mine shot, 60 Hz | same | all 4127, once | field 46 | flash from field 45 |
+| Level 6 contact, 15 Hz | $54498, 5773 words, period 428, volume 51 | all 5773, once | field 141 | score 0 → 135 at field 142 |
+| Level 6 contact, 60 Hz | same | all 5773, once | field 51 | score 0 → 135 at field 52 |
+
+At both rates the same sample plays in full at the same pitch, starting within
+the tick that shows the explosion; no capture has a transient or reversion.
+Sample addresses are the runtime chip addresses of these captures. Evidence:
+`tmp/flicker/mine-audio.json` and `tmp/flicker/mine-*`.
 
 Input-driven jump and controlled native terrain contact pass at both selected
 rates. The existing jump charge is consumed through normal button input;
@@ -301,6 +317,131 @@ The actual process command confirms warp-off. SOL presentation is 4.023 FPS on
 A500 and 20.646 FPS on 68060 in these windows. Both repay initial debt (5→0
 and 2→0 respectively), so their above-target average update rates are not
 sustained-throughput claims. Evidence: `tmp/fast60/corrected/preflight/validation.json`.
+
+### Scripted-sequence presentation
+
+The flicker seen in the step 7 windows was the player's death explosion. The
+death loop ($c8fc, called from $2d9a) draws 45 frames outside the game loop and
+shows each one through the $108f2 stub, which leads to the native present at
+$183c0 and $1c84c. That present waits for the vertical blank after LoadView
+only when its argument is non-zero. Every scripted caller passes data byte
+$1e52, which is static and zero in this release, so the present returns at once
+and the next frame's clear can reach the bitmap still on screen. The game loop
+avoids this with its own field check at $2b96 (BUFFER_REUSE above); the death
+loop, the 60-frame sequence at $cb96 and the other $108f2 callers have none.
+The original game races the same way, but on the 68060 SIM60 lost the race far
+more often.
+
+SIM60 now replaces the $108f2 stub (installation checks its JMP to $183c0).
+The replacement calls the native present, then waits until the field counter
+moves on, but only while the SIM60 loop isn't running; gameplay keeps its own
+wait. That applies the game loop's rule to every scripted sequence on every
+SIM60 build, at a cost of at most one field per scripted frame (a death frame
+takes about 28 fields on the A500 and 5 on the 68060). The plain loader is
+byte-identical.
+
+Normal-speed field captures (`fixed_window.py --shot-windows`, every displayed
+field saved, `field_flicker.py`). Transients are pixels shown for one field
+only; the death captures' only other findings are the Continue dialog's
+colour-cycling background and the black field between scenes, both native:
+
+| Scene | Fields | Transients before → after the fix |
+|---|---|---|
+| 68060 SIM60 death | 600 | 22 → 0 in the explosion |
+| A1200-fast SIM60 death | 600 | 12 → 0 |
+| A500 SIM60 death | 600 | 1 (3 with step 6's interrupt changes off) → 0 |
+| 68060 original timing, natural death | 800 | 4, all in the last frames |
+| A500 original timing, natural death | 800 | 0 |
+| 68060 SOL in-game, SIM60 / original | 300 each | 0 / 0 (the original also has 4 whole-field reversions) |
+
+Evidence: `tmp/flicker/summary.json` and the captures beside it.
+
+### Late copper-list switch on Kickstart 1.3
+
+Step 8's normal-speed captures tore on the A500. In the field before a buffer
+switch, the next frame's blits went into the bitmap still on screen. This
+happened in SOL combat and at the level 2 boss: 8909, 44977 and 18552
+displayed-bitmap writes, each a band of colour shifts across the view. The
+draw's field check (BUFFER_REUSE) worked. The view itself switched one field
+late.
+
+Under the kick13 KickEmu, LoadView only stores the new copper list in
+gb_LOFlist (GfxBase $32). The graphics vertical-blank server copies it to
+COP2LC every field at about slot 240, and copinit jumps to COP2LC a few lines
+into the field. In a 600-field A500 capture the interrupt ran late (slot
+2525–12400, up to line ~55) in 18 fields. When this hits the field after a
+LoadView, the jump has already used the old list, so the new view shows one
+field later. But the field counter has moved on, so the draw starts in the
+bitmap still on screen.
+
+`s60_loadview` (`src/draw60.s`, `LOADVIEW_COP2LC=1`) replaces the native
+present's `JSR $1ce52(PC)` / `ADDQ.W #4,A7` at $1c97c. It calls the LoadView
+stub, then writes the new gb_LOFlist to COP2LC itself. When the old and new
+lists share a high word it writes only the low word, so the copper can never
+fetch half an address. Interlaced views keep the server's own LOF/SHF
+alternation. Installation checks both instructions and the stub's JMP at
+$1ce52. Gameplay and scripted presents both go through it.
+
+The fixed A500 wave and boss captures have no displayed-bitmap draw starts.
+At the old tear field the late server write came at the same slot, but it
+already carried the list s60_loadview had written a field earlier.
+`-DLOADVIEW_COP2LC=0` builds the control; the release bytes don't depend on the
+define's presence.
+
+### Exit handoff
+
+The level-exit, death and quit code starts drawing the next view into the other
+bitmap as soon as the SIM60 loop returns. After the last gameplay presentation
+that bitmap stays on screen until the next field. On `a1200-fast` the native
+exit code wrote 13522 words into it in that field (rows 271–352, the cockpit
+and radar edges) at the level 4 boss, and 2129 at the level 5 boss.
+`s60_loop_handoff` (`src/sim60.s`, under BUFFER_REUSE) applies the draw's rule on
+the way out: `s60_loop_exit` and `s60_loop_quit` wait until the field counter
+differs from native -22(a5) before returning. The fixed captures have no exit
+writes into the shown bitmap.
+
+### Step 8 field captures
+
+Normal-speed field captures (`tmp/glitch/run.py`, built on `fixed_window.py
+--shot-windows` and `field_flicker.py`) cover each level's first kill, boss
+removal (or the last boss hit, for levels 2 and 6) and level entry. Each
+capture is 600 fields at warp off, on all three machines. That is 20 scenes
+per machine, rerun after each fix. Before the fixes, the A500 drew into the
+shown bitmap five times (twice in SOL combat, once in level 1 combat, twice at
+the level 2 boss; four visible) and the A1200-fast exit wrote into it at the
+level 4 and 5 bosses (one visible). After both fixes no field shows a SIM60 draw in the displayed
+bitmap.
+
+The remaining one-field changes all have native causes:
+
+| Finding | Where | Cause |
+|---|---|---|
+| Top emblem light toggles; occasionally a one-field mixed state | boss scenes, all machines | colour change follows simulation time and can land mid-scan; on the A500 catch-up bunches the toggles |
+| Cockpit indicator at (243,170) | some boss scenes | native $d2be–$d334 redraws it in the displayed bitmap |
+| Small HUD writes after the last gameplay present | A1200-fast level 1 and 3 bosses | native ticks after the last present, landing on rows already scanned: invisible |
+| Level-exit colour cycle; on the 68060 an A B A horizon band (rows 207–224) per 3-field presentation | every boss removal | the exit's palette cycle; identical with `LOADVIEW_COP2LC=0` |
+| One darker field, then one field of the other buffer's older frame, before the black exit view | 68060 boss removals | the exit code shows the back buffer once before clearing it; identical with `LOADVIEW_COP2LC=0`, without the exit handoff and with `SCRIPTED_WAIT=0` |
+| Briefing picture one field before its palette; dialog text drawn progressively | level entry | the briefing draws into its single displayed bitmap |
+| Death picture returning after black; the Continue? requester drawn in two fields | level 6 boss (death) | native death and dialog code, outside the SIM60 loop |
+
+The same level 0→1 transition with CUSTOM1 off (`NATIVE_SCENE=6`, the game's
+own timing) shows the briefing picture before its palette and the half-drawn
+dialog as well: 25 fields apart on `a1200-fast`, as with SIM60, and neither on
+the A500. The native boss scene's pilot doesn't kill the boss (the 68060 run
+dies, the A1200-fast run is still fighting after 900 fields), so the boss-kill
+exit has no native-timing capture. Its effects are instead checked with all
+three SIM60 changes that are active during the exit switched off in turn.
+
+The 68060 motion run repeats the 14 wave and boss motion scenes
+(`--motion-ticks`) on `a1200-060`. Ignoring addresses, every T/P/A line is identical
+to `a1200-fast`, so the motion and collision results carry over unchanged
+(`tmp/motion/compare060.sh`, `tmp/motion/summary.json`). Both run N=12; the
+68060 presents about three times as often, so presentation rate doesn't
+reach the simulation.
+
+Evidence: `tmp/glitch/review.md`, `tmp/glitch/*-summary.json` and the captures
+beside them; the pre-fix captures are in `tmp/glitch/oldbuild` and
+`tmp/glitch/fix1`.
 
 ### Corrected selected-rate matrix
 
@@ -2343,7 +2484,13 @@ Shared $11136 sets angular velocity at actor offset $38, which the existing
 motion integrator already scales. The adapter captures and distributes its separate bank increment at $111a2;
 scaling the angular velocity again would be wrong. Level-2
 Y writes at $10aec/$10b8c are continuous descent/ascent, while $10a7e assigns an
-altitude of 2100 as a state-dependent clamp. Sideways helper $110be writes real
+altitude of 2100 as a state-dependent clamp. Its state byte is actor offset $59. State 0 hovers at 2100
+and turns towards the player; once within 512 of the bearing, it dives (state 1)
+only if the player is more than 4000 away ($10ab0). Otherwise it climbs and
+retreats (states 2 and 3) to 16000 before turning back. A dive descends 100 per
+call to 500 and fires twice at counter 10. Hits use the box test at $85f6 (each
+axis within the mean radius, boss 2365), so a grounded shot reaches it only
+below about 1250. Sideways helper $110be writes real
 X/Z movement at $110f6/$11120/$1112a, with its own native trigonometric rounding.
 
 The Y writes at $10c3c/$10d6e temporarily put the boss at a projectile's height
@@ -2632,6 +2779,18 @@ $f31c, restores their starting values, and distributes both over twelve physics
 ticks with signed integer remainders. Native steering, timers and projectile
 creation still execute only once per interval. Decisions start immediately on
 an actor's first callback; they no longer share the global legacy phase.
+
+The starting height and bank are kept on the stack across the native call, not
+in registers. The game's library stubs (for example $876, a sound-library call
+reached through $f5e0 → $f646 → $21386 → $21c5c when a flyer fires) load
+arguments into D2–D4 and do not restore them; the compiled game never keeps a
+value in D3 across a call, so this is harmless natively. Keeping the bank in D3
+restored −2 after a firing call: the bank snapped flat and swung back over the
+interval (a500 tick 917, one presented frame; a1200-fast boss 1 tick 5210). The
+boss adapter had the same fault: it kept the level 4 boss's sampled Z in D3, so
+each firing call snapped the boss's world Z to near the player and glided it
+back over the interval (every 48 ticks at N=3, 192 at N=12). It now keeps its
+samples on the stack, and the cockpit shake keeps its tick there too.
 
 Flying actors use
 word 4 for interval phase, word 6 for height increment, word 62 for its remainder,
@@ -3053,6 +3212,10 @@ completion: $4184 jumps to $101b0, whose dialog string is at data $233e. Its
 native first-update guard at -6(a5) suppresses one call before being cleared.
 Actual level exits clear $1e53 in collision code at $3610 or final-boss handling
 at $3ff4; the scheduler already checks that flag before another simulation tick.
+Player contact with a type 25 exit or a type 26 warp reaches $35e4; a warp adds
+two more to the level index at $360a before the normal advance, skipping two
+levels. In level 3, destroying a type 32 structure revealed a warp
+(`tmp/step8/old13/n3-a500` campaign, session 21: level 3 to level 6).
 
 The post-update block now runs every tick. A guarded eight-byte hook at $2c96
 replays MOVEQ/AND with their native flags on legacy-phase ticks, and otherwise

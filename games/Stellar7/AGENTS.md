@@ -12,7 +12,7 @@ Read `docs/open-work.md` first.
 
 | Doc | Read it for |
 |---|---|
-| `docs/open-work.md` | the plan, where it stands and the remaining steps 7–11 (step 6, A500 interrupts and sound, is done) |
+| `docs/open-work.md` | the plan, where it stands and the remaining steps 9–11 (steps 6–8 are done) |
 | `docs/development.md` | variants, builds and VERIFY fixtures, the fixed-window driver, rate matrices, packaging, traps |
 | `docs/internals.md` | the program, game time, every slave patch, measurements, limitations |
 | `README.md` | the summary and how to play the conversion |

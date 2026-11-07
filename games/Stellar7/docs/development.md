@@ -132,6 +132,11 @@ post-presentation field saved at `-22(a5)` still equals the current field.
 Drawing resumes after the field advances, allowing the display handoff to
 finish before reusing the old bitmap. This adds no interpolation and does not defer owed simulation updates.
 `BUFFER_REUSE=0` is an unsafe diagnostic reference, not a playable setting.
+It also drops the exit handoff wait (`s60_loop_handoff`).
+`LOADVIEW_COP2LC=1` (the COP2LC write after LoadView) and `SCRIPTED_WAIT=1` (the
+field wait after each scripted-sequence present) are the defaults. The `=0`
+definitions are glitch-capture controls only; the defaults leave the release bytes
+as they are.
 `sim68000` additionally enables `POLYGON_BLIT_IRQ=1`, which marks the 68000
 target and defaults `BLIT_IRQ_IDLE=1` (BLIT masked while Kickstart's blit queue is
 idle, superseding the polygon-only wrapper) and `SOUND_FAST=1` (the exact sound-timer
@@ -683,6 +688,97 @@ context, and the call is already active and has not returned. Entry, return,
 context-switch and missing-PC gaps are excluded; this remains a scoped cost,
 not total elapsed time. `tools/test_routine_cost.py` checks call/interrupt edges,
 partial calls and corrupt gap snapshots.
+
+### Encounter instruments (step 8)
+
+**Field screenshots.** `fixed_window.py --shot-windows K` runs K consecutive
+`--fields` windows after the boundary, at normal speed when `EXTRA_ARGS` has
+`--warp_mode=0`. Every field's PNG goes to `shots/`, and `shots.json` records
+per field the displayed bitplane addresses, CPU and blitter accesses inside the
+displayed bitmap, Paula's audio DMA fetches and the CPU's audio register writes.
+The trace itself is deleted after each window. The option cannot be combined
+with raw traces, state-only captures, other observers or checkpoints. On
+non-cycle-exact setups (`a1200-060`) the trace has no CPU or blitter records,
+so only the images and audio are usable there.
+
+`field_flicker.py CAPTURE` reports transients (pixels shown for one field
+whose neighbours agree) and reversions (a whole field equal to an earlier
+image after a different one). Legitimate one-field effects exist, such as the
+colour-cycling background behind dialogs and the black field between scenes,
+so review each finding against its displayed planes. `paula_audio.py CAPTURE`
+rebuilds a WAV from the recorded audio fetches, using the written periods and
+volumes, and lists each channel's sample starts. A trace slot is a DMA record
+index, so it places fetches by their fraction of the NTSC field.
+
+**Motion traces.** `fixed_window.py OUT --tick T --motion-ticks K` records K
+completed ticks from tick T (without another observer, screenshots or
+checkpoints). A read-only stop at `s60_recenter` entry (after the tick's
+movement and collisions, before the world shift) writes the player and every
+active actor to `motion.txt`: type, position, rotation, speed, turn rates,
+lifetime/health, flags, radius and owner. A stop at the native presentation
+entry ($6a0a) records which tick each frame shows. The symbol comes from the
+VERIFY listing, so copy the listing next to the capture.
+
+`motion_check.py CAPTURE` rebuilds world positions across the recentering
+and reports, per object, outliers (one tick off the path both neighbours
+predict: a hitch, or a stall and catch-up), bursts (one step unlike two
+agreeing neighbours, without a change of the object's own speed or turn rate),
+step changes with whether speed or turn rate explains them, and zero steps at
+speed. Steady acceleration is not an outlier. Presented ticks must not
+decrease within a session; a level exit's scripted sequence presents the last
+tick again, which is counted as a repeat. `collision_check.py CAPTURE` applies the
+native box test to every type-23 projectile and target. It reports overlaps
+that survive a tick (missed), paths through the box between two records
+that come within half the reach (tunnelled; one tick's relative step is
+shorter than the reach), and shallow corner grazes separately. It also lists
+each hit (a projectile removed with lifetime left) with the nearest target's
+box distance and whether it lost health. The level 0 boss helper moves the
+boss to the projectile's height for its test, so boss hits are judged by X/Z.
+Warp-speed traces show the tick sequence, not the display's real-time cadence.
+
+**Campaigns.** `campaign.py OUT` plays one VERIFY game from SOL towards the
+ending in its own `INSTANCE` and build directory. Its required flags are
+`-DDEATH_TEST=1 -DDEATH_NATURAL=1 -DDEATH_RETRY=1 -DAPPROACH_TYPE=0`; the
+step 8 runs add
+`-DAPPROACH_FIRE=1 -DAPPROACH_STANDOFF=6000 -DAPPROACH_BOSS_STANDOFF=3000 -DAPPROACH_REACH=1 -DAPPROACH_AVOID_WARP=1 -DAPPROACH_LOCK=1 -DAPPROACH_AIM=512 -DPOWER_ROUTE=1 -DPOWER_TRIGGER_TYPE=44 -DPOWER_TRIGGER_ENERGY=400`
+and `--max-sessions 300`
+with `WHD_ARGS='CUSTOM1=1 CUSTOM3=1'`. APPROACH_BOSS_STANDOFF holds bosses
+closer than other enemies, except the level 2 boss, which only dives at a player
+more than 4000 away. APPROACH_REACH keeps the grounded-target rules (height
+300 or less) and adds two things. When nothing grounded is left, it turns
+towards the nearest flyer without driving, because a wave only ends when its
+flyers are dead. Flyers and bosses are fired at only when the native hit test
+($85f6: each axis within the mean radius) lets a grounded shot reach them; the
+level 2 boss cruises out of reach at height 2100 between dives. APPROACH_AVOID_WARP turns away
+from a type 26 warp within 5000 and drives off; destroying certain level
+structures reveals one, and touching it skips two levels. POWER_TRIGGER_ENERGY
+activates the shield alone, once per session, when energy first drops below the
+value; the other powers still wait for the boss, because a clone deployed
+during a wave stopped the boss carrier arriving. The level 0 and 3 bosses are exempt because their handlers
+test hits at the projectile's height. DEATH_RETRY answers Yes to every
+Continue and OK to the Hall of Fame name entry. After a game over, the menu's
+Begin restarts level 0, and the fixture requests native exits (as LEVEL_TEST
+does) until the game is back at the highest level reached. That level's waves
+and boss stay native. Read-only breakpoints log boss damage, kills, player
+hits, boss-helper calls, exits, deaths, Continues left, game overs, name
+entries and landings, with a state sample every `--sample` ticks. A watchdog
+saves a screenshot and dump when no sample arrives for `--watchdog` fields
+after gameplay has started. An incomplete gdb sample reply is saved as `bad-sample-*.txt`
+and retried. `campaign_report.py OUT [--require-complete]`
+summarises each level. A per-level run builds with `-DCAMPAIGN_START=N`,
+which seeds DEATH_RETRY's highest level so native exits take the game from SOL
+straight to level N, and passes `--level N` to finish once that level is left
+(the ending for level 6); `--require-level N` then checks it. The A1200-fast and
+A500 step 8 runs cover levels 0 and 1 from SOL and levels 2–6 per level
+(`tmp/step8/levels.sh`). `--require-complete` checks a single run from SOL: a
+native boss kill on every level, exits on levels 0–5, the ending and zero
+fixture errors.
+
+**Other dialogs.** PAUSE_TEST accepts `PAUSE_HANDLER=$10170` (Exit this
+mission?) or `$101b0` (Quit to DOS?) and `PAUSE_CHOICE=1|2` for the button
+returned through the native poll. Quit to DOS Yes is rejected at assembly
+because it leaves the game. Exit/Yes runs SIM60's quit path, which re-enters
+the loop once inactive (session 2), so the menu's new game is session 3.
 
 ### Interrupt and sound-timer checks
 

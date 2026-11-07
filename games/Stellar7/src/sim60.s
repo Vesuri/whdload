@@ -1,6 +1,12 @@
         IFND BUFFER_REUSE
 BUFFER_REUSE = 1 ; wait for native display handoff before reusing the old bitmap
         ENDC
+        IFND LOADVIEW_COP2LC
+LOADVIEW_COP2LC = 1 ; hand the new copper list to COP2LC when LoadView returns
+        ENDC
+        IFND SCRIPTED_WAIT
+SCRIPTED_WAIT = 1 ; scripted presents wait for the new view (0: native timing, a control)
+        ENDC
         IFND RETICLE_CLOCK
 RETICLE_CLOCK = 1 ; native reticle refresh belongs to the simulation schedule
         ENDC
@@ -680,6 +686,7 @@ s60_loop_delay: cmp.l ($24a8-S60_DATA,a4),d0
         move.l (s60_ticks-s60_last,a2),(s60_last_render-s60_last,a2)
         bra s60_loop_poll
 s60_loop_quit:
+        bsr s60_loop_handoff
         bsr s60_input_restore
         clr.w (s60_running-s60_last,a2)
         movem.l (sp)+,d2-d7/a2-a6
@@ -697,11 +704,23 @@ s60_loop_exit:
         bsr s60_test_death_exit
         ENDC
         ENDC
+        bsr s60_loop_handoff
         bsr s60_input_restore
         clr.w (s60_running-s60_last,a2)
         movem.l (sp)+,d2-d7/a2-a6
         move.l (s60_code,pc),-(sp)
         add.l #$2d7c,(sp)
+        rts
+
+; The native exit, death and quit code starts drawing into the other bitmap at
+; once. After the last gameplay presentation that bitmap is still on screen
+; until the next field, so keep the BUFFER_REUSE rule on the way out as well.
+s60_loop_handoff:
+        IFNE BUFFER_REUSE
+        move.l (-22,a5),d0
+.wait:  cmp.l ($24a8-S60_DATA,a4),d0
+        beq .wait
+        ENDC
         rts
 
 s60_clock:

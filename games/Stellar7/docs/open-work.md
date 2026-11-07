@@ -18,9 +18,8 @@ cross-rate trajectory differences must be identified and explained.
 Each implementation step ends with measurements in `docs/internals.md`,
 commands in `docs/development.md` and a coherent commit following AGENTS.md.
 The source default remains N=12; the 68000 playable build explicitly selects
-N=3. Steps 1–6 are complete; step 6 retained two exact 68000 interrupt changes.
-Steps 7–11 remain, in order: a fresh baseline on the three validation machines, encounter
-coverage, final build checks, playtesting and the release.
+N=3. Steps 1–8 are complete; step 6 retained two exact 68000 interrupt changes.
+Steps 9–11 remain, in order: final build checks, playtesting and the release.
 
 ### Existing evidence and limitations
 
@@ -203,7 +202,7 @@ is a performance comparison; retain 60 Hz on the 68020+ path. Any unresolved A50
 
 ## Remaining work
 
-Steps 8–11 run in order; steps 6 and 7 are complete. Each change ends with its measurements in
+Steps 9–11 run in order; steps 6–8 are complete. Each change ends with its measurements in
 `docs/internals.md`, its commands in `docs/development.md` and its own commit.
 
 ### Validation machines
@@ -310,8 +309,12 @@ are in internals ("Three-machine baseline").
 
 ### Step 8: Encounter coverage at both rates
 
-Status: in progress. Run each item on `a500-1.5m` (15 Hz) and `a1200-fast`
-(60 Hz), with `a1200-060` for the final full run.
+Status: complete (campaign levels 2–6 optional). Step 8 tests what SIM60
+changes, not game logic it leaves alone: the game still runs, nothing is drawn wrongly, every object moves and
+rotates smoothly, collisions still hit, and sudden position or rotation changes
+are the game's own. Levels matter where they bring object types or handlers of
+their own. Run on `a500-1.5m` (15 Hz) and `a1200-fast` (60 Hz); `a1200-060`
+joins the normal-speed captures and the final run.
 
 Already passing on the earlier configurations: all 26 native-reference fixture
 groups; combined preference changes and re-enabling through the native menus;
@@ -323,47 +326,69 @@ native-event verification; full-health final-boss kills and native ending entry
 and return after explicit earlier-level and wave shortcuts; natural combat death,
 Continue and No/menu/new-game after fixture-controlled exits to level 6.
 
-Still to run:
+Done on both rates (details in internals):
 
-1. Full waves and full-strength boss kills in levels 1–6 without wave shortcuts,
-   including each level transition and the ending.
-2. Boss helpers in each boss encounter.
-3. Mine detonation checked by display capture and recorded audio.
-4. Jumps and landings over arbitrary terrain, not only the controlled contacts.
-5. Each power active during combat: its effect on hits, shots and contacts.
-6. Natural deaths in later levels, with Continue and No.
-7. The remaining native dialog paths.
-8. Flicker seen on 2026-11-06 while watching the step 7 capture windows, in a
-   full-screen view of a ship exploding, possibly the player's death. Those
-   windows showed the extended-combat natural deaths and the lifecycle check's
-   forced deaths at N=3 and N=12. They were warp-mode captures, which skip
-   displayed fields, and some added `SLOW_DRAW=20`, a deliberate draw delay.
-   Reproduce it at normal speed without SLOW_DRAW
-   (`EXTRA_ARGS=--warp_mode=0`), compare the native build in the same scene,
-   and check the displayed buffers
-   (`presentation_buffers.py`) before deciding whether it is a defect. The
-   explosion frame clock is described in internals ("Animation and explosion
-   activation clocks").
-   Flickering in-game graphics were also seen on `a1200-060` (68060, MMU, FPU,
-   AGA) in the same capture windows, all in warp mode. That does not
-   explain it: the step 7 buffer check's 50 traced warp-mode fields on that
-   machine have no changed displayed words in either the release build or
-   the deliberately unsafe `BUFFER_REUSE=0` control, which therefore did not
-   reproduce the step 5 hazard there.
+- **Flicker.** The flicker was the player's death explosion. Scripted
+  sequences presented without waiting for the new view, so the next frame's
+  clear could reach the bitmap on screen. SIM60 now applies the game loop's
+  field check to them ("Scripted-sequence presentation"). Normal-speed field
+  captures show 0 death-scene tears after the fix on all three machines (68060
+  22, A1200-fast 12, A500 1–3 before).
+- **Mine detonation.** Display and Paula audio captured together: the same
+  detonation sample plays once, in full and at the same pitch, within the tick
+  that shows the explosion, for both the shot mine and the level 6 contact.
+- **Native dialogs.** Exit this mission? No and Yes, and Quit to DOS? No,
+  through the native input dispatcher and dialog poll: the modal interval is
+  excluded with owed ticks kept, and Exit/Yes reaches a new SOL game. Quit to
+  DOS Yes, which leaves the game, is not run.
+- **No after a natural death.** Natural death in level 6 after the
+  level-selection exits (tick 1860 at 15 Hz, 9212 at 60 Hz), native No, one menu
+  return and a new SOL game in session 8 with energy 680 and credit 60
+  (`tmp/step8/decline/validation.json`).
+- **Campaign levels 0 and 1.** Full waves, full-strength boss kills and native
+  exits from SOL at both rates (`tools/campaign.py`).
+- **Motion and collisions, every level's wave and boss.** Per-tick traces
+  (`fixed_window.py --motion-ticks`, `motion_check.py`, `collision_check.py`;
+  `tmp/motion/summary.json`). They found one SIM60 fault, now fixed: adapters
+  kept values in D2–D4 across native calls, and the game's library stubs (a
+  sound start when an enemy fires) clobber them. Flyers' bank snapped flat and
+  swung back; the level 4 boss's Z snapped to near the player and glided back
+  ("Flying-enemy integration"). After the fix every scene has no outliers and no
+  unexplained bursts; the remaining step changes are native (type-13 direction
+  changes at the same times on both rates, bank easing, contact blocking at the
+  overlap edge) or by design (type-47 steering and heading picks once per
+  interval, 0.1–0.2° per interval). No projectile passes through a target or
+  survives an overlap; every hit is at the overlap edge, and the level 5 boss
+  takes damage only from shots heading within $3000 of its own heading ($111d8).
+  Each scene also visits its level without a hang. The level 6 boss scene ends
+  in a natural death at Continue (the boss rams the player), so it covers the
+  boss up to that point, not its kill.
+
+- **Normal-speed field captures, every level's combat, boss removal and
+  entry on all three machines** (`tmp/glitch/run.py`, 600 fields each). They
+  found two SIM60 faults, both now fixed. On Kickstart 1.3 a late
+  vertical-blank interrupt could delay the new view by a field, so the next
+  draw started in the bitmap on screen (A500 tears in SOL combat and at the
+  level 2 boss). SIM60 now writes the new copper list itself after LoadView
+  ("Late copper-list switch on Kickstart 1.3"). The level-exit code drew into
+  the bitmap still on screen after the last gameplay frame (A1200-fast level 4
+  boss); the loop now waits for the field before handing over ("Exit
+  handoff"). After both fixes, the remaining one-field changes are native: HUD
+  light and indicator redraws, the exit colour cycle, the briefing and the
+  Continue requester ("Step 8 field captures"). The briefing effects recur with
+  CUSTOM1 off; the exit effects stay with each SIM60 exit change switched off.
+
+- **`a1200-060` final run.** The 14 motion scenes on the 68060 are identical,
+  tick for tick, to `a1200-fast`: every object's position, rotation, speed,
+  health and flags, although the 68060 presents about three times as often
+  ("Step 8 field captures").
+
+Optional: **campaign levels 2–6** with full waves and boss kills, if the
+remaining transitions and the ending need coverage beyond the per-level visits.
 
 ### Step 9: Final build checks
 
 Status: not started; repeat after the last fix.
-
-1. Disabled-code preservation and the normal loader byte-identical to the
-   original timing (it stays without SIM60 unless step 11 decides otherwise).
-2. Hook and indirect-entry checks on the exact release builds. Static
-   patch-boundary checks and observed calls and returns leave exceptions,
-   external-source returns and unseen paths outside coverage; close what can be
-   closed before step 11 considers SIM60 in the normal loader.
-3. Diagnostic exclusion: no VERIFY-only code in the release builds.
-4. `make play60` launcher checks on all three machines and
-   `tools/test_play60_launcher.py`.
 
 ### Step 10: Playtest
 

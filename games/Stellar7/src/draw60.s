@@ -106,6 +106,25 @@ s60_draw_install:
         cmp.l #$25298,d0
         bne s60_bad
         ENDC
+        move.l a1,a0
+        adda.l #$108f2,a0
+        cmp.w #$4ef9,(a0)
+        bne s60_bad
+        move.l (2,a0),d0
+        sub.l a1,d0
+        cmp.l #$183c0,d0
+        bne s60_bad
+        ; Native present: JSR $1ce52(PC) (the LoadView stub), ADDQ.W #4,A7.
+        move.l a1,a0
+        adda.l #$1c97c,a0
+        cmp.l #$4eba04d4,(a0)+
+        bne s60_bad
+        cmp.w #$584f,(a0)
+        bne s60_bad
+        move.l a1,a0
+        adda.l #$1ce52,a0
+        cmp.w #$4ef9,(a0)
+        bne s60_bad
         lea (s60_draw_patches,pc),a0
         jsr (resload_Patch,a2)
         rts
@@ -131,7 +150,65 @@ s60_draw_patches:
         PL_P $9c18,s60_sprite
         PL_PSS $2bd6,s60_stars_draw,4
         PL_NOP $2c08,4 ; damage shake is clocked by simulation
+        PL_P $108f2,s60_scripted_present
+        IFNE LOADVIEW_COP2LC
+        PL_PS $1c97c,s60_loadview ; JSR LoadView stub plus its ADDQ.W #4,A7
+        ENDC
         PL_END
+
+; Kickstart 1.3's vertical-blank server copies GfxBase LOFlist to COP2LC; the
+; copper start-up list jumps there a few lines into each field. LoadView only
+; sets LOFlist, so when that interrupt runs late the old list is shown for one
+; more field after the field counter has moved on, and the next draw (which
+; waits only for that counter) writes the bitmap still on screen. Write COP2LC
+; as soon as LoadView returns: the new list is then displayed from the next
+; field whatever the interrupt latency. The value is the one the server writes.
+GB_LOFLIST = $32 ; graphics/gfxbase.i gb_LOFlist
+V_MODES = $10    ; graphics/view.i v_Modes
+; When both lists share a high word, a single word write cannot be caught
+; half-done by the copper's jump.
+s60_loadview:
+        move.l ($72e2-S60_DATA,a4),a0 ; GfxBase, as loaded by the native stubs
+        move.l (GB_LOFLIST,a0),-(sp)  ; the list COP2LC holds now
+        move.l (8,sp),-(sp)
+        S60_CALL $1ce52
+        move.l (sp)+,a0
+        move.l (sp)+,d1
+        btst #2,(V_MODES+1,a0) ; LACE: the server alternates LOF/SHF lists
+        bne .done
+        move.l ($72e2-S60_DATA,a4),a0
+        move.l (GB_LOFLIST,a0),d0
+        swap d0
+        swap d1
+        cmp.w d0,d1
+        beq .low
+        swap d0
+        move.l d0,($dff084).l
+        bra .done
+.low:   swap d0
+        move.w d0,($dff086).l
+.done:  move.l (sp)+,(sp) ; return over the pushed view: the replaced ADDQ.W #4,A7
+        rts
+
+; Scripted sequences (death, level transitions, ending) present through the
+; $108f2 stub with data $1e52 = 0: the native present then returns without
+; waiting for the new view, and the next frame's clear can reach the bitmap
+; still on screen, which tears the picture. Apply the rule the native game
+; loop keeps at $2b96: draw again only after the field counter has moved on,
+; when the new copper list is being displayed. Gameplay keeps its own wait.
+s60_scripted_present:
+        move.w (4,sp),-(sp)
+        S60_CALL $183c0
+        addq.l #2,sp
+        IFNE SCRIPTED_WAIT
+        move.w (s60_running,pc),d1
+        bne .done
+        move.l ($24a8-S60_DATA,a4),d1
+.wait:  cmp.l ($24a8-S60_DATA,a4),d1
+        beq .wait
+.done:
+        ENDC
+        rts
 
 s60_render:
         ; Beam effects use the native RNG. Restore the gameplay stream after

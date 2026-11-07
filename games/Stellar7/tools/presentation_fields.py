@@ -21,7 +21,7 @@ SITES = {
     0x2c1a: ('present_end', '2b79'), 0x2bec: ('actors_start', '4eba'),
     0x2bf0: ('actors_end', '4eba'), 0x1c8c0: ('copper_start', '4879'),
     0x1c8da: ('copper_end', '3039'), 0x1c976: ('loadview_start', '4879'),
-    0x1c980: ('loadview_end', '584f'), 0x1c986: ('handoff_start', '33fc'),
+    0x1c982: ('loadview_end', '4a47'), 0x1c986: ('handoff_start', '33fc'),
     0x1c996: ('handoff_end', '4eba'), 0x2510c: ('waitblit_start', '2f0e'),
     0x2511a: ('waitblit_end', '4e75'), 0x1db8c: ('polygon_wait_start', '0839'),
     0x1dbb2: ('polygon_wait_end', '4e75'),
