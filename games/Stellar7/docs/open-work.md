@@ -391,23 +391,22 @@ remaining transitions and the ending need coverage beyond the per-level visits.
 Status: complete on the step 8 source; repeat after any later fix
 (development, "Final build checks"; results in internals, "Final build checks").
 
-- **Builds:** the original slave is unchanged (`418f86e4…`); both fixed-rate
-  slaves changed in step 8, and `release/slaves.sha256` records them.
+- **Builds:** at step 9 the original slave was unchanged (`418f86e4…`) and both
+  fixed-rate slaves had changed in step 8. Step 11 made `Stellar7` the single
+  release slave and repeated these checks on it.
 - **Disabled code** and the **lifecycle** scenes pass at both rates.
 - **Diagnostic exclusion:** only production switches change release bytes.
 - **Hooks:** static and installed audits pass on the release builds; the
   `make play60` launcher selects, installs and reaches the menu on all three
   machines; `test_play60_launcher.py` and the other tool tests pass.
 - **Entry traces** at both rates find no patch-interior entry. Still open:
-  exception and external returns, and 36 patches no trace window enters. These
-  matter only if step 11 puts SIM60 into the normal loader.
+  exception and external returns, and 36 patches no trace window enters. They
+  concern only the CUSTOM1 path.
 
-1. Disabled-code preservation and the normal loader byte-identical to the
-   original timing (it stays without SIM60 unless step 11 decides otherwise).
+1. Disabled-code preservation: with CUSTOM1 off the original code is untouched.
 2. Hook and indirect-entry checks on the exact release builds. Static
    patch-boundary checks and observed calls and returns leave exceptions,
-   external-source returns and unseen paths outside coverage; close what can be
-   closed before step 11 considers SIM60 in the normal loader.
+   external-source returns and unseen paths outside coverage.
 3. Diagnostic exclusion: no VERIFY-only code in the release builds.
 4. `make play60` launcher checks on all three machines and
    `tools/test_play60_launcher.py`.
@@ -428,18 +427,21 @@ reported per machine or per item below.
 
 ### Step 11: Release
 
-Status: in progress; items 1 and 3 are done.
+Status: in progress; items 1–3 are done.
 
 1. Done: the two scratch probes (`swap_only_probe.py`, `cache_probe.py`/`.s`) and
    the first-baseline `state_summary.py` and `compare_traces.py` are removed.
    Every remaining tool is a current check, or the reader of a fixture still in
    the source.
-2. Decide the release and whether the normal loader gets SIM60. Today the normal
-   `Stellar7.slave` still contains the pre-SIM60 timing prototype (`timing.s`):
-   CUSTOM1=1 enables it at 5 Hz by default, or 1–25 Hz with CUSTOM2. The plan
-   rejects 5 Hz, and the ReadMe doesn't mention the prototype. Decide whether to
-   remove it from the normal loader, which changes its bytes.
+2. Done: the release ships one slave, `Stellar7.slave`. It carries both
+   simulations, each assembled alone from `src/payload.s`, and CUSTOM1 installs
+   the one for the CPU (15 Hz on 68000/68010, 60 Hz on 68020+); without CUSTOM1 it
+   keeps the original timing. The `timing.s` prototype is removed. Each copy is
+   its development slave's code except its four `_resload` loads
+   (`tools/release_payloads.py`), and the step 9 checks pass on the release slave
+   (internals, "Final build checks"). The installer asks for the fixed-rate
+   simulation or the original timing.
 3. Done: the slaves' `$VER` and the ReadMe say 2.0b (07.11.2026), and the ReadMe's
    2.0b entry lists only user-visible changes since 1.0. `make dist` builds
-   `dist/Stellar7Enhanced-2.0b-20261107.lha`. Nothing is published:
-   `make release` runs only on your go.
+   `dist/Stellar7Enhanced-2.0b-20261107.lha` with the one slave. Nothing is
+   published: `make release` runs only on your go.

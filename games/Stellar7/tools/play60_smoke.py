@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Launcher check (open-work step 9): boot the real tools/play60.sh (release build, default
-CUSTOM1=1) on one machine; confirm the selected slave matches the audited release build, its
-hooks are installed, CUSTOM1=1 reaches WHDLoad and the native menu is reached.
+"""Launcher check (open-work step 9): boot the real tools/play60.sh (release slave, default
+CUSTOM1=1) on one machine; confirm the slave matches the audited release build, the
+simulation for this CPU is the one installed (its hooks and rate), CUSTOM1=1 reaches WHDLoad
+and the native menu is reached.
 Usage: tools/play60_smoke.py SETUP BUILDS OUT
-  BUILDS  a baseline_checks.py builds folder (its VARIANT.slave/.lst are the audited builds)
+  BUILDS  a baseline_checks.py builds folder (Stellar7.slave/.lst and the payload listings)
   OUT     new folder under tmp/; writes OUT/validation.json
 Warp, silent and disconnected inputs: no gameplay or audible-output claim."""
 import fcntl, json, os, socket, struct, subprocess, sys, time
@@ -18,8 +19,8 @@ from amigaxdev import barto
 
 setup = sys.argv[1]
 machine = machines.resolve(setup)
-variant = 'Stellar7-Sim68000' if machine['cpu'] in ('68000', '68010') else 'Stellar7-Sim60'
-n = 3 if variant == 'Stellar7-Sim68000' else 12
+variant, payload = 'Stellar7', audit_hooks.payload_for(machine['cpu'])
+n = 3 if payload == 'Sim68000' else 12
 builds = Path(sys.argv[2]).resolve()
 out = Path(sys.argv[3]).resolve()
 out.relative_to(root/'tmp')
@@ -73,7 +74,7 @@ with (root/'tmp/rate-matrix.lock').open('a') as lock:
                 r = {name: lo for lo, hi, name, o in loaded_game_regions(mem, base, ch)}
                 h, data = r['s7'], r['s7-data']
                 (out/'anchor.txt').write_text(f'code={h:#x}\ndata={data:#x}\nbase={base:#x}\n')
-                audit_hooks.installed(out, listing)
+                audit_hooks.installed(out, listing, payload)
             except (KeyError, ValueError, AssertionError):
                 cmd('cont'); continue
             break
@@ -86,7 +87,7 @@ with (root/'tmp/rate-matrix.lock').open('a') as lock:
         assert mem[h-base+0x4582:h-base+0x4588] == bytes.fromhex('4eba64ca2e00'), 'not at the native menu call'
         for offset, expected in [(0xb1f4, '4eba56847245'), (0xb8c4, '4eba4fb47245')]:
             assert mem[h-base+offset:h-base+offset+6] == bytes.fromhex(expected), 'menu fixture present'
-        installed = audit_hooks.installed(out, listing)
+        installed = audit_hooks.installed(out, listing, payload)
         cmd('gdb monitor profile 1 "" "'+str(out/'screen.bin')+'"', timeout=300)
         field = barto.load(out/'screen.bin').fields[-1]
         (out/'menu.png').write_bytes(field.shot)
@@ -95,7 +96,7 @@ with (root/'tmp/rate-matrix.lock').open('a') as lock:
         (out/'startup-sequence').write_text(startup)
         whdload = [l for l in startup.splitlines() if l.startswith('WHDLoad ')]
         assert len(whdload) == 1 and 'CUSTOM1=1' in whdload[0].split(), whdload
-        result = dict(setup=setup, variant=variant, substeps=n, installed=installed, native_menu_reached=True,
+        result = dict(setup=setup, variant=variant, payload=payload, substeps=n, installed=installed, native_menu_reached=True,
                       menu_fixture_absent=True, release_matches_audited=release_matches,
                       whdload_command=whdload[0],
                       scope='Actual play60 launcher, default CUSTOM1; warp, silent, disconnected inputs. No gameplay or audible-output claim.')

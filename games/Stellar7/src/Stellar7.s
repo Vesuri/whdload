@@ -1,6 +1,6 @@
 ; Stellar 7 loader, reconstructed from Psygore's v1.0 game-specific startup.
 ; Shared WHDLoad 20.0 KickEmu replaces the embedded 2008 implementation.
-; Opt-in fixed-step timing. Original CRC checks and SetCPU values retained.
+; CUSTOM1: the fixed-rate simulation. Original CRC checks and SetCPU values retained.
         INCLUDE whdload.i
         INCLUDE whdmacros.i
         INCLUDE lvo/dos.i
@@ -24,8 +24,7 @@ slv_config:
         IFD SIM60
         dc.b "C1:B:Experimental ",48+S60_RATE/10,48+S60_RATE-(S60_RATE/10)*10," Hz simulation;"
         ELSE
-        dc.b "C1:B:Experimental fixed simulation;"
-        dc.b "C2:L:Simulation Hz:Default (5),1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25;"
+        dc.b "C1:B:Fixed-rate simulation (15 Hz on 68000, 60 Hz on 68020+);"
         ENDC
         IFD VERIFY
         dc.b "C3:B:Movement and firing fixture;C4:L:Draw every N steps:Default (1),1,2,3,4,5,6,7,8;C5:B:Deterministic menu fixture;"
@@ -36,7 +35,7 @@ _args: dc.b 10,0
         EVEN
 _s7tags: dc.l WHDLTAG_CUSTOM1_GET
 _custom1: dc.l 0
-        dc.l WHDLTAG_CUSTOM2_GET
+        dc.l WHDLTAG_CUSTOM2_GET ; unused; kept so the development slaves keep their bytes
 _custom2: dc.l 0
         IFD VERIFY
         dc.l WHDLTAG_CUSTOM3_GET
@@ -134,7 +133,27 @@ _bootdos:
         IFD SIM60
         INCLUDE sim60.s
         ELSE
-        INCLUDE timing.s
+; The release slave: both simulations, each assembled alone from payload.s (game.sh).
+; CUSTOM1 installs 15 Hz with the 68000 interrupt changes on 68000/68010, 60 Hz on 68020+.
+; Each copy is called as the development slaves call it, after its _resload is filled.
+timing_install:
+        lea (s7_sim68000,pc),a0
+        lea (s7_sim68000_end-4,pc),a1
+        move.l (_attnflags,pc),d0
+        btst #AFB_68020,d0
+        beq .install
+        lea (s7_sim60,pc),a0
+        lea (s7_sim60_end-4,pc),a1
+.install:
+        move.l (_resload,pc),(a1)
+        jmp (a0)
+        CNOP 0,4
+s7_sim68000:
+        INCBIN "Stellar7.Sim68000.bin"
+s7_sim68000_end:
+s7_sim60:
+        INCBIN "Stellar7.Sim60.bin"
+s7_sim60_end:
         ENDC
 
 ; The version string (docs/releasing.md), named as the installer ships each build; last, so

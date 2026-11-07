@@ -4,8 +4,8 @@
     make dist        (game.sh game_dist; --dist names the output directory)
 
 Output: DIST/Stellar7Enhanced-<version>-<YYYYMMDD>.lha and its .sha256, named from the
-release slaves' $VER string (docs/releasing.md); all three must carry the same version and
-date, which the ReadMe's title and history entry repeat.
+release slave's $VER string (docs/releasing.md), which the ReadMe's title and history entry
+repeat. The archive ships the one release slave, Stellar7.slave, with both simulations.
 """
 import argparse
 import fcntl
@@ -17,6 +17,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+
+import release_payloads
 
 ROOT = Path(__file__).resolve().parents[1]
 # The shared packager's version_of and date_of; it has this module's name, so load it by path.
@@ -90,14 +92,11 @@ def main():
             subprocess.run([lha, 'xq2', str(original)], cwd=stage, check=True)
             baseline = inventory(stage)
             folder = stage/'Stellar7HD'
-            builds = {'Stellar7.slave': 'Stellar7.Slave',
-                      'Stellar7-Sim68000.Slave': 'Stellar7-Sim68000.Slave',
-                      'Stellar7-Sim60.Slave': 'Stellar7-Sim60.Slave'}
+            builds = {'Stellar7.slave': 'Stellar7.Slave'}
             release = ROOT/'tmp/build/release'
-            stamps = {(shared.version_of(release/s), shared.date_of(release/s)) for s in builds.values()}
-            if len(stamps) != 1:
-                raise ValueError(f'The release slaves disagree on $VER: {sorted(stamps)}')
-            (version, stamp), = stamps
+            # Both simulations must be the development slaves' code (tools/release_payloads.py).
+            release_payloads.check(release)
+            version, stamp = shared.version_of(release/'Stellar7.Slave'), shared.date_of(release/'Stellar7.Slave')
             date = f'{stamp[6:]}.{stamp[4:6]}.{stamp[:4]}'
             for target, source in builds.items():
                 if f'$VER: {target} {version} ({date})'.encode() not in (release/source).read_bytes():
@@ -109,8 +108,7 @@ def main():
                 for forbidden in (b'Movement and firing fixture', b'Deterministic menu fixture'):
                     assert forbidden not in data, 'VERIFY build cannot be packaged'
                 (folder/target).write_bytes(data)
-            for name, rate in [('Stellar7-Sim68000.Slave', '15'), ('Stellar7-Sim60.Slave', '60')]:
-                assert ('Experimental '+rate+' Hz simulation').encode() in (folder/name).read_bytes()
+            assert b'C1:B:Fixed-rate simulation (15 Hz on 68000, 60 Hz on 68020+);' in (folder/'Stellar7.slave').read_bytes()
             script_path = folder/'Install-Stellar7'
             script = script_path.read_bytes().decode('latin1')
             # The conversion is validated only for the supplied English NTSC game.
@@ -118,21 +116,16 @@ def main():
             selection = '''(P_SelectVersion)
 (set #sim-choice
   (askchoice
-    (prompt "Stellar 7 Enhanced: choose your CPU / timing.")
-    (choices "68000/68010: 15 Hz" "68020 or faster: 60 Hz" "Original timing (development loader)")
+    (prompt "Stellar 7 Enhanced: choose the game timing.")
+    (choices "Fixed-rate simulation (15 Hz on 68000, 60 Hz on 68020+)" "Original timing")
     (default 0)
-    (help "Both fixed-rate builds preserve real-time game speed. Playtesting is incomplete. Original timing leaves the conversion disabled.")
+    (help "The fixed-rate simulation keeps real-time game speed on every CPU; the slave picks the rate from the CPU. CUSTOM1=1 in the icon enables it. Original timing leaves it disabled.")
   )
-)
-(select #sim-choice
-  (set #prefix-slave "Stellar7-Sim68000")
-  (set #prefix-slave "Stellar7-Sim60")
-  (set #prefix-slave "Stellar7")
 )
 '''
             script = replace_once(script, '(P_SelectVersion)\n', selection)
             script = replace_once(script, '  (P_SelectIcon)\n)', '''  (P_SelectIcon)
-  (if (< #sim-choice 2)
+  (if (= #sim-choice 0)
     (tooltype
       (dest (tackon #dest #icon_prefix))
       (settooltype "CUSTOM1" "1")
@@ -152,29 +145,27 @@ def main():
             text = text.replace('WHDLoad 16+', 'WHDLoad 17+ (built with KickEmu 20.0)')
             text = text.replace('512 MB OtherMem', '512 KB OtherMem')
             note = f'''Version {version} ({date}) by Vesuri:
- - New fixed-rate builds keep the game at the same speed on every CPU:
-   Stellar7-Sim68000.Slave (15 Hz, 68000/68010) and Stellar7-Sim60.Slave
-   (60 Hz, 68020+). The screen redraws as fast as the machine allows.
- - The installer asks which build to install and adds CUSTOM1=1 to the icon,
-   which enables it. The original-timing slave is still available.
+ - New fixed-rate simulation keeps the game at the same speed on every CPU:
+   15 Hz on 68000/68010 and 60 Hz on 68020+, chosen from the CPU. The screen
+   redraws as fast as the machine allows. CUSTOM1=1 enables it; without it
+   the game keeps its original timing.
+ - The installer asks which timing to use and sets CUSTOM1 in the icon.
  - Requires WHDLoad 17 (built with KickEmu 20.0).
 
 Install using Install-Stellar7 on an Amiga with Installer and your original
-English NTSC disks. Choose the rate matching your CPU. Existing destination
-handling is inherited from the original installer: preserve saves before choosing
-to delete an existing installation. WHDLoad and Kickstart requirements below apply.
-For an already installed English NTSC game, copy the chosen Sim slave beside
-its data drawer, set the game icon SLAVE to that filename and add CUSTOM1=1.
-The installer script has structural checks; its new choice UI has not been run
-under Amiga Installer.
+English NTSC disks. Existing destination handling is inherited from the original
+installer: preserve saves before choosing to delete an existing installation.
+WHDLoad and Kickstart requirements below apply. For an already installed English
+NTSC game, replace its Stellar7.slave with this one and add CUSTOM1=1 to the
+game icon. The installer script has structural checks; its new choice UI has not
+been run under Amiga Installer.
 
 '''
             text = replace_once(text, 'Version 1.0 (02.01.2008) by Psygore:', note+'Version 1.0 (02.01.2008) by Psygore:')
             readme.write_bytes(text.encode('latin1'))
             expected = inventory(stage)
             changed = {'Stellar7HD/Install-Stellar7', 'Stellar7HD/ReadMe', 'Stellar7HD/Stellar7.slave'}
-            added = {'Stellar7HD/Stellar7-Sim68000.Slave', 'Stellar7HD/Stellar7-Sim60.Slave'}
-            assert set(expected) == set(baseline) | added
+            assert set(expected) == set(baseline)
             assert {p for p in baseline if baseline[p] != expected[p]} == changed
             temporary = scratch/'installer.lha'
             subprocess.run([lha, 'a1o5q2', str(temporary), 'Stellar7HD', 'Stellar7HD.info'], cwd=stage, check=True)

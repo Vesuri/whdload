@@ -102,6 +102,33 @@ def native_data_guards(code, relocations):
         assert struct.unpack_from('>I', code, offset)[0] == target
 
 
+def listing_symbols(listing):
+    return {name: int(offset, 16) for name, offset in re.findall(
+        r'^(\w+)\s+00:([0-9A-F]+)', Path(listing).read_text(encoding='latin1'), re.M)}
+
+
+PAYLOADS = ('Sim68000', 'Sim60')
+
+
+def simulation_patch_lists(listing, payload=None):
+    """(name, slave offset) of each compiled SIM60 patch list. The release slave carries
+    them in its two simulations, listed beside it as STEM.<payload>.lst
+    (tools/release_payloads.py): payload selects one, None takes both."""
+    listing = Path(listing)
+    symbols = listing_symbols(listing)
+    if 's7_sim60' not in symbols:
+        assert payload is None, 'not a release listing with simulation payloads'
+        return [(name, start) for name, start in symbols.items()
+                if name.startswith('s60_') and name.endswith('_patches')]
+    result = []
+    for name in (payload,) if payload else PAYLOADS:
+        base = symbols['s7_'+name.lower()]
+        own = listing_symbols(listing.with_name(f'{listing.stem}.{name}.lst'))
+        result += [(f'{name}:{symbol}', base+start) for symbol, start in own.items()
+                   if symbol.startswith('s60_') and symbol.endswith('_patches')]
+    return result
+
+
 def patch_size(command, argument):
     if command in ('P', 'PS'):
         return 6
@@ -131,9 +158,7 @@ def inspect(folder, listing, allow_menu_fixture=False, allow_input_fixture=False
     excluded = {i for start, size, _ in NATIVE_DATA for i in range(start, start+size)}
     slave = slave_code(folder/'slave.slave')
     simulation_patches = []
-    for name, start in symbols.items():
-        if not (name.startswith('s60_') and name.endswith('_patches')):
-            continue
+    for name, start in simulation_patch_lists(listing):
         for offset, command, argument in decode(slave, start):
             if command == 'END':
                 break

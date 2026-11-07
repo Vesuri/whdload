@@ -13,28 +13,34 @@ import re
 import struct
 from pathlib import Path
 import capstone
-from check_disabled import hunks, patch_size
+from check_disabled import hunks, listing_symbols, patch_size, simulation_patch_lists
 import _amigaxdev  # noqa: F401 (finds amigaxdev)
 from amigaxdev.patchlist import decode, slave_code
 from stellar7_report import GAME, locate
 
 
-def compiled_patches(listing):
-    listing = Path(listing)
-    listing_text = listing.read_text(encoding='latin1')
-    symbols = {name: int(offset, 16) for name, offset in re.findall(
-        r'^(\w+)\s+00:([0-9A-F]+)', listing_text, re.M)}
-    slave = slave_code(listing.with_suffix('.slave'))
-    emitted = re.findall(r'^00:([0-9A-F]+)\s+([0-9A-F]+)\s', listing_text, re.M)
+def check_emitted(slave, listing, base=0):
+    emitted = re.findall(r'^00:([0-9A-F]+)\s+([0-9A-F]+)\s', Path(listing).read_text(encoding='latin1'), re.M)
     assert emitted, 'listing has no emitted bytes'
     for offset, encoded in emitted:
-        start = int(offset, 16)
+        start = base+int(offset, 16)
         expected = bytes.fromhex(encoded)
         assert slave[start:start+len(expected)] == expected, f'listing byte mismatch at {start:#x}'
+
+
+def compiled_patches(listing, payload=None):
+    """The SIM60 patches; for the release slave, those of the simulation named by payload
+    (Sim68000 or Sim60, check_disabled.simulation_patch_lists)."""
+    listing = Path(listing)
+    assert payload or 's7_sim60' not in listing_symbols(listing), 'release listing: name its payload'
+    slave = slave_code(listing.with_suffix('.slave'))
+    check_emitted(slave, listing)
+    lists = simulation_patch_lists(listing, payload)
+    if payload:
+        check_emitted(slave, listing.with_name(f'{listing.stem}.{payload}.lst'),
+                      listing_symbols(listing)['s7_'+payload.lower()])
     result = []
-    for name, start in symbols.items():
-        if not (name.startswith('s60_') and name.endswith('_patches')):
-            continue
+    for name, start in lists:
         for offset, command, argument in decode(slave, start):
             if command != 'END':
                 result.append(dict(start=offset, end=offset+patch_size(command, argument),
@@ -46,9 +52,9 @@ def compiled_patches(listing):
     return result
 
 
-def audit(listing, original=None, patches=None):
+def audit(listing, original=None, patches=None, payload=None):
     original = hunks(GAME) if original is None else original
-    patches = compiled_patches(listing) if patches is None else patches
+    patches = compiled_patches(listing, payload) if patches is None else patches
     code, relocations = original[0]
     groups = []
     for patch in patches:
@@ -126,11 +132,16 @@ def audit(listing, original=None, patches=None):
                 scope='Native direct entries only; computed indirect targets and replacement semantics require separate checks.')
 
 
-def installed(folder, listing):
+def payload_for(cpu):
+    """The release slave's simulation for a CPU (src/Stellar7.s timing_install)."""
+    return 'Sim68000' if cpu in ('68000', '68010') else 'Sim60'
+
+
+def installed(folder, listing, payload=None):
     folder, listing = Path(folder), Path(listing)
     binary = (folder/'slave.slave').read_bytes()
     assert binary == listing.with_suffix('.slave').read_bytes(), 'capture/listing build mismatch'
-    patches = compiled_patches(listing)
+    patches = compiled_patches(listing, payload)
     meta = {key: int(value, 0) for key, value in re.findall(
         r'^(code|base)=(\S+)', (folder/'anchor.txt').read_text(), re.M)}
     memory = (folder/'code.bin').read_bytes()
@@ -183,10 +194,11 @@ if __name__ == '__main__':
     parser.add_argument('listing', type=Path, help='exact retained listing with sibling .slave')
     parser.add_argument('--out', type=Path)
     parser.add_argument('--capture', type=Path, help='also verify each installed patch byte and destination')
+    parser.add_argument('--payload', choices=('Sim68000', 'Sim60'), help="the release slave's simulation to audit")
     args = parser.parse_args()
-    result = audit(args.listing)
+    result = audit(args.listing, payload=args.payload)
     if args.capture:
-        result['installation'] = installed(args.capture, args.listing)
+        result['installation'] = installed(args.capture, args.listing, args.payload)
     if args.out:
         args.out.write_text(json.dumps(result, indent=2)+'\n')
     print(json.dumps({k: v for k, v in result.items() if k != 'ranges'}, indent=2))

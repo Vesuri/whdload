@@ -10,12 +10,18 @@ by named setup (tools/machines.py) and writes PREFIX/<check>/validation.json:
              SOL, boss and heavy combat against a500-1.5m, N=12 heavy against a1200-fast
   lifecycle  death/Continue, declining Continue, normal and early level exit at N=3
              (a500-1.5m against delayed a1200-fast) and N=12 (a1200-060 against delayed
-             a1200-fast), plus the CUSTOM1-off preservation check per rate
+             a1200-fast), plus the CUSTOM1-off preservation check per rate and for the
+             release slave's loader
   buffers    displayed-buffer reuse on a1200-060: scanout stability and draw ordering
              with BUFFER_REUSE=1, the BUFFER_REUSE=0 control recorded beside it
   buffers_normal  the same two builds (after buffers) over 100 normal-speed fields
+  release    the release slave's CUSTOM1 path on every setup (its verify build: the menu
+             fixture in the loader, release simulations) against the development build at
+             the same rate, mapped state at two ticks, and the installed simulation's hooks
   builds     release bytes against a reference revision (--changed: the variants expected
-             to differ), the off switches, diagnostic exclusion and the release hook audits
+             to differ), the release slave's two simulations against the development slaves
+             (tools/release_payloads.py), the off switches, diagnostic exclusion and the
+             release hook audits
 
 Completed captures are reused; an incomplete one stops the run. Mapped-state
 comparisons admit only deferred projection scratch.
@@ -40,6 +46,7 @@ import presentation_buffers
 import presentation_report
 import rate_matrix
 import rate_matrix_report
+import release_payloads
 import sim60_state
 import simulation_rate
 import simulation_state
@@ -85,6 +92,10 @@ def capture(out, name, setup, flags, window, whd_args='CUSTOM1=1 CUSTOM3=1', pre
         subprocess.run(command, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
     if prebuilt is None:
         listing.with_suffix('.slave').write_bytes((folder/'slave.slave').read_bytes())
+        # The release slave's loader: its simulations' listings (check_disabled).
+        if 's7_sim60' in check_disabled.listing_symbols(listing):
+            for payload in check_disabled.PAYLOADS:
+                shutil.copyfile(ROOT/f'tmp/build/verify/Stellar7.{payload}.lst', out/f'{name}.{payload}.lst')
     meta = json.loads((folder/'metadata.json').read_text())
     assert meta.get('setup') == setup, (name, meta.get('setup'), setup)
     rate_matrix_report.settings(folder, meta)
@@ -183,6 +194,11 @@ def check_lifecycle(out, args):
         folder = capture(out, name, setup, base_flags(setup, n), ['--frame', '90', '--state-only', '--fields', '1'],
                          whd_args='')
         results[name] = dict(disabled=check_disabled.inspect(folder, out/(name+'.lst'), True, False))
+    # The release slave's loader carries both simulations; CUSTOM1 off installs neither.
+    for setup in ('a500-1.5m', 'a1200-fast'):
+        name = f'release-disabled-{setup}'
+        folder = capture(out, name, setup, '', ['--frame', '90', '--state-only', '--fields', '1'], whd_args='')
+        results[name] = dict(disabled=check_disabled.inspect(folder, out/(name+'.lst'), True, False))
     return dict(results=results, comparisons=comparisons)
 
 
@@ -243,6 +259,23 @@ def check_buffers_normal(out, args):
     return results
 
 
+def check_release(out, args):
+    results, comparisons = {}, []
+    for setup in machines.MACHINES:
+        n = substeps(setup)
+        scale = lambda tick: (tick*n+11)//12
+        window = ['--tick', str(scale(600)), '--tick-checkpoints', str(scale(1500)), '--state-only', '--fields', '1']
+        release = capture(out, 'release-'+setup, setup, '', window, whd_args='CUSTOM1=1')
+        development = capture(out, 'development-'+setup, setup, base_flags(setup, n), window, whd_args='CUSTOM1=1')
+        payload = audit_hooks.payload_for(machines.resolve(setup)['cpu'])
+        assert sim60_state.read(release)['substeps'] == n
+        results[setup] = dict(substeps=n, payload=payload,
+                              hooks=audit_hooks.installed(release, out/f'release-{setup}.lst', payload))
+        for point in ('', f'checkpoints/{scale(1500)}'):
+            comparisons.append(compare(development/point, release/point))
+    return dict(results=results, comparisons=comparisons)
+
+
 def build(game, variant, extra='', build='release', substeps68000=None):
     env = {key: value for key, value in os.environ.items() if key not in ('VASM_EXTRA', 'SIM68000_SUBSTEPS', 'VERIFY_FLAGS')}
     env.update(VARIANT=variant, VASM_EXTRA=extra)
@@ -273,6 +306,9 @@ def check_builds(out, args):
         blob = build(ROOT, variant)
         listing = ROOT/'tmp/build/release'/(variant+'.lst')
         shutil.copyfile(listing, out/(variant+'.lst'))
+        if variant == 'Stellar7':
+            for payload in check_disabled.PAYLOADS:
+                shutil.copyfile(listing.with_name(f'{variant}.{payload}.lst'), out/f'{variant}.{payload}.lst')
         (out/(variant+'.slave')).write_bytes(blob)
         releases[variant] = blob
         old = build(old_game, variant)
@@ -280,6 +316,10 @@ def check_builds(out, args):
                                            identical=blob == old)
         if variant != 'Stellar7':
             result['audits'][variant] = audit_hooks.audit(out/(variant+'.lst'))
+    # The release slave's simulations are the development slaves' code; audit each as installed.
+    result['payloads'] = release_payloads.check(ROOT/'tmp/build/release')
+    for payload in check_disabled.PAYLOADS:
+        result['audits']['Stellar7 '+payload] = audit_hooks.audit(out/'Stellar7.lst', payload=payload)
     # The off switches rebuild the reference bytes; unchanged variants must already match.
     off = build(ROOT, 'Stellar7-Sim68000', '-DBLIT_IRQ_IDLE=0 -DSOUND_FAST=0')
     old = build(old_game, 'Stellar7-Sim68000')
@@ -288,33 +328,40 @@ def check_builds(out, args):
     for variant in VARIANTS:
         if variant not in args.changed:
             assert result['releases'][variant]['identical'], (variant, 'changed from the reference')
-    # Only while the changes are 68000-only can the off switches rebuild the reference.
-    if 'Stellar7-Sim60' not in args.changed:
+    # Only against a reference before step 6, changed only in the 68000 slave (the default),
+    # can the off switches rebuild the reference.
+    if 'Stellar7-Sim60' not in args.changed and 'Stellar7-Sim68000' in args.changed:
         assert result['off_switches']['Stellar7-Sim68000 -DBLIT_IRQ_IDLE=0 -DSOUND_FAST=0']['identical']
     # The A500 rate override builds the same simulation at N=4.
     n4 = build(ROOT, 'Stellar7-Sim68000', substeps68000=4)
-    result['rate_override'] = dict(sha256=sha(n4), differs_from_n3=n4 != releases['Stellar7-Sim68000'])
-    assert result['rate_override']['differs_from_n3']
+    n4_release = build(ROOT, 'Stellar7', substeps68000=4)
+    result['rate_override'] = dict(sha256=sha(n4), differs_from_n3=n4 != releases['Stellar7-Sim68000'],
+                                   release_sha256=sha(n4_release),
+                                   release_differs_from_n3=n4_release != releases['Stellar7'])
+    assert result['rate_override']['differs_from_n3'] and result['rate_override']['release_differs_from_n3']
     # VERIFY-only fixtures and diagnostics compile to nothing in release builds.
     # SOUND_TWIN is refused where SOUND_FAST is off (Sim60), by design.
     fixtures = '-DRETICLE_TEST=100 -DRETICLE_BAD_RENDER=1 -DHISTORY_TEST=1 -DHISTORY_QUEUE_TEST=1 -DSLOW_DRAW=20'
     tags = sorted({line.split("'")[1].encode() for path in (ROOT/'src').glob('*_test.s')
                    for line in path.read_text(encoding='latin1').splitlines() if "dc.b '" in line
                    and len(line.split("'")[1]) == 4} | {b'BI60'})
-    for variant in ('Stellar7-Sim60', 'Stellar7-Sim68000'):
+    # The release slave takes the same defines into both simulations, so not SOUND_TWIN.
+    for variant in VARIANTS:
         defines = fixtures+(' -DSOUND_TWIN=1 -DSOUND_TWIN_BAD=1' if variant == 'Stellar7-Sim68000' else '')
         blob = build(ROOT, variant, defines)
         markers = [tag.decode() for tag in tags if tag in releases[variant]]
         result['exclusion'][variant] = dict(fixtures=defines, identical=blob == releases[variant],
                                             verify_markers=markers)
         assert blob == releases[variant] and not markers, (variant, markers)
-    build(ROOT, 'Stellar7-Sim68000')  # leave the default release build in place
+    build(ROOT, 'Stellar7-Sim68000')  # leave the default release builds in place
+    build(ROOT, 'Stellar7')
     shutil.rmtree(reference)
     return result
 
 
 CHECKS = dict(input=check_input, delayed=check_delayed, lifecycle=check_lifecycle,
-              buffers=check_buffers, buffers_normal=check_buffers_normal, builds=check_builds)
+              buffers=check_buffers, buffers_normal=check_buffers_normal, release=check_release,
+              builds=check_builds)
 
 
 def main():

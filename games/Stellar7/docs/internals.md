@@ -2,21 +2,22 @@
 
 ## Active performance work
 
-The experimental launcher selects **15 Hz (N=3) on 68000/68010 and 60 Hz
-(N=12) on 68020+**, without interpolation. These are separate compiled slaves;
-the launcher selects using its CPU setting. A slave's timestep does not change
-at runtime. Movement, input quanta and game clocks scale with N, retaining
+The release slave runs **15 Hz (N=3) on 68000/68010 and 60 Hz (N=12) on 68020+**,
+without interpolation, when CUSTOM1 is set. It carries both simulations, each the
+code of its development slave, and installs the one for the CPU (WHDLoad's
+`AFB_68020`); without CUSTOM1 the game keeps its original timing. A timestep does not
+change at runtime. Movement, input quanta and game clocks scale with N, retaining
 real-time game speed. History assigns controls to their tick; native menus stay live.
 
 The displayed-buffer reuse correction is enabled in both playable source paths.
 The step 7 matrix, extended-combat, input, delayed-draw, lifecycle, buffer and
 build checks pass on the three validation machines ("Three-machine baseline").
-Step 6 raises A500 presentations by 10–17% there. The actual-launcher smoke
-checks passed on the earlier configurations; the step 9 final build checks
-pass on the step 8 source ("Final build checks").
+Step 6 raises A500 presentations by 10–17% there. The step 9 final build
+checks pass on the step 8 source and again on the single release slave ("Final build
+checks").
 Fast-CPU timing diagnostics and extended-combat checks pass within the scopes below;
 the corrected selected-rate matrix and its 350 state comparisons pass. The step 8
-encounter coverage is complete and the playtest found nothing wrong. The normal loader still omits this conversion.
+encounter coverage is complete and the playtest found nothing wrong.
 
 ## Release validation
 
@@ -1133,10 +1134,48 @@ Evidence is under `tmp/step9`.
 - **Still open:** exception returns, returns from external code (Kickstart),
   and the entries of the 36 untraced patches. Static checks and these traces
   can't prove them; they rest on the step 8 encounter coverage, the fixtures and
-  the playtest. This matters for step 11 only if the normal loader gets SIM60.
+  the playtest. They concern only the CUSTOM1 path: with CUSTOM1 off, no simulation
+  is installed.
 
 Setting the version date to 07.11.2026 afterwards changed one byte in each slave, the
 date in its `$VER` string; `release/slaves.sha256` records the dated bytes.
+
+### The single release slave (step 11)
+
+Step 11 replaced the three shipped slaves with one. `Stellar7.slave` (`4849bc22…`,
+34780 bytes) is the reconstructed loader with both simulations, each assembled alone
+from `src/payload.s`. With CUSTOM1, `timing_install` reads WHDLoad's CPU flags and
+calls the 15 Hz copy on 68000/68010 or the 60 Hz copy on 68020+, after filling that
+copy's `_resload`. The `timing.s` prototype is gone. The development slaves
+`Stellar7-Sim60` (`d4e37904…`) and `Stellar7-Sim68000` (`4c142780…`) are byte-identical
+to `becf8e4e`. Evidence is under `tmp/step11`.
+
+- **The copies are the validated code:** `release_payloads.py` finds each copy
+  identical to its development slave except the displacement words of its four
+  `(_resload,pc)` loads: 15760 of 15768 bytes (Sim68000) and 14584 of 14592 (Sim60),
+  at the same alignment modulo 4.
+- **Hooks, static:** both copies' patch lists audit as their development slaves'
+  do: 109 patches in 83 ranges and 108 in 82, with the same native ranges and
+  entry candidates.
+- **Builds and exclusion:** the fixture builds of all three variants are identical
+  to their release builds with no VERIFY marker; the 20 Hz override changes the
+  release slave too. The define sweep again finds the same 38 production switches,
+  and no other symbol, changing release bytes.
+- **Disabled code:** the release slave with CUSTOM1 off leaves the original code
+  hunk intact on `a500-1.5m` and `a1200-fast`: 151969 bytes, no unexpected byte, and
+  none of both copies' 217 patch ranges touches native data.
+- **CPU selection and gameplay:** on each machine the release path's verify build
+  (menu fixture in the loader, release simulations) with CUSTOM1 installs the copy
+  for that CPU with all its patches (109, 108, 108), runs at N=3 or N=12 and matches
+  the development build's mapped state at ticks 150 and 375 (N=3) or 600 and 1500
+  (N=12): six comparisons, one deferred projection-scratch difference.
+- **Launcher:** `make play60` now runs the release slave. On each machine it installs
+  the copy for the CPU (Sim68000 at N=3 on `a500-1.5m`, Sim60 at N=12 on both
+  A1200s), every patch is installed, WHDLoad gets CUSTOM1=1 and the native menu is
+  reached.
+- **Reused:** the 16 lifecycle comparisons and the per-rate disabled checks reuse
+  the step 9 captures, whose builds differ from today's only in the `$VER` date;
+  the step 9 entry traces stand for the copies, which are those builds' code.
 
 The playtest (open-work step 10) found nothing wrong: in the user's words, "it seemed fine".
 No per-machine observations were recorded.
@@ -2372,68 +2411,15 @@ have identical mapped player state, energy (680), RNG state and timer scale,
 but the timer counters are 3786 and 1628 respectively (including boot).
 This confirms frame-coupled counters; it is not a complete motion-rate study.
 
-The fixed-step implementation below adds a moving/firing route and controlled
-render-cost variation. Full state coverage and PAL/NTSC validation remain open.
+## The first timing prototype (removed)
 
-## Opt-in fixed-step simulation
-
-The chosen design is simulation timing independent of rendering. `CUSTOM1=1`
-installs guarded hooks; `CUSTOM2` chooses 1–25 updates/second (default 5).
-The default reflects the measured early A500 scene, not an established universal
-original cadence. The standard mode remains unchanged when CUSTOM1 is absent.
-
-The main-task entry at $2af6 accumulates elapsed native callback ticks multiplied
-by the chosen frequency. It consumes one field-rate unit per simulation pass
-(50 or 60 from Exec `VBlankFrequency`), retaining fractional credit. The fixed
-750-iteration delay and previous-frame tick wait at $2b96–$2bb3 are replaced.
-This is a cooperative scheduler, not interrupt-context simulation. If the
-simulation itself exceeds the CPU budget, debt can grow; it is not silently
-converted into larger physics steps or discarded.
-
-When another complete step is already owed, mesh rasterization at $132b2 and
-presentation at $6a0a are omitted. Native projection and visibility work in
-$12aa4 remains: gameplay uses that data. The starfield at $9a2a also remains
-once per simulation pass, including its calls to the shared RNG via $9bd4.
-Some HUD/background work is still performed on catch-up passes. Additional
-interpolated pictures are not implemented; presentation can be less frequent
-than simulation, but does not exceed the configured simulation frequency.
-
-The native Permit path at $313e resets clock credit following modal input.
-A restarted/reset gameplay counter reanchors the scheduler. These paths need
-explicit pause/death/transition playtesting before enabling the mode by default.
-
-Hook ranges (whole displaced instructions): $2af6–$2afb, $2b96–$2bb3,
-$2c16–$2c21, $313e–$3143, $132b2–$132b9. CRC checks precede opcode/displacement
-guards; relocated absolute operands are not compared to file addresses.
-VERIFY input hooks cover $22730–$22735 and $22746–$2274d. The native joystick
-mask and key-status APIs consume the scripted input normally.
-
-The timing entry includes a read-only debugger signature, `S7TM`. Its counters
-are decoded by `tools/timing_state.py`. The mapped-state comparator ignores the
-unused third word of each six-byte star record: allocation is uncleared, while
-$9bd4 initializes only x/y and $9a2a reads only those two words.
-
-### Moving/firing timing validation
-
-Snapshots at steps 115, 140 and 160 match mapped state for the original game
-loop (timing disabled), fixed A500 and fixed 68020 with a 20-field drawing
-delay. All use the same native-input fixture. At step 115 there are eight
-world/active objects plus player and clone; the later route turns, fires and
-returns to rest. A second 68020 test presenting every other step also matches
-at 115. These are mapped-state checks, not full machine-state equivalence.
-
-| Mode | Completed updates / 100 PAL fields | Presentation fps |
-|---|---:|---:|
-| Fixed A500, moving/firing | 10 | 5.0 |
-| Fixed 68020, independent breakpoint count | 10 | 5.0 |
-| Fixed 68020, every second presentation | 10 | 2.5 |
-| Fixed 68020, 20 extra fields per drawn frame | 9 | 1.9 |
-
-The slow run has bursty catch-up. Checkpoints 115 to 160 span 452 clock fields
-for 45 simulation starts (4.98 Hz); residual credit is retained. The invariant
-`last_field * simulation_hz - step * field_hz - credit` is unchanged at all
-three checkpoints. A short completion-count window can differ by a step while
-one slow draw is in flight. No renderer speedup is claimed.
+Before SIM60, the normal loader carried an opt-in fixed-step prototype (`timing.s`:
+CUSTOM1, with CUSTOM2 choosing 1–25 updates/s, default 5). It omitted drawing while
+another step was owed but kept projection and the starfield in every pass. The plan
+rejects its 5 Hz timestep and SIM60 replaced it; step 11 removed it from the release
+slave. One finding carries over: the mapped-state comparator ignores the unused third
+word of each six-byte star record, because the allocation is uncleared while $9bd4
+initializes only x/y and $9a2a reads only those two words.
 
 ## Replacement behavior and retained N=12 validation
 
@@ -4847,7 +4833,7 @@ The 68020 spans 896/1205 fields, 60.27/59.75 updates/s, 25/36 presentations
 and debt 26/22/27. Above-sixty intervals pay backlog; these do not establish
 sustained throughput. Default builds match the exact explicitly enabled builds
 used for measurement on both CPUs. HEADING_FAST=0 retains the original game
-entry bytes; normal development builds still use the legacy timing prototype.
+entry bytes.
 
 ### First projectile collision scan
 
@@ -5103,9 +5089,7 @@ Non-VERIFY builds with/without IDLE_TEST are byte-identical
 (`tmp/idle-nonverify-{0,1}.slave`). With the fixture absent, the corrected
 measurement binary is unchanged by adding its source. MOVE_IDLE=0 is
 byte-identical to the preceding default A500 measurement. Default-on builds
-are checked against the measured enabled binaries; the normal non-VERIFY
-slave still uses the legacy timing prototype until the full SIM60 goal is
-validated for normal play.
+are checked against the measured enabled binaries.
 
 
 ## Heavy type-10 combat cost and cache capacity

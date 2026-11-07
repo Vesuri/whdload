@@ -2,63 +2,81 @@
 
 ## Active performance work
 
-The experimental launcher selects **15 Hz (N=3) for 68000/68010 and
-60 Hz (N=12) for 68020+**, without interpolation. Selection resolves `AMIGA_SETUP` first, then uses the launcher's
-`CPU` setting, defaulting to 68000, and builds a separate slave for each path.
-Each build keeps one fixed rate and scales movement and clocks to real time.
-Input history supplies each tick's recorded controls; native modal input is live.
-Selected-rate checks pass. The normal loader remains unchanged.
+The release slave, `Stellar7` (`tmp/build/release/Stellar7.Slave`), runs **15 Hz (N=3)
+on 68000/68010 and 60 Hz (N=12) on 68020+**, without interpolation, when CUSTOM1 is
+set; without it the game keeps its original timing. Each simulation keeps one fixed
+rate and scales movement and clocks to real time. Input history supplies each tick's
+recorded controls; native modal input is live.
 
 ```sh
 . ../../common/env.sh
-make slave                         # both playable variants
-make play60                             # default A500, 15 Hz
+make slave                               # the release slave and both development variants
+make play60                              # default A500, 15 Hz
 make play60 SIM68000_SUBSTEPS=4          # A500 playtest at 20 Hz
 make play60 SETUP=a1200-fast             # 60 Hz
 make play60 SETUP=a1200-060              # 60 Hz, fast end
 ```
 
-The `Stellar7-Sim68000` variant has default N=3; `Stellar7-Sim60` has default N=12. `SIM68000_SUBSTEPS=4` selects N=4 for
-the former. Named machine presets take precedence over an explicit `CPU`,
-matching the shared launcher. `tools/test_play60_launcher.py` checks selection
-without booting, including contradictory CPU settings and invalid presets.
-Explicit `VASM_EXTRA=-DS60_SUBSTEPS=N` still selects diagnostic
-rates for the latter. For actual hardware select the appropriate slave file;
-there is no runtime CPU dispatch or rate switching inside a slave. The source
-and matrix-driver default remain N=12, so use `--substeps 3` for A500 matrix runs.
+`make play60` (`tools/play60.sh`) runs the release slave with `CUSTOM1=1`; every
+`common/run.sh` option applies. `tools/test_play60_launcher.py` checks what it runs
+without booting; `tools/play60_smoke.py` boots it (final build checks).
+
+### The release slave and the development variants
+
+`Stellar7-Sim68000` (default N=3, with the 68000 interrupt changes) and `Stellar7-Sim60`
+(N=12) build one simulation into the slave from `src/sim60.s`: `Stellar7.s` with
+`-DSIM60`, the defines in `game.conf`. Every VERIFY test builds that form (variant
+`Stellar7` with `-DSIM60` in `VERIFY_FLAGS`). `SIM68000_SUBSTEPS=4` selects N=4 for the
+68000 path; explicit `VASM_EXTRA=-DS60_SUBSTEPS=N` selects diagnostic rates for the
+other. The source and matrix-driver default remain N=12, so use `--substeps 3` for A500
+matrix runs.
+
+Without `-DSIM60`, `game.sh` first assembles each simulation alone from
+`src/payload.s` (`-Fbin`, position-independent) with its variant's defines and the
+`-D` words of `VASM_EXTRA`, into `tmp/build/<build>/Stellar7.Sim68000.bin` and
+`Stellar7.Sim60.bin` with listings. `Stellar7.s` includes both. Its `timing_install`
+picks one from WHDLoad's CPU flags (`_attnflags`, `AFB_68020`), fills that copy's own
+`_resload` (its last long) and calls it as the development slaves call theirs. A
+simulation assembled with VERIFY needs the VERIFY loader's symbols, so the copies are
+always release simulations; a verify build of `Stellar7` without `-DSIM60` has the
+fixtures in its loader only, which the native references use with CUSTOM1 off.
+
+`tools/release_payloads.py [BUILD_DIR]` checks each copy against its development slave
+of the same build. All bytes must match except the displacement words of the
+`(_resload,pc)` loads (four in each), and each copy must keep its alignment modulo 4.
+The hook audit and disabled-code check read the copies' patch lists through the
+payload listings beside the release listing (`Stellar7.<payload>.lst`;
+`audit_hooks.py --payload`).
 
 The stationary-star experiment is not retained: its selected-rate presentation
 gains were below the retention threshold. The ordinary star simulation remains
 unchanged. Rate-selection evidence is under `tmp/optimize60`; current rendering
 optimization evidence is under `tmp/render60`; buffer-reuse correction and
-current validation evidence are under `tmp/fast60/corrected`. The normal loader
-remains byte-identical.
+current validation evidence are under `tmp/fast60/corrected`.
 
 ## Installer archive
 
 Run `make dist` in this directory (or `make dist GAME=Stellar7` at the repository root;
 `game.sh` hands it to `tools/package_release.py`). It forces fresh non-VERIFY builds,
-then creates `dist/Stellar7Enhanced-<version>-<YYYYMMDD>.lha` at the repository root
-with an adjacent `.sha256`. The version and date come from the release slaves' `$VER`
-strings (`$VER: <installed name> 2.0b (07.11.2026)`, each named as the installer ships it:
-`Stellar7.slave`, `Stellar7-Sim68000.Slave`, `Stellar7-Sim60.Slave`); all three must agree.
-The string ends the code hunk, so it is the only byte change from the builds the evidence
-in this document was recorded with: setting 07.11.2026 changed one byte in each slave.
-Nothing is published until `make release`.
+checks the release slave's two simulations (`release_payloads.py`), then creates
+`dist/Stellar7Enhanced-<version>-<YYYYMMDD>.lha` at the repository root with an
+adjacent `.sha256`. The version and date come from the release slave's `$VER` string
+(`$VER: Stellar7.slave 2.0b (07.11.2026)`, named as the installer ships it). The string
+ends the code hunk, so in the development slaves it is the only byte change from the
+builds the evidence in this document was recorded with: setting 07.11.2026 changed one
+byte in each. Nothing is published until `make release`.
 
 Packaging starts with a fresh extraction of `tmp/archives/Stellar7.lha`. It replaces the
-normal slave, ReadMe (its `Short:` line and title read "Stellar 7 Enhanced", with a
-version 2.0b history entry above Psygore's) and Install-Stellar7 script, adds the two CPU-specific
-simulation slaves, and preserves all eleven other original members exactly.
-The installer targets English NTSC disks and offers 15 Hz for 68000/68010,
-60 Hz for 68020+, or original timing through the reconstructed development
-loader. Fixed-rate installation sets the selected slave and CUSTOM1=1 in the
+slave, ReadMe (its `Short:` line and title read "Stellar 7 Enhanced", with a version 2.0b
+history entry above Psygore's) and Install-Stellar7 script, and preserves all eleven
+other original members exactly. The installer targets English NTSC disks and asks for
+the fixed-rate simulation or the original timing; the former sets CUSTOM1=1 in the
 installed game icon. Original destination handling and icon choices remain.
 Game data, Kickstarts and WHDLoad itself are not bundled.
 
 The packager uses LHa level-1 headers, tests archive integrity, extracts it again
 and compares every member byte-for-byte with staging. It rejects VERIFY menu
-options, checks both simulation labels and statically validates Installer
+options, checks the slave's CUSTOM1 label and statically validates Installer
 expression balance and procedure references. The changed Installer choice UI
 has not been exercised under Amiga Installer; these checks establish package
 contents, not end-to-end installation. Temporary extraction drawers are removed
@@ -121,8 +139,7 @@ preferences and actual observations for:
 Keep screenshots, recordings and raw notes in `tmp/`. Reconcile confirmed
 findings into internals and open-work; do not turn unchecked items into a pass.
 The step 10 playtest is done: it "seemed fine", without per-item notes. Repeat it
-after any change that reaches controls, sound or pace. Whether the normal loader
-gets SIM60 is a step 11 decision; until then it stays unchanged.
+after any change that reaches controls, sound or pace.
 
 ## Rendering validation
 
@@ -610,17 +627,15 @@ not expose the FS-UAE process even while it is alive. Use the existing VERIFY
 fixtures for scripted gameplay controls; they do not require host app access.
 Physical input and audible output still need a separate check.
 
-`make play60` builds and starts the CPU-selected experimental conversion
-with normal controls and sound. It selects `Stellar7-Sim68000.Slave` or
-`Stellar7-Sim60.Slave` and defaults to CUSTOM1=1; every `make run` option applies.
-To build without launching, run `make slave VARIANT=Stellar7-Sim60`.
-These builds contain no VERIFY fixtures. `tools/play60_smoke.py` ("Final build
-checks (step 9)") boots this launcher on each validation machine. On the step 8
-source it reaches the native menu with 109/108/108 installed hooks and release
-bytes matching the audited builds (`tmp/step9/play60-*`). It does not verify
-interactive gameplay or audible output. `test_play60_launcher.py` checks that a
-named preset overrides a contradictory CPU before the build is selected.
-If overriding WHD_ARGS, include CUSTOM1=1 to enable the replacement. Current
+`make play60` builds and starts the release slave with normal controls and sound,
+with CUSTOM1=1 by default; every `make run` option applies. The slave installs the
+simulation for the machine's CPU. To build without launching, run `make slave
+VARIANT=Stellar7`. It contains no VERIFY fixtures. `tools/play60_smoke.py` ("Final
+build checks (step 9)") boots this launcher on each validation machine and checks
+that the simulation for its CPU is the one installed (`tmp/step11/play60-*`). It does
+not verify interactive gameplay or audible output. `test_play60_launcher.py` checks
+what the launcher runs without booting. If overriding WHD_ARGS, include CUSTOM1=1 to
+enable the replacement. Current
 selected-rate performance and its scene limits are recorded in internals.
 
 `make run SLAVE=original` boots the shipped slave windowed with sound (debug and warp runs
@@ -766,23 +781,28 @@ the loop once inactive (session 2), so the menu's new game is session 3.
 
 Run these on the exact source to be released, after its last fix, one at a time
 (the capture tools share `tmp/rate-matrix.lock`). The step 9 results are under
-`tmp/step9` (internals, "Final build checks").
+`tmp/step9`; the repeat for the single release slave is under `tmp/step11` (internals,
+"Final build checks").
 
 ```sh
 make check                                     # release bytes and the tool tests
-python3 tools/baseline_checks.py tmp/step9/checks builds --reference 52e52251 --changed Stellar7-Sim60 Stellar7-Sim68000
-python3 tools/baseline_checks.py tmp/step9/checks lifecycle
-python3 tools/define_sweep.py tmp/step9/define-sweep.json
+python3 tools/baseline_checks.py tmp/step11/checks builds --reference becf8e4e --changed Stellar7
+python3 tools/baseline_checks.py tmp/step11/checks lifecycle
+python3 tools/define_sweep.py tmp/step11/define-sweep.json
 for setup in a500-1.5m a1200-fast a1200-060; do
-  python3 tools/play60_smoke.py $setup tmp/step9/checks/builds tmp/step9/play60-$setup
+  python3 tools/play60_smoke.py $setup tmp/step11/checks/builds tmp/step11/play60-$setup
 done
 python3 tools/entry_traces.py tmp/step9/traces
 ```
 
 `builds --changed` names the variants expected to differ from the reference; the
 others must be byte-identical. Without `--changed` only the 68000 slave may
-differ, as at step 7. `make check` fails after an intended release-byte change
-until `make record` rewrites `release/slaves.sha256`.
+differ, as at step 7, and the off switches must then rebuild the reference. It also
+runs `release_payloads.py` and audits each of the release slave's simulations.
+`make check` fails after an intended release-byte change until `make record`
+rewrites `release/slaves.sha256`. `lifecycle` reuses completed captures: the step 11
+run reused the step 9 captures, whose VERIFY builds differ from the current ones only
+in the `$VER` date, and added the release slave's CUSTOM1-off checks.
 
 `define_sweep.py` rebuilds each release variant with every conditional symbol
 in `src/` except VERIFY at 0 and at 1. Each symbol it lists as changing must be a
@@ -794,13 +814,15 @@ A test, fixture, twin or `*_BAD` symbol in that list means VERIFY code reached a
 release build.
 
 `play60_smoke.py` boots the real `tools/play60.sh` (instance `smoke`, warp,
-silent, inputs disconnected). It checks the selected slave against the audited
-`builds` slave and its installed hooks, CUSTOM1=1 in the startup-sequence and the
-native menu without the menu fixture. `entry_traces.py` captures and checks ten
-100-field traces (SOL, late type-10, boss, level exit, death on `a500-1.5m` and
-`a1200-fast`). It reuses completed captures, and its `summary.json` lists the
-patches no trace entered. `a1200-060` has no CPU instruction records, so it is
-not traced.
+silent, inputs disconnected). It checks the slave against the audited `builds`
+slave, that the simulation for the machine's CPU is installed (its hooks and its
+rate), CUSTOM1=1 in the startup-sequence and the native menu without the menu
+fixture. `entry_traces.py` captures and checks ten 100-field traces (SOL, late
+type-10, boss, level exit, death on `a500-1.5m` and `a1200-fast`) of the development
+builds. It reuses completed captures, and its `summary.json` lists the patches no
+trace entered. `a1200-060` has no CPU instruction records, so it is not traced.
+The release slave's simulations are those builds' code (`release_payloads.py`), so
+the step 9 traces stand for it.
 
 ### Interrupt and sound-timer checks
 
@@ -931,14 +953,13 @@ the negative capture must stop at the mismatch handler, not reach its requested
 completed tick. Diagnostics are absent without VERIFY. Paired performance and
 five-checkpoint gameplay evidence is in `tmp/sort-inline-long-validation.json`.
 
-`make slave VARIANT=Stellar7` builds the normal development loader. `make verify VARIANT=Stellar7`
-builds the menu fixture; `make run BUILD=verify WHD_ARGS=CUSTOM5=1` boots it. Both retain the original CRC acceptance check. `CUSTOM1=1` enables the
-experimental fixed-step timing patches; without it the game code is unchanged
-except for explicitly enabled VERIFY fixtures.
-SIM60 labels CUSTOM1 with its compiled rate (“Experimental 60 Hz simulation”
-at the default N=12; explicit lower-rate builds display their own rate) and omits the legacy
-CUSTOM2 rate selector, which the replacement does not use. The legacy build
-retains that selector.
+`make slave VARIANT=Stellar7` builds the release slave. `make verify VARIANT=Stellar7`
+adds the menu fixture to its loader; `make run BUILD=verify WHD_ARGS=CUSTOM5=1` boots it.
+Both retain the original CRC acceptance check. `CUSTOM1=1` installs the fixed-rate
+simulation for the CPU; without it the game code is unchanged except for explicitly
+enabled VERIFY fixtures. The release slave labels CUSTOM1 "Fixed-rate simulation (15 Hz
+on 68000, 60 Hz on 68020+)"; a build with SIM60 labels it with its compiled rate
+("Experimental 60 Hz simulation" at the default N=12). No build reads CUSTOM2.
 Only the supplied English layout has been tested; hook-byte guards
 reject other layouts. This is a reconstruction of the game-specific loader
 on modern KickEmu, not a byte-identical reconstruction of the 2008 slave.
@@ -953,7 +974,8 @@ Existing captures are not overwritten. Only one capture runs at a time.
 breakpoint counting. The default window is 100 fields when `--fields` is omitted; the profiler
 supports at most 100 fields per capture. The driver rejects larger requests.
 
-To check the disabled replacement, build with SIM60 but omit CUSTOM1 and
+To check the disabled replacement, build with SIM60 (or the release slave's verify
+build, whose payload listings must sit beside its listing) but omit CUSTOM1 and
 CUSTOM3, retain the exact listing/slave pair, and capture legacy frame 90 with
 `--state-only`. Run `python3 tools/check_disabled.py CAPTURE --listing LISTING
 --allow-menu-fixture`. The checker relocates the original executable, checks
@@ -967,7 +989,8 @@ and all 87 compiled simulation patch ranges covered.
 
 For enabled SIM60 hook checks, retain the exact assembler listing and sibling
 `.slave`, then run `python3 tools/audit_hooks.py LISTING --capture CAPTURE
---out tmp/hook-audit.json`. Omit `--capture` for a static release-build audit.
+--out tmp/hook-audit.json`. Omit `--capture` for a static release-build audit; for the
+release slave add `--payload Sim68000` or `--payload Sim60`.
 This checks complete original instructions, conservative direct interior
 entries and relocated code pointers; the capture additionally verifies exact
 installed bytes and destinations. Computed indirect entries and replacement
@@ -978,36 +1001,30 @@ CHIP_KB=2048 FAST_KB=4096 CPU=68EC020 SLOW_KB=0` after sourcing
 `../../common/env.sh`. This is an A1200 with fast RAM, not a stock A1200.
 
 
-## Fixed-step timing tests
+## Movement fixture and test options
 
-`NTSC=0 WHD_ARGS='CUSTOM1=1 CUSTOM3=1' python3 tools/fixed_window.py
- tmp/prof/fixed-a500 --frame 115 --fields 100 --checkpoints 140 160`
-uses fixed timing plus the VERIFY native movement/firing route. `CUSTOM3`
-requires the `CUSTOM5` menu fixture (enabled by the driver). It supplies forward
-input at steps 100–139, adds turning at 120–139 and holds fire at 105–134.
-The route changes input API results, not positions, velocities or RNG.
+`VERIFY_FLAGS=-DSIM60=1 WHD_ARGS='CUSTOM1=1 CUSTOM3=1' python3 tools/fixed_window.py
+ tmp/prof/route --tick 200 --state-only --tick-checkpoints 220 240` runs the simulation
+with the VERIFY native movement/firing route. `CUSTOM3` requires the `CUSTOM5` menu
+fixture (enabled by the driver). The route supplies forward input, adds turning and
+holds fire over fixed ranges. It changes input API results, not
+positions, velocities or RNG.
 
-`CUSTOM2` is the simulation frequency (1–25 Hz, zero/default means 5).
-The default is a provisional A500 reference, not a claim of historical intent.
-`CUSTOM4=2` in VERIFY presents every second eligible simulation step.
+`CUSTOM4=2` in a VERIFY build with SIM60 presents every second eligible simulation step.
 `VERIFY_FLAGS=-DSLOW_DRAW=20` adds twenty VBL fields to each drawn frame,
 allowing a deliberate slow-renderer catch-up test. Neither test option exists
 in a normal build. Build normally again after running capture tests.
 
-`tools/timing_state.py CAPTURE...` reports scheduler credit and presentation
-counts. `tools/simulation_state.py A B` compares mapped state at an equal
+`tools/simulation_state.py A B` compares mapped state at an equal
 simulation boundary. Checkpoint folders can be passed directly. Comparisons
 include player/world/active objects (including projectiles), visibility flags,
 positions, motion, behavior counters, power timers, score, RNG and star x/y.
 Raw pointers, projected coordinates and unused allocation padding are excluded;
-this is not a complete state-equivalence proof. Input edges use simulation
-steps, while the trace independently measures simulation steps per elapsed field.
+this is not a complete state-equivalence proof.
 
-The original anchor remains the pre-swap point at hunk 0:$2c16, even when that
-step will skip presentation. Actual presentation counting uses $6a0a; simulation
-completion counting uses $2d4e. Never treat anchor hits as displayed frames in
-the timing build. Profiles show completed work per window and can include one
-step of boundary jitter. Saved `metadata.json` records Custom and build options.
+The original anchor remains the pre-swap point at hunk 0:$2c16. Actual presentation
+counting uses $6a0a; simulation completion counting uses $2d4e. Saved `metadata.json`
+records Custom and build options.
 
 
 ## Fixed-rate replacement development
@@ -1049,10 +1066,8 @@ cross-render state comparison. A field trace can start partway through an
 update after the snapshot; do not derive its absolute ticks by simply adding
 observed update-entry counts to that earlier snapshot.
 
-`VERIFY_FLAGS=-DSIM60=1` selects the incomplete replacement implementation;
-`CUSTOM1=1` enables it at runtime. Its rate is fixed at 5*N Hz (default 60 Hz); the older
-`CUSTOM2` rate selection does not configure this path. Normal builds still
-select the older opt-in timing prototype.
+`VERIFY_FLAGS=-DSIM60=1` builds the simulation into the VERIFY slave;
+`CUSTOM1=1` enables it at runtime. Its rate is fixed at 5*N Hz (default 60 Hz).
 
 Use `--tick 1500 --state-only` with `tools/fixed_window.py` to capture the
 completed 1500th simulation tick. `--tick` cannot be combined with legacy
@@ -2155,8 +2170,7 @@ with `python3 tools/shot_state.py CAPTURE`. ABI 27 publishes its result offset
 at entry+128. Capture `--tick 201 --state-only` with later checkpoints for the
 fixture, and omit SHOT_TEST for timing. Retained matched measurements are
 `sim60-shot-measure-{a500,020}-{0,1}`. The delayed 68020 uses SLOW_DRAW=20.
-Normal builds exclude the fixture, and the normal development loader still
-uses the legacy timing prototype unless built with SIM60.
+Normal builds exclude the fixture.
 
 For the longer default-build route, use SIM60 and DEATH_TEST=200 with
 CUSTOM1=1/CUSTOM3=1, then run `tools/fixed_window.py CAPTURE --tick 3600
