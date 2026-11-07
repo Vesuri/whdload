@@ -30,9 +30,14 @@
   reaches, where projection and polygon code can break. The only wall-contact test is one
   synthetic contact on the native paths (GAME_TIME.md). Ruled out: pause writes no game
   code (its sites are patched at install), and the opponents' pose blending never moves
-  the player's view. Next: the same situations with `CUSTOM2=0` in the emulator and on
-  the real machine; then a repeated-contact check on the 20 ms path against the native
-  response. Do not publish the release until this is understood.
+  the player's view. The hanging machine had a PCMCIA network card in the slot, which has
+  caused random failures with other WHDLoad installs there. The card may be the cause of
+  the hangs: for example, an interrupt the card raises through Gayle that nothing
+  acknowledges once WHDLoad has taken over the system. The glitches in the recording come
+  from an emulator without the card, so they need explaining either way. Next: the hang
+  situations on the real machine without the card; the same situations with `CUSTOM2=0`
+  in the emulator and on the real machine; then a repeated-contact check on the 20 ms
+  path against the native response. Do not publish the release until this is understood.
 - **Fast RAM rendering (`make build BUILD=fast`, docs/FASTRAM_PLAN.md),** development only:
   FR1–FR8 and FR12 (draw speed) done: 030-50 BCE 49.9 FPS (every field) against
   24.6 native, 040-40 BCE 29.8 against 24.5 (FR12 checkpoint `376d1164…`, 2026-11-06). FR8 showed the draw is the limit. The work concentrates on the 68030 (below); FR0h is still open. FR builds
