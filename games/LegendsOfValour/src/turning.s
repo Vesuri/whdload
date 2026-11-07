@@ -1,4 +1,4 @@
-; One-degree mouse precision: automatic in release, developer CUSTOM2 bit 7.
+; One-degree mouse precision: release Enhanced frame rate, developer CUSTOM2 bit 7.
 ; Original table ownership stays with the game; only the renderer selects our
 ; separately owned PUBLIC table. The UI command dispatcher remains untouched.
 TURN_TABLE_BYTES = 144000

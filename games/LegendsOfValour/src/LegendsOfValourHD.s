@@ -36,7 +36,7 @@ DEVELOPER = 1
         ENDC
         ENDC
 
-; Optional fixed-rate simulation. Historical build-flag names are retained
+; Fixed-rate simulation. Historical build-flag names are retained
 ; for the recorded verification commands. Runtime CUSTOM2 bit 6 gates all
 ; installation, task creation and allocation; normal builds include both parts.
         IFND SIM_KEYBOARD_EXPERIMENT
@@ -107,7 +107,7 @@ slv_name	dc.b	"Legends Of Valour",0
 slv_copy	dc.b	"1992 US-GOLD.",0
 slv_info	dc.b	"Reworked by Vesuri",10
 		dc.b	"based on the work of CFou!",10
-		dc.b	"Version 2.0b (09.10.2026)",0
+		dc.b	"Version 2.1b (07.11.2026)",0
 slv_config	dc.b	"C1:B:Character creation;"
 	IFD DEVELOPER
 		dc.b	"C2:X:faster chunky-to-planar:0;"
@@ -116,10 +116,11 @@ slv_config	dc.b	"C1:B:Character creation;"
 		dc.b	"C2:X:unrolled sprite columns:3;"
 		dc.b	"C2:X:cached ray reciprocals:4;"
 		dc.b	"C2:X:MOVEM chunky clear:5;"
-	ENDC
 		dc.b	"C2:X:Frame-independent game timing:6;"
-	IFD DEVELOPER
 		dc.b	"C2:X:One-degree mouse precision:7;"
+		dc.b	"C2:X:Click inputs need a release:8;"
+	ELSE
+		dc.b	"C2:B:Enhanced frame rate;"
 	ENDC
 	IFD VERIFY
 		dc.b	"C5:X:input tape from data/lovtape (verification):0;"
@@ -145,12 +146,15 @@ _bootdos	lea	(_saveregs,pc),a0
 		lea	(_tag,pc),a0
 		jsr	(resload_Control,a2)
 	IFND DEVELOPER
-	; Release builds always select W1-W6 and one-degree mouse precision.
-	; Preserve the optional timing bit and existing tooltype values.
-	; Individual installers retain CPU
-	; selection and allocation fallback. Use an address register for the write.
+	; Release builds: CUSTOM2 is the Enhanced frame rate switch. Any value selects every
+	; enhancement (W1-W6, the 25 Hz game timing, mouse precision, click inputs), so the
+	; 2.0b icons' CUSTOM2=64 keeps them; 0 or no tooltype runs the original game.
+	; Individual installers retain CPU selection and allocation fallback.
 		lea	(_custom2,pc),a0
-		ori.l	#$bf,(a0)
+		tst.l	(a0)
+		beq	.original
+		move.l	#$1ff,(a0)
+.original
 	ENDC
 
 	;open doslib
@@ -264,8 +268,12 @@ _decrunched	movem.l	(a7)+,d0-a6
 
 _patchgame
 		bsr	_map_hunks
+		bsr	_lov_version
 	IFD VERIFY
-		bsr	_verify_ccr_install
+	; The VERIFY instruments can lie beyond BSR's reach: call them relatively.
+		lea	(_patchgame,pc),a0
+		adda.l	#_verify_ccr_install-_patchgame,a0
+		jsr	(a0)
 	ENDC
 		move.l	(_hunks+4,pc),a0
 		subq.l	#4,a0			;A0 = hunk 1 - 4
@@ -290,11 +298,14 @@ _patchgame
 		bsr	_w6_install
 		bsr	_sim_install
 		bsr	_turn_install
+		bsr	_click_install
 	IFD VERIFY
 	IFD TIMING_STUDY
 		bsr	_timing_study_install
 	ENDC
-		bsr	_tape_install
+		lea	(_patchgame,pc),a0
+		adda.l	#_tape_install-_patchgame,a0
+		jsr	(a0)
 	ENDC
 		moveq	#_args_end-_args,d0
 		lea	(_args,pc),a0
@@ -316,6 +327,30 @@ _map_hunks	movem.l	d1/a1,-(a7)
 		movem.l	(a7)+,d1/a1
 		rts
 
+; Every enhancement patches fixed offsets of the English AMIGA2 of the 0837 archive. Any
+; other AMIGA2 (CFou!'s v1.0 also supports German, French and another English one) runs
+; with CUSTOM2 cleared, so no installer checks or writes it: the game runs as v1.0.
+; The PowerPacker stub stores each hunk's allocation + 8 before its next-hunk link (the
+; last hunk links to the stub's own segment, so the link does not end the list).
+_lov_version	movem.l	d0-d1/a0-a2,-(a7)
+		move.l	(_custom1,pc),d0
+		bne	.done			;CHARACT has no enhancements
+		lea	(_hunks,pc),a0
+		lea	(_lov_version,pc),a1	;the table is at the end (clicks_hooks.s)
+		adda.l	#_lov_hunk_sizes-_lov_version,a1
+		moveq	#17-1,d1
+.next		move.l	(a0)+,d0
+		beq	.other
+		move.l	d0,a2
+		move.l	(-8,a2),d0
+		cmp.l	(a1)+,d0
+		bne	.other
+		dbf	d1,.next
+		bra	.done
+.other		lea	(_custom2,pc),a0
+		clr.l	(a0)
+.done		movem.l	(a7)+,d0-d1/a0-a2
+		rts
 
 _disk1		dc.b	"LOV",0		;for Assign
 _program	dc.b	"AMIGA2",0
@@ -359,6 +394,7 @@ _h12		dc.l	0
 		INCLUDE	clear.s
 		INCLUDE	simulation.s
 		INCLUDE	turning.s
+		INCLUDE	clicks.s
 
 	IFD VERIFY
 	IFD PROFILER_WINDOW
@@ -370,6 +406,19 @@ _h12		dc.l	0
 		INCLUDE	verify_flags.s
 		INCLUDE	tape.s
 	ENDC
+	; Last: VERIFY builds use up the tag list's PC-relative reach before this point.
+		INCLUDE	clicks_hooks.s
+
+; _lov_version: allocation + 8 of hunks 0-16 of the English AMIGA2 (tools/unpack.py;
+; docs/profiling.md §2).
+		CNOP	0,4
+	IFD VERIFY_FOREIGN_VERSION
+	; VERIFY: one size off, so the English AMIGA2 runs as an unrecognised version.
+_lov_hunk_sizes	dc.l	$199c+8+4,$2c2c+8,$63fc+8,$5bc+8,$b0+8,$2700+8,$8f0+8,$2d8+8
+	ELSE
+_lov_hunk_sizes	dc.l	$199c+8,$2c2c+8,$63fc+8,$5bc+8,$b0+8,$2700+8,$8f0+8,$2d8+8
+	ENDC
+		dc.l	$850+8,$660+8,$c4+8,$a4dc+8,$179d0+8,$14+8,$ec+8,$184+8,$dc+8
 
 ;============================================================================
 
@@ -409,7 +458,7 @@ _timing_combat_clock_records ds.b 64*20
 
 ; Last in the slave, so no code or data offset moves; the version and date match slv_info
 ; and the release ReadMe.
-		dc.b	"$VER: LegendsOfValour.Slave 2.0b (09.10.2026)",0
+		dc.b	"$VER: LegendsOfValour.Slave 2.1b (07.11.2026)",0
 	EVEN
 
 	END

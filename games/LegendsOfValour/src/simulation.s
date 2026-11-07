@@ -1,4 +1,4 @@
-; Optional simulation timing, CUSTOM2 bit 6. PAL reference selected by the user.
+; Simulation timing: release Enhanced frame rate, developer CUSTOM2 bit 6. PAL reference.
 ; These constants belong together when changing the reference rate.
 SIM_FIELDS_PER_TICK = 2
 SIM_MOVEMENT_STEP = 10

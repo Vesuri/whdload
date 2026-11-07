@@ -7,7 +7,8 @@
 Input: tmp/archives/LegendsOfValour.lha (make unpack). Output, in the repository's dist/:
 LegendsOfValourEnhanced-<version>-<YYYYMMDD>.lha and its .sha256, the version and date
 from the release slave's $VER string. Replaced: the Slave, the ReadMe and the six game
-icons (CUSTOM2=64 appended to their tooltypes); every other record is copied byte for byte.
+icons (CUSTOM2=1, Enhanced frame rate, appended to their tooltypes); every other record is
+copied byte for byte.
 """
 import argparse
 import hashlib
@@ -31,9 +32,9 @@ INPUT = 'LegendsOfValour.lha'
 PREFIX = 'LegendsOfValourHd'
 OUTPUT = 'LegendsOfValourEnhanced-{version}-{date}.lha'
 # The installer offers these as the game icon; it sets the default tool, Slave and PreLoad
-# and keeps the other tooltypes, so each one installs with the timing option on.
+# and keeps the other tooltypes, so each one installs with Enhanced frame rate on.
 ICONS = ('inf', 'infC', 'colcfou', 'colcfou2', 'colcfou3', 'colcfou4')
-TIMING = b'CUSTOM2=64'
+ENHANCED = b'CUSTOM2=1'
 
 
 def records(data):
@@ -124,7 +125,7 @@ def main():
     slave = slave_path.read_bytes()
     info = header(code_hunk(slave_path)[0])
     version, date = version_of(slave_path), date_of(slave_path)
-    expected = 'C1:B:Character creation;C2:X:Frame-independent game timing:6;'
+    expected = 'C1:B:Character creation;C2:B:Enhanced frame rate;'
     ver_date = f'{date[6:]}.{date[4:6]}.{date[:4]}'
     if info['ws_config'] != expected or f'Version {version} ({ver_date})' not in info['ws_info']:
         raise SystemExit('Expected the release slave with two options and slv_info matching $VER')
@@ -148,7 +149,7 @@ def main():
         tool, entries, _, _ = parse(icon)
         if entries != [b'CUSTOM1=0'] or tool not in (b'amiga2', b'WHDLoad'):
             raise ValueError(f'{name}: unexpected tooltypes {entries}; review it')
-        replacements[name] = with_tooltype(icon, TIMING)
+        replacements[name] = with_tooltype(icon, ENHANCED)
     # Stage and validate before publishing. All temporary bytes stay in tmp/.
     with tempfile.TemporaryDirectory(prefix='release-', dir=ROOT / 'tmp') as temp:
         updated = {name: stored_record(name, replacements[name])
@@ -167,7 +168,7 @@ def main():
             if extracted != content or extracted == read_member(lha, archive, name):
                 raise ValueError(f'Replacement extraction mismatch: {name}')
         for name in icon_names:
-            if parse(read_member(lha, path, name))[1] != [b'CUSTOM1=0', TIMING]:
+            if parse(read_member(lha, path, name))[1] != [b'CUSTOM1=0', ENHANCED]:
                 raise ValueError(f'{name}: tooltypes did not read back')
         if version.encode() not in replacements[readme_name]:
             raise ValueError(f'ReadMe does not mention version {version}')
@@ -175,7 +176,7 @@ def main():
     digest = hashlib.sha256(target.read_bytes()).hexdigest()
     (destination / (output + '.sha256')).write_text(f'{digest}  {output}\n')
     print(f'Verified {output}: {len(check)} entries; replaced the Slave, the ReadMe and '
-          f'{len(icon_names)} icons ({TIMING.decode()})')
+          f'{len(icon_names)} icons ({ENHANCED.decode()})')
     print(target)
 
 

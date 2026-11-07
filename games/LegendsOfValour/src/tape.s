@@ -29,6 +29,8 @@ TAPEMAX		= 8192			;bytes
 ; called from _patchgame with the program loaded, before it runs; keeps all registers
 ; except D0/A0
 _tape_install	move.l	(_custom5,pc),d0
+		lea	(_tape_custom5,pc),a0	;for code beyond the tag list's reach
+		move.l	d0,(a0)
 		btst	#0,d0
 		beq	.off
 		movem.l	d1-d2/a1-a2,-(a7)
@@ -192,7 +194,7 @@ _tw_skip	move.l	(a0),d0
 ; Pulse the EXIT/status-bar point only while waiting for the computer button.
 ; This fixture is excluded from ordinary VERIFY and performance captures.
 _tw_rescue
-		move.l	(_custom5,pc),d0
+		move.l	(_tape_custom5,pc),d0
 		btst	#1,d0
 		beq	.no
 		tst.w	(a1)
@@ -222,6 +224,8 @@ _tw_rescue
 		rts
 _tw_watch_fields dc.w 0
 	ENDC
+		CNOP	0,4
+_tape_custom5	dc.l	0
 
 ; H entry: read game state, then release the turn input when the target is reached.
 ; The normal count path (including performance windows) has no additional work.

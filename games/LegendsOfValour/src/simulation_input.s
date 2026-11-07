@@ -162,6 +162,8 @@ _sim_input_select
         ; boundary. Do not reopen it from older queued held-button samples.
         ; Keep all active simulation ticks and relative motion; only buttons
         ; already consumed by the live UI are suppressed.
+        lea (_sim_tick_ui_cleared,pc),a0
+        clr.w (a0)
         lea (_sim_ui_until,pc),a0
         tst.w (4,a0)
         beq .motion
@@ -177,6 +179,8 @@ _sim_input_select
 .ui_clear
         ENDC
         clr.w (a1)
+        lea (_sim_tick_ui_cleared,pc),a0
+        move.w #1,(a0)
         bra .motion
 .ui_passed
         clr.w (4,a0)
@@ -204,6 +208,8 @@ _sim_input_select
         move.l (a0)+,(a1)+
         move.l (a0)+,(a1)+
         move.l (a0)+,(a1)+
+        lea (_sim_tick_ui_cleared,pc),a0
+        clr.w (a0)
         lea (_sim_mouse_previous,pc),a0
         move.l (_sim_tick_input+10,pc),(a0)
         lea (_sim_tick_motion,pc),a0
@@ -231,10 +237,18 @@ _sim_input_pointer
         move.w (_sim_tick_input+6,pc),d1
         move.w d1,($6038-32768,a4)
         ext.l d1
-        move.l a0,-(sp)
-        lea (_sim_tick_input,pc),a0
-        move.w (8,a0),($603a-32768,a4)
-        move.l (sp)+,a0
+        ; Buttons the live UI already consumed are neither a press nor a release.
+        move.l d0,-(sp)
+        move.w (_sim_tick_ui_cleared,pc),d0
+        bne .consumed
+        move.w (_sim_tick_input+8,pc),d0
+        bsr _click_filter
+        bra .store
+.consumed
+        move.w (_sim_tick_input+8,pc),d0
+.store
+        move.w d0,($603a-32768,a4)
+        move.l (sp)+,d0
         move.l ($5eb0-32768,a4),a0
         move.l (_sim_input_pointer_done,pc),-(sp)
         rts
@@ -272,6 +286,7 @@ _sim_options
         rts
 
 _sim_input_enabled dc.w 0
+_sim_tick_ui_cleared dc.w 0
 _sim_input_bad dc.b "Simulation: input history exceeded",0
         CNOP 0,4
 _sim_input_vbl_done dc.l 0

@@ -2,27 +2,32 @@
 
 WHDLoad slave patches for the original 1992 game from US Gold / Synthetic Dimensions.
 The slave is reconstructed from CFou!'s v1.0 disassembly using WHDLoad 20.0's KickEmu
-sources. Release **2.0b is a beta**, validated with the English game in the 0837 archive.
-Other versions supported by the original install have not been revalidated.
-
-Release builds automatically enable the six validated rendering improvements:
-CPU-selected chunky-to-planar conversion, PUBLIC-memory chunky allocation, wall and sprite
-loop improvements, cached ray quotients and faster clearing. CPU-specific choices and
-allocation fallbacks are automatic. [Measurements and methodology](docs/profiling.md)
-cover the A500-equivalent and 14 MHz 68020.
+sources. Release **2.1b is a beta**, validated with the English game in the 0837 archive.
+Only that version is enhanced: the German, French and other versions supported by the
+original install run as CFou!'s v1.0.
 
 The player-facing options are:
 
 | Option | Tooltype |
 |---|---|
 | Character creation | `CUSTOM1=1` |
-| Frame-independent game timing (25 ticks/second) | `CUSTOM2=64` |
+| Enhanced frame rate | `CUSTOM2=1` |
 
-The release's installed icon sets `CUSTOM2=64`, so timing is on by default; `CUSTOM2=0`
-restores the original timing. Fixed-rate simulation can reduce rendering speed on slow
-machines. Direct mouse control automatically uses one-degree precision; UI turn buttons
-retain their native increments and repeat behavior. Allocation failure falls back to
-the original five-degree precision.
+The release's installed icon sets `CUSTOM2=1`; `CUSTOM2=0` runs the original game.
+Enhanced frame rate turns on everything at once:
+
+- six validated rendering improvements: CPU-selected chunky-to-planar conversion,
+  PUBLIC-memory chunky allocation, wall and sprite loop improvements, cached ray quotients
+  and faster clearing, with automatic CPU choices and allocation fallbacks
+  ([measurements and methodology](docs/profiling.md) cover the A500-equivalent and 14 MHz
+  68020);
+- frame-independent game timing (25 ticks/second), which can reduce rendering speed on slow
+  machines;
+- one-degree precision for direct mouse control (allocation failure falls back to the
+  original five degrees); UI turn buttons keep their native increments and repeat;
+- click inputs: a click acts once until the mouse button is released, so the U-turn and the
+  other screens no longer repeat while it is held; walk, turn and the compass keep moving
+  while held.
 F10 quits, or use WHDLoad's `QuitKey` tooltype.
 
 ## Setup
@@ -56,8 +61,8 @@ from the Kickstart 1.3 image used by the slave; see the runtime path table in
 From this directory:
 
 ```sh
-make run                          # build the release slave and boot it, timing off
-make run WHD_ARGS=CUSTOM2=64      # with the timing, as the installed icon sets it
+make run                          # build the release slave and boot it, original game
+make run WHD_ARGS=CUSTOM2=1       # Enhanced frame rate, as the installed icon sets it
 make run SLAVE=original           # CFou!'s v1.0, unchanged
 ```
 
@@ -69,7 +74,7 @@ An expanded 68020 trial can be launched with:
 
 ```sh
 make run AMIGA_MODEL=A1200 CPU=68EC020 CHIP_KB=2048 FAST_KB=4096 SLOW_KB=0 \
-  KICKSTART="$KICKSTART_A1200" WHD_ARGS=CUSTOM2=64
+  KICKSTART="$KICKSTART_A1200" WHD_ARGS=CUSTOM2=1
 ```
 
 The launcher copies the game into a fresh run directory (`tmp/run/default/`) each time.
@@ -84,7 +89,8 @@ make verify          # tmp/build/verify/LegendsOfValour.Slave
 make check           # the release slave matches release/slaves.sha256; tapes, ray tables
 ```
 
-Developer builds retain individual W1–W6 and mouse-precision switches. VERIFY adds input tapes, pixel twins,
+Developer builds keep a CUSTOM2 bit for each enhancement (W1–W6, timing, mouse precision,
+click inputs). VERIFY adds input tapes, pixel twins,
 and simulation checks; it must not ship. `VASM_EXTRA='-DTIMING_STUDY=1'` adds a study's
 defines to one build. All builds are assembled afresh.
 
@@ -101,9 +107,9 @@ sessions.
 make dist
 ```
 
-Builds `LegendsOfValourEnhanced-2.0b-20261009.lha` (version and date from the slave's `$VER`)
+Builds `LegendsOfValourEnhanced-2.1b-20261107.lha` (version and date from the slave's `$VER`)
 from the original installer in the repository's `dist/`. Only the slave, the ReadMe and the
-six game icons (`CUSTOM2=64` added to their tooltypes) are replaced; the entry list and every
+six game icons (`CUSTOM2=1` added to their tooltypes) are replaced; the entry list and every
 other compressed record are preserved. Packaging verifies CRCs, replacement contents and the
 icons' tooltypes before publishing the local output. See [releasing.md](docs/releasing.md).
 
@@ -113,8 +119,9 @@ and `dist/`; archives are not committed.
 ## Remaining acceptance and limitations
 
 Automated checks pass on both reference CPUs. One-degree mouse precision has been accepted in
-play testing; the UI buttons retain native behavior. Timing may receive further
-adjustments from play feedback.
+play testing; the UI buttons retain native behavior. Timing and click inputs may receive
+further adjustments from play feedback. German and French enhancements need those
+versions' data (open-work.md).
 The tape cannot wait for a conversation panel's input poll, so affected routes dismiss
 it with repeated EXIT clicks. See [open-work.md](docs/open-work.md) for current items.
 W7's further renderer redesign was dropped by user decision.

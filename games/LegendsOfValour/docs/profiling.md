@@ -87,8 +87,8 @@ planes (only the Intuition pointer colour differs).
 
 | Build | Command | Contents |
 |---|---|---|
-| release | `make slave` | W1–W6 and mouse precision always on; menu: character creation, game timing |
-| developer | `make developer` | individual CUSTOM2 switches for W1–W6 and mouse precision, no instruments |
+| release | `make slave` | menu: character creation, Enhanced frame rate (any nonzero CUSTOM2 selects every enhancement, bits 0–8) |
+| developer | `make developer` | individual CUSTOM2 switches for W1–W6, game timing, mouse precision and click inputs, no instruments |
 | VERIFY | `make verify` | developer + input tape, pixel twins and other CUSTOM5 instruments; never ship |
 
 Each goes to `tmp/build/<build>/LegendsOfValour.Slave` with its listing
@@ -102,8 +102,8 @@ Kickstart 3.1 host + Workbench 2.04 floppy boot DH0, whose startup-sequence runs
 LegendsOfValour.Slave PRELOAD SPLASHDELAY=0 NOREQ` on DH1 (a fresh copy of the game + WHDLoad
 each run: **save games written during a run are lost**). `make run` builds and boots the
 release slave on the interactive machine (`game.conf`: A500, 68000, 1 MB chip, 8 MB fast);
-`make run SLAVE=original` boots CFou!'s v1.0 unchanged, and `WHD_ARGS=CUSTOM2=64` enables
-the optional timing (the repository's `docs/running.md` lists every option).
+`make run SLAVE=original` boots CFou!'s v1.0 unchanged, and `WHD_ARGS=CUSTOM2=1` enables
+Enhanced frame rate (the repository's `docs/running.md` lists every option).
 
 | Machine | Settings | Code base in dumps |
 |---|---|---|
@@ -223,7 +223,8 @@ view changes. `frames.py` counts entries of `h12:05ea6`; `swap_fields.py` watche
 ## 8. Measuring a change
 
 1. Build once; vary only CUSTOM2 (`WHD_ARGS=CUSTOM2=…`). Developer/VERIFY builds honour every
-   bit; release builds force W1–W6 and mouse precision on (pass `--custom2 (mask|191)` to `check_disabled.py`).
+   bit; release builds turn every bit 0–8 on or off together (pass `--custom2 511` to
+   `check_disabled.py` for an enhanced release capture).
 2. Capture off and on, on the A500-equivalent **and** the 68020, one at a time, on `spin` and
    `wall`. `tools/ab_window.sh PREFIX OFF ON [ROUTES [MACHINES]]` does this and runs the analysis
    chain on each capture: `check_disabled.py` (off: patched ranges are original) or

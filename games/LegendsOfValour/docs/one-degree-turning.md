@@ -1,7 +1,7 @@
 # One-degree mouse precision
 
-Release builds always enable whole-degree headings and rendering for direct mouse
-control. The UI turn buttons use the original handler and view-specific increments;
+Release builds enable whole-degree headings and rendering for direct mouse control with
+Enhanced frame rate. The UI turn buttons use the original handler and view-specific increments;
 there is no tap override or added repeat delay. Precision is independent of the
 optional 25 Hz simulation. Developer/VERIFY builds retain CUSTOM2 bit 7 for A/B
 checks; with it off, the turning hooks and five-degree units remain original.
@@ -119,8 +119,8 @@ all headings and one wrap. All four retain the original UI dispatcher target.
 Reproduce with `tools/turning_input_validate.sh PREFIX`.
 
 Release, developer and VERIFY builds assemble. Binary menu/default checks confirm
-2/9/17 menu options respectively, with the release forcing CUSTOM2 mask 191 and
-developer/VERIFY builds keeping independent bit selection. The release archive passes
+2/10/18 menu options respectively, with the release mapping any nonzero CUSTOM2 to mask
+511 and developer/VERIFY builds keeping independent bit selection. The release archive passes
 packaging CRC and replacement-content checks. No new performance claim is made.
 
 ## Cost

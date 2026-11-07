@@ -10,12 +10,12 @@ The input is the original installer, `tmp/archives/LegendsOfValour.lha` (`make u
 ARCHIVES=<directory>` copies and verifies it, `inputs.sha256`). The output, in the
 repository's ignored `dist/`, is `LegendsOfValourEnhanced-<version>-<YYYYMMDD>.lha` and its
 `.sha256`, the version and date from the release slave's `$VER` string (`version_of` and
-`date_of` of `common/tools/package_release.py`): for 2.0b,
-`LegendsOfValourEnhanced-2.0b-20261009.lha`. The preinstalled 0837 archive is an input of
+`date_of` of `common/tools/package_release.py`): for 2.1b,
+`LegendsOfValourEnhanced-2.1b-20261107.lha`. The preinstalled 0837 archive is an input of
 `make unpack` (the game data) but is not repackaged.
 
 The command rebuilds the plain release slave (`make slave` with no `VASM_EXTRA`) and checks
-its two-option menu, that `slv_info` carries the `$VER` version and date, and that
+its two-option menu (character creation, Enhanced frame rate), that `slv_info` carries the `$VER` version and date, and that
 `release/ReadMe` has a `version <version> (<date>)` history entry. `release/ReadMe` is the
 whole shipped ReadMe, in the WHDLoad Install Template layout; it keeps CFou!'s 1.0 history
 entry and credits.
@@ -23,10 +23,10 @@ entry and credits.
 Replaced records: `LegendsOfValourHd/LegendsOfValour.Slave`, `LegendsOfValourHd/ReadMe` and
 the six game icons the installer offers, `LegendsOfValourHd/LegendsOfValour.{inf,infC,
 colcfou,colcfou2,colcfou3,colcfou4}`. Each icon's tooltypes must be exactly `CUSTOM1=0`;
-`tools/icon.py` parses the DiskObject and appends `CUSTOM2=64`, keeping the artwork,
+`tools/icon.py` parses the DiskObject and appends `CUSTOM2=1`, keeping the artwork,
 NewIcon/ColorIcon data and every other byte. The Install script copies the chosen icon and
-sets only its default tool, `Slave`, `PreLoad` and stack, so the installed icon runs with the
-timing on; `CUSTOM2=0` restores the original timing. `python3 tools/icon.py ICON...` prints an
+sets only its default tool, `Slave`, `PreLoad` and stack, so the installed icon runs with
+Enhanced frame rate on; `CUSTOM2=0` runs the original game. `python3 tools/icon.py ICON...` prints an
 icon's tooltypes.
 
 The archive keeps exactly its original entry names and order; every other compressed

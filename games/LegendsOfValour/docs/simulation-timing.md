@@ -1,4 +1,4 @@
-# Optional 25 Hz simulation (CUSTOM2 bit 6)
+# 25 Hz simulation (developer CUSTOM2 bit 6)
 
 Read this before changing `src/simulation*.s`, the game's clock/input paths, or anything
 that runs between rendered frames.
@@ -19,9 +19,10 @@ elapsed-field accumulator:
 - The movement step is the constant 10 (the original value at 25 fps), set in every
   compensation-table entry.
 - Combat keeps its native minimum cadence: one combat step per 4 fields (two world ticks).
-- Bit 6 is independent of the rendering patches (W1–W6) and of mouse precision (developer bit 7). The
-  slave leaves it off unless CUSTOM2 sets it; the release's installed icon sets `CUSTOM2=64`,
-  and `CUSTOM2=0` restores the original timing.
+- Bit 6 is independent of the rendering patches (W1–W6), mouse precision (bit 7) and click
+  inputs (bit 8) in developer builds. Release builds have no separate timing option: Enhanced
+  frame rate (any nonzero CUSTOM2, `CUSTOM2=1` in the installed icon) turns it on with the
+  other enhancements, and `CUSTOM2=0` runs the original game.
 
 It **changes gameplay speed** on machines that rendered below 25 fps: the world now runs at
 the 25 fps reference. It also **costs CPU**: on the A500 catch-up ticks take rendering time
@@ -74,6 +75,9 @@ Renderer calls outside the main tick only redraw and never advance AI. These are
   cumulative positions, and each tick consumes the difference once. The adapter at
   `h5:01e64` (caller `h1:02aaa`) reproduces the heading ADD and its signed **BGE** internally.
 - *Mouse-look entry.* Entering mouse look clears the current delta, as the native code does.
+- *Clicks.* With click inputs (bit 8), `_sim_input_pointer` and `_sim_combat_pointer` pass
+  their historical buttons through `_click_filter`; samples whose buttons the live UI already
+  consumed (see "Modal and pause boundaries") bypass it (`docs/click-inputs.md`).
 - *History loss.* A tick older than the retained history rebases explicitly: it samples
   current input, resynchronises consumed time, drops accumulated motion and increments
   `input_recoveries`. Unrecoverable time is abandoned, not replayed. Every validation run

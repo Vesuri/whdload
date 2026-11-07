@@ -1,0 +1,15 @@
+# Click route for a modal screen: open the options dialog and hold the view-size icon for
+# 100 fields, then apply. Each click cycles medium -> small -> large -> medium; with click
+# inputs (CUSTOM2 bit 8) the hold is one click, so the view ends small (80 pixels wide).
+1    51 174 W     # start screen: green (character) button, id 1
+10   51 174 L     # -> save-slot screen
+10   132 175 W    # right die, id 10
+10   132 175 L    # cancel -> the game starts with the default character
+0    15 188 W     # in game: computer button live
+10   15 188 L     # options dialog
+150  193 52 -     # view-size icon (second from the right, top row)
+100  193 52 L     # hold it: one click
+50   160 90 -
+10   160 90 L     # click outside the dialog applies it
+100  160 90 -
+0    160 90 A     # anchor

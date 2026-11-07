@@ -1,8 +1,9 @@
 # Performance patches (W1–W6)
 
 > Read before changing game code for speed. Measurement method: `docs/profiling.md` §8.
-> Optional timing on bit 6 and automatic mouse precision (developer bit 7): `docs/simulation-timing.md`,
-> `docs/one-degree-turning.md`.
+> Game timing (developer bit 6), mouse precision (bit 7) and click inputs (bit 8):
+> `docs/simulation-timing.md`, `docs/one-degree-turning.md`, `docs/click-inputs.md`.
+> Release builds enable all of them, and W1–W6, with one switch, Enhanced frame rate.
 
 ## Rules for every patch
 
@@ -10,11 +11,13 @@
   after the PowerPacker stub has loaded the 17 hunks. Hunk N is `_hunks[N]` (filled from the
   segment chain); patch with `_hunks[N] + offset`, checking the original bytes first and
   aborting with `TDREASON_FAILMSG` on mismatch. Flush caches after writing. Skip all patches in
-  character-creation mode (CUSTOM1).
+  character-creation mode (CUSTOM1). `_lov_version` clears CUSTOM2 before any installer runs
+  unless the 17 hunk sizes are those of the English AMIGA2, so other versions (German, French)
+  run as CFou!'s v1.0 instead of failing a check.
 - Hooks replace **complete instructions** only. Before choosing a range, check that no
   relocation (`tools/xref.py`) or branch targets its interior.
-- Each patch has a CUSTOM2 bit. Release builds force bits 0–5 and mouse-precision bit 7 on; developer/VERIFY builds honour
-  each bit. With a bit off, the original bytes stay untouched: declare each hook range with a
+- Each patch has a CUSTOM2 bit. Release builds map their single switch, Enhanced frame rate
+  (any nonzero CUSTOM2), to all bits 0–8 and 0 to none; developer/VERIFY builds honour each bit. With a bit off, the original bytes stay untouched: declare each hook range with a
   `PERF_RANGE hN:OFFSET LEN bit=B` comment next to it, and `tools/check_disabled.py` verifies
   every declared range against `tmp/unpacked/AMIGA2` (with relocations applied).
 - CPU choice comes from `WHDLTAG_ATTNFLAGS_GET` (read in `_bootdos`). Keep the original code on

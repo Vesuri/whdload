@@ -295,9 +295,10 @@ _sim_combat_pointer
         move.w (_sim_combat_input+6,pc),d1
         move.w d1,($6038-32768,a4)
         ext.l d1
-        move.l a0,-(sp)
-        lea (_sim_combat_input,pc),a0
-        move.w (8,a0),($603a-32768,a4)
-        move.l (sp)+,a0
+        move.l d0,-(sp)
+        move.w (_sim_combat_input+8,pc),d0
+        bsr _click_filter
+        move.w d0,($603a-32768,a4)
+        move.l (sp)+,d0
         move.l (_sim_combat_pointer_continue,pc),-(sp)
         rts
