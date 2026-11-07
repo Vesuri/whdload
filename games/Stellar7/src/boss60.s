@@ -55,11 +55,15 @@ s60_boss_ai:
         move.l (16,a3),d4
         move.w (22,a3),d5
         move.w (20,a3),d6
+        ; Native library stubs (e.g. $876, reached through sound starts) load
+        ; arguments into D2-D4 without restoring them: keep the samples on the stack.
+        movem.l d2-d7,-(sp)
         move.w ($40,a3),-(sp)
         move.l a3,-(sp)
         S60_CALL $10904
         addq.l #4,sp
         move.w (sp)+,d1
+        movem.l (sp)+,d2-d7
         cmp.l (a6),a3 ; native removal invalidates the record
         bne .done
         btst #3,d7

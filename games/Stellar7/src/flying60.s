@@ -16,11 +16,16 @@ s60_flying_ai:
         tst.w (4,a6)
         bne .integrate
         move.w #S60_LEGACY_DIV,(4,a6)
-        move.l ($10,a3),d2
-        move.w ($16,a3),d3
+        ; The starting height and bank stay on the stack: native library stubs
+        ; (e.g. $876, reached when the flyer fires and starts a sound) load
+        ; arguments into D2-D4 without restoring them.
+        move.l ($10,a3),-(sp)
+        move.w ($16,a3),-(sp)
         move.l a3,-(sp)
         S60_CALL $f192
         addq.l #4,sp
+        move.w (sp)+,d3
+        move.l (sp)+,d2
         move.l ($10,a3),d0
         sub.l d2,d0
         move.w d0,(6,a6)

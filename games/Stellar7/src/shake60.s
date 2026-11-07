@@ -52,8 +52,9 @@ s60_shake_update:
         sub.l (a2),d0
         cmp.l #S60_LEGACY_DIV,d0
         bcs .return
-.due:   move.l (s60_ticks,pc),d2
+.due:   move.l (s60_ticks,pc),-(sp) ; native library stubs may change D2-D4
         S60_CALL $40ae
+        move.l (sp)+,d2
         move.w ($026a-S60_DATA,a4),d0
         beq .reset
         move.l d2,(a2)
