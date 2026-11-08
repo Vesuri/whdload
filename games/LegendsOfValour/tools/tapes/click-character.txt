@@ -1,0 +1,49 @@
+# Click route: open the character screen (Rank, main panel id 25), then close it by clicking
+# outside its gadgets at the same pointer position, where the main panel has the Rank button
+# again. The screen must stay closed: the last W waits until the main panel is hit-tested with
+# Rank under the pointer, so the anchor is reached only if the screen did not reopen.
+# The start follows tools/tapes/spin.txt (W entries, conversation EXIT clicks).
+1    51 174 W     # start screen: green (character) button, id 1
+10   51 174 L     # -> save-slot screen
+10   132 175 W    # right die, id 10
+10   132 175 L    # cancel -> the game starts with the default character
+0    15 188 W     # in game: computer button live
+# The townsman's speech blocks the game until EXIT (tools/tapes/spin.txt).
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+90   75 183 -
+10   75 183 L     # EXIT
+25   145 186 W    # Rank under the pointer
+8    145 186 L    # open the character screen
+250  145 186 -
+8    145 186 L    # click outside its gadgets (below ODIN): close it
+25   145 186 W    # the main panel again, with Rank under the pointer
+100  145 186 -
+1    145 186 A    # anchor
+0    145 186 -

@@ -58,6 +58,8 @@
  - finer turning with the mouse
  - buttons act once per click: U-turn and other screens no longer repeat
    while the mouse button is held; walking and turning still repeat
+ - closing a screen such as the character screen with a click no longer
+   reopens it
  - all enhancements behind one option, Enhanced frame rate (Custom2=1),
    enabled by the game icon
  - enhancements for the English, German and French versions

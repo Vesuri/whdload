@@ -48,6 +48,7 @@ _click_reader
         movea.l (sp)+,a0
         beq .store
         bsr _click_filter
+        bsr _sim_input_live_read
 .store  move.w d0,(h11_0603a-$8000,a4)
         rts
 

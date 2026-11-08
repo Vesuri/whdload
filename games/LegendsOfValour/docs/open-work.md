@@ -37,8 +37,8 @@
   available here and runs unenhanced. With its archive, pin it, add its sizes to
   `_lov_hunk_sizes`, a fourth language to `tools/versions.py`, `src/offsets.s` and the
   fixup table.
-- **Click inputs:** the U-turn, the movement hold and the options dialog are checked at
-  runtime; the item, shop and conversation screens, combat and the save-name editor are not.
+- **Click inputs:** the U-turn, the movement hold, the options dialog and closing the
+  character screen (`click-character.txt`) are checked at runtime; the item, shop and conversation screens, combat and the save-name editor are not.
   Combat's attack buttons now act once per click; play feedback may want them to repeat.
 
 - **Mouse precision:** accepted in play testing. The requested native-button behavior

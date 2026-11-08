@@ -48,6 +48,20 @@ Hz whatever the frame rate.
   (`_click_skip_return`), so the filter never sees two streams. Historical samples whose
   buttons the live UI already consumed (`_sim_ui_until`, `_sim_tick_ui_cleared`) are neither
   a press nor a release.
+- **Screens opened from the main tick.** Under the timing the main tick never calls the live
+  reader (`h1:026ea` reads history), so every live read comes from another screen: the
+  hunk 2 screens (27 calls of the thunk `h2:063dc`, among them the character screen
+  `h2:0511e` at `h2:051f2`), the save-name editor (`h8:00268`) and the start screen
+  (`h1:02044`). The character screen (Rank, main panel id 25, `h5:01c8a`) runs inside the
+  main tick and does not suspend the timing, so history keeps recording while it is open.
+  After it closed, the main tick replayed the queued sample of the press that opened it:
+  the filter, re-armed by the screen's own polls, took it as a new press, and Rank under
+  the pointer opened the screen again (08.11.2026 report). `_click_reader` now calls
+  `_sim_input_live_read` after the filter: with the timing on, it marks the history up to
+  the current field as consumed (`_sim_input_mark_ui`, as the item panel and options dialog
+  do when they close) and clears the sample the current tick holds. Elapsed time and mouse
+  motion are kept; only the buttons are dropped, and the filter blocks a still-held button
+  until it is released.
 - **Mouse look** (right button) reads `h12:05288` directly (`h5:01ea2/01ebc`), where a held
   left button walks forward. It is not filtered.
 - **Layout.** VERIFY builds use up the 16-bit reach of the tag list (`_custom*`, `_hunks`)
@@ -60,7 +74,9 @@ Hz whatever the frame rate.
 - Bit 8 off: `h1:01ba8` (6 bytes) and `h6:007da` (8 bytes) stay original
   (`PERF_RANGE ... bit=8`, `tools/check_disabled.py`).
 - The reader's store and its CCR stay as in the original.
-- Exactly one button stream feeds the filter at a time.
+- Exactly one button stream feeds the filter at a time. Under the timing, a live read
+  marks the queued history as consumed, so a screen's presses never replay in the main
+  tick.
 - Movement gadgets keep native repeat: `tools/turning_input_validate.sh` (with bit 8 on)
   still sees twenty five-degree ticks for a 40-field turn-right press.
 
@@ -73,6 +89,7 @@ Captures as in `docs/simulation-timing.md` (VERIFY, `KEEP_SLAVE=1`, `STATE_ONLY=
 | U-turn held 40 fields | `tools/tapes/click-uturn.txt`, CUSTOM2=511, `STATE_TICKS=60`; heading and buttons per tick | both CPUs: one 270 → 90 flip, then 90 for the whole hold; with CUSTOM2=255 (68020) it alternates 90/270 every tick |
 | U-turn without the timing | same tape, CUSTOM2=447, `STATE_FIELDS=80` (68020) | one flip |
 | Movement hold | `tools/turning_input_check.py --hold` on the turn-button pulse (VERIFY `TIMING_STUDY VERIFY_WAIT_RESCUE`, spin route, CUSTOM5=8389121), CUSTOM2=511 | both CPUs: twenty 5° ticks, native dispatcher target |
+| Character screen closed at Rank | `tools/tapes/click-character.txt`, CUSTOM2=511, A1200/68040 (`SETUP=a1200-040`); screenshot one second after the anchor | the main view; without `_sim_input_live_read` the character screen has reopened and history is stuck on the button-down sample |
 | Modal screen | `tools/tapes/click-options.txt`, CUSTOM2 255 and 511 (68020); view width `h12:0002e` at the anchor | small view (80) in both: the options dialog already waits for release |
 | Disabled ranges | `check_disabled.py --custom2 255` | bit-8 ranges original |
 

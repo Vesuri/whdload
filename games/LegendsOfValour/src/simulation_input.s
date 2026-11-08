@@ -323,6 +323,25 @@ _sim_input_after_modal
 .done   move.l (sp)+,a0
         rts
 
+; Under the timing the main tick reads history (h1:026ea), so a live read of the buttons
+; comes from another screen: the hunk 2 screens (character, conversation, shops, ...), the
+; save-name editor or the start screen (combat's live read is excluded by the caller).
+; Their buttons are consumed: the main tick must not replay the queued samples up to now,
+; or the press that opened a screen, kept in history, would open it again after the screen
+; closes (docs/click-inputs.md). Called from _click_reader; all registers kept.
+_sim_input_live_read
+        move.l a0,-(sp)
+        lea (_sim_input_enabled,pc),a0
+        tst.w (a0)
+        beq .done
+        bsr _sim_input_mark_ui
+        lea (_sim_tick_input+8,pc),a0
+        clr.w (a0)			;the sample the current tick already holds
+        lea (_sim_tick_ui_cleared,pc),a0
+        move.w #1,(a0)
+.done   move.l (sp)+,a0
+        rts
+
 ; Also used by combat's native world-clock pause, without _sim_suspended.
 _sim_input_mark_ui
         move.l a0,-(sp)
