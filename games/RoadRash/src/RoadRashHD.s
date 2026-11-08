@@ -120,6 +120,10 @@ _pl_boot	PL_START
 	; *** patches another prog
 
 	PL_PS	$4844,PatchIntro2
+
+	; *** full-screen copy that returns with its blit running (visual_fixes.s)
+
+	PL_PS	$4BAA,visual_screen_copy_start
 	PL_END
 
 PatchIntro1:
@@ -138,6 +142,20 @@ PatchIntro1:
 pl_intro_1:
 	PL_START
 	PL_R	$12BAE
+	; Title blits the CPU follows without waiting (visual_fixes.s).
+	PL_P	$14008,visual_clear_done
+	PL_PS	$141D0,visual_scroll_start
+	PL_PS	$12D24,visual_plane_copy
+	PL_NOP	$12D2A,2
+	PL_PS	$12D38,visual_plane_copy
+	PL_NOP	$12D3E,2
+	PL_PS	$12D4C,visual_plane_copy
+	PL_NOP	$12D52,2
+	PL_PS	$12D60,visual_plane_copy
+	PL_NOP	$12D66,2
+	PL_P	$12D74,visual_size_d7_done
+	PL_P	$14956,visual_size_d7_done
+	PL_P	$14A98,visual_size_d7_done
 	PL_END
 	
 PatchIntro2:
@@ -156,10 +174,10 @@ pl_intro_2:
 	PL_START
 	PL_P	$8E58,ReadSomeFile
 	PL_P	$8CDA,MoveD0_2
-	; The intro's two screen clears return while the blitter still writes
-	; the planes the CPU decodes next (visual_fixes.s).
-	PL_P	$9F88,visual_intro_clear_done
-	PL_P	$9FB4,visual_intro_clear_done
+	; Intro blits the CPU follows without waiting (visual_fixes.s).
+	PL_P	$9F88,visual_clear_done
+	PL_P	$9FB4,visual_clear_done
+	PL_PS	$9FF0,visual_scroll_start
 	PL_END
 
 	
@@ -293,6 +311,10 @@ pl_main
 	PL_START
 	PL_P $9E2C,visual_actor_visibility
 	PL_PS $2874E,enable_border_blank
+	; Screen utilities that return with their blit running (visual_fixes.s).
+	PL_P $2F6B2,visual_clear_done
+	PL_P $2F75E,visual_size_d7_done
+	PL_PS $2F7C4,visual_screen_copy_start
 	PL_IFC2
 	PL_ENDIF
 

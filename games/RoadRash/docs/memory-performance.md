@@ -586,7 +586,7 @@ The complete bundle exposed a native ordering bug: the two intro screen-clear
 routines returned immediately after starting the blitter. The blitter could
 overwrite faster CPU decoding and the following credits. Their exits now wait
 for completion, preserving the original saved registers and CCR; since the
-intro screen-clear fix (`visual-fixes.md`) this applies in both modes.
+unwaited-blit fixes (`visual-fixes.md`) this applies in both modes.
 This is confined to intro loading/display preparation, not a race pacing wait.
 The decoded-screen checkpoint comparison identifies the race: before the fix,
 the native sample had already lost picture pixels; the public decode produced

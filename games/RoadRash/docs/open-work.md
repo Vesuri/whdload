@@ -37,17 +37,19 @@ password entry); the `PL_IFC2` move is a behaviour change to decide on, not a fi
 
 ## Open
 
-- Unreleased: the intro screen-clear blitter wait now applies in both modes
-  (`visual-fixes.md`). The release slave and `release/slaves.sha256` are still
-  3.0b's; a release needs a version, ReadMe history entry and the release checks.
-- Bike selection screen glitches (player report, 8.11.2026, 68040; not reproduced
-  in the emulator). Suspected unwaited blit, as in the intro. Static audit so far:
-  the full-screen clear at main-hunk `$2f654`/`$2f67c` returns while clearing but
-  serves startup, password and disk-error screens; the clear at `$2ef9e` has no
-  direct caller; the end-of-race picture screens (`$3e5a`, `$3eea`) load, copy and
-  decode with no blit in flight. The shop's texts (`$3540`..`$3802`) are reached
-  through the menu tables at `$2448`..`$2494`. Next: a DMA trace of the shop on
-  `a1200-fast` (030+ traces carry no blitter records), reached by finishing a race.
+- Unreleased: blitter waits after the unwaited blits in the intro, title, loader,
+  menus and bike shop, in both modes (`visual-fixes.md`, "Unwaited blits"). They
+  address the player report of intro and bike-shop glitches (8.11.2026, 68040).
+  The emulator doesn't reproduce the glitches, so the fix needs a player's
+  confirmation on hardware. The release slave and `release/slaves.sha256` are
+  still 3.0b's. A release needs a version, a ReadMe history entry and the release
+  checks.
+- Race-start blits the observer still reports (CUSTOM2=0, `a1200-fast`): the CPU
+  reads and writes the D area of the blit at main hunk `$346e0` (from `$33a3e`),
+  and reprograms the blitter while the blits at `$32e14` (from `$32e2a`) and
+  `$32f8a` (from `$32f96`..`$32fc0`) run. The observer logs each site once, so
+  they may happen every frame. No glitch has been reported there. A wait in the
+  race path costs time, so any fix needs the rate checks.
 - D1d: real 68040/68060 cache and coherency testing (emulator only so far).
 - F6a–F6d: relocating the fixed-address CPU globals, future work by agreement.
 - Testing on real hardware in general; the release's limitations are in `release.md`.

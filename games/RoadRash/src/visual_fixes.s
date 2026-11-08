@@ -1,11 +1,38 @@
 ; Original presentation bug fixes, independent of CUSTOM2 and CPU selection.
 
-; Exit of the intro's screen clears (INTRO.AMI offsets $1f88 and $1fb4,
-; movem.l (sp)+,d0/a0 then rts). Native code returned after starting the
-; blit; a fast CPU then decodes the picture and credits into planes the
-; blitter is still clearing. Wait for it, keeping the native CCR.
-visual_intro_clear_done:
+; Blitter waits for routines that start a blit and return while it runs, so
+; the CPU drew into, or reprogrammed, a blit still in progress; a CPU that
+; overtakes the blitter (cached or Fast RAM code) corrupts the picture.
+; Each keeps the native CCR. Sites (file or main-hunk offsets):
+; - visual_clear_done replaces movem.l (sp)+,d0/a0 + rts: INTRO.AMI $1f88 and
+;   $1fb4, TITLE.AMI $c008 (screen clears), main $2f6b2 (full-screen clear).
+; - visual_scroll_start replaces move.w #$fa14,$58(a6): INTRO.AMI $1ff0 (one-
+;   line scroll), TITLE.AMI $c1d0 (screen copy); the native rts follows.
+; - visual_size_d7_done replaces move.w d7,$58(a0) + rts: TITLE.AMI $ad74,
+;   $c956 and $ca98 (last plane copy, bobs), main $2f75e (partial clear).
+; - visual_plane_copy replaces move.w d7,$58(a0) + lea $20d0(a1),a1 (with a
+;   NOP): TITLE.AMI $ad24, $ad38, $ad4c and $ad60 (planes 1-4 of a copy).
+; - visual_screen_copy_start replaces move.w #$c814,$58(a6): main $2f7c4 and
+;   lomain.ami $47aa (runtime $4baa) (full-screen copies); the native rts
+;   follows.
+visual_clear_done:
  movem.l (a7)+,d0/a0
+ bra.b visual_blit_wait
+visual_scroll_start:
+ move.w #$fa14,$58(a6)
+ bra.b visual_blit_wait
+visual_screen_copy_start:
+ move.w #$c814,$58(a6)
+ bra.b visual_blit_wait
+visual_size_d7_done:
+ move.w d7,$58(a0)
+ bra.b visual_blit_wait
+visual_plane_copy:
+ move.w d7,$58(a0)
+ bsr.b visual_blit_wait
+ lea $20d0(a1),a1
+ rts
+visual_blit_wait:
  move.w sr,-(a7)
  btst #6,$dff002
 .wait:

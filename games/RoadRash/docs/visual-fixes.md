@@ -56,33 +56,61 @@ trajectory is identical: changing rendering workload can change its cadence,
 and the native rider traversal derives pose only for eligible forward riders.
 The accelerated simulation retains authoritative pose ownership.
 
-## Intro screen clears (unreleased)
+## Unwaited blits (unreleased)
 
-The intro's two screen-clear routines (`INTRO.AMI` offsets `$1f5c` and `$1f8e`)
-write the blitter registers without waiting, start a D-only clear and return at
-`$1f88`/`$1fb4` while it runs. The intro then CPU-decodes its picture and credits
-into the planes being cleared; a CPU that overtakes the blitter loses those
-pixels. This was found during D3 (`memory-performance.md`) and fixed there only
-for CUSTOM2. A player report of glitches in the intro on a 68040 machine
-(8.11.2026, CUSTOM2 setting not known) matches this race on the native path.
+A player reported glitches in the intro and on the bike selection screen on a
+68040 machine (8.11.2026, CUSTOM2 setting not known). Several routines start a
+blit and return while it runs; the caller then draws into the blit's area with
+the CPU, or reprograms the blitter. The emulator's timing hides this, but a CPU
+that runs from cache or Fast RAM can overtake the blitter on real hardware. The
+two intro clears were found during D3 (`memory-performance.md`) and fixed there
+only for CUSTOM2.
 
-`pl_intro_2` now replaces both exits in the native module with
-`visual_intro_clear_done`, which restores the saved registers, waits for the
-blitter and keeps the native CCR. The patch is applied before the Enhanced
-framerate copy, so the copy inherits it; none of the copy's validated operands,
-relocations or relative stubs lie within the six replaced bytes.
+The blitter-sync observer (`development.md`) found the sites. It logs CPU access to
+a blit's area, and CPU writes to the blitter registers, between the blit's BLTSIZE
+write and the next DMACONR read that finds the blitter idle. It works by code order,
+so the emulator's timing doesn't matter. Each site now waits for the blitter
+(`visual_blit_wait`) and keeps the native registers and CCR:
 
-Emulator checks (release build, ignored `tmp/blitaudit/`): on `a1200-040` both
-exits jump to the slave with CUSTOM2=0 (native module at `$8000`) and with
-CUSTOM2=1 (public copy). With CUSTOM2=0 at maximum emulated CPU speed the intro
-screenshots every 99 fields from 1349 to 3349 are pixel-identical to the
-unchanged 3.0b slave's: the emulator does not reproduce the race, so this is not
-evidence that the fix removes the reported glitch on real hardware. The 68000 A500
-(custom), `a1200-fast` CUSTOM2=1 and `a1200-040` with CUSTOM2 off and on all reach
-a race.
+| Module | Offsets | Routine | Followed by |
+|---|---|---|---|
+| `INTRO.AMI` | `$1f88`, `$1fb4` | screen clears (exits) | picture and credits decoding |
+| `INTRO.AMI` | `$1ff0` | one-line scroll | the next line's text |
+| `TITLE.AMI` | `$c008` | screen clear (exit) | title drawing |
+| `TITLE.AMI` | `$c1d0` | screen copy | title drawing |
+| `TITLE.AMI` | `$ad24`..`$ad74` | five-plane copy | each plane's blit reprogramming the last |
+| `TITLE.AMI` | `$c956`, `$ca98` | bob blits (exits) | the next bob |
+| `lomain.ami` | `$47aa` | full-screen copy | loader screens |
+| main hunk | `$2f6b2` | full-screen clear (exit) | menu and shop text |
+| main hunk | `$2f75e` | partial clear (exit) | menu and shop text |
+| main hunk | `$2f7c4` | full-screen copy | CPU writes to its source and destination in the menus and bike shop |
 
-The player also reported glitches on the bike selection screen; that is open
-(`open-work.md`).
+The main-hunk copy at `$2f7c4`, followed by the shop's CPU drawing, is the likely
+cause of the bike-shop report. The patches go into the native modules before the
+Enhanced copies are made (title, intro and main), so the copies have them too.
+None of the copies' validated operands, relocations or relative stubs lie inside
+the patched bytes. The jumps were checked in the Enhanced main copy.
+
+Checks (release build, ignored `tmp/blitaudit/`):
+
+- With CUSTOM2=0 on `a1200-fast`, the observer is clean from boot through the
+  title, intro, menus, a race's results and the bike shop (`tools/shop_route.py`),
+  except for the three race-start sites in `open-work.md`.
+- A race is reached on the custom A500 and on `a1200-040` with CUSTOM2=0 and 1,
+  and on `a1200-fast` with CUSTOM2=1.
+- The intro is pixel-identical to 3.0b's on `a1200-040` at the maximum emulated CPU
+  speed. The emulator doesn't reproduce the glitch, so this isn't evidence that
+  the fix removes it on real hardware. That still needs a player's confirmation.
+- Race rates (`tools/check_a.py --normal`, one run each, 3.0b vs this build):
+
+  | Machine | CUSTOM2=0 | CUSTOM2=1 |
+  |---|---|---|
+  | A500 (`a500-1m`) | 8.5 / 8.5 | 8.5 / 8.5 |
+  | `a1200-fast` | 12.5 / 12.5 | 18.6 / 18.6 |
+  | 68040 25 MHz | 22.4 / 22.7 | 49.6 / 49.6 |
+
+  There is no regression. The 040 CUSTOM2=0 difference comes from a single run
+  and is not claimed as a gain.
 
 ## Validation
 
