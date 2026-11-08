@@ -54,7 +54,7 @@ the details. What carries over, untested on BH:
   measured average frame length (moving 1/8 of the way per frame, clamped to 4..field rate),
   carries the time owed between frames, ignores frames of more than 25 fields (pauses, disk
   loads), and starts each flight from the boot T. BH needs the same, from its own field
-  counter (it has none, item 3) and from the mission T at `bh:1341c`.
+  counter (it has none; plan step 2) and from the mission T at `bh:1341c`.
 - **Countdowns set as multiples of T** last their time only while T stays put; TFH's fix is
   the averaged T, and its audit (FR-01..FR-28) replaced frame-counted timers with elapsed
   time one system at a time. Its list (debris, group timers, effects, world clock, projectile
@@ -68,63 +68,111 @@ the details. What carries over, untested on BH:
   integrators (`bh:79f0`, the world arrays at `10908/11484/12060(a4)`) will need the same.
 - **The method:** native CPU checks of single routines under Unicorn (68000 and 68040) from
   a flight snapshot, comparing equal elapsed game time at T = 8/25/50/60 and changing T;
-  input tapes and pinned RNG in the VERIFY build only (item 1); every change behind one
-  `CUSTOM` option with the original bytes untouched when it is off (item 6).
+  input tapes and pinned RNG in the VERIFY build only; every change behind one
+  `CUSTOM` option with the original bytes untouched when it is off (plan step 1).
 - **Not directly:** TFH's frame pacing waits for the buffer swap; BH has one displayed
   bitplane buffer and no swap (profiling.md §5). TFH's merge c2p converts only changed
   groups of 32 pixels, unlike the full-frame merge rejected here (`docs/c2p.md`); whether a
   delta merge pays on BH is unmeasured.
 
-## Not done yet, in order
+## How much of TFH's code BH shares (2026-11-09)
 
-1. **Seed BH's second random generator at flight start** in the VERIFY build (shift register
-   `bh:15bf8`, state `-6070/-6068(a4)`), then re-run the cross-CPU state comparison
-   (68000 vs 68020 at frame 120 now differs in 1059 bytes; profiling.md §9). With that, game
-   state can be compared between any two machines frame by frame: the tool for checking a
-   decoupling design.
-2. **The 68030 ceiling.** A 50 MHz `SWAP_ONLY` run found the flight already at frame 1539 when
-   the anchor was armed: map that machine's screens against the tape first.
-3. **Dynamic T for BH**, now that Their Finest Hour's version is finished (its Enhanced
-   framerate, below; the lessons are in AmigaXDev `docs/playbooks/fixed-time-simulation.md`): the coverage test (profiling.md §9) shows the flight
-   model and the drones follow T and the stick needs the reference-T division. BH also needs
-   its own field counter (no VBL count exists), T restored at mission setup (`bh:1341c`),
-   `10186(a4)` and countdowns recomputed, the slot-128 pool sized for T = 50 (16 slots is all
-   there is), the two T-scaled busy-wait delays replaced with field waits, and TFH's
-   truncation work at large T.
-4. **The state map** for the flight model (position `10908/11484/12060(a4)`, attitude
-   `14328/14952(a4)` integrated at `bh:79f0`, speed, the drones), from `STATE_ONLY` dumps.
-5. **v1.0 vs this slave.** v1.0 was chip-only by design ("too fast" with fast RAM); compare
-   the two on the same window by game state once a step-rate design exists.
-6. **CUSTOM gating** for the first patch, declared in `slv_config`, with a disabled-bytes
-   checker (AmigaXDev `docs/playbooks/new-game-playbook.md` §10; Test Drive 2 has one).
+Matched by normalised instruction runs (12 or more instructions, addresses, offsets and
+large immediates masked; prototype scripts in `tmp/xmatch/`, step 0 below makes them a tool):
 
-## Decision for the user
+- 40% of BH's hunk 0 equals TFH's `bob`. 602 TFH data globals pair with BH's: T
+  `11700`→`10184(a4)`, T/8+1 `11702`→`10186`, heading `18162`→`14328`, roll `19198`→`15240`,
+  object life `20798`→`16816`.
+- 48 of TFH's 162 game-patch sites (not counting NOPs) lie in matched code: object step and
+  polar split (`bh:8290`, `831c`, `842a`, `855c`, `8622`), AI turn (`bh:11e50`/`11ee2`), swept hit
+  (`bh:da6e`), shot life (`bh:c958`, `8588`), flak (`bh:e556`..`ebb6`), effects (`bh:aec8`),
+  ship damage (`bh:e28e`), AI lead (`bh:12b22`, `ca76`), script waits (`bh:10200`), AI attitude
+  (`bh:11238`..`11d90`), bombs (`bh:8742`, `ecaa`), debris (`bh:ce02`, `cf26`), sound
+  (`bh:1ac6e`, `1acbe`). About 14 more match closely: c2p `bh:1a2c2`, fuel `bh:111e2`, aircraft
+  damage `bh:de16`, object loop `bh:8266`/`86b0`, replay camera `bh:784a`/`77f8`/`7982`.
+- BH's own T sites are the patterns TFH's audit fixed: gun reload T/3 (`bh:c70c`/`c76a`),
+  aircraft damage T/3 (`bh:de2c`), ship clock 4T (`bh:e2a2`), drag 5T (`bh:8408`), mission
+  wait 40T (`bh:ed02`), and BH's 180T (`bh:d542`).
+- Constants differ inside matched code (TFH's bomb slots end at 52, BH's at 28; hit
+  tolerance 500 against 400; native replay snapshot 195 fields against 112): ports take BH's.
+- BH-specific: no field counter (the level-3 handler `bh:1ac26` can count); one displayed
+  bitplane buffer (TFH's swap pacing and tear fix do not apply, a one-frame-per-field cap
+  does); input through `input.device` (no JOY0DAT wrap fix); no time acceleration; T from the
+  mission record; simpler player rates (`bh:7920`..`7a6e`); the transform `bh:16bca` is
+  TFH's `bob:2f4ae` arithmetic behind a C entry with an early cull; the c2p is TFH's original
+  without the cockpit mask.
+- The slave does not define KickEmu's `CACHE`, so `kick13.s` turns all caches off: the 68020
+  baseline (28.8 fps) is with caches off.
 
-Game time is coupled to the frame rate, so a faster renderer, fast RAM or a faster CPU makes
-the whole game faster: on a 68020 the turn runs at 28.8 fps, so the whole game runs 3.1 times
-as fast as on the 68000. That is why Galahad shipped a chip-only slave, and the fast memory
-now in this slave speeds the game up too (5 % on the 68000). Possible designs:
+## Plan: Enhanced framerate (the user's request, 2026-11-09)
 
-- **A. Fixed-rate simulation, catch-up.** Run the simulation calls of the flight loop
-  (`bh:75ba`..`bh:de16`) at a fixed rate S from a field counter, as many steps per rendered
-  frame as are due, then render once. Game speed is constant and slow machines catch up, but
-  motion is only as smooth as S. Small patch (the loop is one function); S would be the
-  intended step rate (item 3; guess: near the A500's 6–11 fps), so 50 fps would show
-  repeated frames.
-- **B. Scaled step (dt).** Make every per-step increment proportional to the time since the
-  last frame: integrations of position, attitude, speed, timers, AI, sound triggers. Smooth
-  50 fps, but every rate in the simulation must be found and scaled, with fixed-point care.
-  Large reverse-engineering job; needs the state map first.
-- **C. A + interpolation.** Simulate at S, render at the display rate by interpolating object
-  and camera positions between the last two steps. Smooth 50 fps without touching the
-  simulation's rates, but the renderer must take interpolated inputs (camera, objects).
-- **E. Dynamic T** (the user's question, 2026-10-07): set `10184(a4)` each frame from the
-  measured fields per frame, one step per rendered frame as now. B with the plumbing already
-  in the game, if item 3 shows T reaches everything. Its variant: **fixed T with fixed
-  steps** (T = 50 or 25, one step per elapsed field or two, as in Stunt Car Racer and Revs).
-- **D. Cap only.** Limit the frame rate to the A500's (e.g. 10 fps) so fast machines play at
-  the original speed. Trivial, but not the goal.
+Simulation speed separate from the frame rate and rendering as fast as possible on faster
+machines, every change behind one option, with the least effort by reusing TFH's work. This
+replaces the earlier open items (the RNG seed: routine checks need no cross-CPU equality;
+the state map: the global map gives it; the 68030 ceiling: step 1; dynamic T: step 2;
+gating: step 1) and decides the design question: TFH's dynamic T (E).
 
-Until then, keep the slave's fast memory? It follows the user's memory rule but changes game
-speed on fast machines; a `slv_MemConfig` alternative (chip-only, like v1.0) could keep the old
-behaviour selectable.
+Defaults (the user may override):
+1. `C2:B:Enhanced framerate` (`CUSTOM2=1`, as TFH); off leaves BH's bytes original.
+2. Game speed is real time, as TFH. The original ran the turn at 1.3x real time on the A500,
+   so it feels about a quarter slower there.
+3. The stick divides by the mission's original T instead of the live T: in the original the
+   mouse's response per real second depends on T only, not on the frame rate, so this keeps
+   its feel. No sensitivity option at first.
+4. `CACHE` always on, as TFH; TFH's one-shot sound fix too (BH's sound routine equals
+   TFH's), if BH shows the bug.
+
+Machines: 68000 + 512 KB chip + 8 MB fast (the capture machine: slow reference, traces);
+68020 A1200 + 8 MB fast (traces of the fast path); 68030/50 + 8 MB fast (50 fps ceiling and
+the cap, frame counts only); Unicorn 68000 and 68040 (routine checks). PAL only.
+
+0. **Translation tool** `tools/xmatch.py`: matched runs, TFH→BH sites, globals, differing
+   constants. Retarget TFH's sources and checks with it; fix by hand what it flags.
+1. **Scaffolding:** the option through `resload_Control` and a separate patch list; a
+   `make check` that, off, BH equals the original but for Galahad's manual-check patch;
+   `CACHE`; the VERIFY tape presses Return every ~300 fields until `26292(a4)` moves (every
+   CPU reaches the flight); runtime buffers by `AllocMem` at install, patches skipped on
+   failure, `FASTMEMSIZE` raised to fit; baselines of the turn, original mode, caches on, on
+   all three machines.
+2. **Decoupling** (TFH 1.2b's core, `timing.s`): field count in `bh:1ac26`; `dt_rate`
+   unchanged; `dt_frame` at `bh:6e52` writing `10184`/`10186` (1/8 average, a quarter of the
+   debt, T at least 4, frames over 25 fields add no time); mission T saved and timing reset at
+   `bh:1344e`; before the c2p (`bh:6e8e`) wait for a new field if none passed; the stick
+   divisions `bh:7934`..`797a`, `bh:800e`..`8056` by the mission T and the per-frame mouse
+   limit in `bh:3e98` scaled by mission T / T; fractions: `dt_steplen`/`dt_polar` and
+   `dt_aiadd`/`dt_aisub` retargeted for 144 objects, the player's rates (`bh:79f0`..`7a6e`)
+   rewritten in 16.16; the slot-128 pool (`bh:1351e`) identified and its spawning made
+   time-based if per step; the busy waits `bh:30a`, `bh:12b8` as field waits of their A500
+   length (`1000·T·n` overflows 16 bits at T 50). Checks: TFH's `speed.py` and a turn rate on
+   the 68000 and 68030/50; Unicorn input, object step and AI turn at T 4/7/25/50. Done when
+   speed is within ~0.5% of nominal on both machines and turn rates agree.
+3. **Timers and combat** (TFH's FR-01..FR-28, retargeted with BH's constants, each with its
+   check at T 2/4/7/25/50 and changing T on Unicorn 68000/68040):
+
+   | BH system | BH sites | TFH item |
+   |---|---|---|
+   | guns: reload, bursts | `c366`, `c70c`, `c76a` | FR-07 |
+   | bullets: life, damage age, swept hit | `c958`, `8588`, `da6e` | FR-05, hit test |
+   | bombs and torpedoes | `c378`, `8742`, `ecaa` (slots 20–27) | FR-08, FR-09 |
+   | debris | `ce02`, `cf26`, `8408`..`8480` | FR-01 |
+   | effects (T/8+1 cadence) | `aec8`, `aedc`, `6d2e` | FR-03 |
+   | damage: aircraft, ships, sinking 180T, flak | `de16`, `e28e`, `d542`, `e556`..`ebb6` | FR-10, 11, 06 |
+   | AI: decisions, aim, script waits, attitude | `f074`, `12b22`, `ca76`, `10200`, `11238`..`11d90` | FR-12..15 |
+   | mission waits, messages, contact, fuel | `ed02`, ~`8850`, `d106`, `111e2` | FR-20, 21, 19, 28 |
+   | replay camera | `78aa`, `3772`, `37ca` | FR-22, reduced |
+
+   The replay camera has a 1023-step in-memory film and no files: store each step's T in an
+   allocated buffer, size the film for 128 s, replay with the recorded T. Plus: every stored
+   multiple of T must fit its byte or word at T 50 (TFH's FR-02). Probably absent, to confirm
+   and close: FR-02, 04, 16, 17, 18, 23, 24, 25; FR-26 matters only on NTSC.
+4. **Rendering** (after a 68020 profile of the turn, caches on): TFH's register point
+   transform (`mulu.l` on 68020+) at `bh:16bca`, keeping BH's entry and cull; BH's
+   counterparts of TFH's projection routines (near `bh:16cd8`..`16f58`); TFH's merge c2p
+   without the mask, kept only if faster (BH's c2p has no masked byte merges, most of TFH's
+   gain); BH-only hot spots if each is at least 5% of the 68020 frame (`bh:15cb6` polygon
+   fill, `bh:161ec` overlay, `bh:1a3d6` pixel plot); each checked against the original with
+   TFH's equivalence checks. Done when the 68030/50 holds 50 fps in the turn and the A500 is
+   no slower than its step 1 baseline.
+5. **Release:** Galahad's installer (`BattleHawks1942.lha`) with both `(SLOW)` and `(FAST)`
+   replaced by the release slave, `CUSTOM2=1` in its three icons, a ReadMe entry above
+   Galahad's; then play-testing on real machines.

@@ -24,7 +24,7 @@ Read `docs/open-work.md` first.
 
 | Doc | Read it for |
 |---|---|
-| `docs/open-work.md` | what is known, what is not, the ordered work items, what Their Finest Hour's work gives this one |
+| `docs/open-work.md` | what is known, what Their Finest Hour's work gives this one, and the Enhanced framerate plan |
 | `docs/profiling.md` | running the game, driving it, tracing it, or quoting any performance number |
 | `docs/c2p.md` | touching the chunky-to-planar pass |
 

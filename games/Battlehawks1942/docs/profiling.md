@@ -334,5 +334,5 @@ Evidence:
   hence the clean result above. To compare CPUs, seed it in the VERIFY build at flight start.
   The Aztec `rand()` (`9180(a4)`) is still at its initial value 1 in flight.
 
-What this means for faster machines, and the possible designs: `docs/open-work.md`.
+What this means for faster machines and the plan: `docs/open-work.md`.
 
