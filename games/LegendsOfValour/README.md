@@ -91,6 +91,9 @@ The launcher copies the game into a fresh run directory (`tmp/run/default/`) eac
 Save games written there are lost on the next launch: copy any you want to keep before
 restarting. `make stop` stops it. The repository's `docs/running.md` lists every option.
 
+How to play (screen elements, controls, eating, sleeping, guilds, combat):
+[manual.md](docs/manual.md), the rule book condensed to facts.
+
 ## Development and validation
 
 ```sh

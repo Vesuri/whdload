@@ -22,6 +22,7 @@ Read `docs/open-work.md` first.
 | Doc | Read it for |
 |---|---|
 | `docs/open-work.md` | current state and what is still open |
+| `docs/manual.md` | the player's manual, condensed: screen elements, controls, how to play |
 | `docs/profiling.md` | running, driving and tracing the game, the machines, any performance number |
 | `docs/performance-patches.md` | the rendering pipeline, game time, W1–W6 hooks and invariants, before changing rendering code |
 | `docs/simulation-timing.md` | the game timing (developer CUSTOM2 bit 6) |
