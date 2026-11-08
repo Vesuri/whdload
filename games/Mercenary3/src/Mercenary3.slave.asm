@@ -24,6 +24,8 @@ TABLEMEM	= $7000		;ws_ExpMem requires whole 4 KB pages
 RENDERMEM	= $1a000
 STAGEMEM	= $18000	;32 KB bitmap plus up to 64 KB alignment
 OBJECTMEM	= $3000		;256 pose histories (40 bytes each), page rounded
+OBJECTSAVE	= 256*40	;then live positions replaced for the depth sort
+OBJECTSAVES	= (OBJECTMEM-OBJECTSAVE)/14
 RESTOREMEM	= $5000		;17,912 bytes, rounded to whole pages
 DATAMEM		= $5000		;F5: render scratch at its chip offset ($340..$407F)
 ; F5 destinations, as offsets from ws_ExpMem (src/translate-f5.i).
@@ -1332,6 +1334,7 @@ _object_generation	dc.w	0
 _object_scene	dc.l	-1
 _object_active	dc.w	0
 _object_alpha	dc.w	0
+_object_saved	dc.w	0
 
 _objectdraw
 	move.w	sr,-(sp)
@@ -1512,24 +1515,121 @@ _objectdraw
 	bra.b	.draw
 .reset	lea	(_object_scene,pc),a0
 	move.l	#-1,(a0)
-.draw	movem.l	(sp)+,d0-d7/a0-a6
+.draw	move.w	(_object_active,pc),d0
+	beq.b	.native
+	cmpi.w	#1,($7142).w		;walking: nothing moves with the camera
+	beq.b	.native
+	bsr.w	_objectsortstage
+.native	movem.l	(sp)+,d0-d7/a0-a6
 	move.w	(sp)+,ccr
 	bsr.w	_objectnative
 	move.w	sr,-(sp)
-	move.l	a0,-(sp)
+	movem.l	d0-d7/a0-a6,-(sp)
+	bsr.w	_objectsortrestore
 	lea	(_object_active,pc),a0
 	clr.w	(a0)
-	movea.l	(sp)+,a0
+	movem.l	(sp)+,d0-d7/a0-a6
 	move.w	(sp)+,ccr
 	rts
+
+; The native pass sorts objects by distance from the render camera, which is
+; staged, so the order must use staged object positions too. With committed ones,
+; an object moving with the camera is up to a pass away from it: climbing out of
+; Metis spaceport, the beacon below the ship sorted in front of the pilot's chair
+; (the pilot is placed at the committed player, Disk.1 $54E5C). Write each recorded
+; object's staged position into the live tables for the sort and the models, saving
+; the live one; _objectmodel stages the same values. Restored after the pass. Vehicle,
+; flight and space modes only: walking has nothing moving with the camera, and its
+; many static buildings made the loop cost 0.5 fps on the 030 route.
+_objectsortstage
+	movea.l	(_object_buffer,pc),a4
+	lea	(OBJECTSAVE,a4),a2
+	moveq	#0,d3
+	move.w	(_object_alpha,pc),d6
+	move.w	(_pstate+4,pc),d7
+	beq.w	.end
+	sub.w	d7,d6			;scale back from the current pose
+	move.w	(_object_generation,pc),d5
+	lea	($7423).w,a3
+	move.w	($71e6).w,d4
+	beq.w	.end
+	subq.w	#1,d4
+.next	moveq	#0,d0
+	move.b	(a3)+,d0
+	beq.w	.skip			;player/world marker
+	cmpi.w	#10,d0			;player proxy
+	beq.w	.skip
+	move.w	d0,d1
+	mulu.w	#40,d1
+	lea	(a4,d1.l),a1
+	cmp.w	(32,a1),d5
+	bne.w	.skip			;not recorded on this timeline
+	add.w	d0,d0
+	add.w	d0,d0
+	movea.w	d0,a0
+; Most objects are static, recorded and live alike: nothing to stage.
+	tst.w	(36,a1)
+	bne.b	.moving
+	move.l	($581c,a0),d1
+	cmp.l	(12,a1),d1
+	bne.b	.moving
+	move.l	($5c1c,a0),d1
+	cmp.l	(16,a1),d1
+	bne.b	.moving
+	move.l	($601c,a0),d1
+	cmp.l	(20,a1),d1
+	beq.w	.skip
+.moving	cmpi.w	#OBJECTSAVES,d3
+	bhs.w	.end
+	move.w	a0,(a2)
+	move.l	($581c,a0),(2,a2)
+	move.l	($5c1c,a0),(6,a2)
+	move.l	($601c,a0),(10,a2)
+	lea	($581c,a0),a5
+	moveq	#0,d1
+	moveq	#0,d2
+.axis	move.l	(12,a1,d2.w),d0
+	sub.l	(a1,d2.w),d0
+	bsr.w	_scalelong
+	add.l	(12,a1,d2.w),d0
+	cmp.l	(a5),d0
+	beq.b	.same
+	move.l	d0,(a5)
+	moveq	#1,d1
+.same	lea	($400,a5),a5
+	addq.w	#4,d2
+	cmpi.w	#12,d2
+	bne.b	.axis
+	tst.w	d1
+	beq.w	.skip
+	lea	(14,a2),a2
+	addq.w	#1,d3
+.skip	dbra	d4,.next
+.end	lea	(_object_saved,pc),a0
+	move.w	d3,(a0)
+	rts
+_objectsortrestore
+	move.w	(_object_saved,pc),d3
+	beq.b	.done
+	movea.l	(_object_buffer,pc),a2
+	lea	(OBJECTSAVE,a2),a2
+	subq.w	#1,d3
+.restore	movea.w	(a2)+,a0
+	move.l	(a2)+,($581c,a0)
+	move.l	(a2)+,($5c1c,a0)
+	move.l	(a2)+,($601c,a0)
+	dbra	d3,.restore
+	lea	(_object_saved,pc),a0
+	clr.w	(a0)
+.done	rts
 _objectnative
 	clr.w	($6f32).w
 	move.w	#$7fff,($71da).w
 _object_continue
 	jmp	($577c8-$3cb0).l
 
-; Distance ordering and the nearest-object result remain committed. Only
-; geometry sees staged coordinates, restored before this model returns.
+; Stage the geometry, restored before this model returns. The distance ordering
+; and the nearest-object result before it see _objectsortstage's positions.
 _objectmodel
 ; Most visible objects are static. Avoid the full staging frame for them.
 	movem.l	d0/a1,-(sp)
@@ -1826,7 +1926,9 @@ _f3sky1	equ	*
 	move.w	d0,($42c6c).l
 	rts
 .space	jsr	($59ba0).l
-	jmp	($56c6e).l
+	jsr	($56c6e).l
+; The space rotation matrix ($42C20..$42C67, Disk.1 $469C4) for the bodies and stars.
+	jmp	($42d14).l
 
 _nativewalk
 	lea	(_drawcollision,pc),a0
@@ -1839,8 +1941,6 @@ _nativevehicle
 _nativespace
 	lea	(_drawcollision,pc),a0
 	clr.w	(a0)
-	bsr.b	_prepareview
-	jmp	($42d14).l
 _prepareview
 	lea	(_viewready,pc),a0
 	move.w	#1,(a0)

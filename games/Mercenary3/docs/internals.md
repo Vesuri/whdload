@@ -500,13 +500,57 @@ Both builds go static about 85 fields into the first window, when the ship stops
 reaches one image per field after about 60 fields of two-field frames. `flicker.py` finds
 no one-frame glitches in the windows; the pilot's outline takes the same positions as in
 the reference (its native sway of one to three pixels). The release slave lands at Tolosa
-with identical passes on the 030 and on `a1200-fast` (field 7,375). A small orange dot with
-a white dash, seen in space from field 1,400, still moves once a pass, as in the reference;
-see [open work](open-work.md#to-investigate).
+with identical passes on the 030 and on `a1200-fast` (field 7,375). Planets and the
+depth order of objects near the ship were still on the native timeline
+([P11](#p11-space-view-and-depth-order-on-the-presentation-timeline)).
 
 Same session, VERIFY, standard route, reference → P10: 030 `Custom5=1` 40.40 → 40.40 fps,
 `Custom5=0` 8.90 → 8.90; A500 41 → 41 and 37 → 37 frames. Restore hashes pass 282
 standard-route presentations and 1,901 in the first 2,500 fields of the trip.
+
+### P11: space view and depth order on the presentation timeline
+
+Two faults the user saw in the slot 1 passenger flight with P10:
+
+1. **Planets turned once a pass.** In space the ship's rotation reached the planets only at
+   the pass rate, on all three axes. The space scene (Disk.1 `$57374`) projects the bodies
+   through the view transform `$5B050` with the rotation matrix at chip `$42C20..$42C67`.
+   That matrix is built by Disk.1 `$469C4` (runtime `$42D14`, then `$45600`) from the view
+   sines `$42C08..$42C1F`, which `$56C6E` derives from the angles `$7132..$7136`. The
+   native space path calls it once, in `_nativespace`, before the pose is staged.
+   `_publishedview` then derived the angles and sines from the staged pose but kept the
+   committed matrix, so the cockpit (P7/P8, from the angles) turned smoothly and the bodies
+   didn't. `_deriveview` now builds the matrix after `$56C6E` in space, on every derivation:
+   staged in presentations and staged logic drawings, committed again in `_endvehicle`.
+   This was the "dot in space that moves once a pass" left open in P10: a distant planet
+   with its label.
+2. **The beacon was drawn over the pilot's chair** climbing out of Metis spaceport
+   (fields 426–428 after boarding). The native object pass (Disk.1 `$577BE`, runtime
+   `$53B0E`) sorts the visible objects by distance from the render camera `$7126`, `$70C6`,
+   `$712E` (staged) to the live positions (committed). The pilot is placed at the committed
+   player (Disk.1 `$54E5C`), up to a pass from the staged camera: 77 units above it at the
+   start of the climb, so the beacon just below the ship sorted nearer. `_objectsortstage`
+   writes each recorded object's staged position (`_scalelong`, as `_objectmodel` stages
+   it) into the live tables before the native pass, saving the live one in the spare 2 KB
+   after the 256 histories (`OBJECTSAVE`, up to 146 objects), and `_objectsortrestore`
+   puts it back after the pass. The ordering and the nearest-object result `$71DA/$71DE`
+   (proximity checks, Disk.1 `$54CFC`, `$54E0C`, `$55172`) see staged camera and staged
+   objects alike. Static objects whose live and recorded poses match are skipped.
+   Walking is left out: nothing there moves with the camera, and with every visible
+   building in the loop the standard route lost 0.5 fps on the 030.
+
+Slot 1 trip, VERIFY `Custom5=1`, 030, P10 → P11, per-field captures:
+
+| Check | P10 | P11 |
+| --- | ---: | ---: |
+| Distant planet, fields 1,442–1,489: position changes | 7 (every 8 fields) | 38 (a few pixels each) |
+| Fields 400–549 with the beacon on the chair | 3 (426–428) | 0, as native |
+| Frames over the trip | 6,406 | 6,393 |
+
+The replay stays identical to the native-drawing reference (921 passes, landing at field
+7,370) with the VERIFY and release slaves. Restore hashes pass 281 standard-route
+presentations and 1,900 in the first 2,500 fields of the trip. Same session, standard route,
+P10 → P11 twice each: 030 40.40 → 40.40 fps, A500 41 → 41 frames.
 
 ### R5: cache-safe polygon clipping
 
@@ -574,8 +618,9 @@ scratch, not world poses. The visible-object list is at `$7423`, count `$71E6`.
 Disk.1 `$577BE` captures native-pass poses. Both logic and presentation drawings use
 the previous/current pair and elapsed fields at drawing time; delaying only the extra
 frames would rewind objects. Geometry is staged at `$57C36`, after the native distance
-and nearest-object tests, and restored before each model returns. Collision, distance
-ordering, object selection and simulation keep committed poses. New/reappearing objects,
+and nearest-object tests, and restored before each model returns. Collision and
+simulation keep committed poses; since [P11](#p11-space-view-and-depth-order-on-the-presentation-timeline)
+distance ordering and the nearest-object result use staged ones. New/reappearing objects,
 scene/model changes and per-axis jumps over 32,767 units snap. The player proxy remains
 with P1. This works with the S3 copy or chip renderer.
 

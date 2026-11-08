@@ -264,6 +264,14 @@ landing at Tolosa identical to the native-drawing reference (`tools/replay_trace
 standard-route rates are unchanged. See
 [P10](internals.md#p10-passenger-flights-on-the-presentation-timeline).
 
+P11 fixes two faults seen in that flight. In space, planets turned only once a pass: the
+rotation matrix they are projected with was still built from the committed pose. Climbing
+out of Metis spaceport, the beacon below the ship was drawn over the pilot's chair:
+objects were sorted by committed positions from the staged camera. Planets now move every
+field, the depth order matches native drawing, the replay is unchanged and route frame
+rates are the same. See
+[P11](internals.md#p11-space-view-and-depth-order-on-the-presentation-timeline).
+
 P4 corrects presentation transitions with a shared, delayed camera/geometry timeline;
 starts, stops, reversals and the mailbox approach have been checked. Frame rates are
 unchanged on the routine setups; native world speed and options-off checks pass.
@@ -281,15 +289,6 @@ unverified; the user explicitly accepted completing X1 without those tests. R2's
 clear remains rejected and R3's triple buffering remains closed without implementation.
 
 ## To investigate
-
-- A dot in space moves once a pass. In the slot 1 passenger flight, from about field
-  1,400 after boarding, a small orange dot with a white dash to its right steps outward
-  every eight fields while everything else moves every field (P10). The reference build
-  steps it identically, so it isn't a P10 regression, but it is the one visible
-  element of that trip still on the native timeline. The navigation pose reaching the space
-  scene interpolates on every call; the dot survives the VERIFY objects bypass
-  (`CUSTOM2=1`). Per-pass values that differ include `$6F26` (Disk.1 `$5D240`) and the
-  velocity floats `$7000..$700D`. Not checked in player-controlled space flight.
 
 - Save message stays on screen. After HELP, F1, a digit and Return, Benson's
   "PRESS RETURN WHEN READY" stays in the message line until another message replaces
