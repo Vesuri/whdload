@@ -5,7 +5,8 @@
 - The slave is rebuilt from CFou!'s v1.0 disassembly on WHDLoad 20.0's kick13 example
   (`src/`), with a VERIFY-only input tape and instruments. Release 2.0b (beta, 09.11.2026),
   `LegendsOfValourEnhanced-2.0b-20261109.lha`, is built from the original installer by
-  `make dist` (`tools/release.py`, `docs/releasing.md`).
+  `make dist` (`tools/release.py`, `docs/releasing.md`) and published as the GitHub release
+  of tag `LegendsOfValourEnhanced-2.0b-20261109` (replacing 2.0b of 09.10.2026).
 - Release builds have one switch, Enhanced frame rate (`C2:B`; the installed icon sets
   `CUSTOM2=1`, and any nonzero value, such as the 09.10.2026 icons' `CUSTOM2=64`, counts). It turns on
   every enhancement: W1–W6, the game timing, mouse precision and click inputs; `CUSTOM2=0`
