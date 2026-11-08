@@ -47,24 +47,21 @@
  copy LegendsOfValour.Slave over LegendsOfValourDe.Slave or
  LegendsOfValourFr.Slave and add the tooltype Custom2=1 to its icon.
 
+ Chunky-to-planar conversion by Mikael Kalms.
+
 
  History:
  --------
  version 2.0b (09.11.2026) done by Vesuri:
  - faster 3D rendering, using Fast RAM when available
- - chunky-to-planar conversion by Mikael Kalms
- - game timing that keeps the game speed and animations correct at any frame
-   rate
+ - game speed and animations stay correct at any frame rate
  - finer turning with the mouse
- - buttons act once per click: U-turn and other screens no longer repeat
-   while the mouse button is held; walking and turning still repeat
- - closing a screen such as the character screen with a click no longer
-   reopens it
- - all enhancements behind one option, Enhanced frame rate (Custom2=1),
-   enabled by the game icon
- - enhancements for the English, German and French versions
- - fixed text drawn in wrong colours on fast CPUs (missing blitter waits)
- - memory requirement increased to 0.7 MB OtherMem
+ - buttons act once per click; walking and turning still repeat while held
+ - all of these behind one option, Enhanced frame rate (Custom2=1), enabled
+   by the game icon
+ - works with the English, German and French versions
+ - fixed text drawn in wrong colours on fast CPUs
+ - requires 0.7 MB OtherMem
 
  version 1.0 (05.02.05) done by CFou!:
  - initial release
