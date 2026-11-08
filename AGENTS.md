@@ -23,10 +23,75 @@ the repository (layout, running, building, releasing, bringing a game in) start 
 `docs/index.md` and read only the rows that match the task. `make list` shows the games;
 `make run` inside a game directory boots it (`docs/running.md`).
 
-Shared Amiga guidance starts at AmigaXDev's `docs/index.md`, installed as
-`~/.local/share/amiga/docs/index.md`. Its WHDLoad playbook is the method; a game's current
-task takes precedence over the playbook's full setup workflow. Generic lessons go there
-(edit them in AmigaXDev); this repository keeps what is specific to these games.
+## The shared environment (AmigaXDev)
+
+AmigaXDev's `make setup` installs every tool, reference and input under `~/.local`; it is
+all already there, so do not search the disk or download anything. `common/env.sh` (sourced by
+every `make` target) sources `~/.local/share/amiga/env.sh`, which exports the variables below
+and puts the shared `python3`, the m68k cross tools, `vasmm68k_mot` and the native `fs-uae`
+on `PATH`. In a bare shell, run `. common/env.sh` first. Paths in tracked files use the
+variables, never the expanded paths. `$AMIGA_SHARE` is `~/.local/share/amiga`.
+
+**Shared learnings.** Start at `$AMIGA_SHARE/docs/index.md`: a task and symptom table that
+routes to the rest. The WHDLoad playbook `docs/playbooks/new-game-playbook.md` is the method,
+with `-jotd`, `-stingray` and `-hardware` variants beside it. A game's current task takes
+precedence over the playbook's full setup workflow. Most-used references under `docs/`:
+
+| Doc | For |
+|---|---|
+| `reference/amiga-hardware.md` | Chip bus, copper, blitter, Paula, DMA, interrupts, OS handback |
+| `reference/m68k-optimisation.md` | 68000 to 060 instruction costs and code rules |
+| `reference/measurement-method.md` | profiling, instruments, A/B discipline (before any performance claim) |
+| `reference/headless-fsuae.md` | FS-UAE builds, named machine setups, the gdb stub, screenshots |
+| `reference/validation-harness.md` | equivalence proofs, fixtures, gameplay validation |
+| `playbooks/fixed-time-simulation.md`, `simulation-and-presentation.md` | game time, higher update rates, interpolation |
+| `playbooks/whdload-mmu.md`, `new-game-playbook-hardware.md` | MMU faults; crashes and black screens on real Amigas |
+| `environment.md` | every variable and every shared tool, in full |
+
+Generic lessons go into AmigaXDev's `docs/` (edit them in AmigaXDev, then `make share`
+there), never into the installed copy. This repository keeps what is specific to these games.
+
+**References.**
+
+| What | Where |
+|---|---|
+| Hardware Reference Manual (OCS/ECS) | `$ADCD/ROM_Kernel_Manuals/Hardware_Manual` (AmigaGuide text); `$ADCD/HTML/Hardware_Manual_guide/node*.html` (grep these) |
+| AGA registers | `$AGA_GUIDE` |
+| ROM Kernel Manuals, Amiga Mail, 2.0/3.5 autodocs | `$ADCD/ROM_Kernel_Manuals/` (`Libraries_Manual`, `Devices_Manual`, `Autodocs`, `Includes`), `$ADCD/HTML/` |
+| NDK 3.2 | `$AMIGA_SHARE/ndk/` (`Autodocs/`, `Include_I/`, `Include_H/`, `FD/`, `SFD/`); vasm uses `$NDK` |
+
+**The WHDLoad developer package** (20.1) is at `$WHDLOAD`:
+
+| What | Where |
+|---|---|
+| Slave API: `resload_*`, `PL_*` patch lists, slave header | `$WHDLOAD/Autodoc/whdload.doc`, `$WHDLOAD/Include/whdload.i`, `whdmacros.i` |
+| User docs: options, tooltypes, cache, MMU, FAQ | `$WHDLOAD/Docs/en/*.html` |
+| KickEmu (`kick13.s`, `kick31.s`, `kickfs.s`, ...), blitter fixes, `savegame.s`, `keyboard.s` | `$WHDLOAD/Src/sources/whdload/` |
+| Example slaves (incl. `kick12`, `kick13`, `kick31`) and imagers | `$WHDLOAD/Src/slave-examples/`, `$WHDLOAD/Src/imager-examples/` |
+| Install script template | `$WHDLOAD/Install Template/` (`Xxx Install`, `ReadMe`) |
+| WHDLoad executable, RawDIC, Patcher, WHDInfo; QA slaves | `$WHDLOAD/C/`, `$WHDLOAD/Extra/`; `$WHDLOAD/Src/qa/` |
+| Commodore Installer 43.3 | `$INSTALLER43` |
+
+**Inputs.**
+- Kickstarts: `$AMIGA_SHARE/Kickstarts/` (1.2, 1.3, 2.04, 3.1 A600, 3.1 A1200, each with its `.RTB`); `$KICKSTART`, `$KICKSTART_A1200` and `$KICK13`.
+- Workbench 2.04: `$WORKBENCH_ADF`.
+- SetPatch 40.16: `$SETPATCH`.
+
+**Tools.**
+
+| Need | Use |
+|---|---|
+| Assemble | `vasmm68k_mot` (`$VASM`); `common/build.sh` adds `-I$AMIGA_INCLUDE -I$WHDLOAD/Include -I$WHDLOAD/Src/sources -I$NDK` |
+| Disassemble a dump or hunk | `python3 -m amigaxdev.disasm dis\|disd\|hotspots ...` (objdump underneath, `--cpu 68020` and up); `m68k-amiga-elf-objdump -D -b binary -m m68k:68000` |
+| Hunk files | `hunktool` (amitools), `python3 -m amigaxdev.patchlist SLAVE OFFSET` decodes a slave's patch list |
+| Disk images | `xdftool`, `xdfscan`, `rdbtool` (amitools, on `PATH` from the shared venv); `python3 -m amigaxdev.adf DISK` |
+| Static analysis | Ghidra in `~/.local/share/ghidra/ghidra_<version>_PUBLIC/` (`support/analyzeHeadless`), with the shared scripts `$AMIGA_GHIDRA_SCRIPTS` (`ExportListing`, `DumpCallGraph`, ...) |
+| Debug, trace, profile | `m68k-amiga-elf-gdb` against the FS-UAE gdb stub, through `common/tools/game_server.py` (`amigaxdev.gdbserve`: `stop`, `cont`, `shot`, `profile`, `wait`, `until`); traces through `amigaxdev.barto`, `callprofile` and `aprof` |
+| Emulators | `fs-uae` (`$FSUAE_ARM`), the cycle profiler `$FSUAE_APROF`, the 040/060 MMU fix `$FSUAE_MMU`; the other `$AMIGA_SHARE/fs-uae-*` are diagnostic builds (`reference/headless-fsuae.md`, "Which FS-UAE"), and `fs-uae-src/` is the source |
+| Release archives | `$LHA` (LHa for UNIX); `amigaxdev.release` |
+| Python with Pillow, numpy, capstone, amitools and `amigaxdev` | the shared `python3` |
+| CPU emulation in tools | Unicorn 2.1.4 with the arm64 fix: `$AMIGA_UNICORN/lib/libunicorn.2.dylib` (ctypes; no Python binding is installed) |
+| Emulator processes | `$FSUAE_COMMON` (`fsuae_common.sh`): pid-scoped start and stop, a gdb port per run directory |
 
 ## Rules
 
