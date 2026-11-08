@@ -9,36 +9,36 @@ _w2_install
 		tst.l d0
 		bne .done
 		move.l (_hunks+4,pc),a0
-		cmp.l #$48784e20,($22c6,a0)
+		cmp.l #$48784e20,(h1_022c6,a0)
 		bne .bad
-		cmp.l #$6100fe08,($22ca,a0)
+		cmp.l #$61000000+((h1_020d4-h1_022cc)&$ffff),(h1_022ca,a0)
 		bne .bad
-		cmp.l #$2eacdfc2,($2760,a0)
+		cmp.l #$2eac0000+((h11_05fc2-$8000)&$ffff),(h1_02760,a0)
 		bne .bad
-		cmp.l #$4eba02e4,($2764,a0)
+		cmp.l #$4eba0000+((h1_02a4a-h1_02766)&$ffff),(h1_02764,a0)
 		bne .bad
 		lea (_w2_alloc_resume+2,pc),a1
-		lea ($22ce,a0),a2
+		lea (h1_022ce,a0),a2
 		move.l a2,(a1)
 		lea (_w2_free_resume+2,pc),a1
-		lea ($2768,a0),a2
+		lea (h1_02768,a0),a2
 		move.l a2,(a1)
 		lea (_w2_pool_alloc+2,pc),a1
-		lea ($20d4,a0),a2
+		lea (h1_020d4,a0),a2
 		move.l a2,(a1)
 		lea (_w2_pool_free+2,pc),a1
-		lea ($2a4a,a0),a2
+		lea (h1_02a4a,a0),a2
 		move.l a2,(a1)
 	; PERF_RANGE h1:022c6 8 bit=1
-		move.w #$4ef9,($22c6,a0)
+		move.w #$4ef9,(h1_022c6,a0)
 		lea (_w2_alloc,pc),a1
-		move.l a1,($22c8,a0)
-		move.w #$4e71,($22cc,a0)
+		move.l a1,(h1_022c8,a0)
+		move.w #$4e71,(h1_022cc,a0)
 	; PERF_RANGE h1:02760 8 bit=1
-		move.w #$4ef9,($2760,a0)
+		move.w #$4ef9,(h1_02760,a0)
 		lea (_w2_free,pc),a1
-		move.l a1,($2762,a0)
-		move.w #$4e71,($2766,a0)
+		move.l a1,(h1_02762,a0)
+		move.w #$4e71,(h1_02766,a0)
 		move.l (_resload,pc),a2
 		jsr (resload_FlushCache,a2)
 .done		movem.l (sp)+,d0-a6
@@ -98,7 +98,7 @@ _w2_allocate_dispatch
 .failed		movem.l (sp)+,d1-a6
 		bra _w2_pool_alloc
 
-_w2_free	move.l (-8254,a4),(sp)
+_w2_free	move.l (h11_05fc2-$8000,a4),(sp)
 		bsr _w2_free_dispatch
 _w2_free_resume dc.w $4ef9
 		dc.l 0

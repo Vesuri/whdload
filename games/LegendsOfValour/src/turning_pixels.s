@@ -10,19 +10,19 @@ _turn_pixels_install
         btst #7,d0
         bne .bad                    ; W6 twin shares the scratch allocation
         move.l (_h12,pc),a0
-        cmp.l #$611423ca,($27f2,a0)
+        cmp.l #$611423ca,(h12_027f2,a0)
         bne .bad
-        lea ($26,a0),a1
-        cmp.l ($27f6,a0),a1
+        lea (h12_00026,a0),a1
+        cmp.l (h12_027f6,a0),a1
         bne .bad
         lea (_turn_ray_original+2,pc),a1
-        lea ($2808,a0),a2
+        lea (h12_02808,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:027f2 8 bit=7
-        move.w #$4eb9,($27f2,a0)
+        move.w #$4eb9,(h12_027f2,a0)
         lea (_turn_pixels,pc),a1
-        move.l a1,($27f4,a0)
-        move.w #$4e71,($27f8,a0)
+        move.l a1,(h12_027f4,a0)
+        move.w #$4e71,(h12_027f8,a0)
 .done   rts
 .bad    lea (_turn_pixels_bad,pc),a0
         bra _c2p_abort
@@ -36,7 +36,7 @@ _turn_pixels
         moveq #0,d0
         ; Address heading through an explicit base to avoid 16-bit overflow.
         adda.l #$8000,a0
-        move.w ($c22,a0),d0
+        move.w (h11_08c22-$8000,a0),d0
         divu.w #5,d0
         swap d0
         tst.w d0
@@ -45,7 +45,7 @@ _turn_pixels
         bsr _turn_ray_original
         movem.l d0-a6,-(sp)
         move.l (_h11,pc),a0
-        move.l ($5fc2,a0),a0
+        move.l (h11_05fc2,a0),a0
         lea (_c2p_function,pc),a1
         adda.l #_c2p_chunky-_c2p_function,a1
         move.w #4999,d0
@@ -54,11 +54,11 @@ _turn_pixels
         lea (_turn_active,pc),a0
         clr.l (a0)
         move.l (_h12,pc),a0
-        move.w #5,($38,a0)
+        move.w #5,(h12_00038,a0)
         movem.l (60,sp),d0-a6
         bsr _turn_ray_original
         move.l (_h11,pc),a0
-        move.l ($5fc2,a0),a0
+        move.l (h11_05fc2,a0),a0
         lea (_c2p_function,pc),a1
         adda.l #_c2p_chunky-_c2p_function,a1
         move.w #4999,d0
@@ -69,9 +69,9 @@ _turn_pixels
         lea (_turn_active,pc),a0
         move.l (_turn_owned,pc),(a0)
         move.l (_h12,pc),a0
-        move.w #1,($38,a0)
+        move.w #1,(h12_00038,a0)
         lea (_turn_pixel_counts,pc),a1
-        move.w ($2e,a0),d0
+        move.w (h12_0002e,a0),d0
         cmp.w #80,d0
         beq .count
         addq.l #4,a1
@@ -87,7 +87,7 @@ _turn_pixels
 .publish
         move.l a0,-(sp)
         move.l (_h12,pc),a0
-        move.l a2,($26,a0)
+        move.l a2,(h12_00026,a0)
         move.l (sp)+,a0
         rts
 .different

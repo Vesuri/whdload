@@ -9,7 +9,7 @@ _turn_sweep_rays
         move.l (_turn_active,pc),d0
         beq .done
         move.l (_h12,pc),a0
-        move.w ($2e,a0),d0
+        move.w (h12_0002e,a0),d0
         moveq #0,d1
         cmp.w #80,d0
         beq .view
@@ -31,8 +31,8 @@ _turn_sweep_rays
         move.l a0,a1
         adda.l #$8000,a1
         lea (_turn_sweep_heading,pc),a2
-        move.w ($c22,a1),(a2)
-        move.l ($5fc2,a0),a1
+        move.w (h11_08c22-$8000,a1),(a2)
+        move.l (h11_05fc2,a0),a1
         lea (_turn_sweep_guards,pc),a2
         move.l (-4,a1),(a2)+
         move.l (20000,a1),(a2)
@@ -41,11 +41,11 @@ _turn_sweep_rays
 .next
         move.l (_h11,pc),a0
         adda.l #$8000,a0
-        move.w (_turn_sweep_angle,pc),($c22,a0)
+        move.w (_turn_sweep_angle,pc),(h11_08c22-$8000,a0)
         movem.l (sp),d0-a6
         bsr _turn_ray_original
         move.l (_h11,pc),a0
-        move.l ($5fc2,a0),a0
+        move.l (h11_05fc2,a0),a0
         move.l (_turn_sweep_guards,pc),d0
         cmp.l (-4,a0),d0
         bne .bad
@@ -58,7 +58,7 @@ _turn_sweep_rays
         bcs .next
         move.l (_h11,pc),a0
         adda.l #$8000,a0
-        move.w (_turn_sweep_heading,pc),($c22,a0)
+        move.w (_turn_sweep_heading,pc),(h11_08c22-$8000,a0)
         move.w (_turn_sweep_view,pc),d0
         lea (_turn_sweep_counts,pc),a0
         move.l #360,(a0,d0.w)

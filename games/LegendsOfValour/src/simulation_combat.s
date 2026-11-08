@@ -4,31 +4,31 @@
 SIM_COMBAT_FIELDS = SIM_FIELDS_PER_TICK*2
 _sim_combat_check
         move.l (_hunks+9*4,pc),a2
-        cmp.l #$202ce02c,($1b2,a2)
+        cmp.l #$202c0000+((h11_0602c-$8000)&$ffff),(h9_001b2,a2)
         bne .bad
-        cmp.w #$5880,($1b6,a2)
+        cmp.w #$5880,(h9_001b6,a2)
         bne .bad
-        cmp.l #$48ed0001,($1b8,a2)
+        cmp.l #$48ed0001,(h9_001b8,a2)
         bne .bad
-        cmp.w #$ffc2,($1bc,a2)
+        cmp.w #$ffc2,(h9_001bc,a2)
         bne .bad
-        cmp.l #$4ced0cfc,($5dc,a2)
+        cmp.l #$4ced0cfc,(h9_005dc,a2)
         bne .bad
-        cmp.w #$ff8c,($5e0,a2)
+        cmp.w #$ff8c,(h9_005e0,a2)
         bne .bad
-        cmp.l #$4e55ffe4,(a2)
+        cmp.l #$4e55ffe4,(a2)		;h9:00000
         bne .bad
-        cmp.l #$bfecde40,(4,a2)
+        cmp.l #$bfec0000+((h11_05e40-$8000)&$ffff),(h9_00004,a2)
         bne .bad
-        cmp.l #$650005de,(8,a2)
+        cmp.l #$65000000+((h9_005e8-h9_0000a)&$ffff),(h9_00008,a2)
         bne .bad
-        cmp.l #$206cdeb0,($408,a2)
+        cmp.l #$206c0000+((h11_05eb0-$8000)&$ffff),(h9_00408,a2)
         bne .bad
-        cmp.l #$3028000e,($40c,a2)
+        cmp.l #$3028000e,(h9_0040c,a2)
         bne .bad
-        cmp.l #$48c03228,($410,a2)
+        cmp.l #$48c03228,(h9_00410,a2)
         bne .bad
-        cmp.l #$000c48c1,($414,a2)
+        cmp.l #$000c48c1,(h9_00414,a2)
         bne .bad
         lea (.specs,pc),a0
         lea (_hunks,pc),a1
@@ -43,14 +43,14 @@ _sim_combat_check
         bne .bad
         dbf d2,.next
         rts
-.specs  dc.w $642,12*4
-        dc.l $27bc
-        dc.w $62a,5*4
-        dc.l $2358
-        dc.w $5fa,5*4
-        dc.l $59e
-        dc.w $64e,12*4
-        dc.l $5ea6
+.specs  dc.w h9_00642,12*4
+        dc.l h12_027bc
+        dc.w h9_0062a,5*4
+        dc.l h5_02358
+        dc.w h9_005fa,5*4
+        dc.l h5_0059e
+        dc.w h9_0064e,12*4
+        dc.l h12_05ea6
 .bad    lea (_sim_bad,pc),a0
         bra _c2p_abort
 
@@ -62,59 +62,59 @@ _sim_combat_install
 .target move.w (a1)+,d0
         move.l (2,a2,d0.w),(a0)+
         dbf d2,.target
-        lea ($1b8,a2),a1
+        lea (h9_001b8,a2),a1
         move.l a1,(a0)+
-        lea ($5e2,a2),a1
+        lea (h9_005e2,a2),a1
         move.l a1,(a0)+
-        lea ($c,a2),a1
+        lea (h9_0000c,a2),a1
         move.l a1,(a0)+
-        lea ($5e8,a2),a1
+        lea (h9_005e8,a2),a1
         move.l a1,(a0)+
-        lea ($418,a2),a1
+        lea (h9_00418,a2),a1
         move.l a1,(a0)
         lea (_sim_combat_ring_address,pc),a0
         move.l a0,a1
         adda.l #_sim_combat_ring-_sim_combat_ring_address,a1
         move.l a1,(a0)
         ; PERF_RANGE h9:00408 16 bit=6
-        lea ($408,a2),a0
+        lea (h9_00408,a2),a0
         lea (_sim_combat_pointer,pc),a1
         bsr .jump
         moveq #4,d0
 .nops   move.w #$4e71,(a0)+
         dbf d0,.nops
         ; PERF_RANGE h9:001b2 6 bit=6
-        lea ($1b2,a2),a0
+        lea (h9_001b2,a2),a0
         lea (_sim_combat_step,pc),a1
         bsr .jump
         ; PERF_RANGE h9:005dc 6 bit=6
-        lea ($5dc,a2),a0
+        lea (h9_005dc,a2),a0
         lea (_sim_combat_leave,pc),a1
         bsr .jump
         ; PERF_RANGE h9:00000 8 bit=6
         move.l a2,a0
         lea (_sim_combat_overlay,pc),a1
         bsr .jump
-        move.w #$4e71,(6,a2)
+        move.w #$4e71,(h9_00006,a2)
         ; PERF_RANGE h9:00642 6 bit=6
-        lea ($642,a2),a0
+        lea (h9_00642,a2),a0
         lea (_sim_combat_world,pc),a1
         bsr .jump
         ; PERF_RANGE h9:0062a 6 bit=6
-        lea ($62a,a2),a0
+        lea (h9_0062a,a2),a0
         lea (_sim_combat_sprites,pc),a1
         bsr .jump
         ; PERF_RANGE h9:005fa 6 bit=6
-        lea ($5fa,a2),a0
+        lea (h9_005fa,a2),a0
         lea (_sim_combat_enemy,pc),a1
         bsr .jump
         ; PERF_RANGE h9:0064e 6 bit=6
-        lea ($64e,a2),a0
+        lea (h9_0064e,a2),a0
         lea (_sim_combat_display,pc),a1
 .jump   move.w #$4ef9,(a0)+
         move.l a1,(a0)+
         rts
-.offsets dc.w $642,$62a,$5fa,$64e
+.offsets dc.w h9_00642,h9_0062a,h9_005fa,h9_0064e
 
 _sim_combat_step
         movem.l d1/a0,-(sp)
@@ -123,11 +123,11 @@ _sim_combat_step
         bne .next
         move.w #1,(a0)
         bsr _sim_combat_sample
-        move.l ($602c-32768,a4),d0
+        move.l (h11_0602c-$8000,a4),d0
         bra .start
 .next   move.l (_sim_combat_deadline,pc),d0
 .start  move.l d0,(_sim_combat_field-_sim_combat_active,a0)
-.wait   move.l ($602c-32768,a4),d1
+.wait   move.l (h11_0602c-$8000,a4),d1
         sub.l d0,d1
         bmi .wait
         move.w #1,(_sim_combat_render-_sim_combat_active,a0)
@@ -202,7 +202,7 @@ _sim_combat_overlay
         move.l (sp)+,a0
         beq .skip
         link a5,#-28
-        cmpa.l ($5e40-32768,a4),sp
+        cmpa.l (h11_05e40-$8000,a4),sp
         bcs .overflow
         move.l (_sim_combat_overlay_continue,pc),-(sp)
         rts
@@ -237,10 +237,10 @@ _sim_combat_sample
         move.w (_sim_combat_active,pc),d0
         beq .done
         move.l (_h11,pc),a2
-        move.l ($5eb0,a2),a1
+        move.l (h11_05eb0,a2),a1
         move.l a1,d0
         beq .done
-        move.l ($602c,a2),d0
+        move.l (h11_0602c,a2),d0
         move.w d0,d1
         and.w #511,d1
         mulu.w #12,d1
@@ -249,7 +249,7 @@ _sim_combat_sample
         move.w ($e,a1),(4,a0)
         move.w ($c,a1),(6,a0)
         move.l (_h12,pc),a1
-        move.w ($5292,a1),(8,a0)
+        move.w (h12_05292,a1),(8,a0)
         move.l d0,(a0)              ; publish field tag last
 .done   movem.l (sp)+,d0-d1/a0-a2
         rts
@@ -277,7 +277,7 @@ _sim_combat_select
         jsr (_LVODisable,a6)
         bsr _sim_combat_sample
         move.l (_h11,pc),a0
-        move.l ($602c,a0),d0
+        move.l (h11_0602c,a0),d0
         lea (_sim_combat_field,pc),a0
         move.l d0,(a0)
         move.l d0,d1
@@ -290,15 +290,15 @@ _sim_combat_select
 
 _sim_combat_pointer
         move.w (_sim_combat_input+4,pc),d0
-        move.w d0,($6036-32768,a4)
+        move.w d0,(h11_06036-$8000,a4)
         ext.l d0
         move.w (_sim_combat_input+6,pc),d1
-        move.w d1,($6038-32768,a4)
+        move.w d1,(h11_06038-$8000,a4)
         ext.l d1
         move.l d0,-(sp)
         move.w (_sim_combat_input+8,pc),d0
         bsr _click_filter
-        move.w d0,($603a-32768,a4)
+        move.w d0,(h11_0603a-$8000,a4)
         move.l (sp)+,d0
         move.l (_sim_combat_pointer_continue,pc),-(sp)
         rts

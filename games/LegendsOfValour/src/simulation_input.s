@@ -8,33 +8,33 @@ _sim_input_check
         bsr _sim_modal_check
         bsr _sim_mouse_check
         move.l (_h12,pc),a2
-        cmp.l #$205f4cdf,($6484,a2)
+        cmp.l #$205f4cdf,(h12_06484,a2)
         bne .bad
-        cmp.w #$7fff,($6488,a2)
+        cmp.w #$7fff,(h12_06488,a2)
         bne .bad
         move.l (_hunks+4,pc),a2
-        cmp.w #$4ef9,($2b8e,a2)
+        cmp.w #$4ef9,(h1_02b8e,a2)
         bne .bad
         move.l (_h12,pc),a0
-        lea ($5288,a0),a0
-        cmp.l ($2b90,a2),a0
+        lea (h12_05288,a0),a0
+        cmp.l (h1_02b90,a2),a0
         bne .bad
-        cmp.l #$6100f4a0,($26ea,a2)
+        cmp.l #$6100f4a0,(h1_026ea,a2)
         bne .bad
-        cmp.l #$206cdeb0,($26ee,a2)
+        cmp.l #$206c0000+((h11_05eb0-$8000)&$ffff),(h1_026ee,a2)
         bne .bad
-        cmp.l #$3028000e,($26f2,a2)
+        cmp.l #$3028000e,(h1_026f2,a2)
         bne .bad
-        cmp.l #$48c03228,($26f6,a2)
+        cmp.l #$48c03228,(h1_026f6,a2)
         bne .bad
-        cmp.l #$000c48c1,($26fa,a2)
+        cmp.l #$000c48c1,(h1_026fa,a2)
         bne .bad
         move.l (_hunks+5*4,pc),a2
-        cmp.w #$4ef9,($266e,a2)
+        cmp.w #$4ef9,(h5_0266e,a2)
         bne .bad
         move.l (_hunks+2*4,pc),a0
-        lea ($4678,a0),a0
-        cmp.l ($2670,a2),a0
+        lea (h2_04678,a0),a0
+        cmp.l (h5_02670,a2),a0
         bne .bad
         rts
 .bad    lea (_sim_bad,pc),a0
@@ -47,14 +47,14 @@ _sim_input_install
         lea (_sim_input_ring_address,pc),a0
         move.l a1,(a0)
         move.l (_hunks+2*4,pc),a0
-        lea ($4678,a0),a0
+        lea (h2_04678,a0),a0
         lea (_sim_options_original,pc),a1
         move.l a0,(a1)
         move.l (_hunks+5*4,pc),a2
         ; PERF_RANGE h5:0266e 6 bit=6
-        move.w #$4ef9,($266e,a2)
+        move.w #$4ef9,(h5_0266e,a2)
         lea (_sim_options,pc),a0
-        move.l a0,($2670,a2)
+        move.l a0,(h5_02670,a2)
         IFD VERIFY
         IFD TIMING_STUDY
         ; Identical-build legacy-input control for the field-pulse experiment.
@@ -68,28 +68,28 @@ _sim_input_install
         bsr _sim_mouse_install
         move.l (_h12,pc),a2
         lea (_sim_input_vbl_done,pc),a0
-        lea ($648a,a2),a1
+        lea (h12_0648a,a2),a1
         move.l a1,(a0)
         lea (_sim_input_buttons_original,pc),a0
-        lea ($5288,a2),a1
+        lea (h12_05288,a2),a1
         move.l a1,(a0)
         ; PERF_RANGE h12:06484 6 bit=6
-        move.w #$4ef9,($6484,a2)
+        move.w #$4ef9,(h12_06484,a2)
         lea (_sim_input_vbl,pc),a0
-        move.l a0,($6486,a2)
+        move.l a0,(h12_06486,a2)
         move.l (_hunks+4,pc),a2
         lea (_sim_input_buttons_return,pc),a0
-        lea ($2674,a2),a1
+        lea (h1_02674,a2),a1
         move.l a1,(a0)
         lea (_sim_input_pointer_done,pc),a0
-        lea ($26fe,a2),a1
+        lea (h1_026fe,a2),a1
         move.l a1,(a0)
         ; PERF_RANGE h1:02b8e 6 bit=6
-        move.w #$4ef9,($2b8e,a2)
+        move.w #$4ef9,(h1_02b8e,a2)
         lea (_sim_input_buttons,pc),a0
-        move.l a0,($2b90,a2)
+        move.l a0,(h1_02b90,a2)
         ; PERF_RANGE h1:026ea 20 bit=6
-        lea ($26ea,a2),a0
+        lea (h1_026ea,a2),a0
         move.w #$4ef9,(a0)+
         lea (_sim_input_pointer,pc),a1
         move.l a1,(a0)+
@@ -118,11 +118,11 @@ _sim_input_sample
         bne .done
         move.l (_h12,pc),a2
         move.l a2,a0
-        adda.l #$a0c3,a0
+        adda.l #h12_0a0c3,a0
         tst.b (a0)
         beq .done
         move.l (_h11,pc),a0
-        move.l ($5eb0,a0),a1
+        move.l (h11_05eb0,a0),a1
         move.l a1,d0
         beq .done
         move.l (_sim_fields,pc),d0
@@ -134,7 +134,7 @@ _sim_input_sample
         move.l d0,(a0)
         move.w ($e,a1),(4,a0)
         move.w ($c,a1),(6,a0)
-        move.w ($5292,a2),(8,a0)
+        move.w (h12_05292,a2),(8,a0)
         move.w (_sim_mouse_position,pc),(10,a0)
         move.w (_sim_mouse_position+2,pc),(12,a0)
 .done   movem.l (sp)+,d0-d2/a0-a2
@@ -232,10 +232,10 @@ _sim_input_buttons
 
 _sim_input_pointer
         move.w (_sim_tick_input+4,pc),d0
-        move.w d0,($6036-32768,a4)
+        move.w d0,(h11_06036-$8000,a4)
         ext.l d0
         move.w (_sim_tick_input+6,pc),d1
-        move.w d1,($6038-32768,a4)
+        move.w d1,(h11_06038-$8000,a4)
         ext.l d1
         ; Buttons the live UI already consumed are neither a press nor a release.
         move.l d0,-(sp)
@@ -247,9 +247,9 @@ _sim_input_pointer
 .consumed
         move.w (_sim_tick_input+8,pc),d0
 .store
-        move.w d0,($603a-32768,a4)
+        move.w d0,(h11_0603a-$8000,a4)
         move.l (sp)+,d0
-        move.l ($5eb0-32768,a4),a0
+        move.l (h11_05eb0-$8000,a4),a0
         move.l (_sim_input_pointer_done,pc),-(sp)
         rts
 

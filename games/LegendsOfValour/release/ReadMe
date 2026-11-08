@@ -1,5 +1,5 @@
 
- Legends of Valour Enhanced 2.1b (07.11.2026)
+ Legends of Valour Enhanced 2.0b (08.11.2026)
 
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
@@ -40,24 +40,25 @@
  animations correct at any frame rate, finer turning with the mouse, and
  buttons that act once per click. Set Custom2=0 for the original game.
 
- The enhancements are only available for the English version. The German,
- French and other versions run as the original game.
+ The enhancements work with the English, German and French versions. Other
+ versions run as the original game. For an installed German or French game,
+ copy LegendsOfValour.Slave over LegendsOfValourDe.Slave or
+ LegendsOfValourFr.Slave and add the tooltype Custom2=1 to its icon.
 
 
  History:
  --------
- version 2.1b (07.11.2026) done by Vesuri:
- - German and French versions start again; they run without the enhancements
- - all enhancements behind one option, Enhanced frame rate (Custom2=1),
-   enabled by the game icon; the game timing is no longer a separate option
- - buttons act once per click: U-turn and other screens no longer repeat
-   while the mouse button is held; walking and turning still repeat
-
- version 2.0b (09.10.2026) done by Vesuri:
+ version 2.0b (08.11.2026) done by Vesuri:
  - faster 3D rendering, using Fast RAM when available
  - chunky-to-planar conversion by Mikael Kalms
- - added frame-independent game timing (Custom2=64), enabled by the game icon
+ - game timing that keeps the game speed and animations correct at any frame
+   rate
  - finer turning with the mouse
+ - buttons act once per click: U-turn and other screens no longer repeat
+   while the mouse button is held; walking and turning still repeat
+ - all enhancements behind one option, Enhanced frame rate (Custom2=1),
+   enabled by the game icon
+ - enhancements for the English, German and French versions
  - memory requirement increased to 0.7 MB OtherMem
 
  version 1.0 (05.02.05) done by CFou!:

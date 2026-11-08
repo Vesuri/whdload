@@ -9,13 +9,13 @@ _w6_install
         tst.l d0
         bne .done
         move.l (_h12,pc),a0
-        cmp.w #$3239,($51ee,a0)
+        cmp.w #$3239,(h12_051ee,a0)
         bne .bad
-        lea ($36,a0),a1
-        cmp.l ($51f0,a0),a1
+        lea (h12_00036,a0),a1
+        cmp.l (h12_051f0,a0),a1
         bne .bad
         IFD VERIFY
-        lea ($51ee,a0),a1
+        lea (h12_051ee,a0),a1
         lea (_w6_original,pc),a2
         moveq #22-1,d0
 .copy   move.w (a1)+,(a2)+
@@ -30,8 +30,8 @@ _w6_install
 .normal
         ENDC
         ; PERF_RANGE h12:051ee 6 bit=5
-        move.w #$4ef9,($51ee,a0)
-        move.l a1,($51f0,a0)
+        move.w #$4ef9,(h12_051ee,a0)
+        move.l a1,(h12_051f0,a0)
         move.l (_resload,pc),a2
         jsr (resload_FlushCache,a2)
 .done   movem.l (sp)+,d0-a6
@@ -45,9 +45,9 @@ _w6_clear
         ; general 16-byte path for other widths, with the original rounding.
         movem.l d2-d7/a2-a6,-(sp)
         move.l (_h12,pc),a2
-        move.w ($36,a2),d1
+        move.w (h12_00036,a2),d1
         subq.w #1,d1
-        move.w ($2e,a2),d3
+        move.w (h12_0002e,a2),d3
         lsr.w #4,d3
         subq.w #1,d3
         cmp.w #11,d3
@@ -117,9 +117,9 @@ _w6_clear
 _w6_clear_fallback
         movem.l d4-d7/a2,-(sp)
         move.l (_h12,pc),a2
-        move.w ($36,a2),d1
+        move.w (h12_00036,a2),d1
         subq.w #1,d1
-        move.w ($2e,a2),d3
+        move.w (h12_0002e,a2),d3
         lsr.w #4,d3
         subq.w #1,d3
         moveq #0,d4

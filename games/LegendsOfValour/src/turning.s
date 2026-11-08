@@ -10,62 +10,62 @@ _turn_install
         move.l (_custom1,pc),d0
         bne .done
         move.l (_hunks+4,pc),a0
-        cmp.w #$4ef9,($2bb8,a0)
+        cmp.w #$4ef9,(h1_02bb8,a0)
         bne .bad
         move.l (_h12,pc),a1
-        lea ($229e,a1),a2
-        cmp.l ($2bba,a0),a2
+        lea (h12_0229e,a1),a2
+        cmp.l (h1_02bba,a0),a2
         bne .bad
-        cmp.l #$2f2cdfca,($2740,a0)
+        cmp.l #$2f2c0000+((h11_05fca-$8000)&$ffff),(h1_02740,a0)
         bne .bad
-        cmp.l #$4eba0304,($2744,a0)
+        cmp.l #$4eba0304,(h1_02744,a0)
         bne .bad
-        cmp.w #$deb9,($2904,a1)
+        cmp.w #$deb9,(h12_02904,a1)
         bne .bad
         move.l (_h11,pc),a2
-        lea ($5faa,a2),a2
-        cmp.l ($2906,a1),a2
+        lea (h11_05faa,a2),a2
+        cmp.l (h12_02906,a1),a2
         bne .bad
         move.l (_hunks+5*4,pc),a2
-        cmp.l #$046c0167,($1e7e,a2)
+        cmp.l #$046c0167,(h5_01e7e,a2)
         bne .bad
-        cmp.w #$0c28,($1e82,a2)
+        cmp.w #((h11_08c28-$8000)&$ffff),(h5_01e82,a2)
         bne .bad
-        cmp.l #$426c88d2,($1e84,a2)
+        cmp.l #$426c0000+((h11_008d2-$8000)&$ffff),(h5_01e84,a2)
         bne .bad
-        cmp.l #$302c0c28,($1e88,a2)
+        cmp.l #$302c0000+((h11_08c28-$8000)&$ffff),(h5_01e88,a2)
         bne .bad
         lea (_turn_setup_original,pc),a2
-        move.l ($2bba,a0),(a2)
+        move.l (h1_02bba,a0),(a2)
         lea (_turn_free_resume+2,pc),a2
-        lea ($2748,a0),a4
+        lea (h1_02748,a0),a4
         move.l a4,(a2)
         lea (_turn_pool_free+2,pc),a2
-        lea ($2a4a,a0),a4
+        lea (h1_02a4a,a0),a4
         move.l a4,(a2)
         ; PERF_RANGE h1:02bb8 6 bit=7
         lea (_turn_setup,pc),a2
-        move.l a2,($2bba,a0)
+        move.l a2,(h1_02bba,a0)
         ; PERF_RANGE h1:02740 8 bit=7
-        move.w #$4ef9,($2740,a0)
+        move.w #$4ef9,(h1_02740,a0)
         lea (_turn_free,pc),a2
-        move.l a2,($2742,a0)
-        move.w #$4e71,($2746,a0)
+        move.l a2,(h1_02742,a0)
+        move.w #$4e71,(h1_02746,a0)
         ; PERF_RANGE h12:02904 6 bit=7
-        move.w #$4eb9,($2904,a1)
+        move.w #$4eb9,(h12_02904,a1)
         lea (_turn_table_base,pc),a2
-        move.l a2,($2906,a1)
+        move.l a2,(h12_02906,a1)
         ; Only normalize differently when a finer table is active.
         ; PERF_RANGE h5:01e7e 6 bit=7
         move.l (_hunks+5*4,pc),a2
-        move.w #$4eb9,($1e7e,a2)
+        move.w #$4eb9,(h5_01e7e,a2)
         lea (_turn_wrap,pc),a1
-        move.l a1,($1e80,a2)
+        move.l a1,(h5_01e80,a2)
         ; PERF_RANGE h5:01e84 8 bit=7
-        move.w #$4eb9,($1e84,a2)
+        move.w #$4eb9,(h5_01e84,a2)
         lea (_turn_mouse_finish,pc),a1
-        move.l a1,($1e86,a2)
-        move.w #$4e71,($1e8a,a2)
+        move.l a1,(h5_01e86,a2)
+        move.w #$4e71,(h5_01e8a,a2)
         IFD VERIFY
         bsr _turn_pixels_install
         ENDC
@@ -81,8 +81,8 @@ _turn_setup
         lea (_turn_state,pc),a5
         clr.l (4,a5)                ; unpublished until generation completes
         move.l (_h11,pc),a4
-        move.w #5,($6010,a4)
-        move.w ($8ca,a4),d0
+        move.w #5,(h11_06010,a4)
+        move.w (h11_008ca,a4),d0
         cmp.w #192,d0
         beq .supported
         cmp.w #112,d0
@@ -131,17 +131,17 @@ _turn_setup
 .no_cycle
         ENDC
         move.l d0,a0
-        move.w ($8ca,a4),d0
+        move.w (h11_008ca,a4),d0
         move.l a4,a6
         adda.l #$8000,a6
-        move.w ($c0e,a6),d1
-        move.l ($5faa,a4),a1
+        move.w (h11_08c0e-$8000,a6),d1
+        move.l (h11_05faa,a4),a1
         IFD VERIFY
-        move.l ($602c,a4),d2
+        move.l (h11_0602c,a4),d2
         ENDC
         bsr _turn_generate
         IFD VERIFY
-        move.l ($602c,a4),d3
+        move.l (h11_0602c,a4),d3
         sub.l d2,d3
         lea (_turn_generation_fields,pc),a2
         cmp.w #80,d0
@@ -155,10 +155,10 @@ _turn_setup
         bsr _turn_verify_table
         ENDC
         move.l (a5),(4,a5)
-        move.w #1,($6010,a4)
+        move.w #1,(h11_06010,a4)
         IFD VERIFY
         addq.l #1,(8,a5)
-        move.w ($8ca,a4),(12,a5)
+        move.w (h11_008ca,a4),(12,a5)
         ENDC
 .finish movem.l (sp)+,d0-a6
         move.l (_turn_setup_original,pc),-(sp)
@@ -171,7 +171,7 @@ _turn_table_base
         cmpa.w #0,a0
         bne .active
         move.l (_h11,pc),a0
-        move.l ($5faa,a0),a0
+        move.l (h11_05faa,a0),a0
 .active add.l a0,d7
         move.l (sp)+,a0
         rts
@@ -180,15 +180,15 @@ _turn_wrap
         move.l d0,-(sp)
         move.l (_turn_active,pc),d0
         beq .legacy
-        subi.w #360,($c28,a4)
+        subi.w #360,(h11_08c28-$8000,a4)
         bra .done
-.legacy subi.w #359,($c28,a4)
+.legacy subi.w #359,(h11_08c28-$8000,a4)
 .done   move.l (sp)+,d0
         rts
 
 _turn_free
         bsr _turn_release
-        move.l (-8246,a4),-(sp)      ; original h1:2740 argument
+        move.l (h11_05fca-$8000,a4),-(sp)      ; original h1:2740 argument
         bsr _turn_pool_free
 _turn_free_resume dc.w $4ef9
         dc.l 0

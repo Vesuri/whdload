@@ -15,7 +15,7 @@ _timing_study_panel
         lea (_timing_study_panel_active,pc),a0
         move.w #1,(a0)
         move.l (_hunks+2*4,pc),a0
-        adda.l #$1ca0,a0
+        adda.l #h2_01ca0,a0
         clr.l -(sp)
         jsr (a0)
         addq.l #4,sp
@@ -39,8 +39,8 @@ _timing_study_panel_paused
         move.l (_sim_fields,pc),(a0)+
         move.l (_sim_consumed,pc),(a0)+
         move.l (_h11,pc),a1
-        move.l ($602c,a1),(a0)+
-        move.l ($4d6,a1),(a0)
+        move.l (h11_0602c,a1),(a0)+
+        move.l (h11_004d6,a1),(a0)
         lea (_timing_study_panel_started,pc),a0
         move.w #1,(a0)
 .done   movem.l (sp)+,d0/a0-a1
@@ -50,16 +50,16 @@ _timing_study_panel_input
         move.w (_timing_study_panel_started,pc),d0
         beq .done
         move.l (_h11,pc),a0
-        move.l ($602c,a0),d0
+        move.l (h11_0602c,a0),d0
         sub.l (_timing_study_panel_before+8,pc),d0
         sub.l #600,d0
         cmp.l #8,d0
         scs d0
         and.w #1,d0
         move.l (_h12,pc),a0
-        move.w d0,($5292,a0)
+        move.w d0,(h12_05292,a0)
         move.l (_h11,pc),a0
-        move.l ($5eb0,a0),d0
+        move.l (h11_05eb0,a0),d0
         beq .done
         move.l d0,a0
         clr.w ($e,a0)
@@ -74,8 +74,8 @@ _timing_study_panel_returning
         move.l (_sim_fields,pc),(a0)+
         move.l (_sim_consumed,pc),(a0)+
         move.l (_h11,pc),a1
-        move.l ($602c,a1),(a0)+
-        move.l ($4d6,a1),(a0)
+        move.l (h11_0602c,a1),(a0)+
+        move.l (h11_004d6,a1),(a0)
         move.l (_sim_fields,pc),d0
         cmp.l (_timing_study_panel_before,pc),d0
         bne .bad

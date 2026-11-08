@@ -4,14 +4,14 @@
 ; The original column tail executes once, after comparison, with the W4 output restored.
 _w4_verify_install
         movem.l d0-a6,-(sp)
-        lea ($517e,a0),a1
+        lea (h12_0517e,a0),a1
         lea (_w4_original_0,pc),a2
         moveq #10-1,d0
 .copy0 move.w (a1)+,(a2)+
         dbf d0,.copy0
         move.w #$4e75,(a2)
         lea (_w4_twin_continue_0+2,pc),a1
-        lea ($5192,a0),a2
+        lea (h12_05192,a0),a2
         move.l a2,(a1)
         lea (_w4_original_0,pc),a1
         lea (_w4_originals+0,pc),a2
@@ -23,7 +23,7 @@ _w4_verify_install
         lea (_w4_continues+0,pc),a2
         move.l a1,(a2)
         move.l a0,a1
-        adda.l #$9452,a1
+        adda.l #h12_09452,a1
         lea (_w4_original_1,pc),a2
         moveq #11-1,d0
 .copy1 move.w (a1)+,(a2)+
@@ -31,7 +31,7 @@ _w4_verify_install
         move.w #$4e75,(a2)
         lea (_w4_twin_continue_1+2,pc),a1
         move.l a0,a2
-        adda.l #$9468,a2
+        adda.l #h12_09468,a2
         move.l a2,(a1)
         lea (_w4_original_1,pc),a1
         lea (_w4_originals+4,pc),a2
@@ -43,7 +43,7 @@ _w4_verify_install
         lea (_w4_continues+4,pc),a2
         move.l a1,(a2)
         move.l a0,a1
-        adda.l #$94e2,a1
+        adda.l #h12_094e2,a1
         lea (_w4_original_2,pc),a2
         moveq #11-1,d0
 .copy2 move.w (a1)+,(a2)+
@@ -51,7 +51,7 @@ _w4_verify_install
         move.w #$4e75,(a2)
         lea (_w4_twin_continue_2+2,pc),a1
         move.l a0,a2
-        adda.l #$94f8,a2
+        adda.l #h12_094f8,a2
         move.l a2,(a1)
         lea (_w4_original_2,pc),a1
         lea (_w4_originals+8,pc),a2
@@ -84,7 +84,7 @@ _verify_sr_7 EQU *
         bra _w4_twin
 _w4_twin
         move.l (_h11,pc),a0
-        move.l ($5fc2,a0),a0
+        move.l (h11_05fc2,a0),a0
         move.l (36,sp),d0
         sub.l a0,d0
         cmp.l #20000,d0

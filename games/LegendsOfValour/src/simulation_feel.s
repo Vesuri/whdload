@@ -1,30 +1,30 @@
 ; Visual cadence and button sensitivity are independent of world motion.
 _sim_feel_check
         move.l (_hunks+4,pc),a2
-        cmp.w #$4ef9,($2ae6,a2)
+        cmp.w #$4ef9,(h1_02ae6,a2)
         bne .bad
         move.l (_h12,pc),a0
-        lea ($6b54,a0),a0
-        cmp.l ($2ae8,a2),a0
+        lea (h12_06b54,a0),a0
+        cmp.l (h1_02ae8,a2),a0
         bne .bad
-        cmp.l #$397c000f,($218,a2)
+        cmp.l #$397c000f,(h1_00218,a2)
         bne .bad
-        cmp.l #$397c000a,($248,a2)
+        cmp.l #$397c000a,(h1_00248,a2)
         bne .bad
-        cmp.l #$397c000a,($278,a2)
+        cmp.l #$397c000a,(h1_00278,a2)
         bne .bad
-        cmp.l #$397c000f,($2d2,a2)
+        cmp.l #$397c000f,(h1_002d2,a2)
         bne .bad
         IFD SIM_FIRE_EXPERIMENT
         move.l (_hunks+5*4,pc),a2
-        cmp.w #$4ef9,($2698,a2)
+        cmp.w #$4ef9,(h5_02698,a2)
         bne .bad
         move.l (_hunks+2*4,pc),a0
-        cmp.l ($269a,a2),a0
+        cmp.l (h5_0269a,a2),a0
         bne .bad
         ENDC
         move.l (_h12,pc),a2
-        adda.l #$14224,a2
+        adda.l #h12_14224,a2
         cmp.l #$1030402a,(a2)
         bne .bad
         cmp.l #$d130402b,(4,a2)
@@ -38,20 +38,20 @@ _sim_feel_check
 _sim_feel_install
         move.l (_hunks+4,pc),a2
         ; PERF_RANGE h1:0021a 2 bit=6
-        move.w #SIM_TURN_STEP,($21a,a2)
+        move.w #SIM_TURN_STEP,(h1_0021a,a2)
         ; PERF_RANGE h1:0024a 2 bit=6
-        move.w #SIM_TURN_STEP,($24a,a2)
+        move.w #SIM_TURN_STEP,(h1_0024a,a2)
         ; PERF_RANGE h1:0027a 2 bit=6
-        move.w #SIM_TURN_STEP,($27a,a2)
+        move.w #SIM_TURN_STEP,(h1_0027a,a2)
         ; PERF_RANGE h1:002d4 2 bit=6
-        move.w #SIM_TURN_STEP,($2d4,a2)
+        move.w #SIM_TURN_STEP,(h1_002d4,a2)
         lea (_sim_texture_original,pc),a0
-        move.l ($2ae8,a2),(a0)
+        move.l (h1_02ae8,a2),(a0)
         ; PERF_RANGE h1:02ae6 6 bit=6
         lea (_sim_texture,pc),a0
-        move.l a0,($2ae8,a2)
+        move.l a0,(h1_02ae8,a2)
         move.l (_h12,pc),a2
-        adda.l #$14224,a2
+        adda.l #h12_14224,a2
         lea (_sim_actor_animation_next,pc),a0
         lea (22,a2),a1
         move.l a1,(a0)+              ; h12:1423a no frame advance
@@ -65,16 +65,16 @@ _sim_feel_install
         IFD SIM_FIRE_EXPERIMENT
         move.l (_hunks+5*4,pc),a2
         lea (_sim_fire_original,pc),a0
-        move.l ($269a,a2),(a0)+
-        lea ($2e0,a2),a1
+        move.l (h5_0269a,a2),(a0)+
+        lea (h5_002e0,a2),a1
         move.l a1,(a0)+
-        lea ($300,a2),a1
+        lea (h5_00300,a2),a1
         move.l a1,(a0)+
-        lea ($314,a2),a1
+        lea (h5_00314,a2),a1
         move.l a1,(a0)
         ; PERF_RANGE h5:02698 6 bit=6
         lea (_sim_fire_choice,pc),a0
-        move.l a0,($269a,a2)
+        move.l a0,(h5_0269a,a2)
         ENDC
         rts
 

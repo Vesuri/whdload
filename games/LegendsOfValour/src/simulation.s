@@ -15,55 +15,55 @@ _sim_install
         move.l (_custom1,pc),d0
         bne .done
         move.l (_hunks+4,pc),a2
-        cmp.l #$4a2ce008,($2496,a2)
+        cmp.l #$4a2c0000+((h11_06008-$8000)&$ffff),(h1_02496,a2)
         bne .bad
-        cmp.l #$6600028c,($249a,a2)
+        cmp.l #$6600028c,(h1_0249a,a2)
         bne .bad
-        cmp.l #$4a6cdfea,($2714,a2)
+        cmp.l #$4a6c0000+((h11_05fea-$8000)&$ffff),(h1_02714,a2)
         bne .bad
-        cmp.l #$6700fd7c,($2718,a2)
+        cmp.l #$6700fd7c,(h1_02718,a2)
         bne .bad
-        cmp.w #$4ef9,($2b46,a2)
+        cmp.w #$4ef9,(h1_02b46,a2)
         bne .bad
         move.l (_hunks+5*4,pc),a0
-        lea ($2358,a0),a0
-        cmp.l ($2b48,a2),a0
+        lea (h5_02358,a0),a0
+        cmp.l (h1_02b48,a2),a0
         bne .bad
-        cmp.w #$4ef9,($2be8,a2)
+        cmp.w #$4ef9,(h1_02be8,a2)
         bne .bad
         move.l (_h12,pc),a0
-        lea ($5ea6,a0),a0
-        cmp.l ($2bea,a2),a0
+        lea (h12_05ea6,a0),a0
+        cmp.l (h1_02bea,a2),a0
         bne .bad
         move.l (_h12,pc),a2
-        cmp.w #$52b9,($6412,a2)
+        cmp.w #$52b9,(h12_06412,a2)
         bne .bad
         move.l (_h11,pc),a0
-        lea ($4d6,a0),a0
-        cmp.l ($6414,a2),a0
+        lea (h11_004d6,a0),a0
+        cmp.l (h12_06414,a2),a0
         bne .bad
-        cmp.w #$5379,($27c4,a2)
+        cmp.w #$5379,(h12_027c4,a2)
         bne .bad
-        lea ($27ba,a2),a0
-        cmp.l ($27c6,a2),a0
+        lea (h12_027ba,a2),a0
+        cmp.l (h12_027c6,a2),a0
         bne .bad
         move.l (_hunks+5*4,pc),a2
-        cmp.l #$80416700,($14de,a2)
+        cmp.l #$80416700,(h5_014de,a2)
         bne .bad
-        cmp.w #$021c,($14e2,a2)
+        cmp.w #$021c,(h5_014e2,a2)
         bne .bad
-        cmp.l #$526c8df4,($1934,a2)
+        cmp.l #$526c0000+((h11_00df4-$8000)&$ffff),(h5_01934,a2)
         bne .bad
-        cmp.l #$302c8df4,($1938,a2)
+        cmp.l #$302c0000+((h11_00df4-$8000)&$ffff),(h5_01938,a2)
         bne .bad
-        cmp.l #$b06c8df6,($193c,a2)
+        cmp.l #$b06c0000+((h11_00df6-$8000)&$ffff),(h5_0193c,a2)
         bne .bad
-        cmp.w #$6d12,($1940,a2)
+        cmp.w #$6d12,(h5_01940,a2)
         bne .bad
 
         ; Validate the complete original compensation table before any writes.
         move.l (_h12,pc),a2
-        lea ($5e7a,a2),a0
+        lea (h12_05e7a,a2),a0
         moveq #0,d0
 .check_table
         move.w d0,d1
@@ -121,55 +121,55 @@ _sim_install
 
         ; PERF_RANGE h1:02496 8 bit=6
         move.l (_hunks+4,pc),a2
-        lea ($2496,a2),a0
+        lea (h1_02496,a2),a0
         lea (_sim_loop,pc),a1
         bsr .jump
-        move.w #$4e71,($249c,a2)
+        move.w #$4e71,(h1_0249c,a2)
         ; PERF_RANGE h1:02714 8 bit=6
-        lea ($2714,a2),a0
+        lea (h1_02714,a2),a0
         lea (_sim_end_tick,pc),a1
         bsr .jump
-        move.w #$4e71,($271a,a2)
+        move.w #$4e71,(h1_0271a,a2)
         ; PERF_RANGE h1:02b46 6 bit=6
-        lea ($2b46,a2),a0
+        lea (h1_02b46,a2),a0
         lea (_sim_sprites,pc),a1
         bsr .jump
         ; PERF_RANGE h1:02be8 6 bit=6
-        lea ($2be8,a2),a0
+        lea (h1_02be8,a2),a0
         lea (_sim_display,pc),a1
         bsr .jump
         move.l (_h12,pc),a2
         ; PERF_RANGE h12:06412 6 bit=6
-        lea ($6412,a2),a0
+        lea (h12_06412,a2),a0
         lea (_sim_vbl,pc),a1
         bsr .jump
         ; PERF_RANGE h12:027c4 6 bit=6
-        lea ($27c4,a2),a0
+        lea (h12_027c4,a2),a0
         lea (_sim_renderer,pc),a1
         bsr .jump
         ; The display wait still runs unchanged; normalize only its step table.
         ; PERF_RANGE h12:05e7a 44 bit=6
-        lea ($5e7a,a2),a0
+        lea (h12_05e7a,a2),a0
         moveq #10,d0
 .table  move.w #SIM_MOVEMENT_STEP,(a0)+
         move.w #SIM_ANIMATION_PACING,(a0)+
         dbf d0,.table
         ; Normalize startup creation too, before the first display-clock call.
         move.l a2,a0
-        adda.l #$cdd6,a0
+        adda.l #h12_0cdd6,a0
         move.w #SIM_MOVEMENT_STEP,(a0)
         move.l (_h11,pc),a0
-        move.w #SIM_ANIMATION_PACING,($df6,a0)
+        move.w #SIM_ANIMATION_PACING,(h11_00df6,a0)
         move.l (_hunks+5*4,pc),a2
         ; PERF_RANGE h5:014de 6 bit=6
-        lea ($14de,a2),a0
+        lea (h5_014de,a2),a0
         lea (_sim_projectile_motion,pc),a1
         bsr .jump
         ; PERF_RANGE h5:01934 8 bit=6
-        lea ($1934,a2),a0
+        lea (h5_01934,a2),a0
         lea (_sim_animation,pc),a1
         bsr .jump
-        move.w #$4e71,($193a,a2)
+        move.w #$4e71,(h5_0193a,a2)
         move.l (_resload,pc),a2
         jsr (resload_FlushCache,a2)
 .done   movem.l (sp)+,d0-a6
@@ -194,7 +194,7 @@ _sim_vbl
         addq.l #1,(a0)
 .game_clock
         move.l (_h11,pc),a0
-        addq.l #1,($4d6,a0)
+        addq.l #1,(h11_004d6,a0)
         move.l (sp)+,a0
         move.l (_sim_vbl_continue,pc),-(sp)
         rts
@@ -204,7 +204,7 @@ _sim_vbl
 _sim_loop
         movem.l d0-d1/a0,-(sp)
         lea (_sim_started,pc),a0
-        tst.b ($6008-32768,a4)
+        tst.b (h11_06008-$8000,a4)
         bne .exit
         tst.w (a0)
         bne .wait
@@ -266,7 +266,7 @@ _sim_tick_complete
         lea (_sim_completed_ticks,pc),a0
         addq.l #1,(a0)
         move.l (sp)+,a0
-        tst.w ($5fea-32768,a4)
+        tst.w (h11_05fea-$8000,a4)
         bne .load
         move.l (_sim_loop_restart,pc),-(sp)
         rts
@@ -282,9 +282,9 @@ _sim_renderer
         move.l (_sim_position,pc),a1
         jsr (a1)
         move.l (_h12,pc),a0
-        subq.w #1,($27ba,a0)
+        subq.w #1,(h12_027ba,a0)
         bpl .actors
-        move.w #15,($27ba,a0)
+        move.w #15,(h12_027ba,a0)
         move.l (_sim_periodic,pc),a1
         jsr (a1)
 .actors move.l (_sim_actors,pc),a1
@@ -352,11 +352,11 @@ _sim_animation
         cmp.l (4,a5),d0
         bne .skip
         move.l (sp)+,d0
-        addq.w #1,($df4-32768,a4)
-        move.w ($df4-32768,a4),d0
+        addq.w #1,(h11_00df4-$8000,a4)
+        move.w (h11_00df4-$8000,a4),d0
         ; Compare and branch here: pushing the continuation destroys CCR.
         ; The old adapter skipped CMP and entered BLT with address flags.
-        cmp.w ($df6-32768,a4),d0
+        cmp.w (h11_00df6-$8000,a4),d0
         blt .hold
         move.l (_sim_animation_continue,pc),-(sp)
         rts
@@ -403,49 +403,49 @@ _sim_animation_skip dc.l 0
 _sim_targets_end
 _sim_target_specs
         dc.w 1*4
-        dc.l $249e
+        dc.l h1_0249e
         dc.w 1*4
-        dc.l $2728
+        dc.l h1_02728
         dc.w 1*4
-        dc.l $2496
+        dc.l h1_02496
         dc.w 1*4
-        dc.l $271c
+        dc.l h1_0271c
         dc.w 1*4
-        dc.l $2632
+        dc.l h1_02632
         dc.w 1*4
-        dc.l $2636
+        dc.l h1_02636
         dc.w 1*4
-        dc.l $2646
+        dc.l h1_02646
         dc.w 1*4
-        dc.l $2656
+        dc.l h1_02656
         dc.w 12*4
-        dc.l $27e6
+        dc.l h12_027e6
         dc.w 12*4
-        dc.l $2802
+        dc.l h12_02802
         dc.w 12*4
-        dc.l $140e6
+        dc.l h12_140e6
         dc.w 12*4
-        dc.l $fc12
+        dc.l h12_0fc12
         dc.w 12*4
-        dc.l $15b1a
+        dc.l h12_15b1a
         dc.w 12*4
-        dc.l $2720
+        dc.l h12_02720
         dc.w 12*4
-        dc.l $6418
+        dc.l h12_06418
         dc.w 5*4
-        dc.l $2358
+        dc.l h5_02358
         dc.w 12*4
-        dc.l $5ea6
+        dc.l h12_05ea6
         dc.w 5*4
-        dc.l $14e4
+        dc.l h5_014e4
         dc.w 5*4
-        dc.l $16fe
+        dc.l h5_016fe
         dc.w 5*4
-        dc.l $173e
+        dc.l h5_0173e
         dc.w 5*4
-        dc.l $1942
+        dc.l h5_01942
         dc.w 5*4
-        dc.l $1954
+        dc.l h5_01954
 
         INCLUDE "simulation_input.s"
 

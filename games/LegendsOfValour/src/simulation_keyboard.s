@@ -18,7 +18,7 @@ _sim_keys_check
         lea (.specs,pc),a0
         moveq #3,d2
 .next   move.w (a0)+,d0
-        cmp.l #$bfecde40,(0,a2,d0.w)
+        cmp.l #$bfec0000+((h11_05e40-$8000)&$ffff),(0,a2,d0.w)
         bne .bad
         addq.w #4,d0
         move.l (a0)+,d1
@@ -28,36 +28,37 @@ _sim_keys_check
         rts
 .bad    lea (_sim_bad,pc),a0
         bra _c2p_abort
-.specs  dc.w $1e56
-        dc.l $65000b0a
-        dc.w $1e86
-        dc.l $65000ada
-        dc.w $1eb6
-        dc.l $65000aaa
-        dc.w $1f30
-        dc.l $65000a30
+; cmpa.l -8640(a4),sp / bcs.w h1:02966 at the start of each console routine
+.specs  dc.w h1_01e56
+  dc.l $65000000+((h1_02966-h1_01e5c)&$ffff)
+  dc.w h1_01e86
+  dc.l $65000000+((h1_02966-h1_01e8c)&$ffff)
+  dc.w h1_01eb6
+  dc.l $65000000+((h1_02966-h1_01ebc)&$ffff)
+  dc.w h1_01f30
+  dc.l $65000000+((h1_02966-h1_01f36)&$ffff)
 
 _sim_keys_install
         move.l (_hunks+4,pc),a2
         lea (_sim_keys_overflow_target,pc),a0
-        lea ($2966,a2),a1
+        lea (h1_02966,a2),a1
         move.l a1,(a0)+
-        lea ($1f38,a2),a1
+        lea (h1_01f38,a2),a1
         move.l a1,(a0)
         ; PERF_RANGE h1:01e56 8 bit=6
-        lea ($1e56,a2),a0
+        lea (h1_01e56,a2),a0
         lea (_sim_keys_start,pc),a1
         bsr .jump
         ; PERF_RANGE h1:01e86 8 bit=6
-        lea ($1e86,a2),a0
+        lea (h1_01e86,a2),a0
         lea (_sim_keys_wait,pc),a1
         bsr .jump
         ; PERF_RANGE h1:01eb6 8 bit=6
-        lea ($1eb6,a2),a0
+        lea (h1_01eb6,a2),a0
         lea (_sim_keys_poll,pc),a1
         bsr .jump
         ; PERF_RANGE h1:01f30 8 bit=6
-        lea ($1f30,a2),a0
+        lea (h1_01f30,a2),a0
         lea (_sim_keys_stop,pc),a1
 .jump   move.w #$4ef9,(a0)+
         move.l a1,(a0)+
@@ -69,7 +70,7 @@ _sim_keys_stack_overflow
         rts
 
 _sim_keys_start
-        cmpa.l ($5e40-32768,a4),sp
+        cmpa.l (h11_05e40-$8000,a4),sp
         bcs _sim_keys_stack_overflow
         movem.l d0-d3/a0-a3/a6,-(sp)
         move.l 4.w,a6
@@ -82,7 +83,7 @@ _sim_keys_start
         move.l d0,(a0)
         move.l d0,a2
         move.l (_h11,pc),a0
-        move.l ($5f60,a0),a1
+        move.l (h11_05f60,a0),a1
         lea (_sim_keys_port,pc),a3
         move.l a1,(a3)
         move.l MP_SIGTASK(a1),(_sim_keys_owner-_sim_keys_port,a3)
@@ -92,7 +93,7 @@ _sim_keys_start
         lsl.l d1,d0
         move.l d0,(_sim_keys_signal-_sim_keys_port,a3)
         move.l a2,MP_SIGTASK(a1)
-        move.l ($5f5c,a0),(_sim_keys_request-_sim_keys_port,a3)
+        move.l (h11_05f5c,a0),(_sim_keys_request-_sim_keys_port,a3)
         lea (_sim_keys_head,pc),a0
         clr.l (a0)                      ; head and tail words
         clr.w (_sim_keys_stopping-_sim_keys_head,a0)
@@ -133,7 +134,7 @@ _sim_keys_worker
         move.w #2,28(a1)                ; CMD_READ
         move.l #1,36(a1)
         move.l (_h11,pc),a0
-        lea ($5fa4,a0),a0
+        lea (h11_05fa4,a0),a0
         move.l a0,40(a1)
         lea (_sim_keys_pending,pc),a0
         move.w #1,(a0)
@@ -159,7 +160,7 @@ _sim_keys_worker
         beq .timestamp
         moveq #1,d5                ; combat uses elapsed VBL fields
         move.l (_h11,pc),a0
-        move.l ($602c,a0),d4
+        move.l (h11_0602c,a0),d4
 .timestamp
         ENDC
         addq.l #1,d4                    ; retain arrival even if the queue is full
@@ -181,7 +182,7 @@ _sim_keys_worker
         adda.w d1,a0
         move.l d4,(a0)
         move.l (_h11,pc),a1
-        move.b ($5fa4,a1),4(a0)
+        move.b (h11_05fa4,a1),4(a0)
         move.b d5,5(a0)
         lea (_sim_keys_head,pc),a0
         move.w d2,(a0)                  ; publish only after complete record
@@ -235,13 +236,13 @@ _sim_keys_worker
         jmp (_LVOSignal,a6)
 
 _sim_keys_poll
-        cmpa.l ($5e40-32768,a4),sp
+        cmpa.l (h11_05e40-$8000,a4),sp
         bcs _sim_keys_stack_overflow
         movem.l d1-d3/a0-a2/a6,-(sp)
         moveq #0,d3
         IFD SIM_COMBAT_EXPERIMENT
         move.l (_hunks+9*4,pc),a0
-        lea ($5ac,a0),a1
+        lea (h9_005ac,a0),a1
         cmp.l (28,sp),a1
         bne .world
         moveq #2,d3                ; end-of-combat-step cutoff
@@ -249,10 +250,10 @@ _sim_keys_poll
 .world
         ENDC
         move.l (_hunks+4,pc),a0
-        lea ($258e,a0),a1
+        lea (h1_0258e,a0),a1
         cmp.l (28,sp),a1
         beq .historical
-        lea ($25b2,a0),a1
+        lea (h1_025b2,a0),a1
         cmp.l (28,sp),a1
         bne .read
 .historical
@@ -266,7 +267,7 @@ _sim_keys_poll
         rts
 
 _sim_keys_wait
-        cmpa.l ($5e40-32768,a4),sp
+        cmpa.l (h11_05e40-$8000,a4),sp
         bcs _sim_keys_stack_overflow
         movem.l d1-d3/a0-a2/a6,-(sp)
         move.l 4.w,a6
@@ -356,7 +357,7 @@ _sim_keys_take
 .done   rts
 
 _sim_keys_stop
-        cmpa.l ($5e40-32768,a4),sp
+        cmpa.l (h11_05e40-$8000,a4),sp
         bcs _sim_keys_stack_overflow
         movem.l d0-d2/a0-a2/a6,-(sp)
         move.l 4.w,a6

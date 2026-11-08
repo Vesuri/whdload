@@ -7,32 +7,32 @@ _timing_combat_install
         beq .done
         move.l (_hunks+9*4,pc),a2
         IFND SIM_COMBAT_EXPERIMENT
-        cmp.l #$202ce02c,($1b2,a2)
+        cmp.l #$202c0000+((h11_0602c-$8000)&$ffff),(h9_001b2,a2)
         bne .bad
-        cmp.w #$5880,($1b6,a2)
+        cmp.w #$5880,(h9_001b6,a2)
         bne .bad
-        cmp.l #$48ed0001,($1b8,a2)
+        cmp.l #$48ed0001,(h9_001b8,a2)
         bne .bad
-        cmp.w #$ffc2,($1bc,a2)
+        cmp.w #$ffc2,(h9_001bc,a2)
         bne .bad
         ENDC
-        cmp.w #$4ef9,($618,a2)
+        cmp.w #$4ef9,(h9_00618,a2)
         bne .bad
         move.l (_hunks+4,pc),a0
-        lea ($1eb6,a0),a0
-        cmp.l ($61a,a2),a0
+        lea (h1_01eb6,a0),a0
+        cmp.l (h9_0061a,a2),a0
         bne .bad
         lea (_timing_combat_poll_original,pc),a1
         move.l a0,(a1)
-        lea ($1be,a2),a0
+        lea (h9_001be,a2),a0
         move.l a0,(_timing_combat_continue-_timing_combat_poll_original,a1)
         IFND SIM_COMBAT_EXPERIMENT
         lea (_timing_combat_step,pc),a0
-        move.w #$4ef9,($1b2,a2)
-        move.l a0,($1b4,a2)
+        move.w #$4ef9,(h9_001b2,a2)
+        move.l a0,(h9_001b4,a2)
         ENDC
         lea (_timing_combat_poll,pc),a0
-        move.l a0,($61a,a2)
+        move.l a0,(h9_0061a,a2)
 .done   rts
 .bad    lea (_timing_combat_bad,pc),a0
         bra _c2p_abort
@@ -51,27 +51,27 @@ _timing_combat_enter
         move.w (_sim_render_tick,pc),-(sp)
         lea (_sim_render_tick,pc),a0
         move.w #1,(a0)              ; measure every original combat render
-        move.w ($60be-32768,a4),-(sp)
+        move.w (h11_060be-$8000,a4),-(sp)
         move.l (_custom5,pc),d0
         btst #29,d0
         beq .auto
-        clr.w ($60be-32768,a4)      ; manual attack option, restored on return
+        clr.w (h11_060be-$8000,a4)      ; manual attack option, restored on return
 .auto
         ; Include h12's pause/re-enable envelope around the C combat wrapper.
         ; Select an existing actor, preserving its live health and script data.
         move.l (_h12,pc),a0
-        adda.l #$9716,a0
+        adda.l #h12_09716,a0
         move.w (a0),-(sp)
-        move.w #-15214+43*128,(a0)
+        move.w #h11_04492-$8000+43*128,(a0)
         move.l (_h12,pc),a1
-        adda.l #$10b8c,a1
+        adda.l #h12_10b8c,a1
         move.l (_h12,pc),a0
-        adda.l #$de5e,a0
+        adda.l #h12_0de5e,a0
         jsr (a1)
         move.l (_h12,pc),a0
-        adda.l #$9716,a0
+        adda.l #h12_09716,a0
         move.w (sp)+,(a0)
-        move.w (sp)+,($60be-32768,a4)
+        move.w (sp)+,(h11_060be-$8000,a4)
         lea (_sim_render_tick,pc),a0
         move.w (sp)+,(a0)
         lea (_timing_combat_returned,pc),a0
@@ -81,7 +81,7 @@ _timing_combat_enter
 
 _timing_combat_step
         bsr _timing_combat_record
-        move.l ($602c-32768,a4),d0
+        move.l (h11_0602c-$8000,a4),d0
         addq.l #4,d0
         movem.l d0,(-62,a5)
         move.l (_timing_combat_continue,pc),-(sp)
@@ -93,7 +93,7 @@ _timing_combat_record
         move.l (a0),d0
         bne .epoch_set
         move.l (_h11,pc),a1
-        move.l ($602c,a1),(_timing_combat_firstfield-_timing_combat_steps,a0)
+        move.l (h11_0602c,a1),(_timing_combat_firstfield-_timing_combat_steps,a0)
 .epoch_set
         addq.l #1,(a0)
         cmp.l #64,d0
@@ -104,8 +104,8 @@ _timing_combat_record
         adda.l #_timing_combat_records-_timing_combat_steps,a0
         adda.w d0,a0
         move.l (_h11,pc),a1
-        move.l ($602c,a1),(a0)+
-        move.l ($4d6,a1),(a0)+
+        move.l (h11_0602c,a1),(a0)+
+        move.l (h11_004d6,a1),(a0)+
         move.l (_sim_fields,pc),(a0)+
         move.l (_sim_consumed,pc),(a0)+
         move.l d5,(a0)+
@@ -115,7 +115,7 @@ _timing_combat_record
         move.b (111,a3),d0
         move.w d0,(a0)+
         move.l (_h12,pc),a1
-        adda.l #$a0c3,a1
+        adda.l #h12_0a0c3,a1
         move.b (a1),(a0)+
         move.b (110,a3),(a0)
         IFD SIM_COMBAT_EXPERIMENT
@@ -162,16 +162,16 @@ _timing_combat_input
         move.w (_timing_combat_returned,pc),d0
         bne .done
         move.l (_h11,pc),a0
-        move.l ($602c,a0),d0
+        move.l (h11_0602c,a0),d0
         sub.l (_timing_combat_firstfield,pc),d0
         and.l #31,d0
         subq.l #8,d0
         cmp.l #4,d0
         scs d1
         and.w #1,d1
-        move.l ($5eb0,a0),a0
+        move.l (h11_05eb0,a0),a0
         move.w #174,($e,a0)
         move.w #150,($c,a0)
         move.l (_h12,pc),a0
-        move.w d1,($5292,a0)
+        move.w d1,(h12_05292,a0)
 .done   rts

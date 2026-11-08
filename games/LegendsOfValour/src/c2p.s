@@ -9,13 +9,13 @@ _c2p_install
 		move.l	(_custom1,pc),d0
 		bne	.done			;CHARACT is not AMIGA2
 		move.l	(_h12,pc),a0
-		cmp.l	#$48e7fffe,($54ce,a0)
+		cmp.l	#$48e7fffe,(h12_054ce,a0)
 		bne	.bad
-		cmp.w	#$2079,($54d2,a0)
+		cmp.w	#$2079,(h12_054d2,a0)
 		bne	.bad
 		move.l	(_h11,pc),d0
-		add.l	#$5fc2,d0
-		cmp.l	($54d4,a0),d0
+		add.l	#h11_05fc2,d0
+		cmp.l	(h12_054d4,a0),d0
 		bne	.bad
 		lea	(c2p1x1_4_c5_bm_word,pc),a1
 		move.l	(_lov_attnflags,pc),d0
@@ -26,18 +26,18 @@ _c2p_install
 		move.l	a1,(a2)
 	IFD VERIFY
 		lea	(_c2p_original,pc),a1
-		move.l	($54ce,a0),(a1)+
-		move.l	($54d2,a0),(a1)+
-		move.w	($54d6,a0),(a1)+
+		move.l	(h12_054ce,a0),(a1)+
+		move.l	(h12_054d2,a0),(a1)+
+		move.w	(h12_054d6,a0),(a1)+
 		move.w	#$4ef9,(a1)+
-		lea	($54d8,a0),a2
+		lea	(h12_054d8,a0),a2
 		move.l	a2,(a1)
 	ENDC
 	; PERF_RANGE is declared beside the call in LegendsOfValourHD.s.
-		move.w	#$4ef9,($54ce,a0)
+		move.w	#$4ef9,(h12_054ce,a0)
 		lea	(_c2p_entry,pc),a1
-		move.l	a1,($54d0,a0)
-		move.l	#$4e714e71,($54d4,a0)
+		move.l	a1,(h12_054d0,a0)
+		move.l	#$4e714e71,(h12_054d4,a0)
 		move.l	(_resload,pc),a2
 		jsr	(resload_FlushCache,a2)
 .done		movem.l	(sp)+,d0-a6
@@ -47,8 +47,8 @@ _c2p_install
 
 _c2p_entry	movem.l	d0-a6,-(sp)
 		move.l	(_h12,pc),a5
-		move.w	($2e,a5),d0
-		move.w	($30,a5),d1
+		move.w	(h12_0002e,a5),d0
+		move.w	(h12_00030,a5),d1
 		cmp.w	#192,d0
 		bhi	_c2p_geometry_bad
 		tst.w	d0
@@ -59,7 +59,7 @@ _c2p_entry	movem.l	d0-a6,-(sp)
 		beq	_c2p_geometry_bad
 	; Enclose to a word-aligned left edge and a 32-pixel-multiple width.
 		moveq	#0,d2
-		move.w	($3e,a5),d2
+		move.w	(h12_0003e,a5),d2
 		and.w	#15,d2
 		move.w	d0,d3
 		add.w	d2,d3
@@ -73,7 +73,7 @@ _c2p_entry	movem.l	d0-a6,-(sp)
 		move.w	d1,(_c2p_height-_c2p_width,a0)
 		lsr.w	#3,d2
 		lea	(_c2p_bitmap+bm_Planes,pc),a1
-		lea	($42,a5),a2
+		lea	(h12_00042,a5),a2
 		moveq	#4-1,d4
 .planes		move.l	(a2)+,d5
 		sub.l	d2,d5
@@ -90,9 +90,9 @@ _c2p_entry	movem.l	d0-a6,-(sp)
 	; Large view reads the game's source directly. Smaller views use a private
 	; 192-byte-stride staging area: preserve source column 0 and never write left of it.
 		move.l	(_h11,pc),a0
-		move.l	($5fc2,a0),a0
+		move.l	(h11_05fc2,a0),a0
 		move.w	(_c2p_width,pc),d0
-		cmp.w	($2e,a5),d0
+		cmp.w	(h12_0002e,a5),d0
 		beq	.convert
 	IFD VERIFY
 		lea	(_c2p_function,pc),a1
@@ -110,7 +110,7 @@ _c2p_entry	movem.l	d0-a6,-(sp)
 		subq.w	#1,d2
 .left		clr.b	(a3)+
 		dbf	d2,.left
-.copy		move.w	($2e,a5),d2
+.copy		move.w	(h12_0002e,a5),d2
 		add.w	d2,d3
 		subq.w	#1,d2
 .pixels		move.b	(a2)+,(a3)+
@@ -157,13 +157,13 @@ _c2p_edges_restore movem.l d0-a6,-(sp)
 		moveq	#1,d7
 _c2p_edges_io
 		move.w	(_c2p_width,pc),d0
-		cmp.w	($2e,a5),d0
+		cmp.w	(h12_0002e,a5),d0
 		beq	.done
 		lsr.w	#3,d0
 		moveq	#0,d5
 		move.w	(_c2p_left,pc),d5
 		lsr.w	#3,d5
-		move.w	($2e,a5),d6
+		move.w	(h12_0002e,a5),d6
 		lsr.w	#3,d6
 		sub.w	d0,d6
 		neg.w	d6

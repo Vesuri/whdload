@@ -3,35 +3,35 @@
 
 ; In: D0 = CUSTOM2, A2/A3/A4 = hunks 1/6/9. Out: A0 = 0 when installed, else the reason.
 _click_patch
-        cmp.l #$3940e03a,($1ba8,a2)	;h1:01ba8 move.w d0,-8134(a4)
+        cmp.l #$39400000+((h11_0603a-$8000)&$ffff),(h1_01ba8,a2)	;h1:01ba8 move.w d0,-8134(a4)
         bne .bad
-        cmp.w #$4e75,($1bac,a2)		;rts
+        cmp.w #$4e75,(h1_01bac,a2)		;rts
         bne .bad
-        cmp.l #$bfecde40,($7da,a3)	;h6:007da cmpa.l -8640(a4),sp
+        cmp.l #$bfec0000+((h11_05e40-$8000)&$ffff),(h6_007da,a3)	;h6:007da cmpa.l -8640(a4),sp
         bne .bad
-        cmp.l #$650000f0,($7de,a3)	;bcs.w h6:008d0
+        cmp.l #$65000000+((h6_008d0-h6_007e0)&$ffff),(h6_007de,a3)	;bcs.w h6:008d0
         bne .bad
-        cmp.l #$4eba024e,($404,a4)	;h9:00404 jsr h9:00654 (the live reader)
+        cmp.l #$4eba0000+((h9_00654-h9_00406)&$ffff),(h9_00404,a4)	;h9:00404 jsr h9:00654 (the live reader)
         bne .bad
         lea (_click_targets,pc),a0
-        lea ($7e2,a3),a1
+        lea (h6_007e2,a3),a1
         move.l a1,(a0)+			;_click_hit_continue
-        lea ($8d0,a3),a1
+        lea (h6_008d0,a3),a1
         move.l a1,(a0)+			;_click_hit_overflow
         sub.l a1,a1
         btst #6,d0			;combat replays history only with the timing
         beq .skip
-        lea ($408,a4),a1
+        lea (h9_00408,a4),a1
 .skip   move.l a1,(a0)			;_click_skip_return
         ; PERF_RANGE h1:01ba8 6 bit=8
-        move.w #$4ef9,($1ba8,a2)
+        move.w #$4ef9,(h1_01ba8,a2)
         lea (_click_reader,pc),a0
-        move.l a0,($1baa,a2)
+        move.l a0,(h1_01baa,a2)
         ; PERF_RANGE h6:007da 8 bit=8
-        move.w #$4ef9,($7da,a3)
+        move.w #$4ef9,(h6_007da,a3)
         lea (_click_hit,pc),a0
-        move.l a0,($7dc,a3)
-        move.w #$4e71,($7e0,a3)
+        move.l a0,(h6_007dc,a3)
+        move.w #$4e71,(h6_007e0,a3)
         lea (_click_state+6,pc),a0
         move.w #1,(a0)
         sub.l a0,a0
@@ -48,7 +48,7 @@ _click_reader
         movea.l (sp)+,a0
         beq .store
         bsr _click_filter
-.store  move.w d0,(-8134,a4)
+.store  move.w d0,(h11_0603a-$8000,a4)
         rts
 
 ; D0.w = buttons, out D0 = buttons as press events. All other registers kept.
@@ -77,7 +77,7 @@ _click_filter
 
 ; h6:007da, the button hit test (list, x, y): returns the gadget id, 0 for none.
 _click_hit
-        cmpa.l (-8640,a4),sp
+        cmpa.l (h11_05e40-$8000,a4),sp
         bcs .overflow
         move.l (12,sp),-(sp)
         move.l (12,sp),-(sp)
@@ -113,7 +113,7 @@ _click_hit
         bne .ok
         ; Dragged off a movement gadget: no click and no click outside.
         moveq #0,d0
-        clr.w (-8134,a4)
+        clr.w (h11_0603a-$8000,a4)
 .ok     movem.l (sp)+,d1/a0
 .out    tst.l d0
         rts

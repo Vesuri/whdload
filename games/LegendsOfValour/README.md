@@ -2,9 +2,11 @@
 
 WHDLoad slave patches for the original 1992 game from US Gold / Synthetic Dimensions.
 The slave is reconstructed from CFou!'s v1.0 disassembly using WHDLoad 20.0's KickEmu
-sources. Release **2.1b is a beta**, validated with the English game in the 0837 archive.
-Only that version is enhanced: the German, French and other versions supported by the
-original install run as CFou!'s v1.0.
+sources. Release **2.0b is a beta**. One slave enhances the English, German and French
+games of CFou!'s preinstalled archives (0837, 0525 and 1768; [versions.md](docs/versions.md));
+any other version supported by the original install runs as CFou!'s v1.0. For a German or
+French install, copy `LegendsOfValour.Slave` over its `LegendsOfValourDe.Slave` or
+`LegendsOfValourFr.Slave` and add `CUSTOM2=1` to its icon.
 
 The player-facing options are:
 
@@ -36,12 +38,15 @@ Keep these original archives locally; they are not part of the repository and ar
 in `inputs.sha256`:
 
 ```
-LegendsOfValour_v1.0_0837.lha   preinstalled game (the game data)
-LegendsOfValour.lha             original installer (repackaged by make dist)
+LegendsOfValour_v1.0_0837.lha     preinstalled English game (the game data)
+LegendsOfValour_v1.0_De_0525.lha  preinstalled German game
+LegendsOfValour_v1.0_Fr_1768.lha  preinstalled French game
+LegendsOfValour.lha               original installer (repackaged by make dist)
 ```
 
 `make unpack ARCHIVES=<directory holding them>` copies them into `tmp/archives/`, verifies
-them and installs the game into `tmp/game/LegendsOfValour/`.
+them and installs the games into `tmp/game/LegendsOfValour/`, `LegendsOfValourDe/` and
+`LegendsOfValourFr/`.
 
 Building needs make, vasm's Motorola 68000 assembler, WHDLoad development headers, and
 Amiga NDK headers, all from AmigaXDev's shared environment (the repository's
@@ -64,6 +69,8 @@ From this directory:
 make run                          # build the release slave and boot it, original game
 make run WHD_ARGS=CUSTOM2=1       # Enhanced frame rate, as the installed icon sets it
 make run SLAVE=original           # CFou!'s v1.0, unchanged
+make run GAME_DIR=LegendsOfValourDe SLAVE_FILE=LegendsOfValourDe.Slave WHD_ARGS=CUSTOM2=1
+                                  # the German game (LegendsOfValourFr for French)
 ```
 
 The launcher defaults to a 68000 with 1 MiB chip and 8 MiB fast RAM (`game.conf`);
@@ -86,13 +93,15 @@ restarting. `make stop` stops it. The repository's `docs/running.md` lists every
 ```sh
 make developer       # tmp/build/developer/LegendsOfValour.Slave
 make verify          # tmp/build/verify/LegendsOfValour.Slave
-make check           # the release slave matches release/slaves.sha256; tapes, ray tables
+make check           # the release slave matches release/slaves.sha256; tapes, ray tables,
+                     # src/offsets.s and the signatures in all three versions
 ```
 
 Developer builds keep a CUSTOM2 bit for each enhancement (W1–W6, timing, mouse precision,
 click inputs). VERIFY adds input tapes, pixel twins,
 and simulation checks; it must not ship. `VASM_EXTRA='-DTIMING_STUDY=1'` adds a study's
-defines to one build. All builds are assembled afresh.
+defines to one build. All builds are assembled afresh, each once per language, with the
+German and French differences appended as a fixup table ([versions.md](docs/versions.md)).
 
 Use [profiling.md](docs/profiling.md) for capture commands and fixed-window A/B checks,
 [performance-patches.md](docs/performance-patches.md) for rendering invariants,
@@ -107,7 +116,7 @@ sessions.
 make dist
 ```
 
-Builds `LegendsOfValourEnhanced-2.1b-20261107.lha` (version and date from the slave's `$VER`)
+Builds `LegendsOfValourEnhanced-2.0b-20261108.lha` (version and date from the slave's `$VER`)
 from the original installer in the repository's `dist/`. Only the slave, the ReadMe and the
 six game icons (`CUSTOM2=1` added to their tooltypes) are replaced; the entry list and every
 other compressed record are preserved. Packaging verifies CRCs, replacement contents and the
@@ -120,8 +129,8 @@ and `dist/`; archives are not committed.
 
 Automated checks pass on both reference CPUs. One-degree mouse precision has been accepted in
 play testing; the UI buttons retain native behavior. Timing and click inputs may receive
-further adjustments from play feedback. German and French enhancements need those
-versions' data (open-work.md).
+further adjustments from play feedback. The German and French games pass the install
+checks and the VERIFY twins; their gameplay has not been play-tested.
 The tape cannot wait for a conversation panel's input poll, so affected routes dismiss
 it with repeated EXIT clicks. See [open-work.md](docs/open-work.md) for current items.
 W7's further renderer redesign was dropped by user decision.

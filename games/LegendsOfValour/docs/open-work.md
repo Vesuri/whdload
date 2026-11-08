@@ -3,11 +3,11 @@
 ## State
 
 - The slave is rebuilt from CFou!'s v1.0 disassembly on WHDLoad 20.0's kick13 example
-  (`src/`), with a VERIFY-only input tape and instruments. Release 2.1b (beta),
-  `LegendsOfValourEnhanced-2.1b-20261107.lha`, is built from the original installer by
+  (`src/`), with a VERIFY-only input tape and instruments. Release 2.0b (beta, 08.11.2026),
+  `LegendsOfValourEnhanced-2.0b-20261108.lha`, is built from the original installer by
   `make dist` (`tools/release.py`, `docs/releasing.md`).
 - Release builds have one switch, Enhanced frame rate (`C2:B`; the installed icon sets
-  `CUSTOM2=1`, and any nonzero value, such as 2.0b's `CUSTOM2=64`, counts). It turns on
+  `CUSTOM2=1`, and any nonzero value, such as the 09.10.2026 icons' `CUSTOM2=64`, counts). It turns on
   every enhancement: W1–W6, the game timing, mouse precision and click inputs; `CUSTOM2=0`
   runs the original game. Developer/VERIFY builds keep a CUSTOM2 bit for each (0–8).
 - W1–W6 rendering patches (`docs/performance-patches.md`). Spin route: 2.5 → 3.2 fps on the
@@ -17,20 +17,24 @@
   (`docs/one-degree-turning.md`).
 - Click inputs, bit 8 (`docs/click-inputs.md`): clicks act once per press (the U-turn no
   longer flips back and forth while held); walk, turn and the compass ring still repeat.
-- Only the English AMIGA2 of the 0837 archive is enhanced. `_lov_version` recognises it by
-  its 17 hunk sizes; any other AMIGA2 runs as CFou!'s v1.0 with CUSTOM2 cleared. German and
-  French reports (05.11.2026) aborted in the W1 (German) and W2 (French) install checks
-  under 2.0b; they now start, unenhanced. Checked with a VERIFY build whose size table is
-  skewed (`-DVERIFY_FOREIGN_VERSION=1`): CUSTOM2 ends 0, every declared range stays
-  original, and the spin route plays through.
+- English (0837), German (0525) and French (1768) AMIGA2 are all enhanced by one slave
+  (`docs/versions.md`). Game offsets are `hN_OFFSET` symbols (`src/offsets.s`, generated
+  by `tools/versions.py`). The build appends the German and French words as a fixup table,
+  and `_lov_version` applies it at boot. Any other AMIGA2 runs as CFou!'s v1.0 with CUSTOM2
+  cleared. German and French reports (05.11.2026) had aborted in the W1 and W2 install
+  checks. Both now boot with every hook installed and pass the C2P, wall, sprite and ray
+  twins in all views.
 
 ## Open
 
-- **German and French enhancements:** need their data. Every patch site is a fixed offset into
-  the English AMIGA2, and no other version is available here. With a German or French
-  `data/AMIGA2` (and its `LegendsOfValour.lha`/disk source pinned in `inputs.sha256`),
-  `tools/unpack.py` decrunches it; then compare hunks with the English one, give each hook a
-  per-version offset table and add the version's sizes to `_lov_version`.
+- **German and French play testing:** install checks, signatures and the VERIFY twins pass.
+  Gameplay (timing, clicks, mouse precision) has not been played in those versions.
+  Host-side analysers read English h11 offsets, so the state comparisons in
+  `docs/simulation-timing.md` and `docs/click-inputs.md` have English results only.
+- **Second English version:** CFou!'s v1.0 supports one more English AMIGA2. It is not
+  available here and runs unenhanced. With its archive, pin it, add its sizes to
+  `_lov_hunk_sizes`, a fourth language to `tools/versions.py`, `src/offsets.s` and the
+  fixup table.
 - **Click inputs:** the U-turn, the movement hold and the options dialog are checked at
   runtime; the item, shop and conversation screens, combat and the save-name editor are not.
   Combat's attack buttons now act once per click; play feedback may want them to repeat.

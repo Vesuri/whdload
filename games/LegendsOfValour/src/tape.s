@@ -36,14 +36,14 @@ _tape_install	move.l	(_custom5,pc),d0
 		movem.l	d1-d2/a1-a2,-(a7)
 		move.l	(_h12,pc),a0
 	;check the bytes replaced: moveq #0,d0 / btst #6,$bfe001
-		cmp.l	#$70000839,($5298,a0)
+		cmp.l	#$70000839,(h12_05298,a0)
 		bne	.bad
-		cmp.l	#$000600bf,($529c,a0)
+		cmp.l	#$000600bf,(h12_0529c,a0)
 		bne	.bad
 		move.l	(_h6,pc),a0
-		cmp.l	#$bfecde40,($76c,a0)	;cmpa.l -8640(a4),sp / bcs.w
+		cmp.l	#$bfec0000+((h11_05e40-$8000)&$ffff),(h6_0076c,a0)	;cmpa.l -8640(a4),sp / bcs.w
 		bne	.bad
-		cmp.l	#$6500015e,($770,a0)
+		cmp.l	#$6500015e,(h6_00770,a0)
 		bne	.bad
 	;load the tape
 		lea	(_tapename,pc),a0
@@ -60,14 +60,14 @@ _tape_install	move.l	(_custom5,pc),d0
 		move.l	a1,(a0)
 	;h12:05298: jmp _tape_vbl
 		move.l	(_h12,pc),a0
-		move.w	#$4ef9,($5298,a0)
+		move.w	#$4ef9,(h12_05298,a0)
 		pea	(_tape_vbl,pc)
-		move.l	(a7)+,($529a,a0)
+		move.l	(a7)+,(h12_0529a,a0)
 	;h6:0076c: jmp _tape_hit
 		move.l	(_h6,pc),a0
-		move.w	#$4ef9,($76c,a0)
+		move.w	#$4ef9,(h6_0076c,a0)
 		pea	(_tape_hit,pc)
-		move.l	(a7)+,($76e,a0)
+		move.l	(a7)+,(h6_0076e,a0)
 
         lea (_tape_install,pc),a2
         adda.l #_resload-_tape_install,a2
@@ -86,7 +86,7 @@ _tape_install	move.l	(_custom5,pc),d0
 ; replaces h12:05298 (bsr from the VBL server, which saved d0-a6 around the call)
 _tape_vbl	move.l	(_tapeptr,pc),a1
 		move.l	(_h11,pc),a0
-		move.l	($5eb0,a0),d0		;the game's window
+		move.l	(h11_05eb0,a0),d0		;the game's window
 		beq	.nowin
 		move.l	d0,a0
 		move.w	(2,a1),($e,a0)		;wd_MouseX
@@ -95,7 +95,7 @@ _tape_vbl	move.l	(_tapeptr,pc),a1
 		move.l	(_h12,pc),a0
 		move.w	(6,a1),d0
 		and.w	#3,d0
-		move.w	d0,($5292,a0)
+		move.w	d0,(h12_05292,a0)
 		btst	#6,(6,a1)
 		bne	_tw_wait
 		move.w	(a1),d0
@@ -210,13 +210,13 @@ _tw_rescue
 		cmp.w	#180,(a0)
 		bhs	.reset
 		move.l	(_h11,pc),a0
-		move.l	($5eb0,a0),d0
+		move.l	(h11_05eb0,a0),d0
 		beq	.no
 		move.l	d0,a0
 		move.w	#75,($e,a0)
 		move.w	#183,($c,a0)
 		move.l	(_h12,pc),a0
-		move.w	#1,($5292,a0)
+		move.w	#1,(h12_05292,a0)
 		moveq	#1,d0
 		rts
 .reset	clr.w	(a0)
@@ -235,11 +235,11 @@ _tw_heading
         ; while paused, then resume the tape's held turn. Verification only.
         move.l (_h12,pc),a0
         move.l a0,a2
-        adda.l #$a0c3,a0
+        adda.l #h12_0a0c3,a0
         tst.b (a0)
         bne .heading_live
         move.l (_h11,pc),a0
-        move.l ($5eb0,a0),d0
+        move.l (h11_05eb0,a0),d0
         beq _tape_next
         move.l d0,a0
         move.w #75,($e,a0)
@@ -250,12 +250,12 @@ _tw_heading
         scs d0
         not.b d0
         and.w #1,d0
-        move.w d0,($5292,a2)
+        move.w d0,(h12_05292,a2)
         bra _tape_next
 .heading_live
         ENDC
         move.l (_h11,pc),a0
-		add.l	#$8c28,a0
+		add.l	#h11_08c28,a0
 		move.w	(a0),d0
 		cmp.w	(a1),d0
 		bne	_tape_next
@@ -266,13 +266,13 @@ _tape_hit	move.l	a0,-(a7)
 		lea	(_tapelist,pc),a0
 		move.l	(8,a7),(a0)
 		move.l	(a7)+,a0
-		cmpa.l	(-8640,a4),a7
+		cmpa.l	(h11_05e40-$8000,a4),a7
 		bcs	.ovf
 		move.l	(_h6,pc),-(a7)
-		add.l	#$774,(a7)
+		add.l	#h6_00774,(a7)
 		rts
 .ovf		move.l	(_h6,pc),-(a7)		;stack overflow
-		add.l	#$8d0,(a7)
+		add.l	#h6_008d0,(a7)
 		rts
 
 _tapename	dc.b	"lovtape",0

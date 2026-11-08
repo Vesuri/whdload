@@ -20,31 +20,31 @@ _w4_install
         tst.l d0
         bne .done
         move.l (_h12,pc),a0
-        cmp.l #$301d1033,($517e,a0)
+        cmp.l #$301d1033,(h12_0517e,a0)
         bne .bad
-        tst.w ($5182,a0)
+        tst.w (h12_05182,a0)
         bne .bad
         move.l a0,a4
-        adda.l #$9452,a4
+        adda.l #h12_09452,a4
         cmp.l #$301d1a33,(a4)
         bne .bad
         move.l a0,a4
-        adda.l #$9456,a4
+        adda.l #h12_09456,a4
         tst.w (a4)
         bne .bad
         move.l a0,a4
-        adda.l #$94e2,a4
+        adda.l #h12_094e2,a4
         cmp.l #$301d1a33,(a4)
         bne .bad
         move.l a0,a4
-        adda.l #$94e6,a4
+        adda.l #h12_094e6,a4
         tst.w (a4)
         bne .bad
         IFD VERIFY
         bsr _w4_verify_install
         ENDC
         lea (_w4_resume_0+2,pc),a1
-        lea ($5192,a0),a2
+        lea (h12_05192,a0),a2
         move.l a2,(a1)
         lea (_w4_entry_0,pc),a1
         IFD VERIFY
@@ -58,11 +58,11 @@ _w4_install
 .normal0
         ENDC
         ; PERF_RANGE h12:0517e 6 bit=3
-        move.w #$4ef9,($517e,a0)
-        move.l a1,($5180,a0)
+        move.w #$4ef9,(h12_0517e,a0)
+        move.l a1,(h12_05180,a0)
         lea (_w4_resume_1+2,pc),a1
         move.l a0,a2
-        adda.l #$9468,a2
+        adda.l #h12_09468,a2
         move.l a2,(a1)
         lea (_w4_entry_1,pc),a1
         IFD VERIFY
@@ -77,14 +77,14 @@ _w4_install
         ENDC
         ; PERF_RANGE h12:09452 6 bit=3
         move.l a0,a4
-        adda.l #$9452,a4
+        adda.l #h12_09452,a4
         move.w #$4ef9,(a4)
         move.l a0,a4
-        adda.l #$9454,a4
+        adda.l #h12_09454,a4
         move.l a1,(a4)
         lea (_w4_resume_2+2,pc),a1
         move.l a0,a2
-        adda.l #$94f8,a2
+        adda.l #h12_094f8,a2
         move.l a2,(a1)
         lea (_w4_entry_2,pc),a1
         IFD VERIFY
@@ -99,10 +99,10 @@ _w4_install
         ENDC
         ; PERF_RANGE h12:094e2 6 bit=3
         move.l a0,a4
-        adda.l #$94e2,a4
+        adda.l #h12_094e2,a4
         move.w #$4ef9,(a4)
         move.l a0,a4
-        adda.l #$94e4,a4
+        adda.l #h12_094e4,a4
         move.l a1,(a4)
         move.l (_resload,pc),a2
         jsr (resload_FlushCache,a2)

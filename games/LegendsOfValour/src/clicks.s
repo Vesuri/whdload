@@ -16,7 +16,7 @@
 ; (_sim_input_pointer, _sim_combat_pointer); they feed the filter instead, and combat's
 ; live read at h9:00404, which history overwrites, does not.
 
-CLICK_MAIN_LIST = $b8a6-$10000		; -18266(a4): the main panel's gadget list
+CLICK_MAIN_LIST = h11_038a6-$8000	; -18266(a4) in English: the main panel's gadget list
 
 _click_install
         movem.l d0-a6,-(sp)

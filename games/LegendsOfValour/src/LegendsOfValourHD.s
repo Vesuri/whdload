@@ -46,6 +46,16 @@ SIM_KEYBOARD_EXPERIMENT = 1
 SIM_COMBAT_EXPERIMENT = 1
         ENDC
 
+; The language of the game offsets (src/offsets.s): 0 English (0837), 1 German (0525),
+; 2 French (1768). game.sh assembles all three with LOV_PASS1 and appends their differences
+; to the English build as the fixup table that _lov_version applies (tools/fixups.py).
+        IFND LOV_LANG
+LOV_LANG = 0
+        ENDC
+LOV_EN = -(LOV_LANG=0)
+LOV_DE = -(LOV_LANG=1)
+LOV_FR = -(LOV_LANG=2)
+
 	IFND __VASM
 	INCDIR	Includes:
 	ENDC
@@ -54,6 +64,7 @@ SIM_COMBAT_EXPERIMENT = 1
 	INCLUDE	lvo/dos_lib.i
 	INCLUDE	lvo/exec_lib.i
 	INCLUDE	exec/memory.i
+	INCLUDE	offsets.s
 
 ;============================================================================
 
@@ -107,7 +118,7 @@ slv_name	dc.b	"Legends Of Valour",0
 slv_copy	dc.b	"1992 US-GOLD.",0
 slv_info	dc.b	"Reworked by Vesuri",10
 		dc.b	"based on the work of CFou!",10
-		dc.b	"Version 2.1b (07.11.2026)",0
+		dc.b	"Version 2.0b (08.11.2026)",0
 slv_config	dc.b	"C1:B:Character creation;"
 	IFD DEVELOPER
 		dc.b	"C2:X:faster chunky-to-planar:0;"
@@ -148,7 +159,7 @@ _bootdos	lea	(_saveregs,pc),a0
 	IFND DEVELOPER
 	; Release builds: CUSTOM2 is the Enhanced frame rate switch. Any value selects every
 	; enhancement (W1-W6, the 25 Hz game timing, mouse precision, click inputs), so the
-	; 2.0b icons' CUSTOM2=64 keeps them; 0 or no tooltype runs the original game.
+	; 09.10.2026 icons' CUSTOM2=64 keeps them; 0 or no tooltype runs the original game.
 	; Individual installers retain CPU selection and allocation fallback.
 		lea	(_custom2,pc),a0
 		tst.l	(a0)
@@ -327,17 +338,24 @@ _map_hunks	movem.l	d1/a1,-(a7)
 		movem.l	(a7)+,d1/a1
 		rts
 
-; Every enhancement patches fixed offsets of the English AMIGA2 of the 0837 archive. Any
-; other AMIGA2 (CFou!'s v1.0 also supports German, French and another English one) runs
-; with CUSTOM2 cleared, so no installer checks or writes it: the game runs as v1.0.
+; Every enhancement patches game offsets, written as hN_OFFSET symbols (src/offsets.s); the
+; slave is assembled for the English AMIGA2 of the 0837 archive and carries the German (0525)
+; and French (1768) values as a fixup table. _lov_version recognises the AMIGA2 by its 17
+; hunk sizes and applies the table for German or French. Any other AMIGA2 (CFou!'s v1.0 also
+; supports another English one) runs with CUSTOM2 cleared, so no installer checks or writes
+; it: the game runs as v1.0.
 ; The PowerPacker stub stores each hunk's allocation + 8 before its next-hunk link (the
 ; last hunk links to the stub's own segment, so the link does not end the list).
-_lov_version	movem.l	d0-d1/a0-a2,-(a7)
+_lov_version	movem.l	d0-d2/a0-a3,-(a7)
 		move.l	(_custom1,pc),d0
 		bne	.done			;CHARACT has no enhancements
-		lea	(_hunks,pc),a0
-		lea	(_lov_version,pc),a1	;the table is at the end (clicks_hooks.s)
-		adda.l	#_lov_hunk_sizes-_lov_version,a1
+		lea	(_lov_version,pc),a3	;the tables are at the end of the slave
+		adda.l	#_lov_hunk_sizes-_lov_version,a3
+		moveq	#0,d2			;D2 = language
+.lang		lea	(_hunks,pc),a0
+		move.w	d2,d0
+		mulu	#17*4,d0
+		lea	(a3,d0.l),a1
 		moveq	#17-1,d1
 .next		move.l	(a0)+,d0
 		beq	.other
@@ -346,10 +364,40 @@ _lov_version	movem.l	d0-d1/a0-a2,-(a7)
 		cmp.l	(a1)+,d0
 		bne	.other
 		dbf	d1,.next
+		lea	(_lov_lang,pc),a0
+		move.w	d2,(a0)
+		beq	.done
+		bsr	_lov_fixup
 		bra	.done
-.other		lea	(_custom2,pc),a0
+.other		addq.w	#1,d2
+		cmp.w	#3,d2
+		bne	.lang
+		lea	(_custom2,pc),a0
 		clr.l	(a0)
-.done		movem.l	(a7)+,d0-d1/a0-a2
+.done		movem.l	(a7)+,d0-d2/a0-a3
+		rts
+
+; D2 = 1 German, 2 French: write that language's words of the fixup table over the
+; English ones, then flush the caches.
+_lov_fixup	movem.l	d0-d1/a0-a2,-(a7)
+		lea	(_lov_fixup,pc),a0
+		adda.l	#_lov_fixups-_lov_fixup,a0
+		move.l	a0,a1
+		suba.l	(a0)+,a1		;A1 = the slave's first byte
+		move.l	(a0)+,d1		;entries
+		bra	.go
+.next		move.l	(a0)+,d0
+		cmp.w	#1,d2
+		beq	.de
+		move.w	(2,a0),(0,a1,d0.l)
+		bra	.step
+.de		move.w	(a0),(0,a1,d0.l)
+.step		addq.l	#4,a0
+.go		subq.l	#1,d1
+		bcc	.next
+		move.l	(_resload,pc),a2
+		jsr	(resload_FlushCache,a2)
+		movem.l	(a7)+,d0-d1/a0-a2
 		rts
 
 _disk1		dc.b	"LOV",0		;for Assign
@@ -377,6 +425,8 @@ _dosbase	dc.l	0
 _callregs	ds.l	11
 _callrts	dc.l	0
 _callargs	ds.b	208
+_lov_lang	dc.w	0		;0 English, 1 German, 2 French
+		CNOP	0,4
 _hunks
 _hunk0		dc.l	0
 		ds.l	5
@@ -409,8 +459,8 @@ _h12		dc.l	0
 	; Last: VERIFY builds use up the tag list's PC-relative reach before this point.
 		INCLUDE	clicks_hooks.s
 
-; _lov_version: allocation + 8 of hunks 0-16 of the English AMIGA2 (tools/unpack.py;
-; docs/profiling.md §2).
+; _lov_version: allocation + 8 of hunks 0-16 of the English, German and French AMIGA2
+; (tools/unpack.py; docs/profiling.md §2).
 		CNOP	0,4
 	IFD VERIFY_FOREIGN_VERSION
 	; VERIFY: one size off, so the English AMIGA2 runs as an unrecognised version.
@@ -419,6 +469,10 @@ _lov_hunk_sizes	dc.l	$199c+8+4,$2c2c+8,$63fc+8,$5bc+8,$b0+8,$2700+8,$8f0+8,$2d8+
 _lov_hunk_sizes	dc.l	$199c+8,$2c2c+8,$63fc+8,$5bc+8,$b0+8,$2700+8,$8f0+8,$2d8+8
 	ENDC
 		dc.l	$850+8,$660+8,$c4+8,$a4dc+8,$179d0+8,$14+8,$ec+8,$184+8,$dc+8
+		dc.l	$199c+8,$2c2c+8,$640c+8,$5bc+8,$b0+8,$2700+8,$8f0+8,$2d8+8	;German
+		dc.l	$850+8,$660+8,$c4+8,$a4e0+8,$17a4c+8,$14+8,$ec+8,$184+8,$dc+8
+		dc.l	$199c+8,$2c34+8,$640c+8,$5bc+8,$b0+8,$2700+8,$8f0+8,$2d8+8	;French
+		dc.l	$850+8,$660+8,$c4+8,$a4dc+8,$17a4c+8,$14+8,$ec+8,$184+8,$dc+8
 
 ;============================================================================
 
@@ -456,9 +510,17 @@ _timing_combat_clock_records ds.b 64*20
 	ENDC
 	ENDC
 
-; Last in the slave, so no code or data offset moves; the version and date match slv_info
-; and the release ReadMe.
-		dc.b	"$VER: LegendsOfValour.Slave 2.1b (07.11.2026)",0
-	EVEN
+; Last before the fixup table, so no code or data offset moves; the version and date match
+; slv_info and the release ReadMe.
+		dc.b	"$VER: LegendsOfValour.Slave 2.0b (08.11.2026)",0
+
+; The fixup table is after it, the very last: it is appended to the English build without
+; moving anything (game.sh, tools/fixups.py).
+		CNOP	0,4
+	IFD LOV_PASS1
+_lov_fixups	dc.l	0,0
+	ELSE
+		INCLUDE	lov_fixups.s
+	ENDC
 
 	END

@@ -4,20 +4,20 @@
 ; The original tail executes once, after comparison, with the W3 output restored.
 _w3_verify_install
         movem.l d0-a6,-(sp)
-        lea ($4c38,a0),a1
+        lea (h12_04c38,a0),a1
         lea (_w3_original,pc),a2
         moveq #15-1,d0
 .copy   move.w (a1)+,(a2)+
         dbf d0,.copy
         move.w #$4e75,(a2)
         lea (_w3_twin_continue_0+2,pc),a1
-        lea ($4c56,a0),a2
+        lea (h12_04c56,a0),a2
         move.l a2,(a1)
         lea (_w3_twin_continue_1+2,pc),a1
-        lea ($4cfa,a0),a2
+        lea (h12_04cfa,a0),a2
         move.l a2,(a1)
         lea (_w3_twin_continue_2+2,pc),a1
-        lea ($4d7e,a0),a2
+        lea (h12_04d7e,a0),a2
         move.l a2,(a1)
         lea (_w3_entry_0,pc),a1
         lea (_w3_optimized+0,pc),a2
@@ -59,7 +59,7 @@ _verify_sr_2 EQU *
         bra _w3_twin
 _w3_twin
         move.l (_h11,pc),a0
-        move.l ($5fc2,a0),a0
+        move.l (h11_05fc2,a0),a0
         move.l a5,d0
         sub.l a0,d0
         cmp.l #20000,d0

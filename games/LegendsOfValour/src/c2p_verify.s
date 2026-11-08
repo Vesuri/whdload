@@ -19,7 +19,7 @@ _c2p_twin_before
 		lea	40*92(a3),a3
 		dbf	d7,.plane
 	; Save and redirect the game's original view-origin plane pointers.
-		lea	($42,a5),a0
+		lea	(h12_00042,a5),a0
 		lea	(_c2p_saved_planes,pc),a1
 		lea	(_c2p_bitmap,pc),a2
 		adda.l	#_c2p_scratch-_c2p_bitmap,a2
@@ -33,7 +33,7 @@ _c2p_twin_before
 		lea	40*92(a2),a2
 		dbf	d7,.redirect
 		bsr	_c2p_original
-		lea	($42,a5),a0
+		lea	(h12_00042,a5),a0
 		lea	(_c2p_saved_planes,pc),a1
 		moveq	#4-1,d7
 .restore	move.l	(a1)+,(a0)+
@@ -64,7 +64,7 @@ _c2p_twin_after
 	; Record actual geometry and successful counts for each observed view size.
 		lea	(_c2p_geometries,pc),a0
 		lea	(_c2p_counts,pc),a1
-		move.w	($2e,a5),d0
+		move.w	(h12_0002e,a5),d0
 		moveq	#3-1,d7
 .find		tst.w	(a0)
 		beq	.record
@@ -75,9 +75,9 @@ _c2p_twin_after
 		dbf	d7,.find
 		bra	_c2p_geometry_bad
 .record		move.w	d0,(a0)
-		move.w	($30,a5),(2,a0)
-		move.w	($3e,a5),(4,a0)
-		move.w	($40,a5),(6,a0)
+		move.w	(h12_00030,a5),(2,a0)
+		move.w	(h12_0003e,a5),(4,a0)
+		move.w	(h12_00040,a5),(6,a0)
 		addq.l	#1,(a1)
 		lea	(_c2p_tests,pc),a0
 		addq.l	#1,(a0)
@@ -89,11 +89,11 @@ _c2p_test_done	nop
 ; remain unchanged; the input bytes are restored after the successful comparison.
 _c2p_flip_low	movem.l	d0-d2/a0-a1,-(sp)
 		move.l	(_h11,pc),a0
-		move.l	($5fc2,a0),a0
-		move.w	($30,a5),d2
+		move.l	(h11_05fc2,a0),a0
+		move.w	(h12_00030,a5),d2
 		subq.w	#1,d2
 .row		move.l	a0,a1
-		move.w	($2e,a5),d1
+		move.w	(h12_0002e,a5),d1
 		subq.w	#1,d1
 .byte		eor.b	#$0f,(a1)+
 		dbf	d1,.byte

@@ -13,13 +13,13 @@ _timing_projectile_launch
         IFD TIMING_THROW
         ; Select a known native projectile item for this physics-only fixture.
         ; Restore the previous equipped item after the native throw operation.
-        move.w ($334-32768,a4),-(sp)
-        move.w #55,($334-32768,a4)
-        lea ($195c,a0),a0
+        move.w (h11_00334-$8000,a4),-(sp)
+        move.w #55,(h11_00334-$8000,a4)
+        lea (h5_0195c,a0),a0
         jsr (a0)
-        move.w (sp)+,($334-32768,a4)
+        move.w (sp)+,(h11_00334-$8000,a4)
         ELSE
-        lea ($19aa,a0),a0
+        lea (h5_019aa,a0),a0
         move.l #10,-(sp)
         jsr (a0)
         addq.l #4,sp

@@ -4,24 +4,24 @@
 _timing_study_install
         movem.l d0-a6,-(sp)
         move.l (_h12,pc),a0
-        cmp.l #$48e73f3e,($27bc,a0)
+        cmp.l #$48e73f3e,(h12_027bc,a0)
         bne .bad
-        cmp.l #$6100fc14,($27c0,a0)
+        cmp.l #$6100fc14,(h12_027c0,a0)
         bne .bad
-        cmp.l #$303900df,($643e,a0)
+        cmp.l #$303900df,(h12_0643e,a0)
         bne .bad
-        cmp.w #$f00a,($6442,a0)
+        cmp.w #$f00a,(h12_06442,a0)
         bne .bad
-        lea ($6444,a0),a1
+        lea (h12_06444,a0),a1
         lea (_timing_study_mouse_continue,pc),a2
         move.l a1,(a2)
-        move.w #$4ef9,($643e,a0)
+        move.w #$4ef9,(h12_0643e,a0)
         lea (_timing_study_mouse,pc),a1
-        move.l a1,($6440,a0)
-        move.w #$4ef9,($27bc,a0)
+        move.l a1,(h12_06440,a0)
+        move.w #$4ef9,(h12_027bc,a0)
         lea (_timing_study_render,pc),a1
-        move.l a1,($27be,a0)
-        move.w #$4e71,($27c2,a0)
+        move.l a1,(h12_027be,a0)
+        move.w #$4e71,(h12_027c2,a0)
         bsr _timing_combat_install
         move.l (_resload,pc),a2
         jsr (resload_FlushCache,a2)
@@ -50,8 +50,8 @@ _verify_sr_17 EQU *
         beq .restore
 .delay
         move.l (_h11,pc),a0
-        move.w ($602e,a0),d1
-.wait   move.w ($602e,a0),d0
+        move.w (h11_0602e,a0),d1
+.wait   move.w (h11_0602e,a0),d0
         sub.w d1,d0
         cmp.w #8,d0
         bcs .wait
@@ -63,11 +63,11 @@ _verify_sr_17 EQU *
         movem.l d2-d7/a2-a6,-(sp)
         pea .prepared(pc)
         move.l (_h12,pc),-(sp)
-        add.l #$23d6,(sp)
+        add.l #h12_023d6,(sp)
         rts
 .prepared
         move.l (_h12,pc),-(sp)
-        add.l #$27c4,(sp)
+        add.l #h12_027c4,(sp)
         rts
 _timing_study_bad dc.b "TIMING study: unexpected renderer entry",0
         EVEN
@@ -82,11 +82,11 @@ _timing_study_wait_ready
         move.w (_timing_study_pending,pc),d0
         beq .done
         move.l (_h12,pc),a0
-        adda.l #$a0c3,a0
+        adda.l #h12_0a0c3,a0
         tst.b (a0)
         bne .ready
         move.l (_h11,pc),a0
-        move.l ($5eb0,a0),d0
+        move.l (h11_05eb0,a0),d0
         beq .done
         move.l d0,a0
         move.w #75,($e,a0)
@@ -98,7 +98,7 @@ _timing_study_wait_ready
         not.b d0
         and.w #1,d0
         move.l (_h12,pc),a0
-        move.w d0,($5292,a0)
+        move.w d0,(h12_05292,a0)
 .done   rts
 .ready  lea (_timing_study_pending,pc),a0
         clr.w (a0)
@@ -110,7 +110,7 @@ _timing_study_wait_ready
         btst #12,d0
         beq _timing_study_ready
         move.l (_h11,pc),a0
-        move.w #$fff0,($4d8,a0)
+        move.w #$fff0,(h11_004d8,a0)
 _timing_study_ready
         nop
         rts
@@ -166,14 +166,14 @@ _timing_study_input
         ; The deliberate clock jump can display a click-to-dismiss message.
         ; Use native input only while the original game pause gate is closed.
         move.l (_h12,pc),a0
-        adda.l #$a0c3,a0
+        adda.l #h12_0a0c3,a0
         tst.b (a0)
         beq .modal
 .pulse_option
         btst #9,d0
         beq .done
         move.l (_h11,pc),a0
-        move.l ($5eb0,a0),d0
+        move.l (h11_05eb0,a0),d0
         beq .done
         move.l d0,a0
         move.w #143,($e,a0)
@@ -198,10 +198,10 @@ _timing_study_input
         moveq #0,d0
 .buttons
         move.l (_h12,pc),a0
-        move.w d0,($5292,a0)
+        move.w d0,(h12_05292,a0)
 .done   rts
 .modal  move.l (_h11,pc),a0
-        move.l ($5eb0,a0),d0
+        move.l (h11_05eb0,a0),d0
         beq .done
         move.l d0,a0
         move.w #75,($e,a0)
@@ -213,7 +213,7 @@ _timing_study_input
         scs d0
         and.w #1,d0
         move.l (_h12,pc),a0
-        move.w d0,($5292,a0)
+        move.w d0,(h12_05292,a0)
         rts
         CNOP 0,4
 _timing_study_input_fields dc.l 0
@@ -322,8 +322,8 @@ _timing_study_stall
         bne .done
         move.w #1,(a0)
         move.l (_h11,pc),a0
-        move.l ($602c,a0),d1
-.wait   move.l ($602c,a0),d0
+        move.l (h11_0602c,a0),d1
+.wait   move.l (h11_0602c,a0),d0
         sub.l d1,d0
         cmp.l #600,d0
         bcs .wait

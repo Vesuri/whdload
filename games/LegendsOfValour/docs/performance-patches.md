@@ -11,9 +11,10 @@
   after the PowerPacker stub has loaded the 17 hunks. Hunk N is `_hunks[N]` (filled from the
   segment chain); patch with `_hunks[N] + offset`, checking the original bytes first and
   aborting with `TDREASON_FAILMSG` on mismatch. Flush caches after writing. Skip all patches in
-  character-creation mode (CUSTOM1). `_lov_version` clears CUSTOM2 before any installer runs
-  unless the 17 hunk sizes are those of the English AMIGA2, so other versions (German, French)
-  run as CFou!'s v1.0 instead of failing a check.
+  character-creation mode (CUSTOM1). Write every game offset as an `hN_OFFSET` symbol
+  (`docs/versions.md`): `_lov_version` recognises the English, German or French AMIGA2,
+  applies the fixup table for German and French, and clears CUSTOM2 for any other version,
+  which runs as CFou!'s v1.0 instead of failing a check.
 - Hooks replace **complete instructions** only. Before choosing a range, check that no
   relocation (`tools/xref.py`) or branch targets its interior.
 - Each patch has a CUSTOM2 bit. Release builds map their single switch, Enhanced frame rate

@@ -14,16 +14,16 @@ _timing_keys_install
         IFD TIMING_KEYS_TEXT
         ; Observe the native save-panel console poll; preserve its real caller.
         move.l (_hunks+8*4,pc),a0
-        cmp.w #$4ef9,($800,a0)
+        cmp.w #$4ef9,(h8_00800,a0)
         bne .bad
         move.l (_hunks+4,pc),a1
-        lea ($1eb6,a1),a1
-        cmp.l ($802,a0),a1
+        lea (h1_01eb6,a1),a1
+        cmp.l (h8_00802,a0),a1
         bne .bad
         lea (_timing_keys_text_original,pc),a2
         move.l a1,(a2)
         lea (_timing_keys_text_poll,pc),a1
-        move.l a1,($802,a0)
+        move.l a1,(h8_00802,a0)
         ENDC
         move.l 4.w,a6
         move.l #TK_BYTES,d0
@@ -122,7 +122,7 @@ _timing_keys_worker
         move.l (_timing_keys_text_firstfield,pc),d2
         beq .wait
         move.l (_h11,pc),a0
-        move.l ($602c,a0),d0
+        move.l (h11_0602c,a0),d0
         sub.l d2,d0
         bra .due
         ENDC
@@ -132,7 +132,7 @@ _timing_keys_worker
         move.l (_timing_combat_firstfield,pc),d2
         beq .wait
         move.l (_h11,pc),a0
-        move.l ($602c,a0),d0
+        move.l (h11_0602c,a0),d0
         sub.l d2,d0
         bra .due
 .ordinary_time
@@ -243,7 +243,7 @@ _timing_keys_blocking
         bne .done
         move.w #1,(a0)
         move.l (_hunks+4,pc),a0
-        lea ($1e86,a0),a0
+        lea (h1_01e86,a0),a0
         jsr (a0)
         lea (_timing_keys_blocked_byte,pc),a0
         move.w d0,(a0)
@@ -272,7 +272,7 @@ _timing_keys_exit
         cmp.l #120,d0
         bcs .done
         move.l (_h11,pc),a0
-        move.b #1,($6008,a0)
+        move.b #1,(h11_06008,a0)
 .done   movem.l (sp)+,d0/a0
         rts
 
@@ -287,7 +287,7 @@ _timing_keys_text_poll
         tst.l (a0)
         bne .done
         move.l (_h11,pc),a0
-        move.l ($602c,a0),d0
+        move.l (h11_0602c,a0),d0
         lea (_timing_keys_text_firstfield,pc),a0
         move.l d0,(a0)
 .done   movem.l (sp)+,d0/a0

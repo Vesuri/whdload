@@ -29,43 +29,43 @@ _w5_install
         ENDC
         move.l (_h12,pc),a0
         bsr _w5_check_liveness
-        cmp.l #$2e3c0001,($2998,a0)
+        cmp.l #$2e3c0001,(h12_02998,a0)
         bne .bad
-        cmp.l #$00008ec2,($299c,a0)
+        cmp.l #$00008ec2,(h12_0299c,a0)
         bne .bad
-        cmp.l #$2e3c0001,($2de4,a0)
+        cmp.l #$2e3c0001,(h12_02de4,a0)
         bne .bad
-        cmp.l #$00008ec3,($2de8,a0)
+        cmp.l #$00008ec3,(h12_02de8,a0)
         bne .bad
-        cmp.l #$2e3c0001,($3236,a0)
+        cmp.l #$2e3c0001,(h12_03236,a0)
         bne .bad
-        cmp.l #$00008ec3,($323a,a0)
+        cmp.l #$00008ec3,(h12_0323a,a0)
         bne .bad
-        cmp.l #$2e3c0001,($3676,a0)
+        cmp.l #$2e3c0001,(h12_03676,a0)
         bne .bad
-        cmp.l #$00008ec2,($367a,a0)
+        cmp.l #$00008ec2,(h12_0367a,a0)
         bne .bad
-        cmp.l #$2e3c0001,($3ab4,a0)
+        cmp.l #$2e3c0001,(h12_03ab4,a0)
         bne .bad
-        cmp.l #$00008ec2,($3ab8,a0)
+        cmp.l #$00008ec2,(h12_03ab8,a0)
         bne .bad
-        cmp.l #$2e3c0001,($3f0c,a0)
+        cmp.l #$2e3c0001,(h12_03f0c,a0)
         bne .bad
-        cmp.l #$00008ec3,($3f10,a0)
+        cmp.l #$00008ec3,(h12_03f10,a0)
         bne .bad
-        cmp.l #$2e3c0001,($435e,a0)
+        cmp.l #$2e3c0001,(h12_0435e,a0)
         bne .bad
-        cmp.l #$00008ec3,($4362,a0)
+        cmp.l #$00008ec3,(h12_04362,a0)
         bne .bad
-        cmp.l #$2e3c0001,($479c,a0)
+        cmp.l #$2e3c0001,(h12_0479c,a0)
         bne .bad
-        cmp.l #$00008ec2,($47a0,a0)
+        cmp.l #$00008ec2,(h12_047a0,a0)
         bne .bad
         lea (_w5_resume_0+2,pc),a1
-        lea ($29aa,a0),a2
+        lea (h12_029aa,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:02998 6 bit=4
-        move.w #$4ef9,($2998,a0)
+        move.w #$4ef9,(h12_02998,a0)
         lea (_w5_entry_0,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -74,12 +74,12 @@ _w5_install
         lea (_w5_twin_entry_0,pc),a1
 .normal0
         ENDC
-        move.l a1,($299a,a0)
+        move.l a1,(h12_0299a,a0)
         lea (_w5_resume_1+2,pc),a1
-        lea ($2df6,a0),a2
+        lea (h12_02df6,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:02de4 6 bit=4
-        move.w #$4ef9,($2de4,a0)
+        move.w #$4ef9,(h12_02de4,a0)
         lea (_w5_entry_1,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -88,12 +88,12 @@ _w5_install
         lea (_w5_twin_entry_1,pc),a1
 .normal1
         ENDC
-        move.l a1,($2de6,a0)
+        move.l a1,(h12_02de6,a0)
         lea (_w5_resume_2+2,pc),a1
-        lea ($3248,a0),a2
+        lea (h12_03248,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:03236 6 bit=4
-        move.w #$4ef9,($3236,a0)
+        move.w #$4ef9,(h12_03236,a0)
         lea (_w5_entry_2,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -102,12 +102,12 @@ _w5_install
         lea (_w5_twin_entry_2,pc),a1
 .normal2
         ENDC
-        move.l a1,($3238,a0)
+        move.l a1,(h12_03238,a0)
         lea (_w5_resume_3+2,pc),a1
-        lea ($3688,a0),a2
+        lea (h12_03688,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:03676 6 bit=4
-        move.w #$4ef9,($3676,a0)
+        move.w #$4ef9,(h12_03676,a0)
         lea (_w5_entry_3,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -116,12 +116,12 @@ _w5_install
         lea (_w5_twin_entry_3,pc),a1
 .normal3
         ENDC
-        move.l a1,($3678,a0)
+        move.l a1,(h12_03678,a0)
         lea (_w5_resume_4+2,pc),a1
-        lea ($3ac6,a0),a2
+        lea (h12_03ac6,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:03ab4 6 bit=4
-        move.w #$4ef9,($3ab4,a0)
+        move.w #$4ef9,(h12_03ab4,a0)
         lea (_w5_entry_4,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -130,12 +130,12 @@ _w5_install
         lea (_w5_twin_entry_4,pc),a1
 .normal4
         ENDC
-        move.l a1,($3ab6,a0)
+        move.l a1,(h12_03ab6,a0)
         lea (_w5_resume_5+2,pc),a1
-        lea ($3f1e,a0),a2
+        lea (h12_03f1e,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:03f0c 6 bit=4
-        move.w #$4ef9,($3f0c,a0)
+        move.w #$4ef9,(h12_03f0c,a0)
         lea (_w5_entry_5,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -144,12 +144,12 @@ _w5_install
         lea (_w5_twin_entry_5,pc),a1
 .normal5
         ENDC
-        move.l a1,($3f0e,a0)
+        move.l a1,(h12_03f0e,a0)
         lea (_w5_resume_6+2,pc),a1
-        lea ($4370,a0),a2
+        lea (h12_04370,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:0435e 6 bit=4
-        move.w #$4ef9,($435e,a0)
+        move.w #$4ef9,(h12_0435e,a0)
         lea (_w5_entry_6,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -158,12 +158,12 @@ _w5_install
         lea (_w5_twin_entry_6,pc),a1
 .normal6
         ENDC
-        move.l a1,($4360,a0)
+        move.l a1,(h12_04360,a0)
         lea (_w5_resume_7+2,pc),a1
-        lea ($47ae,a0),a2
+        lea (h12_047ae,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:0479c 6 bit=4
-        move.w #$4ef9,($479c,a0)
+        move.w #$4ef9,(h12_0479c,a0)
         lea (_w5_entry_7,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -172,7 +172,7 @@ _w5_install
         lea (_w5_twin_entry_7,pc),a1
 .normal7
         ENDC
-        move.l a1,($479e,a0)
+        move.l a1,(h12_0479e,a0)
         move.l (_resload,pc),a2
         jsr (resload_FlushCache,a2)
 .done   movem.l (sp)+,d0-a6
@@ -227,7 +227,7 @@ _w5_check_liveness
         move.l (sp)+,a3
         move.l a3,a4            ; PC-relative displacement word
         adda.w (a3)+,a4
-        lea (8,a0),a2
+        lea (h12_00008,a0),a2   ; coordinate D0 (D1 is 2 bytes before)
         tst.w d3
         beq .source
         subq.l #2,a2
@@ -277,7 +277,7 @@ _w5_bad_tail
         bra _c2p_abort
 _w5_tail_badmsg dc.b "W5: unexpected ray continuation liveness",0
         EVEN
-_w5_tail_offsets dc.w $29aa,$2df6,$3248,$3688,$3ac6,$3f1e,$4370,$47ae
+_w5_tail_offsets dc.w h12_029aa,h12_02df6,h12_03248,h12_03688,h12_03ac6,h12_03f1e,h12_04370,h12_047ae
 
 _w5_entry_0
         exg d2,d3

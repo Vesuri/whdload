@@ -15,7 +15,7 @@ _verify_sr_10 EQU *
 _verify_sr_11 EQU *
         move.w sr,-(sp)
         move.l (_h11,pc),a0
-        move.l ($5fc2,a0),a0
+        move.l (h11_05fc2,a0),a0
         lea (_c2p_function,pc),a1
         adda.l #_c2p_chunky-_c2p_function,a1
         move.w #5000-1,d0
@@ -42,7 +42,7 @@ _verify_sr_12 EQU *
         bne .different
         dbf d0,.reg
         move.l (_h11,pc),a0
-        move.l ($5fc2,a0),a0
+        move.l (h11_05fc2,a0),a0
         lea (_c2p_function,pc),a1
         adda.l #_c2p_chunky-_c2p_function,a1
         move.w #5000-1,d0
@@ -52,7 +52,7 @@ _verify_sr_12 EQU *
         lea (_w6_tests,pc),a0
         addq.l #1,(a0)
         move.l (_h12,pc),a0
-        move.w ($2e,a0),d0
+        move.w (h12_0002e,a0),d0
         lea (_w6_counts,pc),a0
         cmp.w #192,d0
         beq .count

@@ -22,26 +22,26 @@ _w3_install
         tst.l d0
         bne .done
         move.l (_h12,pc),a0
-        cmp.l #$b8435cca,($4c50,a0)
+        cmp.l #$b8435cca,(h12_04c50,a0)
         bne .bad
-        cmp.w #$ffe4,($4c54,a0)
+        cmp.w #$ffe4,(h12_04c54,a0)
         bne .bad
-        cmp.l #$b8435cca,($4cf4,a0)
+        cmp.l #$b8435cca,(h12_04cf4,a0)
         bne .bad
-        cmp.w #$ffe4,($4cf8,a0)
+        cmp.w #$ffe4,(h12_04cf8,a0)
         bne .bad
-        cmp.l #$b8435cca,($4d78,a0)
+        cmp.l #$b8435cca,(h12_04d78,a0)
         bne .bad
-        cmp.w #$ffe4,($4d7c,a0)
+        cmp.w #$ffe4,(h12_04d7c,a0)
         bne .bad
         IFD VERIFY
         bsr _w3_verify_install
         ENDC
         lea (_w3_resume_0+2,pc),a1
-        lea ($4c56,a0),a2
+        lea (h12_04c56,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:04c50 6 bit=2
-        move.w #$4ef9,($4c50,a0)
+        move.w #$4ef9,(h12_04c50,a0)
         lea (_w3_entry_0,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -53,12 +53,12 @@ _w3_install
         lea (_w3_twin_0,pc),a1
 .normal0
         ENDC
-        move.l a1,($4c52,a0)
+        move.l a1,(h12_04c52,a0)
         lea (_w3_resume_1+2,pc),a1
-        lea ($4cfa,a0),a2
+        lea (h12_04cfa,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:04cf4 6 bit=2
-        move.w #$4ef9,($4cf4,a0)
+        move.w #$4ef9,(h12_04cf4,a0)
         lea (_w3_entry_1,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -70,12 +70,12 @@ _w3_install
         lea (_w3_twin_1,pc),a1
 .normal1
         ENDC
-        move.l a1,($4cf6,a0)
+        move.l a1,(h12_04cf6,a0)
         lea (_w3_resume_2+2,pc),a1
-        lea ($4d7e,a0),a2
+        lea (h12_04d7e,a0),a2
         move.l a2,(a1)
         ; PERF_RANGE h12:04d78 6 bit=2
-        move.w #$4ef9,($4d78,a0)
+        move.w #$4ef9,(h12_04d78,a0)
         lea (_w3_entry_2,pc),a1
         IFD VERIFY
         move.l (_custom5,pc),d0
@@ -87,7 +87,7 @@ _w3_install
         lea (_w3_twin_2,pc),a1
 .normal2
         ENDC
-        move.l a1,($4d7a,a0)
+        move.l a1,(h12_04d7a,a0)
         move.l (_resload,pc),a2
         jsr (resload_FlushCache,a2)
 .done   movem.l (sp)+,d0-a6
