@@ -1,0 +1,448 @@
+diff --git a/src/barto_gdbserver.cpp b/src/barto_gdbserver.cpp
+index 0f3249a9..e6c2b4aa 100644
+--- a/src/barto_gdbserver.cpp
++++ b/src/barto_gdbserver.cpp
+@@ -1,4 +1,7 @@
+ #include "sysconfig.h"
++// AITD-PROF: newcpu.cpp cycle profiler, driven by "monitor aprof start|stop <file>".
++bool aprof_start(void);
++bool aprof_stop(const char *path);
+ #ifdef _WIN32
+ #include <winsock2.h>
+ #include <windows.h>
+@@ -16,12 +19,14 @@
+ #include <thread>
+ #include <vector>
+ #include <array>
++#include <map>
+ 
+ #include "options.h"
+ #include "memory.h"
+ #include "newcpu.h"
+ #include "debug.h"
+ #include "inputdevice.h"
++#include "keybuf.h"
+ #include "uae.h"
+ #include "debugmem.h"
+ #include "custom.h"
+@@ -31,6 +36,9 @@
+ #include "fsemu-log.h"
+ #include "fsemu-action.h"
+ #include "fsemu-video.h"
++#include "fsemu-control.h"
++#include "fsemu-frame.h"
++extern "C" void fsemu_control_set_warp_internal(bool);
+ #include "fs/conf.h"
+ 
+ #define OPTION_REMOTE_DEBUGGER_START_TIMER "remote_debugger"
+@@ -246,6 +254,8 @@ namespace barto_gdbserver {
+ 	std::string profile_outname;
+ 	int profile_num_frames{};
+ 	int profile_frame_count{};
++ bool survey_mode=false;
++ bool survey_cpu=true;
+ 	std::unique_ptr<cpu_profiler_unwind[]> profile_unwind{};
+ 
+ 	enum class state {
+@@ -620,6 +630,14 @@ namespace barto_gdbserver {
+ 								} else if(request.substr(0, strlen("qRcmd,")) == "qRcmd,") {
+ 									// "monitor" command. used for profiling
+ 									auto cmd = from_hex(request.substr(strlen("qRcmd,")));
++                                    if(cmd.substr(0,7)=="survey ") {
++                                      survey_mode=true; survey_cpu=true; cmd="profile "+cmd.substr(7);
++                                      baseText=0; sizeText=0x7fffffff;
++                                    } else if(cmd.substr(0,7)=="census ") {
++                                      survey_mode=true; survey_cpu=false; cmd="profile "+cmd.substr(7);
++                                      baseText=0; sizeText=0x7fffffff;
++                                    } else if(cmd.substr(0,8)=="profile ") { survey_mode=false; baseText=0;sizeText=0x7fffffff; }
++
+ 									barto_log("GDBSERVER:   monitor %s\n", cmd.c_str());
+ 									// syntax: monitor profile <num_frames> <unwind_file> <out_file>
+ 									if(cmd.substr(0, strlen("profile")) == "profile") {
+@@ -633,7 +651,7 @@ namespace barto_gdbserver {
+ 											profile_num_frames = profile_num_frames * 10 + s[0] - '0';
+ 											s = s.substr(1);
+ 										}
+-										profile_num_frames = max(1, min(100, profile_num_frames));
++										profile_num_frames = max(1, min(survey_mode ? 2000 : 100, profile_num_frames));
+ 										s = s.substr(1); // skip space
+ 
+ 										// get profile_unwindname
+@@ -686,6 +704,32 @@ namespace barto_gdbserver {
+ 											deactivate_debugger();
+ 											return; // response is sent when profile is finished (vsync)
+ 										}
++									// FF1 diagnostic: paused monitor control; no game memory changes.
++                                    } else if(cmd == "warp 0" || cmd == "warp 1") {
++                                        fsemu_action_post_from_main(cmd.back() == '1' ? FSEMU_ACTION_WARP_ENABLE : FSEMU_ACTION_WARP_DISABLE);
++                                        response += "OK";
++                                    } else if(cmd == "blits 0" || cmd == "blits 1") {
++                                      currprefs.immediate_blits = changed_prefs.immediate_blits = cmd == "blits 1";
++                                      response += "OK";
++                                    } else if(cmd == "irq-state") {
++                                        response += to_hex(std::to_string(intena));
++                                    } else if(cmd == "warp-status") {
++                                        response += to_hex(std::string("warp=") + (fsemu_frame_warping() ? "1\n" : "0\n"));
++                                     } else if(cmd.substr(0, 6) == "mouse ") {
++                                        int dx=0, dy=0;
++                                        if(sscanf(cmd.c_str()+6, "%d %d", &dx, &dy) == 2 && abs(dx)<=127 && abs(dy)<=127) {
++                                            inputdevice_uaelib("MOUSE1_HORIZ", dx, 0, false);
++                                            inputdevice_uaelib("MOUSE1_VERT", dy, 0, false);
++                                            response += "OK";
++                                        } else response += "E04";
++                                    } else if(cmd.substr(0, 6) == "input ") {
++                                        auto sep = cmd.find(' ', 6);
++                                        keybuf_allow_explicit_release();
++                                        response += sep != std::string::npos && inputdevice_uaelib(cmd.substr(6, sep-6).c_str(), cmd.substr(sep+1).c_str()) ? "OK" : "E04";
++                                    } else if(cmd == "aprof start") {
++										response += aprof_start() ? "OK" : "E03";
++									} else if(cmd.substr(0, strlen("aprof stop ")) == "aprof stop ") {
++										response += aprof_stop(cmd.substr(strlen("aprof stop ")).c_str()) ? "OK" : "E02";
+ 									} else if(cmd == "reset" && debugging_trigger) {
+ 										savestate_quick(1, 0); // restore state saved at process entry
+ 										barto_debug_resources_count = 0;
+@@ -991,7 +1035,10 @@ start_profile:
+ 					activate_debugger();
+ 					return;
+ 				}
+-				int section_count = (int)sections.size();
++				if(survey_mode) {
++                  fprintf(profile_outfile,"{\"meta\":true,\"baseclock\":%d,\"cpucycleunit\":%d,\"vblank_hz\":%.9g,\"cpu_model\":%d,\"cpu_frequency\":%d,\"cpu_multiplier\":%d,\"cycle_exact\":%d,\"mmu\":%d,\"cacr\":%u,\"immediate_blits\":%d,\"chip_bytes\":%u,\"slow_bytes\":%u}\n",baseclock,cpucycleunit,vblank_hz,currprefs.cpu_model,currprefs.cpu_frequency,currprefs.cpu_clock_multiplier,currprefs.cpu_cycle_exact,currprefs.mmu_model,regs.cacr,currprefs.immediate_blits,chipmem_bank.reserved_size,bogomem_bank.reserved_size);
++                } else {
++                int section_count = (int)sections.size();
+ 				fwrite(&profile_num_frames, sizeof(int), 1, profile_outfile);
+ 				fwrite(&section_count, sizeof(int), 1, profile_outfile);
+ 				fwrite(sections.data(), sizeof(uint32_t), section_count, profile_outfile);
+@@ -1038,6 +1085,7 @@ start_profile:
+ 				// CPU information
+ 				fwrite(&baseclock, sizeof(int), 1, profile_outfile);
+ 				fwrite(&cpucycleunit, sizeof(int), 1, profile_outfile);
++                }
+ 			}
+ 
+ 			// store custom registers
+@@ -1051,7 +1099,7 @@ start_profile:
+ 			}
+ 
+ 			// start profiler
+-			start_cpu_profiler(baseText, baseText + sizeText, profile_unwind.get());
++			if(!survey_mode || survey_cpu) start_cpu_profiler(baseText, baseText + sizeText, profile_unwind.get());
+ 			debug_dma = 1;
+ 			profile_start_cycles = static_cast<uae_u32>(get_cycles() / cpucycleunit);
+ 			//barto_log("GDBSERVER: Start CPU Profiler @ %u cycles\n", get_cycles() / cpucycleunit);
+@@ -1064,6 +1112,49 @@ start_profile:
+ 			uae_u32 profile_end_cycles = static_cast<uae_u32>(get_cycles() / cpucycleunit);
+ 			//barto_log("GDBSERVER: Stop CPU Profiler @ %u cycles => %u cycles\n", profile_end_cycles, profile_end_cycles - profile_start_cycles);
+ 
++            if(survey_mode) {
++                unsigned planes[3]={}; unsigned counts[32]={};
++                auto dma=get_dma_records();
++                for(int y=0;y<313;y++) for(int x=0;x<227;x++) {
++                  auto &v=dma[y*256+x];
++                  if(v.type>=0 && v.type<32) counts[v.type]++;
++                  if(v.type==6 && v.reg>=0x110 && v.reg<=0x114 && !(v.reg&1)) {
++                    int i=(v.reg-0x110)/2; if(!planes[i]) planes[i]=v.addr;
++                  }
++                }
++                fprintf(profile_outfile,"{\"field\":%d,\"cycles\":%u,\"cacr\":%u,\"planes\":[%u,%u,%u],\"dma\":[",profile_frame_count-1,profile_end_cycles-profile_start_cycles,regs.cacr,planes[0],planes[1],planes[2]);
++                for(int i=0;i<32;i++) fprintf(profile_outfile,"%s%u",i?",":"",counts[i]);
++                fprintf(profile_outfile,"],\"pcs\":[");
++                std::map<uae_u32,std::pair<unsigned long long,unsigned>> costs;
++                auto words=get_cpu_profiler_output(); int n=survey_cpu?get_cpu_profiler_output_count():0;
++                unsigned long long total=0;
++                std::vector<std::array<unsigned long long,3>> marks;
++                auto timing=get_word_debug(0x6a304)==0x4eb9 ? get_long_debug(0x6a306) : 0;
++                for(int at=0;at<n;) {
++                  uae_u32 pc=0xfffffffe, v;
++                  do {v=words[at++];if(v<0xffff0000 && pc==0xfffffffe)pc=v;} while(v<0xffff0000 && at<n);
++                  unsigned cost=0xffffffff-v;
++                  // Preserve context in the key: supervisor stack lies at top of base memory.
++                  if(at+17>n) break;
++                  auto sp=words[at+15]; at+=17;
++                  if(pc==0x2a130 || pc==0x22986 || pc==0x24ba2 || pc==0x24c2e || pc==0x24c88 || pc==0x24d1e || pc==0x24dcc || pc==0x32db4 || pc==0x32e18 || pc==0x32e72 || pc==0x64ed8 || pc==0x654ec || pc==0x6571a || pc==0x65f34 || pc==0x65f4e || pc==0x66524 || pc==0x665cc || pc==0x6abcc || pc==0x6ac1c || pc==0x6ad4c || pc==0x6ad9a || pc==0x6b05a || pc==0x6b088 || pc==0x6b102 || pc==0x6baa6 || pc==0x6bb3c || pc==0x6c4fa || pc==0x6c51c || pc==0x67120 || pc==0x65606 || pc==0x654e6 || pc==0x654ec || pc==0x654f6 || pc==0x654fc || pc==0x65728 || pc==0x65734 || pc==0x6578a || pc==0x65790 || pc==0x65174 || pc==0x65f40 || pc==0x6ac4a || pc==timing || pc==0x6a30a)
++                    if(pc!=0x65728 || marks.empty() || marks.back()[0]!=pc) marks.push_back({pc,total,sp});
++                  if(pc<0x1000000 && sp>=0x70000 && sp<0x80000) pc|=0x1000000;
++                  auto &c=costs[pc]; c.first+=cost;c.second++;total+=cost;
++                }
++                bool comma=false;
++                for(auto &e:costs) {fprintf(profile_outfile,"%s[%u,%llu,%u]",comma?",":"",e.first,e.second.first,e.second.second);comma=true;}
++                fprintf(profile_outfile,"],\"recorded_cycles\":%llu,\"events\":[",total);
++                comma=false;
++                for(auto &e:marks) {fprintf(profile_outfile,"%s[%llu,%llu,%llu]",comma?",":"",e[0],e[1],e[2]);comma=true;}
++                fprintf(profile_outfile,"]}\n");
++                free(profile_custom_regs);profile_custom_regs=nullptr;
++                free(profile_custom_agacolors);profile_custom_agacolors=nullptr;
++                if(profile_frame_count==profile_num_frames) {
++                  fclose(profile_outfile);send_response("$OK");debugger_state=state::debugging;activate_debugger();
++                } else {debugger_state=state::profile;goto start_profile;}
++                return;
++            }
+ 			// process dma records
+ 			static constexpr int NR_DMA_REC_HPOS_IN = 256, NR_DMA_REC_VPOS_IN = 1000;
+ 			static constexpr int NR_DMA_REC_HPOS_OUT = 227, NR_DMA_REC_VPOS_OUT = 313;
+diff --git a/src/custom.cpp b/src/custom.cpp
+index fea994a4..ba04b9db 100644
+--- a/src/custom.cpp
++++ b/src/custom.cpp
+@@ -15977,8 +15977,18 @@ void wait_cpu_cycle_write(uaecptr addr, int mode, uae_u32 v)
+ }
+ 
+ 
++// AITD-PROF: time every CE020/030 chip-bus access.
++extern bool aprof_on;
++extern evt_t aprof_chip_acc;
++extern uae_u32 aprof_chip_cnt;
++struct aprof_chip_scope {
++	evt_t t0;
++	aprof_chip_scope() : t0(aprof_on ? get_cycles() : 0) {}
++	~aprof_chip_scope() { if (aprof_on) { aprof_chip_acc += get_cycles() - t0; aprof_chip_cnt++; } }
++};
+ uae_u32 wait_cpu_cycle_read_ce020(uaecptr addr, int mode)
+ {
++	aprof_chip_scope aprof_scope_;
+ 	uae_u32 v = 0;
+ 	int hpos, ipl;
+ 
+@@ -16036,6 +16046,7 @@ uae_u32 wait_cpu_cycle_read_ce020(uaecptr addr, int mode)
+ 
+ void wait_cpu_cycle_write_ce020(uaecptr addr, int mode, uae_u32 v)
+ {
++	aprof_chip_scope aprof_scope_;
+ 	int hpos, ipl;
+ 
+ 	sync_cycles();
+diff --git a/src/include/keybuf.h b/src/include/keybuf.h
+index d411ec02..a544ba42 100644
+--- a/src/include/keybuf.h
++++ b/src/include/keybuf.h
+@@ -22,3 +22,5 @@ extern void keybuf_ignore_next_release(void);
+ extern void keybuf_vsync(void);
+ 
+ #endif /* UAE_KEYBUF_H */
++
++extern void keybuf_allow_explicit_release(void);
+diff --git a/src/keybuf.cpp b/src/keybuf.cpp
+index a9ba38eb..4e64a8f3 100644
+--- a/src/keybuf.cpp
++++ b/src/keybuf.cpp
+@@ -338,3 +338,6 @@ void keybuf_inject(const uae_char *txt)
+ 	keyinject_offset = 0;
+ 	keyinject = newbuf;
+ }
++
++// Explicit debugger input is not the host key which opened the debugger.
++void keybuf_allow_explicit_release(void) { ignore_next_release = false; }
+diff --git a/src/newcpu.cpp b/src/newcpu.cpp
+index f6d7fd40..b4cb619d 100644
+--- a/src/newcpu.cpp
++++ b/src/newcpu.cpp
+@@ -224,6 +224,176 @@ struct cpu_profiler {
+ };
+ // BARTO-END
+ 
++// AITD-PROF: whole-address-space cycle profiler with a calling-context tree.
++#include <unordered_map>
++struct aprof_frame { uae_u32 ret; uae_u32 node; uae_u8 kind; };
++struct aprof_node { uae_u32 parent; uae_u32 target; uae_u8 kind; uae_u64 self; uae_u64 calls; };
++bool aprof_on = false;
++evt_t aprof_chip_acc = 0;
++uae_u32 aprof_chip_cnt = 0;
++static uae_u64 *aprof_chip = nullptr, aprof_chip_total = 0, aprof_chip_accesses = 0;
++static uae_u32 *aprof_chipn = nullptr;
++static evt_t aprof_last = 0, aprof_start_cycles = 0;
++static uae_u32 aprof_start_vsync = 0;
++static uae_u64 *aprof_cyc = nullptr;
++static uae_u32 *aprof_cnt = nullptr;
++static uae_u64 aprof_hi_cyc = 0, aprof_gap = 0;
++static std::vector<aprof_node> aprof_nodes;
++static std::unordered_map<uae_u64, uae_u32> aprof_children;
++static aprof_frame aprof_stack[512];
++static int aprof_depth = 0;
++static uae_u64 aprof_overflow = 0, aprof_unmatched_rts = 0, aprof_unmatched_rte = 0;
++extern uae_u32 vsync_counter;
++
++static uae_u32 aprof_child(uae_u32 parent, uae_u32 target, uae_u8 kind)
++{
++	uae_u64 key = ((uae_u64)parent << 34) ^ ((uae_u64)kind << 32) ^ target;
++	auto it = aprof_children.find(key);
++	if (it != aprof_children.end())
++		return it->second;
++	uae_u32 id = (uae_u32)aprof_nodes.size();
++	aprof_nodes.push_back({parent, target, kind, 0, 0});
++	aprof_children.emplace(key, id);
++	return id;
++}
++
++static void aprof_push(uae_u32 target, uae_u32 ret, uae_u8 kind)
++{
++	if (aprof_depth >= 512) {
++		// Drop the oldest half; leaked frames (longjmp-like control flow) must not wedge us.
++		memmove(aprof_stack, aprof_stack + 256, 256 * sizeof(aprof_frame));
++		aprof_depth = 256;
++		aprof_overflow++;
++	}
++	uae_u32 parent = aprof_depth ? aprof_stack[aprof_depth - 1].node : 0;
++	uae_u32 node = aprof_child(parent, target, kind);
++	aprof_nodes[node].calls++;
++	aprof_stack[aprof_depth++] = {ret, node, kind};
++}
++
++static void aprof_pop(uae_u32 newpc, bool rte)
++{
++	for (int i = aprof_depth - 1; i >= 0 && i >= aprof_depth - 64; i--) {
++		const aprof_frame &fr = aprof_stack[i];
++		if (fr.ret == newpc || ((fr.kind == 10 || fr.kind == 11) && fr.ret + 2 == newpc)) {
++			aprof_depth = i;
++			return;
++		}
++	}
++	if (rte) aprof_unmatched_rte++; else aprof_unmatched_rts++;
++}
++
++// Only m68k_run_2ce is instrumented: refuse other CPU loops rather than report nothing.
++bool aprof_start(void)
++{
++	if (!currprefs.cpu_cycle_exact || currprefs.cpu_model < 68020 || currprefs.cpu_model > 68030 || currprefs.mmu_model)
++		return false;
++	if (!aprof_cyc) {
++		aprof_cyc = (uae_u64 *)calloc(1 << 23, sizeof(uae_u64));
++		aprof_cnt = (uae_u32 *)calloc(1 << 23, sizeof(uae_u32));
++		aprof_chip = (uae_u64 *)calloc(1 << 23, sizeof(uae_u64));
++		aprof_chipn = (uae_u32 *)calloc(1 << 23, sizeof(uae_u32));
++	} else {
++		memset(aprof_chip, 0, (1 << 23) * sizeof(uae_u64));
++		memset(aprof_chipn, 0, (1 << 23) * sizeof(uae_u32));
++		memset(aprof_cyc, 0, (1 << 23) * sizeof(uae_u64));
++		memset(aprof_cnt, 0, (1 << 23) * sizeof(uae_u32));
++	}
++	aprof_nodes.clear();
++	aprof_children.clear();
++	aprof_nodes.push_back({0, 0, 0, 0, 0}); // root
++	aprof_depth = 0;
++	aprof_hi_cyc = aprof_gap = aprof_overflow = aprof_unmatched_rts = aprof_unmatched_rte = 0;
++	aprof_chip_acc = 0; aprof_chip_cnt = 0; aprof_chip_total = aprof_chip_accesses = 0;
++	aprof_start_cycles = aprof_last = get_cycles();
++	aprof_start_vsync = vsync_counter;
++	aprof_on = true;
++	return true;
++}
++
++bool aprof_stop(const char *path)
++{
++	if (!aprof_on)
++		return false;
++	aprof_on = false;
++	FILE *f = fopen(path, "w");
++	if (!f)
++		return false;
++	// Times are emulated cycle units: CYCLE_UNIT per colour clock.
++	fprintf(f, "AITDPROF 1\n");
++	fprintf(f, "units %llu\nvsyncs %u\ncycleunit %d\nCYCLE_UNIT %d\ncolorclock_hz %d\n",
++		(unsigned long long)(get_cycles() - aprof_start_cycles), vsync_counter - aprof_start_vsync, cpucycleunit, CYCLE_UNIT,
++		currprefs.ntscmode ? 3579545 : 3546895);
++	fprintf(f, "cacr %x\ncpu_model %d\n", regs.cacr, currprefs.cpu_model);
++	fprintf(f, "gap %llu\nhigh %llu\noverflow %llu\nunmatched_rts %llu\nunmatched_rte %llu\n",
++		(unsigned long long)aprof_gap, (unsigned long long)aprof_hi_cyc, (unsigned long long)aprof_overflow,
++		(unsigned long long)aprof_unmatched_rts, (unsigned long long)aprof_unmatched_rte);
++	fprintf(f, "chip_units %llu\nchip_accesses %llu\n", (unsigned long long)aprof_chip_total, (unsigned long long)aprof_chip_accesses);
++	for (uae_u32 i = 0; i < (1u << 23); i++)
++		if (aprof_cnt[i] || aprof_cyc[i])
++			fprintf(f, "P %x %llu %u %llu %u\n", i << 1, (unsigned long long)aprof_cyc[i], aprof_cnt[i],
++				(unsigned long long)aprof_chip[i], aprof_chipn[i]);
++	for (size_t i = 0; i < aprof_nodes.size(); i++) {
++		const auto &n = aprof_nodes[i];
++		fprintf(f, "N %zu %u %x %u %llu %llu\n", i, n.parent, n.target, n.kind,
++			(unsigned long long)n.self, (unsigned long long)n.calls);
++	}
++	fclose(f);
++	return true;
++}
++
++// Called by Exception_normal after the frame is built; nr is the vector.
++void aprof_exception(int nr)
++{
++	if (!aprof_on)
++		return;
++	uae_u32 ret = get_long_debug(m68k_areg(regs, 7) + 2);
++	// Line-A: key the context by the trap word, since every trap enters one handler.
++	uae_u32 target = nr == 10 ? (0xa0000000u | get_word_debug(ret)) : m68k_getpc();
++	aprof_push(target, ret, (uae_u8)(nr < 255 ? nr : 255));
++	// kind = vector number (never 0: vector 0 is the reset SSP)
++}
++
++static inline void aprof_before(void)
++{
++	evt_t now = get_cycles();
++	evt_t d = now - aprof_last;
++	// Cycles outside instruction bodies: interrupt entry, STOP idle, etc.
++	aprof_gap += d;
++	aprof_nodes[aprof_depth ? aprof_stack[aprof_depth - 1].node : 0].self += d;
++	aprof_last = now;
++}
++
++static inline void aprof_after(uae_u32 pc, uae_u16 opcode)
++{
++	evt_t now = get_cycles();
++	evt_t d = now - aprof_last;
++	aprof_last = now;
++	if (pc < 0x1000000) {
++		aprof_cyc[pc >> 1] += d;
++		aprof_cnt[pc >> 1]++;
++		if (aprof_chip_cnt) {
++			aprof_chip[pc >> 1] += aprof_chip_acc;
++			aprof_chipn[pc >> 1] += aprof_chip_cnt;
++		}
++	} else {
++		aprof_hi_cyc += d;
++	}
++	aprof_chip_total += aprof_chip_acc; aprof_chip_accesses += aprof_chip_cnt;
++	aprof_chip_acc = 0; aprof_chip_cnt = 0;
++	// Attribute to the context that executed the instruction; calls below change it.
++	aprof_nodes[aprof_depth ? aprof_stack[aprof_depth - 1].node : 0].self += d;
++	if ((opcode & 0xffc0) == 0x4e80 || (opcode & 0xff00) == 0x6100) {
++		// JSR/BSR: return address is now on top of the active stack.
++		aprof_push(m68k_getpc(), get_long_debug(m68k_areg(regs, 7)), 0);
++	} else if (opcode == 0x4e75 || opcode == 0x4e74 || opcode == 0x4e77) {
++		aprof_pop(m68k_getpc(), false);
++	} else if (opcode == 0x4e73) {
++		aprof_pop(m68k_getpc(), true);
++	}
++}
++// AITD-PROF-END
++
+ const int areg_byteinc[] = { 1, 1, 1, 1, 1, 1, 1, 2 };
+ const int imm8_table[] = { 8, 1, 2, 3, 4, 5, 6, 7 };
+ 
+@@ -2234,7 +2404,7 @@ static void update_68k_cycles (void)
+ 			cpucycleunit /= 2;
+ 		}
+ 	} else if (currprefs.cpu_frequency) {
+-		cpucycleunit = CYCLE_UNIT * baseclock / currprefs.cpu_frequency;
++		cpucycleunit = (uae_u64)CYCLE_UNIT * (baseclock / 8) / currprefs.cpu_frequency;
+ 	} else if (currprefs.cpu_memory_cycle_exact && currprefs.cpu_clock_multiplier == 0) {
+ 		if (currprefs.cpu_model >= 68040) {
+ 			cpucycleunit = CYCLE_UNIT / 16;
+@@ -3466,6 +3636,7 @@ kludge_me_do:
+ 	ipl_fetch_now();
+ 	fill_prefetch ();
+ 	exception_check_trace (nr);
++	aprof_exception(vector_nr);
+ }
+ 
+ // address = format $2 stack frame address field
+@@ -6169,6 +6340,7 @@ static void m68k_run_2ce (void)
+ 					debug_trainer_match();
+ 				}
+ 
++				if (aprof_on) aprof_before();
+ 				{ cpu_profiler profiler(r->instruction_pc); // BARTO
+ 					(*cpufunctbl_noret[r->opcode])(r->opcode);
+ 		
+@@ -6176,6 +6348,7 @@ static void m68k_run_2ce (void)
+ 					regs.instruction_cnt++;
+ 					regs.ce020extracycles++;
+ 				} // BARTO
++				if (aprof_on) aprof_after(r->instruction_pc, r->opcode);
+ 
+ 		cont:
+ 				if (r->spcflags || regs.ipl[0] > 0) {
