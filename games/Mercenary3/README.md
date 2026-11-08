@@ -1,6 +1,6 @@
 # Mercenary 3 — Enhanced framerate
 
-Version **2.0b (04.11.2026)**.
+Version **2.0b (09.11.2026)**.
 
 Performance WHDLoad slave for **Mercenary III: The Dion Crisis** (Novagen), based on
 install version 1.2 by Harry, Graham and Wepl, whose source came with the official installer.
@@ -32,7 +32,7 @@ make slave verify original check
 ```
 
 To build the release archive, run `make dist`. It writes the repository's
-`dist/Mercenary3Enhanced-2.0b-20261104.lha`:
+`dist/Mercenary3Enhanced-2.0b-20261109.lha`:
 the original WHDLoad installer archive with the slave and the `ReadMe` replaced,
 `CUSTOM5=1` added to the two game icons (`Mercenary3.inf`, `Mercenary3.romicon`) and the
 slave source in `src/` replaced by the 2.0b source the slave is assembled from.
@@ -83,11 +83,11 @@ Developers can use `make verify` with `CUSTOM5=0 CUSTOM1=<feature mask>` for ind
 feature comparisons. The VERIFY build also contains the measurement instruments;
 use the regular slave to play. [Development](docs/development.md) describes the tools.
 
-## Version 2.0b (04.11.2026) — Vesuri
+## Version 2.0b (09.11.2026) — Vesuri
 
 - New **Enhanced framerate** option, enabled in the installed icon (`CUSTOM5=1`): faster
-  rendering, and smoother walking, vehicles, flight, doors and shots, without speeding up
-  the game world. With it, `CACHE` also enables the data cache on 68030 and later.
+  rendering, and smoother walking, vehicles, flight (passenger flights included), doors and
+  shots, without speeding up the game world. With it, `CACHE` also enables the data cache on 68030 and later.
 - Fixed the display routine, which waited for a vertical blank every frame and left part
   of each frame's colour update undone.
 - Fixed intermittently missing ground with caches on 68040/68060.

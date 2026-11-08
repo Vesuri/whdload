@@ -2128,13 +2128,21 @@ The default-on matrix passed every cell, including explicit 030 MMU (24.80 fps)
 and chip-only A1200 (9.40 fps). The known 040 frequency advisory remains: both 8 and
 25 MHz give 248 frames. These 040/060 numbers do not predict hardware speed.
 
-Release Off and shipped A500 both give 37 frames. Release world-speed checks on
+At the first 2.0b build, release Off and shipped A500 both gave 37 frames; since P9 the release gives 41 with Off (the 04.11.2026 archive too), the shipped slave 37. Release world-speed checks on
 020-fast and 030 give 6 walking units and 2 heading units per field. Release play
 checks on 68000/020/030/040/060 covered Help/return, Quit Situation and walking;
 030/040/060 also loaded the Eagle save, boarded, flew and returned from Help.
 Screenshots were inspected, including the startup control showing Enhanced framerate
 enabled. All 124 VERIFY presentation restores passed.
 Input verification and original/release/VERIFY builds passed. Evidence: `tmp/x1/`.
+
+The 09.11.2026 archive carries P10 and P11. Its checks: the matrix with the VERIFY build,
+`Custom5=1`, passed every cell (A500 41, A1200 88, A1200-fast 124, 030 404, 030 MMU 384,
+040-25 352, 060-50 357 frames; the 040 frequency check passed, 337 frames at 8 MHz). The
+release slave flew the slot 1 trip with every replayed pass and the landing identical to the
+native-drawing reference on the 68000 (`a500-1.5m`; its trace starts four passes earlier),
+040-25 and 060-50, as on the 030 with P11 (`a1200-fast` was last flown with P10). Evidence:
+`tmp/matrix/ver-0911/`, `tmp/rot/rel/`.
 
 No real hardware is available (user decision). X1 is complete without hardware tests;
 real-cache behaviour with relocated/self-modifying code and 040/060 speed remain

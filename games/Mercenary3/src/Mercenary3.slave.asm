@@ -59,7 +59,7 @@ _expmem		dc.l	-(STACKSIZE+HOTSIZE+TABLEMEM+RESTOREMEM+RENDERMEM+STAGEMEM+OBJECTM
 _name		dc.b	"Mercenary 3 - The Dion Crisis",0
 _copy		dc.b	"1991 Novagen",0
 _info		dc.b	"adapted by Harry/Graham/Wepl/Vesuri",10
-		dc.b	"Version 2.0b (04.11.2026)",10
+		dc.b	"Version 2.0b (09.11.2026)",10
 		dc.b	"enhanced framerate edition"
 	IFD VERIFY
 		dc.b	" (VERIFY)"
@@ -3643,4 +3643,4 @@ _resload	dc.l	0
 _restore_buffer	dc.l	0
 
 ; The version string (docs/releasing.md); last, so every other byte keeps its offset.
-	dc.b	"$VER: Mercenary3.Slave 2.0b (04.11.2026)",0
+	dc.b	"$VER: Mercenary3.Slave 2.0b (09.11.2026)",0

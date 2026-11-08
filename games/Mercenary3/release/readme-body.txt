@@ -1,5 +1,5 @@
  This install applies to "Mercenary 3 - The Dion Crisis" © 1991 Novagen.
- Mercenary 3 Enhanced 2.0b (04.11.2026)
+ Mercenary 3 Enhanced 2.0b (09.11.2026)
 
  Requirements:
  -------------
@@ -40,11 +40,11 @@
 
  History:
  --------
- version 2.0b (04.11.2026) done by Vesuri:
+ version 2.0b (09.11.2026) done by Vesuri:
  - new option Enhanced framerate, enabled in the installed icon: faster
-   rendering, and smoother walking, vehicles, flight, doors and shots,
-   without speeding up the game world; with it, the Tooltype Cache also
-   enables the data cache on 68030 and later
+   rendering, and smoother walking, vehicles, flight (passenger flights
+   included), doors and shots, without speeding up the game world; with it,
+   the Tooltype Cache also enables the data cache on 68030 and later
  - fixed the display routine, which waited for a vertical blank every frame
    and left part of each frame's colour update undone
  - fixed intermittently missing ground with caches on 68040/68060
