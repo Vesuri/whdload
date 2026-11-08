@@ -48,3 +48,14 @@ game_check() {
     game_original &&
     (cd "$GAME_ROOT" && python3 -m unittest discover -s tools -p 'test_*.py' -q)
 }
+
+# SAVES=<directory> (absolute, or relative to the game directory): put its saved games
+# (Mercenary3.save0..9) on the run's game drive, for checks that start from a saved
+# situation (tools/replay_trace.py, tools/presentation_check.py).
+game_drives() {
+  [ -n "${SAVES:-}" ] || return 0
+  local dir="$SAVES"
+  case "$dir" in /*) ;; *) dir="$GAME_ROOT/$dir" ;; esac
+  [ -d "$dir" ] || die "no saves directory $dir"
+  cp -f "$dir"/Mercenary3.save[0-9] "$2/"
+}

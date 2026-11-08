@@ -3,6 +3,9 @@
 
 SLAVE=tmp/build/verify/Mercenary3.Slave WHD_ARGS="CUSTOM5=0 CUSTOM1=31" python3 tools/presentation_check.py tmp/p1/check.json
 Uses VERIFY-only markers; no guest state is altered by this checker.
+With SLOT (and SAVES, the game.sh hook) it first loads that saved game and boards with B
+(tools/replay_trace.py's sequence); ROUTE then counts from there, e.g. a passenger flight:
+SAVES=$PWD/tmp/replay/saves SLOT=1 ROUTE='3000:' ... python3 tools/presentation_check.py OUT
 Besides the chip game image it hashes the slave's expansion-memory copies of game state
 (EXP_RANGES, offsets from ws_ExpMem): M1's code, M2/F3 tables, the S3/F2/F5 renderer
 copies and F5's render scratch. The restore buffer and the stack are not included.
@@ -17,8 +20,9 @@ from route_profile import slave_code, SLAVE, ROUTE
 from relocation import Map
 from route_runtime import session, deadline, timeouts, output_path, word, at_breakpoint, delta
 from amigaxdev.input import Input
+from replay_trace import board
 
-START, END = 0x5350, 0x68000
+START, END = int(os.environ.get("CHECK_START", "0x5350"), 16), int(os.environ.get("CHECK_END", "0x68000"), 16)
 EXP_RANGES = [(0x1000, 0x9000), (0xe000, 0x28000), (0x43340, 0x47080)]
 DISPLAY = [(0x72b2, 0x72b4), (0x72b6, 0x72b8), (0x7ce2, 0x7d26),
            (0x42c00, 0x42c04), (0x52ad0, 0x52b60),
@@ -75,7 +79,11 @@ def run(path):
                 i += hi - lo
         before, after = [base + x for x in markers]
         controls=Input(g, log=inputs.append)
-        held=[]; segment=0; boundary=ROUTE[0][0]; total=sum(n for n,_ in ROUTE)
+        start=0
+        if os.environ.get('SLOT'):
+            board(controls, int(os.environ['SLOT']))
+            start=delta(word(g,0x529f4),meta['anchor_state']['vertb'])
+        held=[]; segment=0; boundary=start+ROUTE[0][0]; total=start+sum(n for n,_ in ROUTE)
         with tempfile.TemporaryDirectory(prefix='presentation-',dir='tmp') as temp:
             dump=Path(temp)/'image.bin'
             def read():
@@ -102,12 +110,15 @@ def run(path):
                 field=delta(word(g,0x529f4),meta['anchor_state']['vertb'])
                 if pc==before:
                     saved=read()
+                elif pc==after and saved is None and start and not records:
+                    pass        # boarding ended inside a presentation: not observed whole
                 elif pc==after:
                     if saved is None: raise RuntimeError('missing before marker')
                     restored=read()
                     changed=[where(i) for i,(a,b,m) in enumerate(zip(saved,restored,mask)) if m and a!=b]
                     records.append(dict(field=field,before_sha256=digest(saved),after_sha256=digest(restored),changed=changed))
-                    if changed: break
+                    if changed and not os.environ.get('KEEP_GOING'): break
+                    if len(records) >= int(os.environ.get('MAX_RESTORES', '1000000')): break
                     saved=None
                 elif pc!=0x5a2e2: raise RuntimeError('unexpected stop')
                 if saved is None:

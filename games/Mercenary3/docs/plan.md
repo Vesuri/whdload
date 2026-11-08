@@ -371,6 +371,7 @@ Hardware validation remains unavailable, outside X1.
   `log_harness.py` (F4 against the original, every input),
   `translate.py` (F5's growing translation, verified by re-decoding; `--check` on a
   `memory_dump.py` dump),
-  `presentation_check.py` (VERIFY restore hashes), the
+  `presentation_check.py` (VERIFY restore hashes, also from a saved game),
+  `replay_trace.py` (passenger flights pass by pass, `--compare`), the
   `VERIFY` build's `Custom2` drawing bypass.
 - The game-time model and the renderer's inputs and writes ([internals](internals.md)).

@@ -289,10 +289,37 @@ reject an enabled P1 release build instead of mistaking logic passes for display
 
 `tools/presentation_check.py tmp/p1/check.json`, with the VERIFY slave and bit 4 enabled,
 compares SHA-256 hashes and reports changed addresses around every presentation restore.
+`SLOT=1` (with `SAVES`, below) first loads that saved game and boards with B, and `ROUTE`
+counts from there; `CHECK_START`/`CHECK_END` widen the hashed chip range (default
+`0x5350`/`0x68000`), `KEEP_GOING=1` reports past a failure and `MAX_RESTORES` stops early.
 The report lists the display and interrupt-owned exclusions. These allow live field,
 clock, panel and text updates; they are never restored to old values. At least one
 presentation frame must execute for a passing result. Use the fast cell when the 020
 has no spare interval. No instruction recording is needed.
+
+## Passenger flights
+
+A passenger flight replays recorded joystick input keyed to the logic-pass counter, so its
+course is a function of the pass number alone ([P10](internals.md#p10-passenger-flights-on-the-presentation-timeline)).
+`tools/replay_trace.py` loads a saved game, boards with B and records every pass of the
+trip (pass counter, replay flag `$70A2`, list pointer `$709A`, pose `$7142..$7161`, field;
+with a VERIFY slave also the displayed-frame counter) until 40 passes after landing, then
+saves a screenshot. `--compare` checks two recordings pass by pass: any build that keeps
+the logic native must give identical poses at every pass and the same landing.
+
+```sh
+. ../../common/env.sh
+SAVES=tmp/replay/saves SLOT=1 AMIGA_SETUP=a1200-030 SLAVE=tmp/build/verify/Mercenary3.Slave \
+  WHD_ARGS='CUSTOM5=1' RUN_TIMEOUT=3000 python3 tools/replay_trace.py tmp/replay/new.json
+python3 tools/replay_trace.py --compare tmp/replay/reference.json tmp/replay/new.json
+```
+
+`SAVES` (a `game.sh` hook, absolute or relative to the game directory) copies a directory's
+`Mercenary3.save0..9` onto the run's game drive; the slot 1 save of the reference trip
+(Metis spaceport, B boards the Tolosa flight) is the user's and stays in ignored `tmp/`.
+On the 030 a trip takes about 7,400 fields and five host minutes. `DUMP_PASSES=141,142`
+also writes chip RAM and the slave's expansion memory at those pass heads, to find the first
+state that differs between two builds.
 
 ## Release packaging
 

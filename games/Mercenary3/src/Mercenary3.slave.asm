@@ -1339,8 +1339,6 @@ _objectdraw
 	lea	(_inpresent,pc),a6
 	lea	(_object_active,pc),a0
 	clr.w	(a0)
-	tst.w	($70a2).w		;recorded-input replay: native (see _presentgate)
-	bne.w	.reset
 	move.w	($7142).w,d0
 	cmp.w	($7122).w,d0
 	bne.w	.reset
@@ -1431,15 +1429,24 @@ _objectdraw
 	move.l	($7158).w,d2
 	cmp.l	(_object_scene,pc),d2
 	bne.b	.snap
-; Large discontinuities snap, including wrapped world coordinates.
+; Large discontinuities snap, including wrapped world coordinates. Vehicles and
+; flight move objects with the camera (a passenger ship's pilot is placed at the
+; player each pass, Disk.1 $54E5C): the camera's limit, so they move together.
+	move.l	#32767,d1
+	cmpi.w	#1,($7142).w
+	beq.b	.walklimit
+	move.l	#VEHICLELIMIT,d1
+.walklimit
 	moveq	#0,d2
 .validate
 	move.l	(12,a1,d2.w),d3
 	sub.l	(a1,d2.w),d3
-	cmpi.l	#32767,d3
+	bpl.b	.magnitude
+	neg.l	d3
+	bmi.b	.snap
+.magnitude
+	cmp.l	d1,d3
 	bgt.b	.snap
-	cmpi.l	#-32767,d3
-	blt.b	.snap
 	addq.w	#4,d2
 	cmpi.w	#12,d2
 	bne.b	.validate
@@ -1603,14 +1610,14 @@ _objectmodel
 	move.w	#1,(18,a5)
 	moveq	#0,d2
 	lea	($581c,a0),a2
+	move.w	d6,d5
+	sub.w	d7,d6			;scale back from the current pose, as the camera
 .position
-	move.l	(12,a1,d2.w),d1
-	sub.l	(a1,d2.w),d1
-	muls.w	d6,d1
-	divs.w	d7,d1
-	ext.l	d1
-	add.l	(a1,d2.w),d1
-	move.l	d1,(a2)
+	move.l	(12,a1,d2.w),d0
+	sub.l	(a1,d2.w),d0
+	bsr.w	_scalelong
+	add.l	(12,a1,d2.w),d0
+	move.l	d0,(a2)
 	lea	($400,a2),a2
 	addq.w	#4,d2
 	cmpi.w	#12,d2
@@ -1618,6 +1625,7 @@ _objectmodel
 	cmpa.w	#28*4,a0
 	bhs.b	.draw
 	move.b	($6c1c,a0),(16,a5)
+	move.w	d5,d6
 	moveq	#0,d1
 	move.b	(35,a1),d1
 	sub.b	(34,a1),d1
@@ -1698,6 +1706,14 @@ _viewinit
 	lea	(_viewscene,pc),a2
 	lea	(_viewscenechip,pc),a3
 	bsr.w	_viewhook
+; The space scene's call (Disk.1 $5E42A), through its operand as F2/F5 left it.
+	btst	#4,(_custom1+2,pc)
+	beq.b	.done
+	lea	($5e42c-$3cb0).l,a0
+	lea	(_spacescene_call+2,pc),a1
+	move.l	(a0),(a1)
+	lea	(_spacescene,pc),a1
+	move.l	a1,(a0)
 .done	rts
 _viewhook
 	cmpi.w	#$4e75,(a0)
@@ -1867,6 +1883,112 @@ _publishedview
 	rts
 _rollbackcamera
 	bra.w	_viewcamera
+
+; The space scene (Disk.1 $57374) is game logic as well as drawing. From the
+; navigation pose it finds the nearest body: its distance in $6FAE (space movement
+; reads it, Disk.1 $5D184) and pointer in $6FB6. Unless its countdown $71A2 runs, it
+; then copies the pointer to $6FB2 (the arrival, $5DCC0) and sets the arrival flag
+; $70BE when the ship is close. A logic pass draws it with the staged navigation pose,
+; which would feed the delayed pose to the next pass: a passenger flight then left its
+; recorded course. After the drawing, recompute those outputs from the committed pose.
+; Presentations restore them anyway.
+_spacescene
+	move.l	a0,-(sp)
+	lea	(_inpresent,pc),a0
+	tst.w	(a0)
+	bne.b	.native
+	lea	(_viewspaceactive,pc),a0
+	tst.w	(a0)
+	bne.b	.logic
+.native	move.l	(sp)+,a0
+	bra.b	_spacescene_call
+.logic	move.l	(sp)+,a0
+	move.w	($71a2).w,-(sp)
+	move.w	($70be).w,-(sp)
+	bsr.b	_spacescene_call
+	movem.l	d0-d7/a0-a6,-(sp)
+	move.w	(60,sp),($70be).w	;undo a flag set by the staged pose
+	bsr.b	_spacenearest
+	tst.w	(62,sp)
+	bne.b	.done			;the countdown ran: no pointer or flag update
+	move.l	($6fb6).w,($6fb2).w	;Disk.1 $5758C..$575AC
+	movea.l	($6fb2).w,a0
+	move.w	a0,d0
+	beq.b	.done
+	move.w	($6fae).w,d0
+	sub.w	(21584,a0),d0
+	cmpi.w	#-7,d0
+	bpl.b	.done
+	move.w	#-1,($70be).w
+.done	movem.l	(sp)+,d0-d7/a0-a6
+	addq.l	#4,sp
+	rts
+_spacescene_call
+	jmp	0.l
+; The nearest-body search of Disk.1 $5737C..$5749C with the committed navigation pose,
+; instruction for instruction, without the per-body store and the projection.
+_spacenearest
+	move.l	#$201000,($6fae).w
+	movea.l	($72aa).w,a0
+	lea	(_committednav,pc),a1
+	movea.l	(8,a1),a3
+	movea.l	(4,a1),a2
+	movea.l	(a1),a1
+	movea.l	#$64000,a5
+	movea.l	#$60000,a6
+.body	move.l	(21328,a0),d3
+	sub.l	a1,d3
+	move.l	(22234,a0),d4
+	bmi.w	.next
+	sub.l	a2,d4
+	move.l	(21456,a0),d5
+	sub.l	a3,d5
+	exg	d3,d1
+	jsr	($4b1d8).l
+	exg	d3,d1
+	exg	d4,d1
+	jsr	($4b1d8).l
+	exg	d4,d1
+	exg	d5,d1
+	jsr	($4b1d8).l
+	exg	d5,d1
+	move.l	d3,d0
+	move.l	d4,d1
+	move.l	d5,d2
+	move.w	(a5,d0.w),d0
+	add.l	d0,d0
+	ror.w	#4,d0
+	andi.w	#$1ffe,d0
+	move.w	(a6,d0.w),d0
+	move.w	(a5,d1.w),d1
+	add.l	d1,d1
+	ror.w	#4,d1
+	andi.w	#$1ffe,d1
+	move.w	(a6,d1.w),d1
+	move.w	(a5,d2.w),d2
+	add.l	d2,d2
+	ror.w	#4,d2
+	andi.w	#$1ffe,d2
+	move.w	(a6,d2.w),d2
+	exg	d1,d2
+	exg	d1,d0
+	jsr	($4b134).l
+	exg	d1,d0
+	exg	d1,d2
+	jsr	($4b134).l
+	move.w	(a5,d2.w),d2
+	asr.l	#1,d2
+	lsr.w	#4,d2
+	andi.w	#$ffe,d2
+	move.w	(a6,d2.w),d2
+	cmp.l	($6fae).w,d2
+	bpl.b	.next
+	move.l	d2,($6fae).w
+	move.l	a0,($6fb6).w
+.next	subq.w	#4,a0
+	move.w	a0,d0
+	bpl.w	.body
+	rts
 _endwalk
 	lea	(_viewready,pc),a0
 	clr.w	(a0)
@@ -2045,8 +2167,6 @@ _doorstage
 	move.w	(_doorvalid,pc),d0
 	beq.w	.done
 	move.w	(_collisiononly,pc),d0
-	bne.w	.done
-	tst.w	($70a2).w
 	bne.w	.done
 	cmpi.w	#1,($7142).w
 	bne.w	.done
@@ -2576,7 +2696,7 @@ _interpolateplayer
 .vehicle
 	btst	#4,(_custom1+2,pc)
 	beq.w	.done
-	move.l	#32767,d3
+	move.l	#VEHICLELIMIT,d3
 .limit	moveq	#2,d5
 	moveq	#4,d4
 .validate
@@ -2596,9 +2716,7 @@ _interpolateplayer
 .position
 	move.l	(a1,d4.w),d0
 	sub.l	(a0,d4.w),d0
-	muls.w	d6,d0
-	divs.w	d7,d0
-	ext.l	d0
+	bsr.w	_scalelong
 	add.l	d0,(a1,d4.w)
 ; Bit 16: room walls use separate local XYZ words. Apply the same delta,
 ; retaining the native room origin and the existing discontinuity guards.
@@ -2630,6 +2748,48 @@ _interpolateplayer
 	dbra	d5,.angle
 .done	rts
 
+; Vehicle and flight moves interpolate up to this many units per axis and pass; a
+; passenger ship flies up to 3,020,800 a replay pass on the surface. Larger ones are
+; coordinate changes (about 2^27 entering space) and snap.
+VEHICLELIMIT	=	$ffffff
+
+; d0.l = d0.l * d6.w / d7.w, truncated toward zero as muls.w/divs.w give for
+; small values. |d0| < 2^27, |d6| <= d7, 0 < d7 <= 8 (a pass's fields). 68000.
+_scalelong
+	movem.l	d1-d3,-(sp)
+	moveq	#0,d3
+	tst.l	d0
+	bpl.b	.positive
+	neg.l	d0
+	not.w	d3
+.positive
+	move.w	d6,d1
+	bpl.b	.factor
+	neg.w	d1
+	not.w	d3
+.factor	move.l	d0,d2
+	swap	d2
+	mulu.w	d1,d2
+	mulu.w	d1,d0
+	swap	d2
+	clr.w	d2
+	add.l	d2,d0
+	move.l	d0,d2
+	clr.w	d2
+	swap	d2
+	divu.w	d7,d2
+	move.w	d2,d1
+	move.w	d0,d2
+	divu.w	d7,d2
+	swap	d1
+	move.w	d2,d1
+	move.l	d1,d0
+	tst.w	d3
+	beq.b	.done
+	neg.l	d0
+.done	movem.l	(sp)+,d1-d3
+	rts
+
 ; P1 uses its own gate so disabled options retain L1's measured path.
 _presentgate
 	move.w	sr,-(sp)
@@ -2637,14 +2797,20 @@ _presentgate
 	lea	(_viewready,pc),a0
 	clr.w	(a0)
 	lea	(_pstate,pc),a5
-; $70A2: the game replays recorded input from $709A (a passenger flight). With
-; presentations or interpolated objects the flight leaves the recording's course,
-; so replay keeps native drawing, paced by bit 24 (_replaygate).
+; $70A2: the game replays recorded input from $709A (a passenger flight), keyed to
+; the pass counter. Bit 24 paces its passes at REPLAYFIELDS fields, with
+; presentations in between. The course also depends on each pass's elapsed fields
+; ($52954 scales velocity, Disk.1 $5C9EA), so presentations must not change them:
+; one stamp (_replaystamp) paces every replay pass, whichever path takes it, and a
+; pass that a presentation delayed past its length is charged exactly its length.
+	clr.w	(10,a5)			;no presentation in this wait yet
+	moveq	#4,d0
 	tst.w	($70a2).w
-	beq.b	.live
-	bsr.w	_replaygate
-	bra.w	.other
-.live
+	beq.b	.length
+	btst	#0,(_custom1,pc)
+	beq.b	.length
+	moveq	#REPLAYFIELDS,d0
+.length	move.w	d0,(8,a5)
 	move.w	($7142).w,d0
 	cmp.w	($7122).w,d0
 	bne.w	.other
@@ -2662,11 +2828,12 @@ _presentgate
 	beq.b	.first
 .check	move.w	($529f4).l,d0
 	sub.w	(a5),d0
-	cmpi.w	#4,d0
+	cmp.w	(8,a5),d0
 	bhs.b	.ready
 ; With one field left, only redraw if the last presentation fit in one field.
 ; Two spare fields can amortise a redraw even when it finishes a field late.
-	cmpi.w	#3,d0
+	addq.w	#1,d0
+	cmp.w	(8,a5),d0
 	bne.b	.screen
 	cmpi.w	#1,(6,a5)
 	bhi.b	.waitfield
@@ -2683,14 +2850,33 @@ _presentgate
 	move.w	($529f4).l,d0
 	sub.w	(sp)+,d0
 	move.w	d0,(6,a5)
+	move.w	#1,(10,a5)
 	bra.b	.check
-.first	move.w	($52954).l,d0
+.first	cmpi.w	#REPLAYFIELDS,(8,a5)
+	bne.b	.native
+	bsr.w	_replaygate		;paced from the previous replay pass
+.native	move.w	($52954).l,d0
 	bra.b	.accept
-.ready	move.w	d0,($52954).l
+.ready	cmpi.w	#REPLAYFIELDS,(8,a5)
+	bne.b	.elapsed
+	tst.w	(10,a5)
+	beq.b	.elapsed
+	move.w	(8,a5),d0		;late after a presentation: the pass's length
+	move.w	d0,($52954).l
+	add.w	d0,(a5)
+	bra.b	.stamped
+.elapsed
+	move.w	d0,($52954).l
 .accept
 	move.w	($529f4).l,(a5)
+.stamped
 	move.w	#1,(2,a5)
-	cmpi.w	#4,d0
+	cmpi.w	#REPLAYFIELDS,(8,a5)
+	bne.b	.clamp
+	lea	(_replaystamp,pc),a0
+	move.w	(a5),(a0)+
+	move.w	#1,(a0)
+.clamp	cmpi.w	#4,d0
 	bge.b	.minok
 	moveq	#4,d0
 .minok	cmpi.w	#8,d0
@@ -2703,7 +2889,8 @@ _presentgate
 	movem.l	d0-d7,(a1)
 	bsr.w	_doorrecord
 	bra.b	.done
-.other	clr.w	(2,a5)
+.other	bsr.w	_replaygate
+	clr.w	(2,a5)
 	lea	(_doorvalid,pc),a0
 	clr.w	(a0)
 .done	movem.l	(sp)+,d0-d7/a0-a6
@@ -2731,7 +2918,7 @@ _pubcount
 	move.w	($52952).l,d1
 	rts
 
-_pstate	dc.w	0,0,4,2
+_pstate	dc.w	0,0,4,2,4,0		;stamp, valid, ticks, last cost, pass fields, presented
 _previous	ds.b	32
 
 _present

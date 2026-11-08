@@ -437,6 +437,77 @@ where natively it crosses within 50 fields, and those chunks draw 19–38 frames
 25–50. A500 41 frames. Restore hashes pass 282 presentations. Bit 25 is in the release
 mask (`$3FFFFFF`).
 
+### P10: passenger flights on the presentation timeline
+
+Passenger flights drew natively, one frame a pass (6.25 fps at bit 24's eight fields),
+because with presentations the replay left its recorded course (P3). The replay depends
+on the pass number alone, so a build that keeps the logic native must give the same pose
+at every pass: `tools/replay_trace.py` records the trip pass by pass and compares two
+recordings ([development](development.md#passenger-flights)). Reference: the slot 1 save
+(Metis spaceport, B boards the Tolosa flight), VERIFY `Custom5=1`, 030, the release before
+this change: 921 replayed passes, landing at field 7,370. Three faults kept the replay
+off the presentation timeline:
+
+1. **Pass length.** Flight movement multiplies velocity by the pass's elapsed fields
+   `$52954` (Disk.1 `$5C9EA`). A presentation that finished a field past the pass
+   boundary made that pass nine fields long; and at a mode change the gate's first pass
+   was not paced at all (a one-field pass), because replay pacing kept its own stamp in
+   `_replaygate`. During a paced replay `_presentgate` now waits for `REPLAYFIELDS`, one
+   stamp (`_replaystamp`) paces every replay pass on either gate path, and a pass that a
+   presentation delayed is charged exactly `REPLAYFIELDS`, with the stamp advanced by as
+   much, so real time is kept. Pass fields then matched the reference exactly, yet the
+   course still split at pass 142, the first space pass with presentations (Z +23 against
+   +26).
+2. **The space scene is game logic.** Disk.1 `$57374`, drawn in every space frame, finds
+   the nearest body from the navigation pose `$702A..$7035`: its distance in `$6FAE`
+   (space movement reads it at `$5D184`) and pointer in `$6FB6`. Unless its countdown
+   `$71A2` runs, it then copies the pointer to `$6FB2` (the arrival, `$5DCC0`) and sets the
+   arrival flag `$70BE` once the ship is close (`$5758C..$575AC`). Since P4 a logic pass
+   draws with the delayed navigation pose, so the next pass moved by the previous pose's
+   distance. Presentations restore these words; the logic pass had nothing to restore. The
+   restore check passed throughout (1,078 flight presentations, also hashing all of chip
+   RAM): the difference appeared in whole-machine dumps of the two builds at the pass 141
+   head (`DUMP_PASSES`), in `$6FAE..$6FB1` and otherwise only in display state and slave
+   addresses. `_spacescene` now takes the scene's call (the operand at Disk.1 `$5E42C`, as
+   F2/F5 left it). After a logic pass's staged drawing, `_spacenearest` repeats the scene's
+   search (`$5737C..$5749C`, instruction for instruction, without the per-body store and
+   the projection) with the committed pose, and the pointer and flag update follows, with
+   the flag the staged drawing set undone. This applies to all space flight with bits 12
+   and 14, not only replays: space logic is native again.
+3. **Interpolation range.** In an eight-field replay pass the passenger ship flies up to
+   3,020,800 units per axis on the surface (up to 2^15 in space). P4 scaled with
+   `muls.w`/`divs.w` and snapped anything over 32,767, so most surface-flight frames
+   repeated a pose. `_scalelong` scales 32-bit deltas exactly in 68000 code (the same
+   results as `muls.w`/`divs.w` where those fit; checked under the shared Unicorn against
+   exact arithmetic for 150,880 inputs), and vehicle modes interpolate up to 2^24−1 units
+   per axis (`VEHICLELIMIT`); the 2^27 coordinate change entering space still snaps.
+   Objects in vehicle modes take the same limit and scale back from the current pose like
+   the camera: the pilot is a world object placed at the player every pass (Disk.1
+   `$54E5C`) and must move with the camera. Walking keeps its limits; walking-mode objects
+   can round one unit differently.
+
+Slot 1 trip, 030, same session, reference → this build:
+
+| Check | Reference | P10 |
+| --- | ---: | ---: |
+| Replayed passes, poses and landing (`--compare`) | 921, field 7,370 | identical, field 7,370 |
+| Frames over the trip | 919 (6.2 fps) | 6,425 (43.7 fps) |
+| Distinct images, 150 fields from field 400 (surface) | 12 | 78 |
+| Distinct images, 150 fields from field 1,400 (space) | 20 | 128 |
+| Distinct images, 150 fields from field 5,000 (surface) | 20 | 123 |
+
+Both builds go static about 85 fields into the first window, when the ship stops. Space
+reaches one image per field after about 60 fields of two-field frames. `flicker.py` finds
+no one-frame glitches in the windows; the pilot's outline takes the same positions as in
+the reference (its native sway of one to three pixels). The release slave lands at Tolosa
+with identical passes on the 030 and on `a1200-fast` (field 7,375). A small orange dot with
+a white dash, seen in space from field 1,400, still moves once a pass, as in the reference;
+see [open work](open-work.md#to-investigate).
+
+Same session, VERIFY, standard route, reference → P10: 030 `Custom5=1` 40.40 → 40.40 fps,
+`Custom5=0` 8.90 → 8.90; A500 41 → 41 and 37 → 37 frames. Restore hashes pass 282
+standard-route presentations and 1,901 in the first 2,500 fields of the trip.
+
 ### R5: cache-safe polygon clipping
 
 Outside the prison, turning then stopping exposed intermittent missing gray ground
@@ -573,8 +644,9 @@ frame of a single colour, a fifth of all fields on the 030
 VERIFY `Custom1=$3FFFFFF` and release `Custom5=1`; it needs bits 12 and 20).
 `tools/test_entry_calls.py` checks that no slave call targets moved code without an entry. Bit 11 also interpolates objects in those modes.
 Boarding/leaving resets history; transport, scene, planet and floor changes snap.
-Transport displacements over 32,767 units per axis also snap to avoid signed-word
-arithmetic overflow. Enclosed rooms retain native drawing.
+Transport displacements up to 2^24−1 units per axis interpolate with 32-bit scaling
+([P10](#p10-passenger-flights-on-the-presentation-timeline)); larger ones snap.
+Enclosed rooms retain native drawing.
 
 Every native path draws the sights (Disk.1 `$55DEE`, while the Sights are owned) into
 the finished frame just before publishing it; walking, surface and space presentations
@@ -585,14 +657,10 @@ VERIFY `CUSTOM5=1` restore hashes pass 279 route presentations on the 030.
 
 A passenger flight is a recording: with `$70A2` set, the game reads its joystick
 input from the list at `$709A`, keyed to the pass counter `$7180` (Disk.1 `$5CB7A`,
-`$5D07C`, `$5D5A4`). With P1/P3 presentations during the replay, the ship leaves the
-recorded course. On the 030 the spaceport trip ended at Damocles instead of Tolosa,
-with full-view gray frames, a doubled pilot and a jumping camera. The full-view frames
-look like the space-scene fault fixed above (not retested with replay presentations);
-the course change has not been isolated; restoring `$7056..$7059` and `$709A..$709D` around presentations does
-not change it. During replay, `_presentgate` and `_objectdraw` therefore keep native
-drawing. On the 030 that trip (a user save, B to board) has no one-frame glitches over
-2,500 fields and lands at Tolosa, as with Enhanced framerate off.
+`$5D07C`, `$5D5A4`). With P1/P3 presentations during the replay the ship first left the
+recorded course (on the 030 the spaceport trip ended at Damocles instead of Tolosa), so
+replays kept native drawing until [P10](#p10-passenger-flights-on-the-presentation-timeline)
+found the causes. Replays now draw presentation frames like other flight.
 
 The trip is a fixed number of logic passes (about 930), so its real-time length
 follows the pass rate, while the pilot's 15 messages run in real time. With P1,
@@ -609,8 +677,8 @@ clamp, so the world still moves in real time. Fields from boarding (`taxi2.py`, 
 | 030, release | 8 | 7,400 | 7,700 |
 
 With bit 24 the ship lands at Tolosa as the pilot says "I do hope that you have
-enjoyed the flight"; on the A500 the last message also comes before landing. The trip
-draws at 6.25 fps, as replay keeps native drawing. Same session, `fps.py`, VERIFY,
+enjoyed the flight"; on the A500 the last message also comes before landing. Before P10
+the trip drew at 6.25 fps, as replays kept native drawing. Same session, `fps.py`, VERIFY,
 `Custom5=1`: 030 44.50 → 44.70 fps (447 frames twice; the standard route has no
 replay, so this is code layout), A500 41 frames. L1 without P1 (`Custom1` bits 0, 3,
 24): 10.90 fps, as without bit 24, and the trip lands at the same field. Bit 24 is in
