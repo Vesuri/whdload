@@ -16,7 +16,9 @@ source is `src/` and the shipped files are `release/`. Sessions (`tools/rr.py`,
 `tmp/run/session-<OUT under tmp/>/`, with the old launcher's variables: no `SLAVE` boots the
 shipped slave, `AMIGA_SETUP=''` is the custom A500 of `game.conf`, `RR_PAD=1` a CD32 pad in
 port 1. `tools/build.sh` keeps its interface and writes `tmp/build/RoadRash*.slave`.
-`tools/build-fsuae.sh` needs `AMIGAXDEV=<AmigaXDev checkout>`. `tools/installer_g.py` and
+`tools/build-fsuae.sh` needs `AMIGAXDEV=<AmigaXDev checkout>`. It clones from
+`$AMIGA_SHARE/fs-uae-aprof-build`, which the current shared setup no longer installs, so for
+now it has to be pointed at another clone of the pinned commit. `tools/installer_g.py` and
 `tools/run_installer_g.py` drove the G-phase installer test through a private copy of the old
 launcher and are not ported.
 
@@ -27,6 +29,39 @@ framerate" in this game's history. To use those tools, export that commit's `src
 `tmp/` and point `RR_SOURCE` at it. Normal builds of the development tip and of the release
 source are not byte-identical (the release source was reduced to its configuration), so
 evidence recorded against the development builds names their own slave hashes.
+
+### Blitter-sync observer and the bike-shop route
+
+`tools/patches/fsuae-blitsync.patch` adds a diagnostic to FS-UAE. With `BLITSYNC_LOG=FILE`
+set, it logs every CPU access that isn't synchronised with a running blit. A blit stays open
+from its BLTSIZE write until the CPU reads DMACONR with BBUSY clear. While it's open, the
+observer logs:
+
+- CPU access to the blit's D rows;
+- CPU writes to its A/B/C rows, when the minterm uses those sources;
+- CPU writes to the blitter registers (`REG`).
+
+Each is logged once per (PC, blit, channel). `live` says whether the emulated blit was still
+running and `irq` gives the interrupt mask. DMA and copper accesses aren't logged. The patch
+applies to the source of the shared `$FSUAE_ARM` build: the pinned commit plus the AmigaXDev
+patches listed in that build's `source-revision.txt`. Build it with that build's static
+SDL2_ttf and libmpeg2 (the `configure` line in `tools/build-fsuae.sh`) and keep the binary
+under `tmp/`.
+
+`tools/blitsync.py LOG` summarises a log by blit PC and channel, with main-hunk offsets
+(native base `$80000`).
+
+`tools/shop_route.py OUT` reaches the bike shop, which only opens after a race. It builds
+`OUT/shop-test.Slave` from `src/` with a test-only keyboard hook that never ships: keypad `*`
+moves the player to just before the finish. It then starts a race with CUSTOM2=0, finishes it,
+presses F3 on the results screen and steps through two bikes. It leaves screenshots and
+traces in `OUT/run`. CUSTOM2=1 isn't supported, because the hook uses the native actor
+addresses. Run the two together:
+
+```sh
+BLITSYNC_LOG=$PWD/tmp/bs.log FSUAE=<observer fs-uae> python3 tools/shop_route.py tmp/shop
+python3 tools/blitsync.py tmp/bs.log
+```
 
 The rest of this document is the harness's own, from the development branch.
 

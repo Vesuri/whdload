@@ -1,0 +1,278 @@
+diff --git a/src/blitter.cpp b/src/blitter.cpp
+index 57db07d7..7866d891 100644
+--- a/src/blitter.cpp
++++ b/src/blitter.cpp
+@@ -1940,6 +1940,98 @@ static void blitter_start_init (void)
+ 	}
+ }
+ 
++
++/* Blitter-sync observer (Road Rash harness diagnostic). A blit is open from its BLTSIZE
++   write until the CPU reads DMACONR with BBUSY clear, as a blitter wait does. CPU access
++   to an open blit's D rows, a CPU write to its A/B/C rows (when the minterm uses them) and
++   a CPU write to a blitter register (REG) are logged once per PC and blit, whether or not
++   the emulated blit is still running ("live" says which). BLITSYNC_LOG=FILE enables it. */
++static FILE *blitsync_f; static int blitsync_init_done, blitsync_lines;
++static int blitsync_open; static uaecptr blitsync_pc; static uae_u16 blitsync_con0, blitsync_size_v, blitsync_size_h;
++static uae_u32 blitsync_lo[4], blitsync_hi[4], blitsync_first[4]; static long blitsync_stride[4]; static int blitsync_rowbytes, blitsync_desc;
++static uae_u32 blitsync_seen[4096];
++static void blitsync_range(int ch, uae_u32 p, int mod, int desc)
++{
++	int rowbytes = blt_info.hblitsize * 2, v = blt_info.vblitsize;
++	long stride = rowbytes + mod;
++	long first = (long)p, last;
++	blitsync_first[ch] = p; blitsync_stride[ch] = stride; blitsync_rowbytes = rowbytes; blitsync_desc = desc;
++	if (!desc) {
++		last = first + (long)(v - 1) * stride;
++		blitsync_lo[ch] = (uae_u32)(first < last ? first : last);
++		blitsync_hi[ch] = (uae_u32)((first > last ? first : last) + rowbytes);
++	} else {
++		last = first - (long)(v - 1) * stride;
++		blitsync_lo[ch] = (uae_u32)((first < last ? first : last) - rowbytes + 2);
++		blitsync_hi[ch] = (uae_u32)((first > last ? first : last) + 2);
++	}
++}
++static void blitsync_start(uaecptr pc)
++{
++	if (!blitsync_init_done) {
++		const char *p = getenv("BLITSYNC_LOG");
++		blitsync_init_done = 1;
++		if (p && *p) blitsync_f = fopen(p, "w");
++	}
++	if (!blitsync_f) return;
++	blitsync_open = 0;
++	if (bltcon1 & 1) return; /* line mode: not tracked */
++	int desc = (bltcon1 & 2) != 0;
++	for (int i = 0; i < 4; i++) blitsync_lo[i] = blitsync_hi[i] = 0;
++	if (bltcon0 & 0x800) blitsync_range(0, bltapt, blt_info.bltamod, desc);
++	if (bltcon0 & 0x400) blitsync_range(1, bltbpt, blt_info.bltbmod, desc);
++	if (bltcon0 & 0x200) blitsync_range(2, bltcpt, blt_info.bltcmod, desc);
++	if (bltcon0 & 0x100) blitsync_range(3, bltdpt, blt_info.bltdmod, desc);
++	blitsync_open = 1; blitsync_pc = pc; blitsync_con0 = bltcon0;
++	blitsync_size_v = blt_info.vblitsize; blitsync_size_h = blt_info.hblitsize;
++}
++void blitsync_close(uae_u16 dmaconr)
++{
++	if (blitsync_open && !(dmaconr & 0x4000)) blitsync_open = 0;
++}
++void blitsync_reg(int reg, int live)
++{
++	if (!blitsync_open || !blitsync_f) return;
++	uaecptr pc = M68K_GETPC;
++	uae_u32 key = pc * 31u + blitsync_pc * 7u + 0x9000u + reg;
++	uae_u32 h = (key ^ (key >> 13)) & 4095;
++	if (blitsync_seen[h] == key + 1) return;
++	blitsync_seen[h] = key + 1;
++	if (blitsync_lines++ < 20000) {
++		fprintf(blitsync_f, "frame=%d vpos=%d pc=%08x REG addr=dff%03x ch=R blitpc=%08x con0=%04x size=%dx%d range=000000-000000 live=%d irq=%d\n",
++			vsync_counter, vpos, pc, reg, blitsync_pc, blitsync_con0, blitsync_size_h, blitsync_size_v, live, regs.intmask);
++		fflush(blitsync_f);
++	}
++}
++void blitsync_cpu(uaecptr addr, int size, int write)
++{
++	if (!blitsync_open || !blitsync_f) return;
++	addr &= chipmem_bank.mask;
++	for (int ch = 0; ch < 4; ch++) {
++		if (blitsync_lo[ch] == blitsync_hi[ch]) continue;
++		if (ch < 3 && !write) continue;
++		if (ch < 3 && ((blitsync_con0 & 0xff) == 0 || (blitsync_con0 & 0xff) == 0xff)) continue;
++		if (addr + size <= blitsync_lo[ch] || addr >= blitsync_hi[ch]) continue;
++		if (!blitsync_desc && blitsync_stride[ch] > blitsync_rowbytes && addr >= blitsync_first[ch]) {
++			long off = (long)addr - (long)blitsync_first[ch];
++			long inrow = off % blitsync_stride[ch];
++			if (inrow >= blitsync_rowbytes && inrow + size <= blitsync_stride[ch]) continue;
++		}
++		uaecptr pc = M68K_GETPC;
++		uae_u32 key = (pc * 31u + blitsync_pc * 7u + ch * 2u + (write ? 1u : 0u));
++		uae_u32 h = (key ^ (key >> 13)) & 4095;
++		int live = blt_info.blit_main || blt_info.blit_finald || blt_info.blit_pending;
++		if (blitsync_seen[h] == key + 1) return;
++		blitsync_seen[h] = key + 1;
++		if (blitsync_lines++ < 20000) {
++			fprintf(blitsync_f, "frame=%d vpos=%d pc=%08x %s%d addr=%06x ch=%c blitpc=%08x con0=%04x size=%dx%d range=%06x-%06x live=%d irq=%d\n",
++				vsync_counter, vpos, pc, write ? "W" : "R", size, addr, "ABCD"[ch], blitsync_pc, blitsync_con0,
++				blitsync_size_h, blitsync_size_v, blitsync_lo[ch], blitsync_hi[ch], live, regs.intmask);
++			fflush(blitsync_f);
++		}
++		return;
++	}
++}
+ void do_blitter(int hpos, int copper, uaecptr pc)
+ {
+ 	int cycles;
+@@ -1976,6 +2068,7 @@ void do_blitter(int hpos, int copper, uaecptr pc)
+ 	if (memwatch_enabled || BLITTER_DEBUG) {
+ 		blitter_debugsave(copper, pc);
+ 	}
++	if (!copper) blitsync_start(pc);
+ 
+ 	if ((log_blitter & 1) || ((log_blitter & 32) && !blitline)) {
+ 		if (1) {
+diff --git a/src/custom.cpp b/src/custom.cpp
+index fea994a4..3e9b12db 100644
+--- a/src/custom.cpp
++++ b/src/custom.cpp
+@@ -7046,6 +7046,8 @@ static bool blit_busy(int hpos, bool dmaconr)
+ 	return true;
+ }
+ 
++extern void blitsync_close(uae_u16 dmaconr);
++extern void blitsync_reg(int reg, int live);
+ STATIC_INLINE uae_u16 DMACONR(int hpos)
+ {
+ 	decide_line(hpos);
+@@ -14467,7 +14469,7 @@ static uae_u32 REGPARAM2 custom_wget_1(int hpos, uaecptr addr, int noput, bool i
+ 	addr &= 0xfff;
+ 
+ 	switch (addr & 0x1fe) {
+-	case 0x002: v = DMACONR(hpos); break;
++	case 0x002: v = DMACONR(hpos); blitsync_close(v); break;
+ 	case 0x004: v = VPOSR(); break;
+ 	case 0x006: v = VHPOSR(); break;
+ 
+@@ -14653,6 +14655,9 @@ static int REGPARAM2 custom_wput_1 (int hpos, uaecptr addr, uae_u32 value, int n
+ 	if (memwatch_access_validator) {
+ 		debug_check_reg(oaddr, 1, value);
+ 	}
++	if (!copper_access && addr >= 0x040 && addr <= 0x074) {
++		blitsync_reg(addr, blit_busy(hpos, true));
++	}
+ 
+ 	switch (addr) {
+ 	case 0x00E: CLXDAT(hpos); break;
+diff --git a/src/memory.cpp b/src/memory.cpp
+index 79cb1a8e..71b559b9 100644
+--- a/src/memory.cpp
++++ b/src/memory.cpp
+@@ -572,9 +572,11 @@ static void ce2_timeout (void)
+ 	wait_cpu_cycle_read (0, -1);
+ }
+ 
++extern void blitsync_cpu(uaecptr addr, int size, int write);
+ static uae_u32 REGPARAM2 chipmem_lget_ce2 (uaecptr addr)
+ {
+ 	uae_u32 *m;
++	blitsync_cpu(addr, 4, 0);
+ 
+ 	addr &= chipmem_bank.mask;
+ 	m = (uae_u32 *)(chipmem_bank.baseaddr + addr);
+@@ -585,6 +587,7 @@ static uae_u32 REGPARAM2 chipmem_lget_ce2 (uaecptr addr)
+ static uae_u32 REGPARAM2 chipmem_wget_ce2 (uaecptr addr)
+ {
+ 	uae_u16 *m, v;
++	blitsync_cpu(addr, 2, 0);
+ 
+ 	addr &= chipmem_bank.mask;
+ 	m = (uae_u16 *)(chipmem_bank.baseaddr + addr);
+@@ -595,6 +598,7 @@ static uae_u32 REGPARAM2 chipmem_wget_ce2 (uaecptr addr)
+ 
+ static uae_u32 REGPARAM2 chipmem_bget_ce2 (uaecptr addr)
+ {
++	blitsync_cpu(addr, 1, 0);
+ 	addr &= chipmem_bank.mask;
+ 	ce2_timeout ();
+ 	return chipmem_bank.baseaddr[addr];
+@@ -603,6 +607,7 @@ static uae_u32 REGPARAM2 chipmem_bget_ce2 (uaecptr addr)
+ static void REGPARAM2 chipmem_lput_ce2 (uaecptr addr, uae_u32 l)
+ {
+ 	uae_u32 *m;
++	blitsync_cpu(addr, 4, 1);
+ 
+ 	addr &= chipmem_bank.mask;
+ 	m = (uae_u32 *)(chipmem_bank.baseaddr + addr);
+@@ -613,6 +618,7 @@ static void REGPARAM2 chipmem_lput_ce2 (uaecptr addr, uae_u32 l)
+ static void REGPARAM2 chipmem_wput_ce2 (uaecptr addr, uae_u32 w)
+ {
+ 	uae_u16 *m;
++	blitsync_cpu(addr, 2, 1);
+ 
+ 	addr &= chipmem_bank.mask;
+ 	m = (uae_u16 *)(chipmem_bank.baseaddr + addr);
+@@ -622,6 +628,7 @@ static void REGPARAM2 chipmem_wput_ce2 (uaecptr addr, uae_u32 w)
+ 
+ static void REGPARAM2 chipmem_bput_ce2 (uaecptr addr, uae_u32 b)
+ {
++	blitsync_cpu(addr, 1, 1);
+ 	addr &= chipmem_bank.mask;
+ 	ce2_timeout ();
+ 	chipmem_bank.baseaddr[addr] = b;
+@@ -632,6 +639,7 @@ static void REGPARAM2 chipmem_bput_ce2 (uaecptr addr, uae_u32 b)
+ static uae_u32 REGPARAM2 chipmem_lget (uaecptr addr)
+ {
+ 	uae_u32 *m;
++	blitsync_cpu(addr, 4, 0);
+ 
+ 	addr &= chipmem_bank.mask;
+ 	m = (uae_u32 *)(chipmem_bank.baseaddr + addr);
+@@ -641,6 +649,7 @@ static uae_u32 REGPARAM2 chipmem_lget (uaecptr addr)
+ static uae_u32 REGPARAM2 chipmem_wget (uaecptr addr)
+ {
+ 	uae_u16 *m, v;
++	blitsync_cpu(addr, 2, 0);
+ 
+ 	addr &= chipmem_bank.mask;
+ 	m = (uae_u16 *)(chipmem_bank.baseaddr + addr);
+@@ -651,6 +660,7 @@ static uae_u32 REGPARAM2 chipmem_wget (uaecptr addr)
+ static uae_u32 REGPARAM2 chipmem_bget (uaecptr addr)
+ {
+ 	uae_u8 v;
++	blitsync_cpu(addr, 1, 0);
+ 	addr &= chipmem_bank.mask;
+ 	v = chipmem_bank.baseaddr[addr];
+ 	return v;
+@@ -659,6 +669,7 @@ static uae_u32 REGPARAM2 chipmem_bget (uaecptr addr)
+ void REGPARAM2 chipmem_lput (uaecptr addr, uae_u32 l)
+ {
+ 	uae_u32 *m;
++	blitsync_cpu(addr, 4, 1);
+ 
+ 	addr &= chipmem_bank.mask;
+ 	m = (uae_u32 *)(chipmem_bank.baseaddr + addr);
+@@ -668,6 +679,7 @@ void REGPARAM2 chipmem_lput (uaecptr addr, uae_u32 l)
+ void REGPARAM2 chipmem_wput (uaecptr addr, uae_u32 w)
+ {
+ 	uae_u16 *m;
++	blitsync_cpu(addr, 2, 1);
+ 
+ 	addr &= chipmem_bank.mask;
+ 	m = (uae_u16 *)(chipmem_bank.baseaddr + addr);
+@@ -676,6 +688,7 @@ void REGPARAM2 chipmem_wput (uaecptr addr, uae_u32 w)
+ 
+ void REGPARAM2 chipmem_bput (uaecptr addr, uae_u32 b)
+ {
++	blitsync_cpu(addr, 1, 1);
+ 	addr &= chipmem_bank.mask;
+ 	chipmem_bank.baseaddr[addr] = b;
+ }
+@@ -879,6 +892,17 @@ void (REGPARAM2 *chipmem_bput_indirect)(uaecptr, uae_u32);
+ int (REGPARAM2 *chipmem_check_indirect)(uaecptr, uae_u32);
+ uae_u8 *(REGPARAM2 *chipmem_xlate_indirect)(uaecptr);
+ 
++
++static uae_u32 REGPARAM2 chipmem_lget_nohook (uaecptr addr)
++{
++	addr &= chipmem_bank.mask;
++	return do_get_mem_long ((uae_u32 *)(chipmem_bank.baseaddr + addr));
++}
++static void REGPARAM2 chipmem_lput_nohook (uaecptr addr, uae_u32 l)
++{
++	addr &= chipmem_bank.mask;
++	do_put_mem_long ((uae_u32 *)(chipmem_bank.baseaddr + addr), l);
++}
+ void chipmem_setindirect(void)
+ {
+ 	if (debugmem_bank.baseaddr && debugmem_chiplimit) {
+@@ -900,10 +924,10 @@ void chipmem_setindirect(void)
+ 		chipmem_check_indirect = chipmem_check_bigmem;
+ 		chipmem_xlate_indirect = chipmem_xlate_bigmem;
+ 	} else {
+-		chipmem_lget_indirect = chipmem_lget;
++		chipmem_lget_indirect = chipmem_lget_nohook;
+ 		chipmem_wget_indirect = chipmem_agnus_wget;
+ 		chipmem_bget_indirect = chipmem_agnus_bget;
+-		chipmem_lput_indirect = chipmem_lput;
++		chipmem_lput_indirect = chipmem_lput_nohook;
+ 		chipmem_wput_indirect = chipmem_agnus_wput;
+ 		chipmem_bput_indirect = chipmem_agnus_bput;
+ 		chipmem_check_indirect = chipmem_check;
