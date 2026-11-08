@@ -118,7 +118,7 @@ slv_name	dc.b	"Legends Of Valour",0
 slv_copy	dc.b	"1992 US-GOLD.",0
 slv_info	dc.b	"Reworked by Vesuri",10
 		dc.b	"based on the work of CFou!",10
-		dc.b	"Version 2.0b (08.11.2026)",0
+		dc.b	"Version 2.0b (09.11.2026)",0
 slv_config	dc.b	"C1:B:Character creation;"
 	IFD DEVELOPER
 		dc.b	"C2:X:faster chunky-to-planar:0;"
@@ -514,7 +514,7 @@ _timing_combat_clock_records ds.b 64*20
 
 ; Last before the fixup table, so no code or data offset moves; the version and date match
 ; slv_info and the release ReadMe.
-		dc.b	"$VER: LegendsOfValour.Slave 2.0b (08.11.2026)",0
+		dc.b	"$VER: LegendsOfValour.Slave 2.0b (09.11.2026)",0
 
 ; The fixup table is after it, the very last: it is appended to the English build without
 ; moving anything (game.sh, tools/fixups.py).

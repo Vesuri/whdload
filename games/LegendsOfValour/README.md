@@ -122,7 +122,7 @@ sessions.
 make dist
 ```
 
-Builds `LegendsOfValourEnhanced-2.0b-20261108.lha` (version and date from the slave's `$VER`)
+Builds `LegendsOfValourEnhanced-2.0b-20261109.lha` (version and date from the slave's `$VER`)
 from the original installer in the repository's `dist/`. Only the slave, the ReadMe and the
 six game icons (`CUSTOM2=1` added to their tooltypes) are replaced; the entry list and every
 other compressed record are preserved. Packaging verifies CRCs, replacement contents and the

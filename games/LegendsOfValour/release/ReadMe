@@ -1,5 +1,5 @@
 
- Legends of Valour Enhanced 2.0b (08.11.2026)
+ Legends of Valour Enhanced 2.0b (09.11.2026)
 
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
@@ -50,7 +50,7 @@
 
  History:
  --------
- version 2.0b (08.11.2026) done by Vesuri:
+ version 2.0b (09.11.2026) done by Vesuri:
  - faster 3D rendering, using Fast RAM when available
  - chunky-to-planar conversion by Mikael Kalms
  - game timing that keeps the game speed and animations correct at any frame
