@@ -301,6 +301,7 @@ _patchgame
 		move.w	#$4e71,($141e,a0)
 .done
 	; Optional W1 hook, checked while disabled: PERF_RANGE h12:054ce 10
+		bsr	_blit_install
 		bsr	_c2p_install
 		bsr	_w2_install
 		bsr	_w3_install
@@ -436,6 +437,7 @@ _h11		dc.l	0
 _h12		dc.l	0
 		ds.l	4
 
+		INCLUDE	blitwait.s
 		INCLUDE	c2p.s
 		INCLUDE	chunky.s
 		INCLUDE	walls.s

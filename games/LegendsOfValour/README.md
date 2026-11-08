@@ -15,7 +15,10 @@ The player-facing options are:
 | Character creation | `CUSTOM1=1` |
 | Enhanced frame rate | `CUSTOM2=1` |
 
-The release's installed icon sets `CUSTOM2=1`; `CUSTOM2=0` runs the original game.
+The release's installed icon sets `CUSTOM2=1`; `CUSTOM2=0` runs the original game, apart
+from one fix in every setting: the game's own graphics.library calls (`RectFill`, `SetRast`,
+`Draw`) now wait for their blit. Without the wait, text drawn by the CPU straight after a
+`RectFill` lost bitplanes on fast CPUs (red and green first words; [performance-patches.md](docs/performance-patches.md)).
 Enhanced frame rate turns on everything at once:
 
 - six validated rendering improvements: CPU-selected chunky-to-planar conversion,

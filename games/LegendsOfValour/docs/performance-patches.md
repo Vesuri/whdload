@@ -15,6 +15,14 @@
   (`docs/versions.md`): `_lov_version` recognises the English, German or French AMIGA2,
   applies the fixup table for German and French, and clears CUSTOM2 for any other version,
   which runs as CFou!'s v1.0 instead of failing a check.
+- Exception: `_blit_install` (`src/blitwait.s`) runs in every build and every CUSTOM2,
+  skipping silently on any byte mismatch. The game's graphics.library glue (h15:
+  SetRast `h15:00054`, Draw `h15:0008a`, RectFill `h15:000a8`) returns while the blit runs,
+  and the game then draws text with the CPU (`h1:0117c` RectFill, then the print at
+  `h1:02446`; `h1:014ec`). On a 68040 the blitter wiped planes of the first glyphs: red and
+  green first words, with the cut row moving between runs. CFou!'s v1.0 shows it too. Each
+  glue's `jsr` becomes a `jmp` to a copy that adds `WaitBlit`. Check: break at `h1:02462` on
+  `SETUP=a1200-040` and look at "Legends of Valour!" (white, no red/green).
 - Hooks replace **complete instructions** only. Before choosing a range, check that no
   relocation (`tools/xref.py`) or branch targets its interior.
 - Each patch has a CUSTOM2 bit. Release builds map their single switch, Enhanced frame rate

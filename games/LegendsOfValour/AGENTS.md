@@ -6,7 +6,8 @@ click inputs, all behind the release's one switch, Enhanced frame rate (CUSTOM2,
 installed icon), and separate CUSTOM2 bits in developer builds. One slave enhances the
 English (0837), German (0525) and French (1768) AMIGA2: game offsets are `hN_OFFSET` symbols
 (`src/offsets.s`, generated) and the German/French values are a boot-time fixup table
-(`docs/versions.md`); other versions run as CFou!'s v1.0. CFou!'s v1.0 slave (06.02.2005, `LegendsOfValour_v1.0_0837.lha`) is
+(`docs/versions.md`); other versions run as CFou!'s v1.0. Every build also adds blitter waits
+to the game's graphics.library glue (`src/blitwait.s`), a fast-CPU text fix. CFou!'s v1.0 slave (06.02.2005, `LegendsOfValour_v1.0_0837.lha`) is
 credited as the original (`game.conf` `AUTHOR`, `UPSTREAM`): `src/LegendsOfValourHD.s`
 reconstructs it from the binary on WHDLoad 20.0's kick13 example. There is no game source:
 work from cycle-exact FS-UAE traces and disassembly. The game is `data/AMIGA2`, a

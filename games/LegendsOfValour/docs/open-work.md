@@ -24,6 +24,8 @@
   cleared. German and French reports (05.11.2026) had aborted in the W1 and W2 install
   checks. Both now boot with every hook installed and pass the C2P, wall, sprite and ray
   twins in all views.
+- Blitter waits in every build (`src/blitwait.s`, `docs/performance-patches.md`): text drawn
+  after a `RectFill` lost bitplanes on a 68040, in CFou!'s v1.0 as well (08.11.2026).
 
 ## Open
 

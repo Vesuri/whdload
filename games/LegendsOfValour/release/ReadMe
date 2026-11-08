@@ -40,6 +40,8 @@
  animations correct at any frame rate, finer turning with the mouse, and
  buttons that act once per click. Set Custom2=0 for the original game.
 
+ Text is no longer drawn in wrong colours on fast CPUs (with any setting).
+
  The enhancements work with the English, German and French versions. Other
  versions run as the original game. For an installed German or French game,
  copy LegendsOfValour.Slave over LegendsOfValourDe.Slave or
@@ -59,6 +61,7 @@
  - all enhancements behind one option, Enhanced frame rate (Custom2=1),
    enabled by the game icon
  - enhancements for the English, German and French versions
+ - fixed text drawn in wrong colours on fast CPUs (missing blitter waits)
  - memory requirement increased to 0.7 MB OtherMem
 
  version 1.0 (05.02.05) done by CFou!:
