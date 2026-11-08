@@ -56,6 +56,34 @@ trajectory is identical: changing rendering workload can change its cadence,
 and the native rider traversal derives pose only for eligible forward riders.
 The accelerated simulation retains authoritative pose ownership.
 
+## Intro screen clears (unreleased)
+
+The intro's two screen-clear routines (`INTRO.AMI` offsets `$1f5c` and `$1f8e`)
+write the blitter registers without waiting, start a D-only clear and return at
+`$1f88`/`$1fb4` while it runs. The intro then CPU-decodes its picture and credits
+into the planes being cleared; a CPU that overtakes the blitter loses those
+pixels. This was found during D3 (`memory-performance.md`) and fixed there only
+for CUSTOM2. A player report of glitches in the intro on a 68040 machine
+(8.11.2026, CUSTOM2 setting not known) matches this race on the native path.
+
+`pl_intro_2` now replaces both exits in the native module with
+`visual_intro_clear_done`, which restores the saved registers, waits for the
+blitter and keeps the native CCR. The patch is applied before the Enhanced
+framerate copy, so the copy inherits it; none of the copy's validated operands,
+relocations or relative stubs lie within the six replaced bytes.
+
+Emulator checks (release build, ignored `tmp/blitaudit/`): on `a1200-040` both
+exits jump to the slave with CUSTOM2=0 (native module at `$8000`) and with
+CUSTOM2=1 (public copy). With CUSTOM2=0 at maximum emulated CPU speed the intro
+screenshots every 99 fields from 1349 to 3349 are pixel-identical to the
+unchanged 3.0b slave's: the emulator does not reproduce the race, so this is not
+evidence that the fix removes the reported glitch on real hardware. The 68000 A500
+(custom), `a1200-fast` CUSTOM2=1 and `a1200-040` with CUSTOM2 off and on all reach
+a race.
+
+The player also reported glitches on the bike selection screen; that is open
+(`open-work.md`).
+
 ## Validation
 
 Normal slave: 39,228 bytes, SHA-256

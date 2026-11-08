@@ -1,4 +1,19 @@
 ; Original presentation bug fixes, independent of CUSTOM2 and CPU selection.
+
+; Exit of the intro's screen clears (INTRO.AMI offsets $1f88 and $1fb4,
+; movem.l (sp)+,d0/a0 then rts). Native code returned after starting the
+; blit; a fast CPU then decodes the picture and credits into planes the
+; blitter is still clearing. Wait for it, keeping the native CCR.
+visual_intro_clear_done:
+ movem.l (a7)+,d0/a0
+ move.w sr,-(a7)
+ btst #6,$dff002
+.wait:
+ btst #6,$dff002
+ bne .wait
+ move.w (a7)+,ccr
+ rts
+
 ; Compare full 16.16 separation before rounding. D0 must still carry the
 ; difference of segment indices for the native forward geometry lookup.
 visual_actor_visibility:

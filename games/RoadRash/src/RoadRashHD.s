@@ -156,6 +156,10 @@ pl_intro_2:
 	PL_START
 	PL_P	$8E58,ReadSomeFile
 	PL_P	$8CDA,MoveD0_2
+	; The intro's two screen clears return while the blitter still writes
+	; the planes the CPU decodes next (visual_fixes.s).
+	PL_P	$9F88,visual_intro_clear_done
+	PL_P	$9FB4,visual_intro_clear_done
 	PL_END
 
 	

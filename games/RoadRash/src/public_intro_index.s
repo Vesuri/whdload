@@ -17,25 +17,7 @@ public_intro_index_install:
  lea public_intro_index_reset(pc),a0
  move.w #$4ef9,(a1)
  move.l a0,2(a1)
- ; Native clears returned while the blitter was still writing. Fast image
- ; decoding exposes that race; wait before the CPU writes the same planes.
- move.l a5,a1
- adda.l #$1f88,a1
- bsr .clear_exit
- move.l a5,a1
- adda.l #$1fb4,a1
- bsr .clear_exit
- bra .done
-.clear_exit:
- cmpi.l #$4cdf0101,(a1)
- bne .clear_done
- cmpi.w #$4e75,4(a1)
- bne .clear_done
- lea public_intro_clear_done(pc),a0
- move.w #$4ef9,(a1)
- move.l a0,2(a1)
-.clear_done:
- rts
+ ; The copy carries pl_intro_2's screen-clear waits (visual_fixes.s).
 .done:
  rts
 public_intro_index_reset:
@@ -74,13 +56,3 @@ public_intro_index_reset:
  rts
 public_intro_exp:
  dc.l 0
-
-public_intro_clear_done:
- movem.l (a7)+,d0/a0
- move.w sr,-(a7)
- btst #6,$dff002
-.wait:
- btst #6,$dff002
- bne .wait
- move.w (a7)+,ccr
- rts
