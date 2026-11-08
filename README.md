@@ -22,7 +22,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Gunship Enhanced | JOTD | not yet released |
 | Hard Drivin' Enhanced | JOTD | [4.0b (06.11.2026)](https://github.com/Vesuri/whdload/releases/tag/HardDrivinEnhanced-4.0b-20261106) |
 | Indianapolis 500 Enhanced | StingRay | [4.0b (10.10.2026)](https://github.com/Vesuri/whdload/releases/tag/Indianapolis500Enhanced-4.0b-20261010) |
-| Legends of Valour Enhanced | CFou! | [2.0b (09.10.2026)](https://github.com/Vesuri/whdload/releases/tag/LegendsOfValourEnhanced-2.0b-20261009) |
+| Legends of Valour Enhanced | CFou! | [2.0b (09.11.2026)](https://github.com/Vesuri/whdload/releases/tag/LegendsOfValourEnhanced-2.0b-20261109) |
 | Mercenary 3 Enhanced | Harry, Graham and Wepl | [2.0b (04.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Mercenary3Enhanced-2.0b-20261104) |
 | Powerdrome Enhanced | Galahad/Fairlight | not yet released |
 | Prince of Persia Enhanced | JOTD | released upstream as JOTD's 5.2 (24.10.2026) |
