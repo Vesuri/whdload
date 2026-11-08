@@ -1,0 +1,35 @@
+# Battlehawks 1942
+
+A performance study of the original 1989/1990 Lucasfilm Games flight game (PAL v1.0), run
+under Galahad/Fairlight's WHDLoad install (slave v1.0, 12.05.2003, Retroplay pack
+`Battlehawks1942_v1.0_0053.lha`). There is no game source: work from cycle-exact FS-UAE
+traces and disassembly. Galahad's slave shipped without source; `src/original/` reconstructs
+it byte for byte, so the slave is credited to Galahad/Fairlight (game.conf `AUTHOR`,
+`UPSTREAM`). The slave that is built and patched is `src/Battlehawks1942.s` (WHDLoad 20
+KickEmu, 512 KB chip + 512 KB fast memory). Any change to the game ships as patches in that
+slave. Goal: frame-rate-independent gameplay, 50 fps on faster Amigas. Nothing is released yet.
+The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
+this file and `docs/` here hold only what is specific to this game.
+
+- Addresses in docs are `bh:` hunk-0 offsets of the game executable `BH` (on `Disk.1`),
+  `bh-data:` data-hunk offsets, `kick:` ROM addresses (`$FC0000`-based), or `slave:` offsets
+  (the reconstruction's `Lxxx` labels), never absolute addresses.
+- Instruments (the input tape, experiments, anything that changes behaviour for measurement)
+  go in the `VERIFY` build only. Game patches for players go behind an option.
+- Only what DMA needs belongs in chip RAM; everything else in public memory (fast when there
+  is any). BH already allocates that way; keep it so in any patch.
+- Never edit a script while a capture is running it (bash reads scripts as it goes).
+
+Read `docs/open-work.md` first.
+
+| Doc | Read it for |
+|---|---|
+| `docs/open-work.md` | what is known, what is not, the ordered work items, what Their Finest Hour's work gives this one |
+| `docs/profiling.md` | running the game, driving it, tracing it, or quoting any performance number |
+| `docs/c2p.md` | touching the chunky-to-planar pass |
+
+The slave source is `src/` (`Battlehawks1942.s`, the VERIFY-only `tape.s` and `c2p_full.s`,
+`original/` the reconstruction); game.conf and game.sh define the builds (release, verify,
+c2pfull, tscale, original). `tools/` is the development harness and never ships: `bh.py` is
+the gdb-stub server, `fixed_window.sh` the capture runner, `bh_report.py`, `frames.py`,
+`c2p_stats.py` and the `compare_*.py` scripts read its captures.
