@@ -75,10 +75,46 @@ try:
     if skip:
         cmd('delete'); cmd(f'break *{native(0x2482a)}'); cmd(f'ignore $bpnum {skip - 1}'); assert 'Breakpoint' in cmd('continue')
     rows = []
+    # DEMO_WATCH=1: count the native wall response and the impulse sites per sample
+    # (STEP must then be 1: the field breakpoint has no ignore count).
+    WATCH = {'wall_6988c': 0x6988c, 'impulse_6ee00': 0x6ee00, 'impulse_6ee16': 0x6ee16}
+    watch = os.environ.get('DEMO_WATCH') == '1'
+    # DEMO_TICK=1 (with DEMO_WATCH): one sample per native 100 ms tick (performance mode:
+    # FF1PresentationAfterTick; CUSTOM2=0: the main-loop entry $65174), counting only the
+    # player's impulses (a0 = the player's array, $6f13c) and wall responses.
+    per_tick = os.environ.get('DEMO_TICK') == '1'
+    if per_tick:
+        build = json.loads((b.parent / 'build.json').read_text()); hs = build['host_symbols']
+        kind = '000' if profile.startswith('a500') else 'fine'
+        probe = marker - hs['FF1PublicMarker'] + build['payloads'][kind]['offset']
+        perf = 'CUSTOM2=1' in os.environ['WHD_ARGS']
+        tick = probe + build['payloads'][kind]['symbols']['FF1PresentationAfterTick'] if perf else native(0x65174)
+        report.update(tick=hex(tick), perf=perf)
     for i in range(SAMPLES):
-        cmd('delete'); cmd(f'break *{native(0x2482a)}'); cmd(f'ignore $bpnum {STEP - 1}')
-        assert 'Breakpoint' in cmd('continue')
-        d = {'i': i}
+        cmd('delete'); cmd(f'break *{tick if per_tick else native(0x2482a)}')
+        counts = {}
+        if per_tick:
+            ids = {}
+            for n, a in WATCH.items():
+                cmd(f'break *{native(a)}')
+                if n.startswith('impulse'): cmd(f'condition $bpnum $a0 == {native(0x6f13c)}')
+            counts = dict.fromkeys(WATCH, 0)
+            while True:
+                assert 'Breakpoint' in cmd('continue'); pc = val('$pc')
+                if pc == tick: break
+                for n, a in WATCH.items():
+                    if pc == native(a): counts[n] += 1
+        elif watch:
+            for a in WATCH.values(): cmd(f'break *{native(a)}')
+            counts = dict.fromkeys(WATCH, 0); fields = 0
+            while fields < STEP:
+                assert 'Breakpoint' in cmd('continue'); pc = val('$pc')
+                if pc == native(0x2482a): fields += 1
+                for n, a in WATCH.items():
+                    if pc == native(a): counts[n] += 1
+        else:
+            cmd(f'ignore $bpnum {STEP - 1}'); assert 'Breakpoint' in cmd('continue')
+        d = {'i': i, **counts}
         for n, a in {'speed': 0x2275a, 'segment': 0x6a60a, 'longitudinal': 0x6a62a, 'status': 0x2268e,
                      'demo': 0x1bee8, 'countdown': 0x66f94, 'heading': 0x6a66a, 'laps': 0x1bdea}.items():
             d[n] = val(f'*(unsigned short*){native(a)}')
@@ -86,7 +122,7 @@ try:
         d['cars'] = [[val(f'*(unsigned short*){native(0x6a60a + 2 * k)}'), sval(f'*(short*){native(0x6a61a + 2 * k)}')]
                      for k in range(8)]
         rows.append(d); report['rows'] = rows; save()
-        print(i, d['speed'], d['segment'], d['lateral'], d['status'], d['demo'], flush=True)
+        print(i, d['speed'], d['segment'], d['lateral'], d['status'], d['demo'], counts, flush=True)
     report['status'] = 'passed'; save()
     s.handle(g, f'shot {out}/end.png')
 finally:

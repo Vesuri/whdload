@@ -37,12 +37,20 @@
   situations on the real machine without the card; the same situations with `CUSTOM2=0`
   in the emulator and on the real machine; then a repeated-contact check on the 20 ms
   path against the native response. Do not publish the release until this is understood.
-  Reproduced in the emulator (2026-11-08, `tools/demo_trace.py`, 020+Fast, the FR10 slave,
-  demo race): after a contact the player's speed falls 301 → 168, rises to 361 and the car
-  is thrown sideways about 90 lateral units a tick to the clamp at 604, then counts out of
-  the race. The A500+Fast controls run (68000 path) ends at lateral 604 too, during the
-  countdown with no input. The pre-FR10 slave misses that contact only because the demo's
-  start shifts by a few fields.
+  **The glitches are the original game's (2026-11-08).** `tools/wall_contact.py` holds
+  throttle and full right steering into the wall on 020+Fast with the FR10 slave. With
+  `CUSTOM2=0` (the original loop) the car is kicked from speed 94 to 263, thrown about 400
+  lateral units a tick from one clamp (604) to the other (-604), spins at speed 500
+  while status counts -24 to -1, and is towed; screenshots during the spin show the
+  white wedge at the bottom left and a large red kerb wedge at the bottom right. In
+  performance mode the same steering gives the same kind of response, with smaller
+  throws: in the demo crash (`tools/demo_trace.py`) the impulse runs once and the car
+  moves about 35 lateral units per 20 ms step (about 175 a tick). So the undivided-impulse
+  suspicion is not borne out, and the view swings, bouncing, white strip and red wedge
+  of the recording are the original's crash response and drawing. Still open: the hangs
+  on the real machine (the card; `CUSTOM2=0` there). The lap (020+Fast) and controls
+  (A500+Fast) checks fail because the FR10 layout's demo start reaches such a crash, a
+  fixture problem: they need a start that avoids it.
 - **Fast RAM rendering (docs/FASTRAM_PLAN.md)** is in the release slave since FR10:
   030-50 BCE 48.9–49.9 FPS against 12.5–25.0 on the Chip path, 040-40 BCE 22.5–31.5.
 - Human playtesting (full races) and real Amiga hardware remain deferred.
@@ -61,7 +69,9 @@ The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory
 The current build is the FR10 production slave (`376d1164…`, `tools/fr10_build.py`, with
 `-off` arms and scene fixtures). Next, in order:
 
-1. The collision problem (Where it stands): the contact comparison, both modes.
+1. The real-hardware hangs (Where it stands): the user's test without the card and with
+   `CUSTOM2=0`. Then the lap and controls fixtures' demo crash, reload, and the season
+   runner's missing exit.
 2. FR11 (optional, FASTRAM_PLAN).
 
 Done: FR10, checkpoint and release (2026-11-08; FASTRAM_PLAN "FR10").
