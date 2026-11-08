@@ -15,6 +15,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Game | Original slave by | Release |
 |---|---|---|
 | 4D Sports Driving Enhanced | JOTD | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/4DSportsDrivingEnhanced-2.0b-20261013) |
+| Battlehawks 1942 Enhanced | Galahad/Fairlight | not yet released |
 | Ferrari Formula One Enhanced | StingRay | not yet released |
 | Formula One Grand Prix Enhanced | Codetapper | [2.0b (02.11.2026)](https://github.com/Vesuri/whdload/releases/tag/FormulaOneGrandPrixEnhanced-2.0b-20261102) |
 | Grand Prix Circuit Enhanced | JOTD | [2.0b (14.10.2026)](https://github.com/Vesuri/whdload/releases/tag/GrandPrixCircuitEnhanced-2.0b-20261014) |
