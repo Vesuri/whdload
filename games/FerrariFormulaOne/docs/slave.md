@@ -20,14 +20,15 @@ addresses used in the audited assembly. Every live game address is bound through
 the game's current hunk table, including reloads. Build offsets are not game
 addresses and must never receive native relocation bindings.
 
-The Fast RAM rendering work in progress ([FASTRAM_PLAN.md](FASTRAM_PLAN.md))
-is not part of the release slave. A development build, `make build BUILD=fast`, sets
-`FF1_FINE_DEFINES=FF1_FAST_RENDER=1` in the environment of `build.py`; only
-`FF1_FAST_RENDER*` defines are accepted. They change the fine payload and
-raise the WHDLoad reservation to 1 MiB (768 KiB public pool) for the Fast
-mirrors; such builds do not start on the A500 with 1.5 MiB Slow or the
-chip-only A1200. Without the variable the build is byte-identical to the
-release.
+Fast RAM rendering ([FASTRAM_PLAN.md](FASTRAM_PLAN.md), FR10) is part of the release
+slave: on a 68030, 68040 or 68060 with Fast memory, performance mode draws the picture into
+Fast RAM shadows of the two Chip banks and copies the displayed region to Chip. Any failed
+check at install (CPU, Chip layout, allocation) selects the Chip path, as on the 68020.
+On the emulator the 030 at 50 MHz presents 48.9–49.9 FPS against 12.5–25.0 without it and
+the 040 at 40 MHz 22.5–31.5 against 12.5–25.0 (FASTRAM_PLAN FR10); the 060 is assumed to
+behave like the 040 and is not measured, and real hardware is untested.
+`build.py` accepts further `FF1_FAST_RENDER*` defines in `FF1_FINE_DEFINES` for
+development builds (`FF1_FAST_RENDER_PACING`); without them the build is the release.
 
 `CUSTOM2=0` (the slave's default) selects the original loop. The release installer
 writes `CUSTOM2=1` into the installed icon, so installed games start in performance mode. `CUSTOM1` retains its
@@ -47,15 +48,16 @@ MEMF_PUBLIC; DMA resources retain Chip placement. An overloaded A500 retains its
 200 ms scheduler and pending time. There is no performance-triggered return to
 the legacy loop. Irek's version retains its original path even with CUSTOM2 set.
 
-The combined slave reserves 768 KiB through WHDLoad (256 KiB Kickstart image plus
-512 KiB public pool), in addition to 512 KiB Chip memory and host/slave overhead.
-This reservation also applies with CUSTOM2 disabled: identical minimum memory
-requirements to the small v1.01 release are not claimed. The documented A500
-emulator configuration has 512 KiB Chip plus 1.5 MiB Slow memory; the Fast variant
-also has 2 MiB Fast. The 020 configurations have 2 MiB Chip, with/without 4 MiB Fast.
-These configurations are qualified with WHDLoad 20.1; A500 with 512 KiB Chip
-and 2 MiB Fast also passes without Slow memory. Smaller configurations are
-documented in RELEASE_QUALIFICATION.md. WHDLoad 17.0 and 68060 are not tested.
+The combined slave reserves 1 MiB through WHDLoad (256 KiB Kickstart image plus
+768 KiB public pool, which holds the Fast RAM rendering block), in addition to 512 KiB
+Chip memory and host/slave overhead. This reservation also applies with CUSTOM2
+disabled: identical minimum memory requirements to the small v1.01 release are not
+claimed. It does not fit an A500 with 512 KiB Chip and 1.5 MiB Slow or a chip-only
+A1200 (2 MiB Chip); both started with the earlier 768 KiB reservation. The documented
+emulator configurations are the A500 with 512 KiB Chip, 1.5 MiB Slow and 2 MiB Fast,
+the A500 with 512 KiB Chip and 2 MiB Fast, and the 020 with 2 MiB Chip and 4 MiB Fast,
+qualified with WHDLoad 20.1. The memory check (RELEASE_QUALIFICATION.md) records which
+layouts start. WHDLoad 17.0 and 68060 are not tested.
 
 The elapsed clock is PAL-calibrated. Enabled SPS mode requires WHDLoad to report
 PAL; NTSC is rejected with the normal WHDLoad PAL requirement message. The
@@ -102,8 +104,7 @@ Accelerated profiles present about 16.64 FPS with less than 0.041% clock error i
 the measured automatic demo. Those are emulator observations, not physical CPU
 rankings. The original-loop observations are reported separately.
 
-For the qualified emulator save/load route, use `NoWriteCache`. Chip-only 020
-with WHDLoad 20.1 also needs `ConfigDelay=0` and `SplashDelay=0`. The slave keeps
+For the qualified emulator save/load route, use `NoWriteCache`. The slave keeps
 API 17, but only WHDLoad 20.x is tested; historical 17.0 results are in
 RELEASE_QUALIFICATION.md. Use the shared `~/.local/share/amiga/WHDLoad`
 installation for development. The local candidate package and hash manifest

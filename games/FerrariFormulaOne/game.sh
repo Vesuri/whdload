@@ -3,17 +3,16 @@
 # tools/build.py assembles the host and its payloads and binds them through SPS 0481's
 # relocation records, read from the installed racemenu (never copied into the slave).
 game_build() {
-  local build="$1" out="$2" fine="" game stage
+  local build="$1" out="$2" game stage
   case "$build" in
     release) ;;
-    fast) fine=FF1_FAST_RENDER=1 ;;
-    *) die "no $build build of $VARIANT (game.sh game_build: release, fast)" ;;
+    *) die "no $build build of $VARIANT (game.sh game_build: release)" ;;
   esac
   game="$GAME_ROOT/tmp/game/$GAME_DIR/data/racemenu"
   [ -f "$game" ] || die "no tmp/game/$GAME_DIR/data/racemenu: run make unpack ARCHIVES=<directory> first"
   stage="$out/$VARIANT.d"
   rm -rf "$stage" "$out/$VARIANT.Slave"
-  if ! (cd "$GAME_ROOT" && FF1_FINE_DEFINES="$fine" python3 tools/build.py --game "$game" --out "$stage") \
+  if ! (cd "$GAME_ROOT" && FF1_FINE_DEFINES= python3 tools/build.py --game "$game" --out "$stage") \
       > "$out/$VARIANT.log" 2>&1; then
     cat "$out/$VARIANT.log" >&2
     die "the $build build of $VARIANT failed (tmp/build/$build/$VARIANT.log)"

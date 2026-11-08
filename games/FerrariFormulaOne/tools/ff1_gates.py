@@ -5,7 +5,7 @@
 
 Prepares matched-state, grid and stable-scanout fixtures from the working tree
 (tmp/build/render-<TAG>-*). Then on 040-40-bce it requires: exact 100-update
-states (records.bin and private.json), 30 frames equal to the B8-PAL frames
+states (records.bin and private.json; only Fast pointers, moved by the 1 MiB layout, may differ), 30 frames equal to the B8-PAL frames
 for the normal and grid scenes, and elapsed clock error <= 0.25% over 60
 simulated seconds using DIR's slave. Writes manifest/gates-<TAG>.json.
 Cases are named states/normal, frames/normal, frames/grid, timing/elapsed.
@@ -41,6 +41,28 @@ def prepare():
     exec(compile(s, str(r / 'tools/build_hi25_fixtures.py'), 'exec'), g)
     s = (r / 'tools/build_b8pal_stable_frames.py').read_text()
     exec(compile(s[s.index('for scene in'):].replace('render-b8pal-', f'render-{tag}-'), 'stable', 'exec'), g)
+
+
+def same_but_pointers(a, b):
+    """A and B equal except for longs (at any word offset) that are Fast addresses in both:
+    the 1 MiB ExpMem of Fast RAM rendering moves the guest's Fast allocations (FASTRAM_PLAN
+    FR4, FR10). Returns the count of moved pointers per delta."""
+    import collections, struct
+    assert len(a) == len(b)
+    fast = lambda v: 0x200000 <= v < 0xa00000
+    covered, moved = set(), collections.Counter()
+    for i in range(0, len(a), 2):
+        if a[i:i + 2] == b[i:i + 2] or i in covered:
+            continue
+        for at in (i - 2, i):
+            if at < 0 or at + 4 > len(a):
+                continue
+            x, y = struct.unpack_from('>I', a, at)[0], struct.unpack_from('>I', b, at)[0]
+            if fast(x) and fast(y):
+                moved[hex(x - y)] += 1; covered.update((at, at + 2)); break
+        else:
+            raise AssertionError(f'records differ at {i:#x}, not a Fast pointer')
+    return dict(moved)
 
 
 def raw(p, name):
@@ -106,8 +128,14 @@ for mode, case, b in cases:
     assert x['error'] == 0 and x['slave_sha256'] == hashlib.sha256((b / 'FerrariFormulaOne.slave').read_bytes()).hexdigest()
     if mode == 'states':
         assert x['steps'] == 100
-        assert raw(p, 'records.bin') == raw(old, 'records.bin')
-        assert json.loads((p / 'private.json').read_text()) == json.loads((old / 'private.json').read_text())
+        moved = same_but_pointers(raw(p, 'records.bin'), raw(old, 'records.bin'))
+        mine, ref = json.loads((p / 'private.json').read_text()), json.loads((old / 'private.json').read_text())
+        assert len(mine) == len(ref) == 100
+        for m, o in zip(mine, ref):
+            # wear_remainders ends in the upper word of a Fast pointer (FASTRAM_PLAN FR4).
+            assert m.keys() == o.keys() and all(m[k] == o[k] for k in m if k != 'wear_remainders')
+            assert m['wear_remainders'][:-4] == o['wear_remainders'][:-4]
+        print('states: Fast pointers moved', moved, flush=True)
     if mode == 'frames':
         assert len(x['frames']) == 30 and x['frames'] == json.loads((old / 'result.json').read_text())['frames']
     if mode == 'timing':

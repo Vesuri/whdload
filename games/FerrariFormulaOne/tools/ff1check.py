@@ -29,17 +29,19 @@ GAMES = legacy()                                  # the old Games/ view, staged 
 STAMPS = R / 'tmp/manifest/check-stamps.json'
 GAME = R / 'tmp/game/FerrariFormulaOne/data/racemenu'
 
-CORE = ['a500', 'a1200', 'a1200-fast', '030-50-bce', '040-40-bce']
-FAST = ['a1200', 'a1200-fast', '030-50-bce', '040-40-bce']
+# The 1 MiB ExpMem of Fast RAM rendering (FR10) leaves out the A500 without Fast and the
+# chip-only A1200 (MEMORY below).
+CORE = ['a500-fast', 'a1200-fast', '030-50-bce', '040-40-bce']
+FAST = ['a1200-fast', '030-50-bce', '040-40-bce']
 PERF = 'CUSTOM1=0 CUSTOM2=1 ConfigDelay=0 NoWriteCache'
 ANY = ['FerrariFormulaOne_*.s', 'FerrariFormulaOne/*.s', 'FerrariFormulaOne/*.py',
        'FerrariFormulaOne/layout.json']
 
 # A500 and chip-only memory layouts: (profile, tag, overrides, expect pass).
 MEMORY = [
-    ('a500', 'mem-slow1536', {'SLOW_KB': '1536'}, True),
+    ('a500', 'mem-slow1536', {'SLOW_KB': '1536'}, False),
     ('a500-fast', 'mem-fast2m', {'SLOW_KB': '0'}, True),
-    ('a1200', 'mem-chip2m', {}, True),
+    ('a1200', 'mem-chip2m', {}, False),
     ('a500', 'mem-slow1024', {'SLOW_KB': '1024'}, False),
     ('a500', 'mem-slow512', {'SLOW_KB': '512'}, False),
     ('a1200', 'mem-chip1m', {'CHIP_KB': '1024'}, False),
@@ -73,17 +75,17 @@ CHECKS = {
     'mmu':      dict(script='test_release_smoke.py', kind='release-smoke', profiles=None, core=False,
                      covers=['FerrariFormulaOne_Cache.s', 'FerrariFormulaOne_PublicMemory.s', 'FerrariFormulaOne_WHD.s'],
                      doc='030 WHDLoad MMU + data cache and 040 MMU, performance mode, 20 updates'),
-    'lap':      dict(script='test_release_lap.py', kind='release-lap', profiles=['a500', 'a1200', 'a1200-fast'],
+    'lap':      dict(script='test_release_lap.py', kind='release-lap', profiles=['a500-fast', 'a1200-fast'],
                      core=False, covers=['FerrariFormulaOne_Logic.s', 'FerrariFormulaOne_Track.s',
                      'FerrariFormulaOne_Position*.s', 'FerrariFormulaOne_Time.s', 'FerrariFormulaOne_UpdateHooks.s',
                      'FerrariFormulaOne_Coarse200Timing.s'], doc='native lap crossing and last-lap time'),
-    'controls': dict(script='test_drive_controls.py', kind='controls', profiles=['a500', 'a1200-fast', '040-40-bce'],
+    'controls': dict(script='test_drive_controls.py', kind='controls', profiles=['a500-fast', 'a1200-fast', '040-40-bce'],
                      core=False, covers=['FerrariFormulaOne_Speed.s', 'FerrariFormulaOne_Velocity.s',
                      'FerrariFormulaOne_Steering.s', 'FerrariFormulaOne_Physics200.s', 'FerrariFormulaOne_Step.s',
                      'FerrariFormulaOne_Coarse200Response.s', 'FerrariFormulaOne_Coarse200Motion.s',
                      'FerrariFormulaOne/Fine.s', 'FerrariFormulaOne/Coarse.s'],
                      doc='throttle/clutch, coast, braking, steering and gears (RC2 regression)'),
-    'season':   dict(script='run_release_season.py', kind='release-live', profiles=['a500'], core=False,
+    'season':   dict(script='run_release_season.py', kind='release-live', profiles=['a500-fast'], core=False,
                      covers=['FerrariFormulaOne_Coarse200Save.s', 'FerrariFormulaOne_PublicLoader.s',
                      'FerrariFormulaOne_PublicLifecycle.s', 'FerrariFormulaOne/ProductionHost.s'],
                      whd='CUSTOM1=1 CUSTOM2=1 NoWriteCache', doc='native season save'),
@@ -95,11 +97,16 @@ CHECKS = {
                      covers=['FerrariFormulaOne_Time.s', 'FerrariFormulaOne_Coarse200Timing.s',
                      'FerrariFormulaOne_Coarse200Wait*.s', 'FerrariFormulaOne_PublicLifecycle.s'],
                      doc='repair and transport calendar clocks'),
-    'reload':   dict(script='run_release_legacy_reload.py', kind='release-legacy-live', profiles=['a500', 'a1200-fast'],
+    'reload':   dict(script='run_release_legacy_reload.py', kind='release-legacy-live', profiles=['a500-fast', 'a1200-fast'],
                      core=False, covers=['FerrariFormulaOne_PublicPatches.s', 'FerrariFormulaOne_PublicLoader.s',
                      'FerrariFormulaOne_PublicLifecycle.s', 'FerrariFormulaOne_Bindings.s', 'FerrariFormulaOne_Native*.s',
                      'FerrariFormulaOne/bindings.py', 'FerrariFormulaOne/native.py', 'FerrariFormulaOne/layout.json'],
                      doc='CUSTOM2=0 native overlay reloads keep the patch inventory exact'),
+    'fastrender': dict(script='fr4_probe.py', kind=None, profiles=['030-50-bce', '040-40-bce'], core=False,
+                     covers=['FerrariFormulaOne/FastRender*.s', 'FerrariFormulaOne/Render*.s',
+                     'FerrariFormulaOne_FullPresentation.s', 'FerrariFormulaOne_UpdateHooks.s',
+                     'FerrariFormulaOne_PublicLifecycle.s', 'FerrariFormulaOne/Fine.s'],
+                     whd=PERF, doc='Fast RAM rendering active, 50 draws: no fault, Chip banks equal to their shadows'),
 }
 
 

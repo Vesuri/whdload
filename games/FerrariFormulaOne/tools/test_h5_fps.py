@@ -91,7 +91,7 @@ try:
   cmd(f'dump binary memory {(out/"fr8-log.bin").relative_to(r)} {probe+sy["FR8Log"]} {probe+sy["FR8Log"]+1024*entry}')
  intervals=intervals[:300];report['fps_end']=context();report['intena_end']=val('*(unsigned short*)0xdff01c');fields=sum(intervals)
  import statistics,math
- report['fps']=300/(fields*71051/3546895);report['fps_fields']=fields;report['interval_fields']=intervals;report['mean_ms']=statistics.mean(intervals)*71051/3546895*1000;report['p95_ms']=sorted(intervals)[math.ceil(len(intervals)*.95)-1]*71051/3546895*1000
+ report['fps']=300/(fields*71051/3546895);report['fps_fields']=fields;report['interval_fields']=intervals;report['one_field_share']=intervals.count(1)/len(intervals);report['mean_ms']=statistics.mean(intervals)*71051/3546895*1000;report['p95_ms']=sorted(intervals)[math.ceil(len(intervals)*.95)-1]*71051/3546895*1000
  report['measurement']='300 complete displayed-buffer intervals after 100 presentation calls, excluding each census window boundary; warp off. Concatenated window.jsonl is a storage view, not a continuous timing timeline.';report['census_metadata']=meta
  if 'HeavyFrames' in sy:
   report['heavy_frames']=val(f'*(unsigned int*){probe+sy['HeavyFrames']}');report['heavy_incomplete']=val(f'*(unsigned int*){probe+sy['HeavyIncomplete']}');assert report['heavy_incomplete']==0 or os.environ.get('FR0_NODRAW')=='1'  # FR0 no-draw skips the counted car draws

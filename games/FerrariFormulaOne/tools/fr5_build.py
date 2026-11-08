@@ -20,7 +20,7 @@ import hashlib, json, os, shutil, subprocess, sys
 r = Path(__file__).resolve().parents[1]
 BUILD = r / 'tools/build.py'
 GAME = r / 'tmp/game/FerrariFormulaOne/data/racemenu'
-PRODUCTION_SHA = '9008bdb0ce780cfbaed1bbb891e4a7117e101d273d8adf7c710fdf6be78fb0cb'
+PRODUCTION_SHA = '376d116419e4f7e7de2756043944658fb14d7be39dca840e4ba6407f1c4d3bd6'
 
 
 def build(tag, defines=''):

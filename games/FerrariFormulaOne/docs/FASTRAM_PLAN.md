@@ -1947,6 +1947,52 @@ without the MMU option. Gates: section 4 plus both MMU smokes.
   and that real hardware is untested.
 - Record what limits each CPU next.
 
+**Done (2026-11-08).** The release build has Fast RAM rendering built in
+(`build.py`: `FF1_FAST_RENDER=1` and 1 MiB ExpMem always; `make build BUILD=fast` is
+gone) and is byte-identical to FR12's checkpoint, `376d1164…`; the release pin moves
+to it. `tools/fr10_build.py --scenes` builds it, its scene fixtures and a `-off` arm of
+each (`FF1FastRenderControl` 1 → 0: the Chip path in the same layout).
+
+FR selection gate, 300 presentations, warp off, path on / off, same layout:
+
+| Scene | 030‑50 BCE | 040‑40 BCE |
+| --- | --- | --- |
+| normal | 49.92 / 24.55 | 29.54 / 24.51 |
+| solo | 49.92 / 24.96 | 31.46 / 24.96 |
+| grid | 49.92 / 24.96 | 29.66 / 24.92 |
+| dense | 48.94 / 12.48 | 22.52 / 12.48 |
+
+One-field intervals with the path: 030 300, 300, 300 and 294 of 300; 040 93, 124, 95
+and 0. Both CPUs are faster in every scene and take the path; the 020+Fast stays on the
+Chip path (FR0: its logic and copy exceed a field). The 060 is assumed to behave like
+the 040 and is not measured. These are emulator results; real hardware is untested.
+
+Gates: exact states (only Fast pointers differ from B8-PAL: 1,200 moved by -$54000 and
+100 by -$15000; `ff1_gates.py` now allows exactly that), frames normal and grid, elapsed
+clock 0.026 %. Release checks (`ff1check.py release`): smokes, FPS, gates, memory (the
+A500 with 2 MiB Fast starts; the A500 without Fast and the chip-only A1200 do not), MMU
+030 and 040, lap on A500+Fast, controls on 020+Fast and 040, route, modal and the new
+`fastrender` check (030 and 040: active, 50 draws without a fault, banks equal to their
+shadows) pass. Failing:
+
+- lap (020+Fast) and controls (A500+Fast): both pass on the pre-FR10 slave. FR10's code
+  does not run on either machine; the 1 MiB layout shifts the demo's start by a few
+  fields, and the demo then reaches a contact that throws the player sideways to
+  lateral 604 (speed 301 → 168 → 361, about 90 lateral units a tick; `tools/demo_trace.py`)
+  and out of the race. That is the open collision problem (open-work), not a fault of
+  the path; it blocks the release with it.
+- reload (A500+Fast, 020+Fast): fails on the pre-FR10 slave too.
+- season (A500+Fast): the season saves and F10 quits to the shell, but the runner waits
+  for the emulator to exit and hung (stopped after 10.5 hours).
+
+The measurement emulator was lost in a cleanup and rebuilt (`tools/build_observer.sh`,
+`tools/observer.patch`); the rebuild reproduces FR12's dense 47.85 FPS exactly.
+
+What limits each CPU next: the 030 draws every field except dense (draw about 19 ms;
+50 FPS needs about 19.5 ms busy, FR12); the 040 draws slower than the 030 on this path
+(FR5, cause unknown, not profiled since) and presents 29.5–31.5 FPS; the 020+Fast is
+limited by logic and copy.
+
 ## 4. Gates for every code step
 
 The reduced test matrix applies: no 060, no WHDLoad 17.0, one A500 setup
@@ -1995,7 +2041,7 @@ Dependencies:
 
 ```
 FR0 (go, 2026-11-02) → FR0h → FR1 (done 2026-11-02) → FR2 (done 2026-11-03) → FR3 (done 2026-11-03) → FR4 (done 2026-11-04) → FR5a (done 2026-11-04) → FR5b (done 2026-11-04) → FR5c…FR5f (done 2026-11-05) → FR6 (done 2026-11-05)
-  → FR7 (done 2026-11-06) → FR8 (done 2026-11-06) → FR12 (done 2026-11-06) → FR10 → (FR11, optional)
+  → FR7 (done 2026-11-06) → FR8 (done 2026-11-06) → FR12 (done 2026-11-06) → FR10 (done 2026-11-08) → (FR11, optional)
                                       ↑ checkpoints at FR5c and FR5f
 FR9 any time after FR0, only if the 030 takes the path.
 See "FR0 decision and plan revisions" for the changes to FR1–FR6.

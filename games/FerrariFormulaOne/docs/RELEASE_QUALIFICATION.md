@@ -17,14 +17,19 @@ Human full-race playtesting and real Amiga hardware testing remain deferred.
 From 2.0b on, checks run through the local runner `tools/ff1check.py`
 against one build, on WHDLoad 20.1 build 7190. The core profiles are:
 
-- A500 with 512 KiB Chip and 1.5 MiB Slow
-- chip-only 020 with 2 MiB Chip
-- 020 with 4 MiB Fast
+- A500 with 512 KiB Chip, 1.5 MiB Slow and 2 MiB Fast
+- 020 with 2 MiB Chip and 4 MiB Fast
 - cycle-exact 030 at 50 MHz and 040 at 40 MHz, each with 8 MiB Fast
 
+The A500 without Fast memory and the chip-only 020 left the core profiles at FR10
+(2026-11-08): the 1 MiB reservation of Fast RAM rendering does not fit them (memory
+check below).
+
 Core checks run on every source change: a 20-update smoke on every core
-profile, performance-mode FPS and CACR on the four 020-or-faster profiles, and
-the exact-state, stable-frame and elapsed-clock gates on 040.
+profile, performance-mode FPS (with the share of one-field intervals) and CACR on
+the three 020-or-faster profiles, and the exact-state, stable-frame and elapsed-clock
+gates on 040. The exact-state gate allows only Fast pointers to differ from the B8-PAL
+reference, as the 1 MiB layout moves the guest's Fast allocations.
 
 Feature checks run when a source file they cover changes, and all of them run
 for a release:
@@ -34,6 +39,8 @@ for a release:
 - native lap completion and driving controls
 - season save, the race-control route and repair/transport clocks
 - CUSTOM2=0 native overlay reloads
+- Fast RAM rendering on 030 and 040: the path is active, 50 draws without a fault, and
+  both Chip banks equal their Fast shadows
 
 68060 and WHDLoad 17.0 are no longer tested. The slave's cache policy treats
 060 as a 040-class CPU. The slave still declares WHDLoad API 17, but only
@@ -147,6 +154,11 @@ including with the older emulator observer. Adding `ConfigDelay=0` passes
 sets `SplashDelay=0`; both delays must be disabled for this tested configuration.
 This isolates the failure to startup memory pressure rather than game code or
 the observer correction.
+
+From FR10 (2026-11-08) the reservation is 1 MiB for Fast RAM rendering. The memory
+check on the FR10 slave `376d1164…`: A500 with 512 KiB Chip and 2 MiB Fast starts; A500
+with 512 KiB Chip and 1.5 MiB, 1 MiB or 512 KiB Slow, and the 020 with 2 MiB or 1 MiB
+Chip only, do not. The rest of this section describes the earlier 768 KiB reservation.
 
 With 20.1, A500 with 512 KiB Chip and 2 MiB Fast, without Slow memory, also
 passes. The production reservation is 768 KiB expansion memory in addition to

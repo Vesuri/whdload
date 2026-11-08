@@ -1,21 +1,20 @@
 # Ferrari Formula One current work
 
-## Where it stands (2026-11-06)
+## Where it stands (2026-11-08)
 
-- **Release 2.0b (06.11.2026), unreleased.** The release slave (`9008bdb0…`) is the default-off combined
-  performance slave (`CUSTOM2=1`, PAL, SPS 0481): RC2 plus the performance-mode cache
-  policy. The cache-policy build has not passed the feature checks yet: run
-  `python3 tools/ff1check.py release` (or `changed --run`) on the release build before
-  releasing. `ff1check.py changed` lists memory, lap, controls and reload as never passed
-  on the current sources and season as changed (`ProductionHost.s`).
+- **Release 2.0b (06.11.2026), unreleased.** The release slave (`376d1164…`, FR10) is the
+  default-off combined performance slave (`CUSTOM2=1`, PAL, SPS 0481) with Fast RAM
+  rendering on the 030/040/060 (FASTRAM_PLAN "FR10"). It reserves 1 MiB ExpMem (768 KiB
+  pool), so the A500 without Fast memory and the chip-only A1200 no longer start (the
+  user's decision, "add enough memory", 2026-11-06). `ff1check.py release` on it
+  (2026-11-08): everything passes except lap (020+Fast) and controls (A500+Fast), which
+  meet the collision problem below in the demo; reload (A500+Fast, 020+Fast), which fails
+  on the pre-FR10 slave too; and season, whose runner hangs after a correct F10 exit
+  (`run_release_season.py` waits for the emulator to exit, with no timeout).
 - **Before a release here:** `tools/build.py` appends `$VER: FerrariFormulaOne.slave 2.0b
   (06.11.2026)` after the payloads, from `slv_info`'s version and date, so no host or payload
-  byte moves (`$VER` alone changed the slave from `597a74b9…`; the core smokes pass on it).
-  The installed icon enables performance mode: `release/Install` writes `CUSTOM2=1` into it
-  (the user's decision, 2026-11-06; not yet run under Installer). Memory: the release is to
-  reserve what the FR path needs (1 MiB ExpMem, 768 KiB pool), which drops the A500 with
-  1.5 MiB Slow and the chip-only A1200. It goes into the release slave with the FR path at
-  FR10; until then the release slave has no use for it, and it keeps the `9008bdb0…` pin.
+  byte moves. The installed icon enables performance mode: `release/Install` writes
+  `CUSTOM2=1` into it (the user's decision, 2026-11-06; not yet run under Installer).
 - **Release blocker: hangs on a real A1200/040 (2026-11-07, the user's report).** On an
   A1200 with a 68040, MMU and 32 MB, performance mode hung every time on Esc to pause then
   Esc to resume, and in collisions with the track edges: the game stops with the clock
@@ -38,10 +37,14 @@
   situations on the real machine without the card; the same situations with `CUSTOM2=0`
   in the emulator and on the real machine; then a repeated-contact check on the 20 ms
   path against the native response. Do not publish the release until this is understood.
-- **Fast RAM rendering (`make build BUILD=fast`, docs/FASTRAM_PLAN.md),** development only:
-  FR1–FR8 and FR12 (draw speed) done: 030-50 BCE 49.9 FPS (every field) against
-  24.6 native, 040-40 BCE 29.8 against 24.5 (FR12 checkpoint `376d1164…`, 2026-11-06). FR8 showed the draw is the limit. The work concentrates on the 68030 (below); FR0h is still open. FR builds
-  need 1 MiB ExpMem and do not boot on the 512 KiB A500 or the chip-only A1200.
+  Reproduced in the emulator (2026-11-08, `tools/demo_trace.py`, 020+Fast, the FR10 slave,
+  demo race): after a contact the player's speed falls 301 → 168, rises to 361 and the car
+  is thrown sideways about 90 lateral units a tick to the clamp at 604, then counts out of
+  the race. The A500+Fast controls run (68000 path) ends at lateral 604 too, during the
+  countdown with no input. The pre-FR10 slave misses that contact only because the demo's
+  start shifts by a few fields.
+- **Fast RAM rendering (docs/FASTRAM_PLAN.md)** is in the release slave since FR10:
+  030-50 BCE 48.9–49.9 FPS against 12.5–25.0 on the Chip path, 040-40 BCE 22.5–31.5.
 - Human playtesting (full races) and real Amiga hardware remain deferred.
 
 ## Fast RAM rendering: continuing
@@ -50,19 +53,18 @@ The user's decisions (2026-11-05): concentrate on the 68030 and leave the 68040 
 30–38 FPS on the 030 is a good result. The 040 is slower than the 030 on this path (FR5
 already showed it: 161 against 94 ms per draw, road 67 against 24 ms), the cause is not
 known and it has not been profiled since FR5, so no 040 figure follows from an 030 one.
-Commit each FR step when its gates pass; push only when asked. Production stays the
-`9008bdb0…` slave (`597a74b9…` before the `$VER` string) with DEBUG off and ExpMem `$c0000`; the 1 MiB ExpMem is only for
-`FF1_FAST_RENDER` builds and the release memory scheme is undecided. The hunks already load
+Commit each FR step when its gates pass; push only when asked. Production is the FR10
+slave `376d1164…` (1 MiB ExpMem). The hunks already load
 into Fast memory (FASTRAM_PLAN "Code and data placement check"); that needs no new look.
 The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory checks.
 
-The current build is FR12's candidate (`376d1164…`, `tools/fr12_build.py`; FR8's was `e9ae9b3c…`); FR6's final
-build was k5 (`8ec61e11…`). `tmp/manifest/fr6-validation.json` and `fr8-validation.json`
-hold the FPS, gates and measurements; `tmp/logs/fr6-*.log`, `fr7-*.log` and `fr8-*.log` the
-gate, FPS, probe and profile logs. Next, in order:
+The current build is the FR10 production slave (`376d1164…`, `tools/fr10_build.py`, with
+`-off` arms and scene fixtures). Next, in order:
 
-1. FR10: checkpoint and release (FASTRAM_PLAN "FR10"), with the release memory scheme
-   above.
+1. The collision problem (Where it stands): the contact comparison, both modes.
+2. FR11 (optional, FASTRAM_PLAN).
+
+Done: FR10, checkpoint and release (2026-11-08; FASTRAM_PLAN "FR10").
 
 Done: FR12, draw work on the 030 (FASTRAM_PLAN "FR12"; closed by the user's decision,
 2026-11-06). Eight steps (one-dot lines, zero road-fill words, the car in one pass, the road
@@ -79,7 +81,7 @@ Commands, from this directory after `. ../../common/env.sh`, one emulator job at
 python3 tools/fr2_unicorn.py 68020   # and 68030, 68040, after any kernel change:
                                      # "cases 4479 mismatches 0 kernel cases 3162"
 python3 tools/fr8_build.py TAG [--scenes]
-                                     # tmp/build/fr8-production (asserts 9008bdb0), fr8-TAG,
+                                     # tmp/build/fr8-production (asserts the production sha), fr8-TAG,
                                      # fr8-TAG-pace (pacing log) and their -early0 arms
                                      # (FF1FastRenderEarly 0); --scenes: fr8-TAG-pace-{normal,
                                      # solo,grid,dense}[-early0]
@@ -148,7 +150,9 @@ Pitfalls:
 
 The evidence (measurement and validation JSON, `tmp/manifest/`, with `project.json` as the
 index) and the captures (`tmp/step5/`, ...) are local and ignored. `tmp/step5-frame-observer-build/`
-is the private FS-UAE build most checks run on (`RELEASE_FSUAE`).
+is the private FS-UAE build most checks run on (`RELEASE_FSUAE`); `tools/build_observer.sh`
+rebuilds it from upstream plus `tools/observer.patch` (census, the 030/040 clock fix). A
+rebuild on 2026-11-08 reproduced FR12's dense 47.85 FPS exactly.
 
 ## Release qualification (October)
 

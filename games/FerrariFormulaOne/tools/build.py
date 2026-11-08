@@ -30,15 +30,16 @@ def host(offsets):
  run([vasm,f'-DFF1_EXPMEM_SIZE={EXPMEM}','-DFF1_PUBLIC_MEMORY=1','-DFF1_PUBLIC_LOADER=1','-DFF1_PUBLIC_STACK=1','-m68000','-pic','-x','-devpac','-Fhunkexe','-nosym',f'-I{out}',f'-I{FINE}',f'-I{MAIN}',f'-I{whd}/Include',f'-I{whd}/Src/sources',f'-I{ndk}','-L','host.list','-o','host.slave',str(MAIN/'FerrariFormulaOne_WHD.s')],out)
  return symbols(out/'host.list'),(out/'host.slave').read_bytes()
 flags0=['FF1_PRODUCTION=1','FF1_PUBLIC_BINDINGS=1','FF1_PUBLIC_PATCHES=1','FF1_PUBLIC_MEMORY=1','FF1_RENDER_POSES=1']
-flagsfine=['FF1_PRESENTATION_SPLIT=1','FF1_PRESENTATION_CALLBACK=1','FF1_PLAN_B=1','FF1_PLAYER_HOOKS=1','FF1_HELPERS_020=1','FF1_NATIVE_EXACT=5','FF1_PUBLIC_LIFECYCLE=1']
+# FF1_FAST_RENDER: Fast RAM rendering on the 030/040/060 (FASTRAM_PLAN.md, released at FR10).
+flagsfine=['FF1_PRESENTATION_SPLIT=1','FF1_PRESENTATION_CALLBACK=1','FF1_PLAN_B=1','FF1_PLAYER_HOOKS=1','FF1_HELPERS_020=1','FF1_NATIVE_EXACT=5','FF1_PUBLIC_LIFECYCLE=1','FF1_FAST_RENDER=1']
 # Development-only fine-payload defines (FASTRAM_PLAN.md FR series), e.g.
-# FF1_FINE_DEFINES=FF1_FAST_RENDER=1. Unset for production builds.
-extra=[x for x in os.environ.get('FF1_FINE_DEFINES','').split(',') if x]
+# FF1_FINE_DEFINES=FF1_FAST_RENDER_PACING=1. Unset for production builds.
+extra=[x for x in os.environ.get('FF1_FINE_DEFINES','').split(',') if x and x not in flagsfine]
 assert all(x.startswith('FF1_FAST_RENDER') for x in extra),extra
 flagsfine+=extra
-# ws_ExpMem: the 256 KiB Kickstart plus guest Fast. The Fast render mirrors
-# (FASTRAM_PLAN.md FR4) need 256 KiB more guest Fast than production today.
-EXPMEM=0x100000 if extra else 0xc0000
+# ws_ExpMem: the 256 KiB Kickstart plus guest Fast; the Fast render mirrors
+# (FASTRAM_PLAN.md FR4) need 1 MiB in all.
+EXPMEM=0x100000
 flags000=['FF1_COARSE_NATIVE_000=1','FF1_NATIVE_000_STAGE=3','FF1_COARSE_200=1','FF1_COARSE_200_COMPLETE=1']
 flags000 += [x+'=1' for x in ['FF1_PRODUCT_AB','FF1_DIV200_AB','FF1_NATIVEMUL200_AB','FF1_RESET200_AB','FF1_CROSS200_AB','FF1_ROOTLEAD_AB','FF1_SMALLROOT_AB','FF1_C4_BLIT_GUARD','FF1_C4_ROAD_PREFETCH','FF1_C4_ROOT_SEED','FF1_C4_MUL_INLINE','FF1_C4_DIV_LIMIT','FF1_C4_MUL_WORD','FF1_C4_HOOK_P5','FF1_C4_CONTEXT_P5','FF1_C4_BOUNDARY_P5','FF1_C4_WAIT_IDLE','FF1_C4_COLOUR_ELIDE','FF1_C4_DIV_FAST','FF1_C4_ROTATE_FAST','FF1_C4_MUL_SITES','FF1_C4_SINE_INLINE','FF1_C4_NATIVE_FRAMES','FF1_C4_WAIT_DIRECT','FF1_C4_DIV_SHORT_FRAMES']]
 def payload(kind,offset,hs):

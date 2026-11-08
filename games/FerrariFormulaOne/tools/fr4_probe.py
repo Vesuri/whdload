@@ -2,7 +2,8 @@
 # draws past the first publication and read FF1FastRenderStats (FR3S) and
 # FF1FastRenderSiteStats (FR4S: software/hardware blits per site, faults).
 # A break on FF1FastRenderFault or FF1ProductionFault reports the fault.
-#   fr4_probe.py PROFILE [DRAWS]      env FR4_BUILD, FR4_TAG
+#   fr4_probe.py PROFILE [DRAWS]      env FR4_BUILD (or FF1_BUILD), FR4_TAG
+# Exits 1 unless the probe passed (ff1check.py fastrender).
 # Output tmp/step5/fr4-probe-PROFILE[TAG]/result.json
 from pathlib import Path
 import os,sys,time,signal,json,struct,hashlib
@@ -10,7 +11,7 @@ sys.path.insert(0,str(Path.home()/'.local/share/amiga/pylib'))
 from amigaxdev.gdbserve import Server
 r=Path(__file__).resolve().parents[1];os.chdir(r);profile=sys.argv[1];draws=int(sys.argv[2]) if len(sys.argv)>2 else 50
 out=r/'tmp/step5'/('fr4-probe-'+profile+os.environ.get('FR4_TAG',''));out.mkdir(parents=True,exist_ok=True)
-b=Path(os.environ.get('FR4_BUILD',str(r/'tmp/build/fr4-candidate')))/'FerrariFormulaOne.slave'
+b=Path(os.environ.get('FR4_BUILD') or os.environ.get('FF1_BUILD') or str(r/'tmp/build/fr4-candidate'))/'FerrariFormulaOne.slave'
 profiles=json.loads((r/'tmp/manifest/step3-profiles.json').read_text());os.environ.update(profiles[profile])
 os.environ.update(SLAVE=str(b),WARP='1',WINDOW='none',JOY0='mouse',WHD_ARGS=os.environ.get('RELEASE_WHD_ARGS','CUSTOM1=1 CUSTOM2=1'),DETERMINISTIC='1',
  FSUAE=os.environ.get('RELEASE_FSUAE',str(r/'tmp/step5-frame-observer-build/fs-uae')),FF1_FRAME_SENTINEL='0',KICKSTART=os.environ['KICKSTART_A1200'])
@@ -135,3 +136,4 @@ finally:
  if s.g:s.g.p.kill()
  try:os.kill(int((r/'tmp/run/default/.run/fsuae.pid').read_text()),signal.SIGKILL)
  except (ProcessLookupError,FileNotFoundError):pass
+sys.exit(0 if report.get('status')=='passed' else 1)
