@@ -1,7 +1,7 @@
 # The chunky-to-planar pass, and whether a Kalms c2p would help
 
 Question (2026-10-07): would replacing the game's c2p (`bh:1a2c2`) with one of Mikael Kalms'
-merge c2p routines (`~/.local/share/amiga/kalms-c2p`) raise the frame rate?
+merge c2p routines (`$AMIGA_SHARE/kalms-c2p`) raise the frame rate?
 
 **Answer: no.** Measured: a full-frame merge c2p in Kalms' style makes the game 40 % slower
 on the A500 (9.7 → 5.7 fps in level flight, 6.2 → 4.3 fps in a roll). The game's own pass
@@ -30,7 +30,7 @@ routine that converts every pixel.
 Costs: 31.2 cycles per long compared, 381.7 cycles per changed long converted; one pass is
 about 117,000 cycles in level flight (0.8 PAL fields at 7.09 MHz).
 
-## The experiment (`make c2pfull`, `whdload/c2p_full.s`, VERIFY only)
+## The experiment (`make build BUILD=c2pfull`, `src/c2p_full.s`, VERIFY only)
 
 A full-frame merge c2p written for this chunky format: Kalms' routines take a byte per pixel
 and start by merging bytes into nibbles; here the nibbles exist already but in sequential

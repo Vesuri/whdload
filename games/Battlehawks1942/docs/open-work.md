@@ -7,17 +7,17 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
 ## Done
 
 2026-10-06/07, first pass:
-- Repo, rules (`AGENTS.md`), `tmp/` ignored; game, Kickstart, WHDLoad bytes and captures local only.
+- Repo, rules (`AGENTS.md`, the repository root's), `tmp/` ignored; game, Kickstart, WHDLoad bytes and captures local only.
 - Game, version, slave type and the slave's patches documented (profiling.md §1). The slave
-  had no source: reconstructed byte-identically (`whdload/original/`).
-- A WHDLoad 20 KickEmu slave (`whdload/Battlehawks1942.s`) and a VERIFY build with an input
+  had no source: reconstructed byte-identically (`src/original/`, `make build BUILD=original`).
+- A WHDLoad 20 KickEmu slave (`src/Battlehawks1942.s`) and a VERIFY build with an input
   tape that reaches the first training flight.
 - `bh_report.py` names every hot region; traces have PCs. Frame counter: c2p passes.
 
 2026-10-07, second pass:
 - **Reproducibility fixed.** The JOY0DAT difference between boots was FS-UAE: with
   `joystick_port_0=none` the port's mode stays `mouse` and the host mouse still moves the
-  counters. `run.sh` (through the shared `fsuae_common.sh`) now also sets `joystick_port_N_mode=nothing` for `JOYN=none`; two
+  counters. The shared `fsuae_common.sh` (under `common/run.sh`) now also sets `joystick_port_N_mode=nothing` for `JOYN=none`; two
   captures then compared `identical` (every register, DMA record and screenshot).
 - **Memory: only DMA data in chip RAM** (the user's rule). The slave gives 512 KB of fast
   memory; BH's hunks are "any" memory and BH allocates sample data `MEMF_CHIP` and everything
@@ -42,6 +42,39 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   player and drones cover the same ground in the same game time (4.1 %, 1–2 %).
 - **Baselines, the turn:** 68000 9.2 fps (chip-only slave 8.8), 68020 28.8 fps (§6).
 
+## What Their Finest Hour's work gives this one
+
+The work here paused for Their Finest Hour (`games/TheirFinestHour`, the same Lucasfilm
+engine family: Aztec C, small-data `a4` globals, a step divisor T, a chunky buffer and a delta
+c2p). That work is finished (Enhanced framerate, `CUSTOM2=1`, released as 2.0b). Its
+`docs/internals.md` ("Game time", "The slave's changes") and `docs/framerate-audit.md` hold
+the details. What carries over, untested on BH:
+
+- **The design: T per frame (E above).** TFH sets T at the top of the flight loop from the
+  measured average frame length (moving 1/8 of the way per frame, clamped to 4..field rate),
+  carries the time owed between frames, ignores frames of more than 25 fields (pauses, disk
+  loads), and starts each flight from the boot T. BH needs the same, from its own field
+  counter (it has none, item 3) and from the mission T at `bh:1341c`.
+- **Countdowns set as multiples of T** last their time only while T stays put; TFH's fix is
+  the averaged T, and its audit (FR-01..FR-28) replaced frame-counted timers with elapsed
+  time one system at a time. Its list (debris, group timers, effects, world clock, projectile
+  life, flak, gun reloads, bomb salvos and guidance, damage, AI decisions and aim, script
+  waits, mission waits, messages, replay and camera, field-based input, audio envelopes, fuel)
+  is the checklist for BH's 25 `divu.w 10184(a4)` sites and the timers in units of T.
+- **The stick:** TFH scales the counts by T/8 (its reference T) at the end of its input
+  routine; BH's `STICKREF` experiment (divide by the reference T 7) is the same fix.
+- **Fractions at large T:** at T = 50 per-step increments truncate to nothing; TFH carries
+  16.16 fractions per object for position, the player's rates and the AI turn. BH's
+  integrators (`bh:79f0`, the world arrays at `10908/11484/12060(a4)`) will need the same.
+- **The method:** native CPU checks of single routines under Unicorn (68000 and 68040) from
+  a flight snapshot, comparing equal elapsed game time at T = 8/25/50/60 and changing T;
+  input tapes and pinned RNG in the VERIFY build only (item 1); every change behind one
+  `CUSTOM` option with the original bytes untouched when it is off (item 6).
+- **Not directly:** TFH's frame pacing waits for the buffer swap; BH has one displayed
+  bitplane buffer and no swap (profiling.md §5). TFH's merge c2p converts only changed
+  groups of 32 pixels, unlike the full-frame merge rejected here (`docs/c2p.md`); whether a
+  delta merge pays on BH is unmeasured.
+
 ## Not done yet, in order
 
 1. **Seed BH's second random generator at flight start** in the VERIFY build (shift register
@@ -51,8 +84,8 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
    decoupling design.
 2. **The 68030 ceiling.** A 50 MHz `SWAP_ONLY` run found the flight already at frame 1539 when
    the anchor was armed: map that machine's screens against the tape first.
-3. **Dynamic T for BH**, after Their Finest Hour's `CUSTOM4` is finished (the
-   lessons are in AmigaXDev `docs/playbooks/fixed-time-simulation.md`): the coverage test (profiling.md §9) shows the flight
+3. **Dynamic T for BH**, now that Their Finest Hour's version is finished (its Enhanced
+   framerate, below; the lessons are in AmigaXDev `docs/playbooks/fixed-time-simulation.md`): the coverage test (profiling.md §9) shows the flight
    model and the drones follow T and the stick needs the reference-T division. BH also needs
    its own field counter (no VBL count exists), T restored at mission setup (`bh:1341c`),
    `10186(a4)` and countdowns recomputed, the slot-128 pool sized for T = 50 (16 slots is all

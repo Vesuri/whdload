@@ -1,4 +1,4 @@
-; VERIFY-only experiment (make c2pfull): replace the game's delta chunky-to-planar pass
+; VERIFY-only experiment (make build BUILD=c2pfull): replace the game's delta chunky-to-planar pass
 ; (bh:1a2c2) with a full-frame merge c2p in the style of Mikael Kalms' c2p1x1_4_c5, to measure
 ; whether converting every pixel with bit exchanges beats comparing and converting only the
 ; changed longs (docs/c2p.md).

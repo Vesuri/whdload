@@ -5,7 +5,7 @@
 
 Each FRAME:EVENT presses input event EVENT at the start of emulated frame FRAME (line 1) and
 releases it HOLD frames later (default 5). BASE.rec is a recording made with no input
-(`RECORD=... amiga/run.sh` in warp, ended with SIGTERM) that runs past the last release.
+(`make run RECORD=... WARP=1`, ended with SIGTERM) that runs past the last release.
 
 FS-UAE recording format (big-endian uint32): per frame `0x80000000|frame`,
 `0x10000000|rand checksum`, `0x08000000|state checksum`; then that frame's events as

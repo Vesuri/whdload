@@ -5,9 +5,13 @@ AmigaXDev's `docs/playbooks/new-game-playbook.md`. Every number here names its i
 
 ## TL;DR
 
+From `games/Battlehawks1942`, the tools after `. ../../common/env.sh` (the shared `python3`):
+
 ```sh
-source amiga/env.sh
-make -C whdload original                 # reconstruction == shipped slave (byte compare)
+make unpack ARCHIVES=<directory with Battlehawks1942_v1.0_0053.lha>
+make build BUILD=original                # reconstruction == shipped slave (byte compare)
+make run                                 # boot the KickEmu slave (A500, 1 MB chip + 2 MB fast)
+make run SLAVE=original                  # boot the shipped v1.0 slave
 tools/fixed_window.sh tmp/prof/turn      # VERIFY build: 100 fields from flight frame 90, in a left circle
 SLAVE=tmp/prof/turn/slave.slave python3 tools/bh_report.py tmp/prof/turn/trace.bin tmp/prof/turn/code.bin
 SLAVE=tmp/prof/turn/slave.slave python3 tools/frames.py tmp/prof/turn/trace.bin tmp/prof/turn/code.bin 0x200000
@@ -23,13 +27,13 @@ A capture takes about 10 minutes (one boot, ~4800 fields to the window in warp) 
 
 | | |
 |---|---|
-| Archive | `Battlehawks1942_v1.0_0053.lha` (Retroplay), SHA-256s in `tmp/archive.sha256` |
+| Archive | `Battlehawks1942_v1.0_0053.lha` (Retroplay), pinned in `inputs.sha256`, unpacked into `tmp/game/Battlehawks1942/` |
 | Game | PAL v1.0, three AmigaDOS OFS disks: `Disk.1` "BHawk1" (boot, `BH`, sounds), `Disk.2` "BHawk2" (screens, `FDAT/` plane data), `Disk.3` "BHPilots" (pilot records) |
 | Code | `BH` on `Disk.1` (167 936 bytes), Aztec C (`link a5` prologues, `jsr d16(a4)` jump table, small data `a4` = data hunk + `$7FFE`). Hunk 0 code `$1C794` bytes at file `$28` (3 relocs); hunk 1 data `$A664` file-backed / `$F1EC` allocated (2146 relocs); hunk 2 BSS 4 bytes. `Disk.1:s/startup-sequence` is just `BH`. |
 | Shipped slave | Galahad of Fairlight v1.0 (12/05/03), 1512 bytes, WHDLoad v15 header, no source. `ws_BaseMemSize` `$80000`, `ws_ExpMem` `$40000` (exactly the Kickstart image), flags `NoError\|EmulPriv`, quit F10. The archive is the "SLOW" slave (no fast RAM); the ReadMe mentions a "FAST" one, not included. |
-| Reconstruction | `whdload/original/Battlehawks1942.s` rebuilds the shipped slave byte-identically. Old-style Kick 1.3 boot: `resload_LoadKick` into ExpMem, a `resload_Patch` list on the Kickstart image (trackdisk → `Disk.N` via `resload_DiskLoad`, disk change, copper, a dos `LoadSeg` hook), and in the hook one patch to `BH`. Decode its list with `python3 -m amigaxdev.patchlist SLAVE 0x206`. |
+| Reconstruction | `src/original/Battlehawks1942.s` (`make build BUILD=original`, `-no-opt`) rebuilds the shipped slave byte-identically. Old-style Kick 1.3 boot: `resload_LoadKick` into ExpMem, a `resload_Patch` list on the Kickstart image (trackdisk → `Disk.N` via `resload_DiskLoad`, disk change, copper, a dos `LoadSeg` hook), and in the hook one patch to `BH`. Decode its list with `python3 -m amigaxdev.patchlist SLAVE 0x206`. |
 | Game patch | The manual check ("Recognition Test", shown before the first flight): `bh:025be move.b (0,a0,d1.l),d2; cmp.w d2,d0; beq.s` becomes `jsr fix; bra.s` — any answer passes, but Return must still be pressed. |
-| Built slave | `whdload/Battlehawks1942.s`: WHDLoad 20 KickEmu (`kick13.s` and the 20.0 headers from the shared `$WHDLOAD`, see `whdload/README.md`). 512 KB chip **plus 512 KB fast memory** (v1.0: chip only), `DISKSONBOOT`, `NUMDRIVES=3` (no swaps), `WPDRIVES=%1111` (as v1.0), the same `BH` patch via `_cb_dosLoadSeg` + `resload_PatchSeg`. `make verify` adds `tape.s`; `make c2pfull` the c2p experiment (`docs/c2p.md`). |
+| Built slave | `src/Battlehawks1942.s` (`make slave`): WHDLoad 20 KickEmu (`kick13.s` and the headers from the shared `$WHDLOAD`, following its `Src/slave-examples/kick13.asm`; `src/include/lvo/` adapts the official sources' include names to the NDK). 512 KB chip **plus 512 KB fast memory** (v1.0: chip only), `DISKSONBOOT`, `NUMDRIVES=3` (no swaps), `WPDRIVES=%1111` (as v1.0), the same `BH` patch via `_cb_dosLoadSeg` + `resload_PatchSeg`. `make verify` adds `tape.s`; `make build BUILD=c2pfull` the c2p experiment (`docs/c2p.md`). |
 
 **Memory.** Only what DMA needs is in chip RAM. `BH`'s three hunks are "any" memory; it
 allocates the sample data of its sound resources `MEMF_CHIP` (`bh:157d6`: resource id + 1000,
@@ -47,9 +51,9 @@ Anything read inside the slave (the tape counter) is searched for from the runni
 ## 2. The machine
 
 68000, 512 KB chip, **8 MB Zorro II fast RAM** (`CHIP_KB=512 FAST_KB=8192`, no slow RAM),
-cycle exact, PAL, host Kickstart 3.1 + Workbench 2.04 floppy booting `DH0`, WHDLoad 20.0 on `DH1`
-(`amiga/run.sh`; kick13 needs `kick34005.A500` + `.RTB`, both come from the
-shared `~/.local/share/amiga/Kickstarts/`). `fixed_window.sh` sets all of this. The fast RAM holds
+cycle exact, PAL, host Kickstart 3.1 + Workbench 2.04 floppy booting `DH0`, WHDLoad 20 on `DH1`
+(`common/run.sh`; kick13 needs `kick34005.A500` + `.RTB`, both come from the
+shared `$AMIGA_SHARE/Kickstarts/`). `fixed_window.sh` sets all of this. The fast RAM holds
 the slave's fast memory and lets `PRELOAD` cache all three disk images; with only 1.5 MB of
 slow RAM it could not, and every disk read became a WHDLoad OS switch (the screen blinks
 through the boot, and loads slowed enough to break the tape). The first baseline (§6, "chip
@@ -57,11 +61,11 @@ only") used the old A500-equivalent: `FAST_KB=0 EXTRA_ARGS=--slow_memory=1536`, 
 
 ## 3. Driving: `tools/bh.py` and the input tape
 
-`bh.py serve` boots (`DEBUG=1 amiga/run.sh`: silent, its window behind the others; `WINDOW=none`
+`bh.py serve` boots (`common/run.sh` with `DEBUG=1`: silent, its window behind the others; `WINDOW=none`
 runs with no video), attaches gdb within the stub's 20 s window,
-and serves `stop/cont/gdb/shot/profile/wait/until/quit` on `amiga/.run/bh.sock` (the shared
-server, AmigaXDev `amigaxdev.gdbserve`; the shared tools are run under `. amiga/env.sh` or
-through `tools/_amigaxdev.py`). The profiler's PC window is fixed before each capture through
+and serves `stop/cont/gdb/shot/profile/wait/until/quit` on `tmp/run/<INSTANCE or default>/.run/bh.sock` (the
+shared server, AmigaXDev `amigaxdev.gdbserve`, through `common/tools/game_server.py`; the shared
+tools are run under `. ../../common/env.sh` or through `tools/_amigaxdev.py`). The profiler's PC window is fixed before each capture through
 one lldb kept attached for the session (link-time `0x32dea04`, unchanged FS-UAE binary): the
 first capture takes ~30 s for the attach, later ones none.
 
@@ -72,10 +76,10 @@ first capture takes ~30 s for the attach, later ones none.
    event table, 48-byte entries, `JOY2_LEFT` = 60 and `SPC_STATESAVE1` = 378 agree with
    TD2), but FS-UAE itself emits two events at startup (2263, 2272: joystick-port mode
    actions, sent whatever `JOY0/JOY1` are). During playback recording any event truncates the
-   recording at the play position, so playback always ends at position 0. `PLAYBACK=` is kept
-   in `run.sh` in case a fixed FS-UAE turns up. The recordings also showed that the host
+   recording at the play position, so playback always ends at position 0. `make run PLAYBACK=file`
+   is kept (`game.sh`) in case a fixed FS-UAE turns up. The recordings also showed that the host
    mouse feeds port 0 when `JOY0=mouse`, even with input grab off.
-2. **The VERIFY input tape (`whdload/tape.s`) — used.** `_cb_dosLoadSeg` starts an Exec task
+2. **The VERIFY input tape (`src/tape.s`) — used.** `_cb_dosLoadSeg` starts an Exec task
    (TCB, stack and I/O blocks inside the slave, so the game's allocations do not move) that
    counts fields with `WaitTOF` and sends `IECLASS_RAWKEY` events through `input.device`
    `IND_WRITEEVENT`: Return at fields 3000, 3505, 4010, 4515 after BH's LoadSeg, then the
@@ -201,10 +205,10 @@ Same scene, other configurations (frames.py; the turn, flight frame 90, 100 fiel
 | machine | slave | fps | fields/frame |
 |---|---|---:|---:|
 | 68000, 512 KB chip + 8 MB fast | fast memory (default) | **9.2** | 5.41 |
-| 68000, 512 KB chip + 8 MB fast | chip only (`-DFASTMEMSIZE=0`, like v1.0) | 8.8 | 5.69 |
+| 68000, 512 KB chip + 8 MB fast | chip only (`VASM_EXTRA=-DFASTMEMSIZE=0`, like v1.0) | 8.8 | 5.69 |
 | 68020 (A1200, 2 MB chip + 8 MB fast) | fast memory | **28.8** | 1.74 |
 
-`AMIGA_MODEL=A1200 KICKSTART=~/.local/share/amiga/Kickstarts/kick40068.A1200 CHIP_KB=2048
+`AMIGA_MODEL=A1200 KICKSTART=$KICKSTART_A1200 CHIP_KB=2048
 CPU=68020`. Fast memory is worth 5 % on the 68000 (no bitplane contention on code, data and
 chunky reads); the 68020 is 3.1 times the 68000. Every such speed-up also speeds the game up
 (§9). Not yet measured: the 68030 ceiling (a `SWAP_ONLY` run at 50 MHz found the flight at
@@ -230,7 +234,7 @@ Two captures (`tmp/prof/base`, `base2`, chip-only machine) first differed in reg
 DMA records from the Kickstart's first gameport read: **JOY0DAT** read `$0000` in one boot
 and `$0101` in the other. FS-UAE's `joystick_port_0=none` only unplugs the host device; the
 port's mode stays `mouse` (the default for port 0) and the host mouse still moves the
-counters. `run.sh` (through the shared `fsuae_common.sh`) now also passes `--joystick_port_N_mode=nothing` for `JOYN=none`, and two
+counters. The shared `fsuae_common.sh` (under `common/run.sh`) now also passes `--joystick_port_N_mode=nothing` for `JOYN=none`, and two
 fresh captures (`tmp/prof/r1`, `r2`) compared **`identical`**: every field's instruction
 records (PCs, costs, registers), DMA records and screenshot, and the chip snapshot.
 
@@ -242,7 +246,7 @@ A touched emulator window is input: people watching can move the mouse over it.
 
 - `fixed_window.sh` uses `bh until`, which blocks until the anchor is hit. If the tape no
   longer reaches the flight (retimed boot, another slave), kill your own emulator by
-  `amiga/.run/fsuae.pid` and check with `shot`s against the tape counter.
+  `tmp/run/default/.run/fsuae.pid` (`make stop`) and check with `shot`s against the tape counter.
 - Don't `pkill -f` broad patterns: other sessions' command lines can match.
 - Don't edit `fixed_window.sh` (or any script) while a capture runs it: bash reads scripts as
   it executes, and the run continues from a shifted offset (`h: command not found`).
@@ -268,7 +272,7 @@ time: `10186(a4) = T/8 + 1`; `bh:1351e` picks 16 instead of 8 when `T > 10`.
 - **Working model:** a step is 1/T seconds, and T is the designers' estimate of each
   mission's frame rate on an A500. The coverage test below supports it for the flight model.
 
-**Coverage test** (2026-10-08, `make tscale TSCALE=2 [STICKREF=1]`, `tools/tscale_compare.py`):
+**Coverage test** (2026-10-08, `make build BUILD=tscale TSCALE=2 [STICKREF=1]`, `tools/tscale_compare.py`):
 the VERIFY slave multiplies T by 2 at `bh:1344e` (14 in the turn mission) and the tape gives
 each press at frame 2F instead of F, so frame 2N is the game time of frame N at T = 7.
 `STATE_ONLY` dumps at T = 7 frames 60/120/240 and T = 14 frames 120/240; the world arrays are
@@ -313,7 +317,7 @@ Evidence:
   per frame whatever the frame rate, but each frame is one step, so control response also
   scales with the frame rate.
 - **Coupling test** (`STATE_ONLY=1 SKIP_FRAMES=120`, flight input injected on frame
-  numbers): the normal VERIFY slave (~5.4 fields per frame) against `make c2pfull` (the slow
+  numbers): the normal VERIFY slave (~5.4 fields per frame) against `make build BUILD=c2pfull` (the slow
   full-frame c2p, ~9 fields per frame), BH's data hunk at the c2p entry of flight frame 120
   (`tools/compare_state.py tmp/prof/state-a tmp/prof/state-b`): **3 bytes of 61,932 differ**,
   the original c2p's scratch byte `+6609(a4)` and one word of the per-field sound sequencer

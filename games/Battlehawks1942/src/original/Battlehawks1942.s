@@ -3,7 +3,7 @@
 ; No source was distributed. This file is a disassembly of the shipped
 ; Battlehawks1942.Slave (1512 bytes, the "SLOW" slave of the Retroplay pack
 ; Battlehawks1942_v1.0_0053.lha) that vasm rebuilds byte-identically:
-;   make -C whdload original      (assembles and compares with the installed slave)
+;   make build BUILD=original     (assembles and compares with the installed slave)
 ; Labels Lxxx are the shipped slave's hunk offsets. Kept as the reference for what v1.0 does;
 ; the slave that is built and patched is ../Battlehawks1942.s (WHDLoad 20 KickEmu).
 ;

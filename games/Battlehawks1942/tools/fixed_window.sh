@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Benchmark window: trace FIELDS PAL fields of the first training flight, in a left turn.
 # tools/fixed_window.sh OUTDIR [SLAVE]
-# There is no attract demo. The VERIFY slave's input tape (whdload/tape.s) answers the manual
+# There is no attract demo. The VERIFY slave's input tape (src/tape.s) answers the manual
 # check, picks Select Training and accepts the defaults, so the flight starts by itself.
 # The anchor is bh:1a2c2, the 3D view's chunky-to-planar pass (menus and screens never run
 # it), at flight frame SKIP_FRAMES by BH's own frame counter (default 90, inside the left turn
@@ -22,8 +22,8 @@ export JOY0="${JOY0:-none}" JOY1="${JOY1:-none}"
 # or hook addresses when analysing a saved trace. The default is a fresh VERIFY build (tape).
 INPUT_SLAVE=${2:-}
 if [ -z "$INPUT_SLAVE" ]; then
-  make -s -C whdload verify > /dev/null
-  INPUT_SLAVE=whdload/Battlehawks1942.Slave
+  make -s verify > /dev/null
+  INPUT_SLAVE=tmp/build/verify/Battlehawks1942.Slave
 fi
 if [ "$INPUT_SLAVE" != "$PWD/$OUT/slave.slave" ]; then
   cp "$INPUT_SLAVE" "$OUT/slave.slave"
@@ -35,31 +35,34 @@ SLOW_KB=$(sed -n 's/.*--slow_memory=\([0-9]*\).*/\1/p' <<< "$EXTRA_ARGS")
 if [ "$FAST_KB" -gt 0 ]; then BASE=0x200000; SIZE=$((FAST_KB * 1024))
 else BASE=0xc00000; SIZE=$((${SLOW_KB:-512} * 1024)); fi
 CHIP_END=$(printf '%#x' $((CHIP_KB * 1024)))
+RUN="tmp/run/${INSTANCE:-default}/.run"
+mkdir -p "$RUN"
 bh() { python3 tools/bh.py "$@"; }
-[ -S amiga/.run/bh.sock ] && { bh quit > /dev/null 2>&1 || true; sleep 1; }
-rm -f amiga/.run/serve.log "$OUT/trace.bin"
-WARP=1 python3 tools/bh.py serve > amiga/.run/serve.log 2>&1 &
+[ -S "$RUN"/bh.sock ] && { bh quit > /dev/null 2>&1 || true; sleep 1; }
+rm -f "$RUN"/serve.log "$OUT/trace.bin"
+WARP=1 python3 tools/bh.py serve > "$RUN"/serve.log 2>&1 &
 trap 'bh quit > /dev/null 2>&1 || true' EXIT
 SERVER=$!
 for _ in $(seq 1 120); do
-  grep -q serving amiga/.run/serve.log 2>/dev/null && break
-  kill -0 "$SERVER" 2>/dev/null || { cat amiga/.run/serve.log >&2; exit 1; }
+  grep -q serving "$RUN"/serve.log 2>/dev/null && break
+  kill -0 "$SERVER" 2>/dev/null || { cat "$RUN"/serve.log >&2; exit 1; }
   sleep 1
 done
-grep -q serving amiga/.run/serve.log || { echo "server did not start" >&2; exit 1; }
+grep -q serving "$RUN"/serve.log || { echo "server did not start" >&2; exit 1; }
 
-# gdb splits arguments at spaces, so dump through space-free paths. Retry: the dump
-# occasionally fails to appear (seen on A1200 configurations in Indianapolis 500).
+# gdb runs in the game directory and its dump command takes no spaces in the path: dump to
+# tmp/. Retry: the dump occasionally fails to appear (seen on A1200 configurations in
+# Indianapolis 500).
 dump() {
   local reply
   for _ in $(seq 1 12); do
-    reply=$(bh gdb "dump binary memory /tmp/bh-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))
-dump binary memory /tmp/bh-chip.bin 0 $CHIP_END")
-    if [ -f /tmp/bh-code.bin ] && [ -f /tmp/bh-chip.bin ]; then
-      mv /tmp/bh-code.bin "$OUT/code.bin"; mv /tmp/bh-chip.bin "$OUT/chip.bin"; return 0
+    reply=$(bh gdb "dump binary memory tmp/bh-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))
+dump binary memory tmp/bh-chip.bin 0 $CHIP_END")
+    if [ -f tmp/bh-code.bin ] && [ -f tmp/bh-chip.bin ]; then
+      mv tmp/bh-code.bin "$OUT/code.bin"; mv tmp/bh-chip.bin "$OUT/chip.bin"; return 0
     fi
     echo "memory not ready, retrying: ${reply: -300}" >&2
-    kill -0 "$(cat amiga/.run/fsuae.pid)" 2>/dev/null || return 1
+    kill -0 "$(cat "$RUN"/fsuae.pid)" 2>/dev/null || return 1
     bh wait 1 > /dev/null
   done
   return 1
@@ -122,7 +125,7 @@ continue
 delete" >> "$OUT/anchor.txt"
 fi
 bh gdb "x/1hx $frames" >> "$OUT/anchor.txt"
-retain_log() { cp amiga/.run/fsuae.log "$OUT/fsuae.log"; }
+retain_log() { cp "$RUN"/fsuae.log "$OUT/fsuae.log"; }
 # STATE_ONLY=1: dump memory at the c2p entry of flight frame SKIP_FRAMES and stop (game-state
 # comparisons at equal frame numbers: the coupling test, docs/profiling.md §9).
 if [ "${STATE_ONLY:-0}" = 1 ]; then

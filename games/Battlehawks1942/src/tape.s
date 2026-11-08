@@ -175,7 +175,7 @@ F	SET	F+10
 	dc.w	0
 tape_flight_pos:	dc.w	0		;offset of the next entry
 
-; The T experiment (make tscale TSCALE=n, docs/profiling.md §9): BH divides per-step
+; The T experiment (make build BUILD=tscale TSCALE=n, docs/profiling.md §9): BH divides per-step
 ; quantities by T = 10184(a4), set per mission at bh:1341c. Multiply it, in place of
 ; move.w 10184(a4),d0; lsr.w #3,d0 at bh:1344e (10186(a4) = T/8 + 1 follows).
 t_scale:
