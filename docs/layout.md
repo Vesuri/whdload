@@ -6,11 +6,13 @@ Makefile             make list | new | check | dist, and every game target with 
 common/              shared by all games; changes here are their own commits
   lib.sh             finds the game, loads game.conf, game.sh and the shared environment
   build.sh run.sh unpack.sh dist.sh check.sh new.sh
+  try.sh             unpacks and runs an archive from try/ without a game directory
   mk/game.mk         the targets every games/<Game>/Makefile includes
   tools/             package_release.py, game_server.py (gdb-stub harness on run.sh)
   template/          what `make new GAME=<Game>` copies
 docs/                shared docs: true of every game here
 games/<Game>/        one release package
+try/                 make run here boots any installed archive ([running](running.md))
 dist/                release archives (ignored)
 ```
 

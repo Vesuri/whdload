@@ -3,7 +3,8 @@
 # Sourced, never run. Works with macOS /bin/bash 3.2.
 #
 # The game is $GAME (a directory name under games/) or, when that is unset, the games/<Game>
-# directory that contains the current directory. load_game then sets:
+# directory that contains the current directory. common/try.sh instead sets TRY_ROOT, a
+# directory under try/tmp/ with a generated game.conf, and GAME. load_game then sets:
 #   REPO        the repository root
 #   GAME        the game's directory name
 #   GAME_ROOT   games/<Game>, absolute
@@ -54,8 +55,14 @@ _source_conf() {
 }
 
 load_game() {
-  find_game
-  GAME_ROOT="$REPO/games/$GAME"
+  if [ -n "${TRY_ROOT:-}" ]; then
+    [ -f "$TRY_ROOT/game.conf" ] || die "no $TRY_ROOT/game.conf"
+    GAME="${GAME:-$(basename "$TRY_ROOT")}"
+    GAME_ROOT="$TRY_ROOT"
+  else
+    find_game
+    GAME_ROOT="$REPO/games/$GAME"
+  fi
   export GAME GAME_ROOT REPO COMMON
   # First pass for VARIANTS; the second sees $VARIANT, so game.conf can depend on it.
   VARIANT="${VARIANT:-}"

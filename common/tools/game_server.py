@@ -31,7 +31,9 @@ from amigaxdev.gdbserve import Server  # noqa: E402
 
 
 def game_root():
-    """games/<Game> for $GAME or the current directory."""
+    """games/<Game> for $GAME or the current directory; common/try.sh's $TRY_ROOT first."""
+    if os.environ.get('TRY_ROOT'):
+        return Path(os.environ['TRY_ROOT'])
     games = COMMON.parent / 'games'
     if os.environ.get('GAME'):
         return games / os.environ['GAME']
@@ -62,3 +64,8 @@ def game_server(name, server_class=Server, **kwargs):
         kwargs['sock'] = sock
     return server_class(name, root=str(root), run_script=str(COMMON / 'run.sh'),
                         run_dir=run_dir, **kwargs)
+
+
+if __name__ == '__main__':
+    # A game without its own tool, such as one common/try.sh runs: the built-in commands.
+    game_server('game').main(sys.argv[1:])

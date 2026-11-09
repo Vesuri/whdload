@@ -35,6 +35,31 @@ make stop [INSTANCE=b]
 The machine definitions are AmigaXDev's (`docs/reference/headless-fsuae.md`, "Named machine
 setups"). A setup a game is tested on goes in its `SETUPS`.
 
+## Trying a game without a directory
+
+`try/` boots any installed WHDLoad archive (a Retroplay-style `.lha`, `.lzh`, `.lzx` or
+`.zip`) before it has a `games/<Game>` directory, to judge a candidate:
+
+```sh
+cd try
+curl -O 'https://.../StarWars_v2.0_0403.lha'
+make run SETUP=a1200-040                     # the newest archive here, its shipped slave
+make run ARCHIVE=other.lha VARIANT=Name      # another archive; another slave of it
+make list                                    # the slaves the archive holds
+make serve &                                 # gdb-stub server (DEBUG=1); then:
+make server CMD='shot tmp/x.png'             # or CMD='wait 5', CMD=quit
+make stop | make clean
+```
+
+`common/try.sh` unpacks the archive once into `try/tmp/<archive name>/tmp/game/` (again
+when its SHA-256 changes, or with `FORCE=1`), writes a `game.conf` beside it and hands over
+to `common/run.sh`, so every option above applies; `SLAVE=path` runs another slave. Every
+Kickstart in `$AMIGA_SHARE/Kickstarts` goes to `DEVS:Kickstarts`. The icon's tooltypes are
+not read: pass what they set in `WHD_ARGS`. `make serve` and `make server` drive the boot
+through `common/tools/game_server.py`'s built-in commands; their relative paths are
+relative to `try/tmp/<archive name>/`. `ARCHIVE=` also takes a file elsewhere
+(`make -C try run ARCHIVE=<file>`). Everything under `try/` but its `Makefile` is ignored.
+
 ## What a boot does
 
 Kickstart 3.1 and the Workbench 2.04 floppy boot `DH0`, whose startup-sequence runs

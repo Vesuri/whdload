@@ -8,7 +8,7 @@ Amiga knowledge shared with other projects is AmigaXDev's: start at
 | Task | Read |
 |---|---|
 | Find your way around; a game's files, `game.conf`, hooks | [Layout](layout.md) |
-| Run a game, on any machine; drive it through the gdb stub | [Running](running.md) |
+| Run a game, on any machine; drive it through the gdb stub; try an archive without a game directory | [Running](running.md) |
 | Build, VERIFY builds, patch conventions, byte identity | [Building](building.md) |
 | Package and publish a release | [Releasing](releasing.md) |
 | Credit, bring a game in, follow upstream changes | [Upstream](upstream.md) |
