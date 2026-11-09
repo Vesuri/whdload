@@ -105,6 +105,7 @@ timing_patch	move.l	d1,d7
 		lea	(_pl_timing,pc),a0
 		move.l	d7,a1
 		jsr	(resload_PatchSeg,a2)
+		bsr	render_patch		;render.s
 .done		rts
 
 ; < A6: exec; the VERTB server counting dt_fields (once)
@@ -826,3 +827,4 @@ dt_vbint	dcb.b	IS_SIZE,0
 	EVEN
 
 	INCLUDE	combat.s
+	INCLUDE	render.s

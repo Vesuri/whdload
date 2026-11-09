@@ -116,6 +116,15 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   runs BH's attitude step `bh:79f0..7a72` original against patched for both signs. TFH's
   stick fix scales the input (`muls`) and leaves the game's rate code alone: not affected.
 
+2026-11-09, plan step 4 (below):
+- **Rendering** (`src/render.s`, `CUSTOM2=1` only): the point transform `bh:16bca` (TFH's
+  arithmetic in registers; `mulu.l` on the 68020, 68030 and 68040), the horizon row fill
+  `bh:160ba` and `bh:15ea2..15ece`, and the run-length overlay `bh:161ec`. They leave
+  everything the originals leave, on the 68000, 68020 and 68030 (`tools/render_check.py`,
+  in `make check`). Flight records (rectime, `CUSTOM2=1`, fields 50..1750 of one flight
+  each), before step 4 and now: A500 9.50 and 9.88 fps, 68020 31.21 and 37.56 (with the
+  span eviction above), 68030/50 50.0 and 50.0.
+
 ## What Their Finest Hour's work gives this one
 
 The work here paused for Their Finest Hour (`games/TheirFinestHour`, the same Lucasfilm
@@ -285,14 +294,27 @@ the cap, frame counts only); Unicorn 68000 and 68040 (routine checks). PAL only.
    A patch must not cover a branch target. The release wait's first patch (`bh:c372`)
    overwrote `bh:c376`, the target of the `beq` before it; the guns check crashed on it. All
    94 patch sites were then checked against every branch target in the disassembly.
-4. **Rendering** (after a 68020 profile of the turn, caches on): TFH's register point
-   transform (`mulu.l` on 68020+) at `bh:16bca`, keeping BH's entry and cull; BH's
-   counterparts of TFH's projection routines (near `bh:16cd8`..`16f58`); TFH's merge c2p
-   without the mask, kept only if faster (BH's c2p has no masked byte merges, most of TFH's
-   gain); BH-only hot spots if each is at least 5% of the 68020 frame (`bh:15cb6` polygon
-   fill, `bh:161ec` overlay, `bh:1a3d6` pixel plot); each checked against the original with
-   TFH's equivalence checks. Done when the 68030/50 holds 50 fps in the turn and the A500 is
-   no slower than its step 1 baseline.
+4. **Rendering** — **done** (`src/render.s`, from timing.s's patch list; done when the
+   68030/50 holds 50 fps in the turn and the A500 is no slower than before). A 68020
+   profile of the turn (flight frame 90, 100 fields, caches on, `CUSTOM2=1`) put these
+   routines' self time at or above 5% of the frame: c2p `bh:1a2c2` 14.6%, the polygon fill
+   `bh:15cb6` 9.6% (with its row fill `bh:160ba` 3.4%), the overlay `bh:161ec` 6.8%, the
+   transform `bh:16bca` 5.4% and the span loop `bh:1719c` 5.4%.
+   Cycles per call on the 68020, original and now, from traces: transform 2006 and 1307,
+   polygon fill 83430 and 54214, overlay 36606 and 33765 (68000: 3597 and 3013, 106185 and
+   86214, 59986 and 53858).
+
+   | Routine | Change |
+   |---|---|
+   | transform `bh:16bca` | TFH's register version of the same arithmetic: differences, signs and partial sums in registers instead of data-hunk globals (only 568, 570, 572 and 576 are read outside it); each matrix term one 64-bit `mulu.l` on the 68020..68040; the 68060 traps that form, so it takes the 68000 version. The perspective divide `bh:16f6e` is still BH's. |
+   | row fill `bh:160ba`, `bh:15ea2..15ece` | each run of longs a jump into 32 `move.l` instead of `move.l`/`dbf` |
+   | overlay `bh:161ec` | a whole byte inside a run is `c<<4 \| c` whatever it held, so one `move.b`; only the odd first and last pixels are merged |
+   | span loop `bh:1719c` | its own code unchanged; the flush after each span's `rts` (in the slave) replaced by the cache-line eviction on the 68020 and 68030 (above; both modes) |
+
+   Not changed: the c2p (TFH's merge c2p is a full-frame conversion; BH's is a delta c2p
+   and the full-frame one was 40% slower, `docs/c2p.md`), TFH's projection routines (BH's
+   `bh:16cd8`..`16f58` counterparts are not 5% of the frame), and the pixel plot
+   `bh:1a3d6` (2.2%).
 5. **Release:** Galahad's installer (`BattleHawks1942.lha`) with both `(SLOW)` and `(FAST)`
    replaced by the release slave, `CUSTOM2=1` in its three icons, a ReadMe entry above
    Galahad's; then play-testing on real machines.

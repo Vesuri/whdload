@@ -28,8 +28,9 @@ game_drives() {
 # The reconstruction must still equal the installed slave, the instrumented builds must
 # assemble, the release slave must leave BH original without CUSTOM2 (tools/pl_check.py),
 # the Enhanced framerate routines must pass their Unicorn checks on the 68000 and 68040
-# (tools/timing_check.py; tools/combat_check.py for step 3's timers and combat), and the
-# tools must compile.
+# (tools/timing_check.py; tools/combat_check.py for step 3's timers and combat), step 4's
+# rendering routines must equal BH's on the 68000 and 68020 (tools/render_check.py), and
+# the tools must compile.
 game_check() {
   (
     cd "$GAME_ROOT"
@@ -49,9 +50,14 @@ game_check() {
           echo "$t $b: $(tail -1 "tmp/$t-$b.log" | sed 's/^# //')"
         done
       done
+      for b in 68000 68020; do
+        python3 tools/render_check.py --cpu "$b" > "tmp/render_check-$b.log" ||
+          { grep -A3 FAIL "tmp/render_check-$b.log" | head -20; exit 1; }
+        echo "render_check $b: $(grep -c '^# ' "tmp/render_check-$b.log") routines equal"
+      done
     else
       echo "skipped (no installed game; make unpack): the original build comparison," \
-        "timing_check, combat_check"
+        "timing_check, combat_check, render_check"
     fi
     python3 -c 'import py_compile, sys; [py_compile.compile(f, doraise=True) for f in sys.argv[1:]]' tools/*.py &&
       echo "tools: compile"
