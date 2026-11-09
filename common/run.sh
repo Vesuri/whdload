@@ -12,6 +12,8 @@
 #   SLAVE=path           any slave file (relative to where make or this script was started)
 #   NOBUILD=1            run the existing build without rebuilding
 #   WHD_ARGS='...'       WHDLoad options added after the game's WHD_DEFAULTS
+#   COREDUMP=0           do not pass COREDUMP. By default WHDLoad writes a register and memory
+#                        dump on every exit; the next boot moves it to tmp/dumps/<time>/
 # The machine:
 #   SETUP=name           an AmigaXDev named machine: a500, a500-1.5m, a500+, a500-020,
 #                        a500+-020, a3000, a1200, a1200-fast, a1200-030, a1200-040, a1200-060
@@ -99,6 +101,14 @@ DH0="$FSUAE_RUN/dh0"; DH1="$FSUAE_RUN/dh1"
 for target in "$FSUAE_RUN" "$DH0" "$DH1"; do
   [ ! -L "$target" ] || die "$target must not be a symlink"
 done
+# Keep the previous run's WHDLoad core dump (COREDUMP writes it to PROGDIR:, which is DH1).
+dumps=""
+for f in "$DH1"/.whdl_*; do
+  [ -e "$f" ] || continue
+  [ -n "$dumps" ] || { dumps="$GAME_ROOT/tmp/dumps/$(date +%Y%m%d-%H%M%S)"; mkdir -p "$dumps"; }
+  mv "$f" "$dumps/"
+done
+[ -z "$dumps" ] || echo "The previous run's WHDLoad core dump is in $dumps"
 rm -rf "$DH0" "$DH1"
 mkdir -p "$DH0/s" "$DH0/devs/Kickstarts" "$FSUAE_RUN/state"
 cp -R "$GAME_PATH" "$DH1"
@@ -121,8 +131,9 @@ if [ "${WB:-1}" = 1 ]; then
   printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assign DEVS: DH0:devs' \
     >> "$DH0/s/startup-sequence"
 fi
+coredump=" COREDUMP"; [ "${COREDUMP:-1}" = 1 ] || coredump=""
 printf '%s\n' 'Stack 16384' 'FailAt 999' 'CD DH1:' \
-  "WHDLoad $SLAVE_FILE ${WHD_DEFAULTS-PRELOAD SPLASHDELAY=0 NOREQ} ${WHD_ARGS:-}" >> "$DH0/s/startup-sequence"
+  "WHDLoad $SLAVE_FILE ${WHD_DEFAULTS-PRELOAD SPLASHDELAY=0 NOREQ}$coredump ${WHD_ARGS:-}" >> "$DH0/s/startup-sequence"
 if [ "${VERIFY_EXIT:-0}" = 1 ]; then
   printf '%s\n' 'If WARN' 'Echo "FAIL" >DH0:whdload-exit.txt' 'Else' \
     'Echo "OK" >DH0:whdload-exit.txt' 'EndIf' >> "$DH0/s/startup-sequence"

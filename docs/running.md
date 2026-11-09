@@ -25,6 +25,7 @@ make stop [INSTANCE=b]
 | `NOBUILD=1` | run the existing build |
 | `VARIANT` | the slave, for packages with several |
 | `WHD_ARGS` | WHDLoad options after the game's `WHD_DEFAULTS` |
+| `COREDUMP=0` | do not pass WHDLoad's `COREDUMP` (see below) |
 | `INSTANCE` | another emulator of the same game with its own drives, run directory and gdb-stub port |
 | `DEBUG=1`, `WARP=1`, `SOUND`, `WINDOW=front\|back\|none`, `RECORD`, `DETERMINISTIC`, `EXTRA_ARGS`, `FSUAE` | AmigaXDev's launcher options (its `docs/reference/headless-fsuae.md`) |
 | `NTSC=1`, `JOY0`, `JOY1`, `JOY0_MODE`, `JOY1_MODE` | video timing and ports |
@@ -63,9 +64,11 @@ relative to `try/tmp/<archive name>/`. `ARCHIVE=` also takes a file elsewhere
 ## What a boot does
 
 Kickstart 3.1 and the Workbench 2.04 floppy boot `DH0`, whose startup-sequence runs
-`WHDLoad <SLAVE_FILE> <WHD_DEFAULTS> <WHD_ARGS>` on `DH1`. `DH1` is a fresh copy of
+`WHDLoad <SLAVE_FILE> <WHD_DEFAULTS> COREDUMP <WHD_ARGS>` on `DH1`. `DH1` is a fresh copy of
 `tmp/game/<GAME_DIR>` with WHDLoad and the selected slave, so saves and preferences never
-reach the pristine install. `KICKS` names the Kickstart images the slave needs in
+reach the pristine install. `COREDUMP` makes WHDLoad write its register and memory dump
+(`.whdl_*`) to `DH1` on every exit, so a crash under `NOREQ` still leaves the state behind;
+the next boot moves it to `games/<Game>/tmp/dumps/<time>/` before replacing `DH1`. `KICKS` names the Kickstart images the slave needs in
 `DEVS:Kickstarts` (`kick34005.A500` for kick13 slaves); their `.RTB` comes along.
 
 Each game and instance runs in `games/<Game>/tmp/run/<instance>/`. AmigaXDev's launcher
