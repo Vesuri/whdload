@@ -352,5 +352,6 @@ the cap, frame counts only); Unicorn 68000 and 68040 (routine checks). PAL only.
    the installed slave equal to the release build, the icon equal to `tools/icons.py`'s,
    `Disk.1` and `Disk.2` imaged by DIC from DF0 equal to the originals, `Disk.3`, the
    ReadMe, manual, hints and cockpit map copied; with the OS 3.5 icon, the icon equal to
-   `tools/icons.py`'s (colour image kept). Left: play-testing on real machines (notably
-   the 68020/030 cache-line eviction and the blitter waits), then the release.
+   `tools/icons.py`'s (colour image kept). Released as 2.0b (09.11.2026,
+   tag `Battlehawks1942Enhanced-2.0b-20261109`) without play-testing on real machines; that
+   is still open (notably the 68020/030 cache-line eviction and the blitter waits).
