@@ -255,6 +255,39 @@ def mouse(fixed):
     check((x, y) == (191, -127), f'mouse outside a flight: {x},{y} (expected the original 191,-127)')
 
 
+def menu(fixed):
+    print('# menu mouse: one step per 32 counts, the carry under a step, cursor keys kept')
+    stub = 0x800                       # bh:2b2's frame (link a5; movem d4-d5), then bh:2c6
+    fixed.c.write(stub, bytes.fromhex('4e550000' '48e70c00' '4ef9') + struct.pack('>I', CODE + 0x2c6))
+    fixed.c.flush()
+
+    def poll(dx, dy, key=0, sx=None, sy=None):
+        fixed.set(10306, key)
+        fixed.set(10298, dx)
+        fixed.set(10300, dy)
+        fixed.set(10308, (dx << 7) & 0xffff if sx is None else sx & 0xffff)
+        fixed.set(10310, (dy << 7) & 0xffff if sy is None else sy & 0xffff)
+        fixed.c.reg(A4, fixed.a4)
+        fixed.c.run(stub, STOP)
+        return fixed.get(10308), fixed.get(10310)
+
+    fixed.lput('dt_menu_carry', 0, 'l')
+    got = [poll(0, 8)[1] for _ in range(8)]
+    check(got == [0, 0, 0, 4096] * 2, f'slow down, 8 counts a poll: {got}')
+    got = [poll(0, -3)[1] for _ in range(11)]
+    check(got.count(-4096) == 1 and got[-1] == -4096 and not any(got[:-1]), f'slower up, 3 a poll: {got}')
+    fixed.lput('dt_menu_carry', 0, 'l')
+    got = [poll(0, d)[1] for d in (127, 0, 1, 0)]
+    check(got == [4096, 0, 4096, 0], f'a swipe of 127: one step, 31 carried, one more count steps: {got}')
+    fixed.lput('dt_menu_carry', 0, 'l')
+    got = [poll(d, 0)[0] for d in (-40, 0, -24, 0)]
+    check(got == [-4096, 0, -4096, 0], f'across, 40 then 24 left: {got}')
+    fixed.lput('dt_menu_carry', 0, 'l')
+    check(poll(5, 0, key=1, sy=-1600) == (0, -1600), 'cursor up: the key\'s value kept, across 0')
+    check(poll(0, 5, key=4, sx=2112) == (2112, 0), 'cursor right: kept, down 0')
+    check(poll(0, 0) == (0, 0), 'no movement: nothing')
+
+
 def objstep(fixed, orig):
     print('# object step: a class-1 object over one game second (T steps)')
     obj = 5
@@ -337,6 +370,7 @@ def main():
     turn(fixed)
     pitch(fixed, orig)
     mouse(fixed)
+    menu(fixed)
     objstep(fixed, orig)
     aiturn(fixed, orig)
     print(f'# {len(failures)} failed' if failures else '# all passed')

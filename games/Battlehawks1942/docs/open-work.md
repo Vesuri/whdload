@@ -117,9 +117,15 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   (`bh:1e34`, `bh:2198` load it), so every `bh:30a` pause before that was none, among them
   the one after each selection move (`bh:28e2`); only the A500's slow redraw held the
   selection back. With `CUSTOM2=1`, `dt_delay` times these pauses with BH's base T
-  (`10182(a4)` = 7, `bh:54a`), as after a flight. That made the selection sluggish (12.6
-  fields a step), so its pause (`bh:2934`, n = 4) is 2: 6.3 fields, 8 steps a second. Original
-  mode keeps v1.0's behaviour.
+  (`10182(a4)` = 7, `bh:54a`), as after a flight. The menus' mouse threshold was
+  on speed: `bh:2b2` dropped a movement of up to 16 counts across or 12 down since the last
+  poll (`10308/10310(a4)`, from `bh:3e98` and `bh:110`), so on a fast machine, which polls
+  often, a slow movement never moved the selection and a faster one moved it once per pause
+  (12.6 fields at T 7, sluggish). With `CUSTOM2=1` the selection moves by distance instead
+  (`dt_menu_mouse` at `bh:2c6`): one item per 32 counts, the remainder carried but kept
+  under a step (a menu moves one item a poll and wraps around, so a swipe must not leave
+  steps queued), cursor keys as before, and no pause after a step (`bh:2934`, n = 4 → 0).
+  Checked in `tools/timing_check.py`. Original mode keeps v1.0's behaviour.
 
 - **Mouse up raised the nose, as mouse down did** (`CUSTOM2=1`, every machine). BH keeps the
   pitch rate `28508(a4)` as |stick| / T (`bh:795a..797e` negate the stick but not the

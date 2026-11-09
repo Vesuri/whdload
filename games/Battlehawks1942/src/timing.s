@@ -145,7 +145,8 @@ _pl_timing	PL_START
 		PL_PS	$11e50,dt_aiadd		;move.w -42(a5),d0; swap d0
 		PL_PS	$11ee2,dt_aisub		;same bytes
 		PL_P	$30e,dt_delay		;bh:30a after its link
-		PL_W	$2936,2			;bh:2934 move.w #4,-(sp): the menu selection's pause per step halved
+		PL_W	$2936,0			;bh:2934 move.w #4,-(sp): no pause after a menu step (dt_menu_mouse)
+		PL_P	$2c6,dt_menu_mouse	;bh:2b2 after jsr 110(pc): the menus' mouse by distance
 		PL_P	$12b8,dt_keywait	;bh:12ac after its link and movem
 ; combat.s (step 3): FR-15 attitude, FR-28 fuel
 		PL_PS	$11238,dt_att_roll	;moveq #0,d0; move.w d4,d0; lea 15540(a4),a0
@@ -770,7 +771,7 @@ dt_wait		movem.l	d0-d1,-(a7)
 ; (bh:1e34, bh:2198 load it), and the pauses were none: the main menu moved its selection
 ; at every poll that saw the mouse move (bh:28e2 pauses 4), which only the A500's slow
 ; redraw held back.  Then T is BH's base T 10182 (7, bh:54a), as after a flight.  The
-; selection's pause (bh:2934) is 2 instead of 4 (6.3 fields a step at T 7, not 12.6).
+; selection's own pause (bh:2934, 4) is 0: dt_menu_mouse steps by distance.
 dt_delay	move.w	#1000,d1
 		move.w	(BH_T,a4),d0
 		bne.b	.t
@@ -811,6 +812,61 @@ dt_keywait	moveq	#0,d4
 .done		movem.l	(a7)+,d4-d5
 		unlk	a5
 		rts
+
+; bh:2c6, the rest of bh:2b2 (the menus' input poll, after bh:110 has set 10308/10310(a4)
+; to this poll's mouse counts 10298/10300(a4) x 128): it cleared a movement of up to 16
+; counts across or 12 down since the last poll, a threshold on the mouse's speed that
+; depended on how often the menu polled.  On a fast machine it polls often, so a slow
+; movement never moved the selection and any faster one moved it once per pause.  Here
+; each axis adds the poll's counts to what it carries and moves when the sum reaches
+; MENU_STEP counts: 10308/10310 = +-MENU_STEP*128 (the menus read their signs), the sum less
+; one step carried; else 0 and the sum carried.  A menu moves one item a poll, so the carry
+; is limited to under a step: a fast swipe leaves no steps queued once the mouse stops (the
+; menus wrap around).  No pause after a step (bh:2934): one item per MENU_STEP counts.  A cursor key (10306(a4) 1 and 2 up and down, 3 and 4 across, bh:216)
+; has set its axis already (bh:14a..1fe, beyond the old threshold): kept, the other 0.
+MENU_STEP	= 32
+dt_menu_mouse	move.w	(10306,a4),d0
+		subq.w	#1,d0
+		cmp.w	#3,d0
+		bhi.b	.mouse
+		cmp.w	#1,d0
+		bhi.b	.across
+		clr.w	(10308,a4)
+		bra.b	.done
+.across		clr.w	(10310,a4)
+		bra.b	.done
+.mouse		lea	(dt_menu_carry,pc),a0
+		lea	(10308,a4),a1
+		move.w	(10298,a4),d0
+		bsr.b	.axis
+		move.w	(10300,a4),d0
+		bsr.b	.axis
+.done		movem.l	(a7)+,d4-d5
+		unlk	a5
+		rts
+; < D0.w this poll's counts, A0 the carry, A1 10308 or 10310 > A0, A1 the next ones
+.axis		add.w	(a0),d0
+		clr.w	(a1)
+		cmp.w	#MENU_STEP,d0
+		bge.b	.plus
+		cmp.w	#-MENU_STEP,d0
+		ble.b	.minus
+.carry		move.w	d0,(a0)+
+		addq.l	#2,a1
+		rts
+.plus		move.w	#MENU_STEP<<7,(a1)
+		sub.w	#MENU_STEP,d0
+		cmp.w	#MENU_STEP-1,d0
+		ble.b	.carry
+		moveq	#MENU_STEP-1,d0
+		bra.b	.carry
+.minus		move.w	#-MENU_STEP<<7,(a1)
+		add.w	#MENU_STEP,d0
+		cmp.w	#-(MENU_STEP-1),d0
+		bge.b	.carry
+		moveq	#-(MENU_STEP-1),d0
+		bra.b	.carry
+dt_menu_carry	dc.w	0,0			;across, down: counts not yet a step
 
 dt_buf		dc.l	0			;DTB_SIZE bytes, allocated
 dt_bh		dc.l	0			;BH's hunk 0
