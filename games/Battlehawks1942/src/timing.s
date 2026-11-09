@@ -145,6 +145,7 @@ _pl_timing	PL_START
 		PL_PS	$11e50,dt_aiadd		;move.w -42(a5),d0; swap d0
 		PL_PS	$11ee2,dt_aisub		;same bytes
 		PL_P	$30e,dt_delay		;bh:30a after its link
+		PL_W	$2936,2			;bh:2934 move.w #4,-(sp): the menu selection's pause per step halved
 		PL_P	$12b8,dt_keywait	;bh:12ac after its link and movem
 ; combat.s (step 3): FR-15 attitude, FR-28 fuel
 		PL_PS	$11238,dt_att_roll	;moveq #0,d0; move.w d4,d0; lea 15540(a4),a0
@@ -768,7 +769,8 @@ dt_wait		movem.l	d0-d1,-(a7)
 ; (141 876 cycles per field: 2217 loops).  T is 0 until the first mission is chosen
 ; (bh:1e34, bh:2198 load it), and the pauses were none: the main menu moved its selection
 ; at every poll that saw the mouse move (bh:28e2 pauses 4), which only the A500's slow
-; redraw held back.  Then T is BH's base T 10182 (7, bh:54a), as after a flight.
+; redraw held back.  Then T is BH's base T 10182 (7, bh:54a), as after a flight.  The
+; selection's pause (bh:2934) is 2 instead of 4 (6.3 fields a step at T 7, not 12.6).
 dt_delay	move.w	#1000,d1
 		move.w	(BH_T,a4),d0
 		bne.b	.t

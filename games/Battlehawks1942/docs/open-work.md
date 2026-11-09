@@ -105,7 +105,9 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   (`bh:1e34`, `bh:2198` load it), so every `bh:30a` pause before that was none, among them
   the one after each selection move (`bh:28e2`); only the A500's slow redraw held the
   selection back. With `CUSTOM2=1`, `dt_delay` times these pauses with BH's base T
-  (`10182(a4)` = 7, `bh:54a`), as after a flight. Original mode keeps v1.0's behaviour.
+  (`10182(a4)` = 7, `bh:54a`), as after a flight. That made the selection sluggish (12.6
+  fields a step), so its pause (`bh:2934`, n = 4) is 2: 6.3 fields, 8 steps a second. Original
+  mode keeps v1.0's behaviour.
 
 - **Mouse up raised the nose, as mouse down did** (`CUSTOM2=1`, every machine). BH keeps the
   pitch rate `28508(a4)` as |stick| / T (`bh:795a..797e` negate the stick but not the

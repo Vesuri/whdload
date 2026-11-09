@@ -114,6 +114,8 @@ class BH:
                     c.write(CODE + adr, (b'\x4e\xf9' if cmd == 'P' else b'\x4e\xb9') + struct.pack('>I', dest))
                 elif cmd == 'NOP':
                     c.write(CODE + adr, b'\x4e\x71' * (int(arg, 16) // 2))
+                elif cmd == 'W':
+                    c.write(CODE + adr, struct.pack('>H', int(arg, 16)))
                 else:
                     raise SystemExit(f'timing_check: PL_{cmd} not handled')
         c.flush()
