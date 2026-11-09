@@ -89,7 +89,8 @@
    block copy to publish the completed scene to Chip RAM.
  - Added 20 ms movement steps and 90 ms control updates, with elapsed-time
    handling for input, opponents, resources, repairs, laps and weather.
- - Paced cockpit liftoff to the measured original A500 movement cadence.
+ - Paced cockpit liftoff to the measured original A500 movement cadence, with
+   intermediate views drawn between its steps when there is time.
  - Added fractional mouse steering with smooth 20 ms rotation updates.
  - Kept the mouse stick in step with the game's own changes to it (wall and
    floor contact, repositioning with A) and limited its range.

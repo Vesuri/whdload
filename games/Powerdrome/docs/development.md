@@ -420,3 +420,19 @@ The 060 single-count mouse tape above also reproduces all 501 complete mouse/mat
 states of the capture recorded before this change (`tmp/mouse-reset/tape-060` against
 `tmp/mouse-steering/current-060`).
 
+### Cockpit departure blending checks
+
+```sh
+make build BUILD=verify VASM_EXTRA=-DDEPARTURE_INTERPOLATE=0   # step-only reference
+make verify                                                    # blended (default)
+```
+
+Capture each with `CPU=68030` (25 MHz) or `68060-NOMMU` (50 MHz), A1200, fast RAM,
+`WHD_ARGS='CUSTOM1=1 CUSTOM5=2 NoCache' ANCHOR=0x1020e FIELDS=150 SWAP_ONLY=1
+SWAP_MARKER=0x102d0 TIMING_STATE=1` and `COVERAGE_PROBES='0x1026c 0x10322 0x10336 0xca3e
+0x8056'` (add `0xcedc` for world-step states). `check_departure.py
+tmp/prof/timing-liftoff-a500-native CAPTURE...` checks the nine native states, the 100 ms
+period and the final state; `0x8056` events count presentations. The `PDDEPI01` tag in the
+slave (the last copy in `final-code.bin`) holds the last view cost in clock units, the
+number of blended views and the number of steps; `-DDEPARTURE_DIAGNOSTICS=1` adds the
+view-only and native-view costs.

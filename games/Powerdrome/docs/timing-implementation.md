@@ -189,6 +189,27 @@ and speed updates at `$102d0` are originally per-frame. The enhanced path preser
 the native sequence and final speed of 90, pacing each step to the measured A500
 100 ms interval. Initial setup/drawing time is separate from that movement cadence.
 
+Between steps the enhanced path draws extra views (`DEPARTURE_INTERPOLATE`, default 1).
+`$10304` (the `MOVE.W`/`CMP.W` before the view choice) enters `departure_blend` after
+the step's position update. While one more view and the native view still fit before
+the step's deadline, it publishes the position blended from the previous to the current
+step for the time the view will be shown (`$12c..$130`, negated at `$3ac..$3b0`), draws
+the view the native loop selects for that height (`$10338`, or `$1572e` at or below
+−140), and presents it. It then restores the exact position and replays the two
+instructions; the native view and its present at the deadline are unchanged. The frame
+counter `$5e` is restored after each extra view. A view that does not fit is not drawn,
+so a machine with no spare time presents the native steps only.
+
+On the A1200 with a 68030/25 or 68060/50 and fast RAM, each departure view takes two
+PAL fields (eight clock units, measured with `-DDEPARTURE_DIAGNOSTICS=1`), so one blended
+view fits per 100 ms step: 20 presentations per second instead of 10
+(`tmp/liftoff/interp-030`, `interp-060` against `step-030`, `step-060`). In all four
+captures the nine native step states, the 100 ms step period and the final state match
+the A500 reference. With and without blending, the state at all 96 common world steps
+on the 030 is identical except the native frame-interval word `$21c`, which the scheduler
+overwrites before every world step. More views per step would need a faster departure
+view; that has not been attempted.
+
 The external pit animation at `$14764` is a different native sequence. Menus,
 recorded title-camera progression and other presentation animations retain their
 native behavior. Repair service uses elapsed logical time and suppresses late

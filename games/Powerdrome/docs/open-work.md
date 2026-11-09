@@ -73,6 +73,15 @@ to full deflection after A. [Design](timing-implementation.md#inputs-pause-and-s
 The 060 single-count mouse tape matches all 501 recorded mouse/matrix states. Not yet
 played by hand, and the release matrix has not been repeated for this change.
 
+## Liftoff blending
+
+Part of **Enhanced framerate**. One blended view is drawn between each pair of 100 ms
+cockpit liftoff steps on 030/25 and 060/50 (20 instead of 10 presentations per second);
+native states, step period and final state are unchanged.
+[Design and measurements](timing-implementation.md#pit-departure-and-repair-display).
+The pit animations are still native. Not yet watched by hand, and the release matrix has
+not been repeated for this change.
+
 ## Release baseline measurements
 
 All 20 measurements of the pre-steering release baseline are complete. The full intervals/fields, fps and mean
@@ -125,7 +134,9 @@ The user approved these when the completion plan was made:
 - **A500:** representative behaviour, not exact matching of native A500 histories.
 - **CPU split:** native timing on 68000/68010; the fixed-step scheduler on 68020+,
   selected at run time from AttnFlags.
-- **No interpolation** between simulation states.
+- **No interpolation** between simulation states. Presentation-only blending is allowed
+  where it keeps the original duration and final state; the user asked for it on
+  09.11.2026 for the cockpit liftoff and the pit animations.
 - **Bounded gates:** every check has a finite, stated bound. Open-ended exact matching
   against native histories is not a release gate.
 - Changes worth under 3% of a frame are skipped. Caches stay under WHDLoad's own
