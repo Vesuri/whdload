@@ -87,6 +87,12 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   not write code (its generator `bob:2cd7a` fills a table of offsets and its span loop
   reads it), so TFH needed nothing.
 
+- **The main menu's selection raced** on fast machines. T is 0 until a mission is chosen
+  (`bh:1e34`, `bh:2198` load it), so every `bh:30a` pause before that was none, among them
+  the one after each selection move (`bh:28e2`); only the A500's slow redraw held the
+  selection back. With `CUSTOM2=1`, `dt_delay` times these pauses with BH's base T
+  (`10182(a4)` = 7, `bh:54a`), as after a flight. Original mode keeps v1.0's behaviour.
+
 ## What Their Finest Hour's work gives this one
 
 The work here paused for Their Finest Hour (`games/TheirFinestHour`, the same Lucasfilm

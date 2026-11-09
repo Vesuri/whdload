@@ -759,10 +759,15 @@ dt_wait		movem.l	d0-d1,-(a7)
 
 ; bh:30e (bh:30a after link.w a5,#-12): a pause of n = 8(a5): (k*T*n) mod 65536 loops
 ; of 64 cycles (k = 100 at T 3, else 1000), now their fields on a 7.09 MHz 68000
-; (141 876 cycles per field: 2217 loops)
+; (141 876 cycles per field: 2217 loops).  T is 0 until the first mission is chosen
+; (bh:1e34, bh:2198 load it), and the pauses were none: the main menu moved its selection
+; at every poll that saw the mouse move (bh:28e2 pauses 4), which only the A500's slow
+; redraw held back.  Then T is BH's base T 10182 (7, bh:54a), as after a flight.
 dt_delay	move.w	#1000,d1
 		move.w	(BH_T,a4),d0
-		cmp.w	#3,d0
+		bne.b	.t
+		move.w	(10182,a4),d0
+.t		cmp.w	#3,d0
 		bne.b	.k
 		moveq	#100,d1
 .k		mulu.w	d1,d0
