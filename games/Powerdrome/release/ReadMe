@@ -99,6 +99,8 @@
    floor contact, repositioning with A) and limited its range.
  - Made a nose-first dive into the floor crash and reposition the ship as in
    the original, instead of pinning it there with the mouse ignored.
+ - Moved the opponents every 20 ms between their 90 ms race decisions, so
+   they glide along the track instead of jumping in steps.
  - Fixed an access fault during races on 68040/68060 with the MMU active: the
    game samples a screen pixel with a stale high word in its x coordinate,
    which from the Fast RAM bitmap could read outside memory.

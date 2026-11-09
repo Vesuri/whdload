@@ -96,6 +96,17 @@ fields. [Design and measurements](timing-implementation.md#pit-departure-and-rep
 The pit departure (`$14764`, paced already), the rescue arrival (`$1464c`) and the `$102`
 sprite flicker (`$145e2`) are still step-only. Not yet watched by hand.
 
+## Opponent movement
+
+Part of **Enhanced framerate**. Opponents move every 20 ms world step between their 90 ms
+native updates, which keep every decision, random draw, timer, pit and lap; before, their
+positions changed only with those updates and lurched against the 50 Hz track. In a
+060/50 sample their positions change on 299 of 299 frames instead of 73. Player–opponent
+contact exists (knock, damage, bounce; 120 ms, the measured A500 cadence).
+[Design and measurements](timing-implementation.md#opponent-movement-and-contact);
+`tools/check_opponent_motion.py`. Not yet watched by hand; the CPU cost and the release
+matrix have not been measured for it.
+
 ## Release baseline measurements
 
 All 20 measurements of the pre-steering release baseline are complete. The full intervals/fields, fps and mean
@@ -148,9 +159,10 @@ The user approved these when the completion plan was made:
 - **A500:** representative behaviour, not exact matching of native A500 histories.
 - **CPU split:** native timing on 68000/68010; the fixed-step scheduler on 68020+,
   selected at run time from AttnFlags.
-- **No interpolation** between simulation states. Presentation-only blending is allowed
-  where it keeps the original duration and final state; the user asked for it on
-  09.11.2026 for the cockpit liftoff and the pit animations.
+- **No interpolation** of the player's simulation states. Presentation-only blending is
+  allowed where it keeps the original duration and final state; the user asked for it on
+  09.11.2026 for the cockpit liftoff and the pit animations, and on 10.11.2026 allowed it
+  for the opponents, choosing 20 ms opponent movement instead.
 - **Bounded gates:** every check has a finite, stated bound. Open-ended exact matching
   against native histories is not a release gate.
 - Changes worth under 3% of a frame are skipped. Caches stay under WHDLoad's own

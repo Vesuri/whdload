@@ -176,6 +176,9 @@ timing_pit_opponent_allocate
 timing_pit_opponent_begin
  move.w sr,-(sp)
  movem.l d0/a0,-(sp)
+ IFNE TIMING_OPPONENT_MOTION
+ bsr timing_opponent_motion_restore
+ ENDC
  lea timing_pit_opponent_state(pc),a0
  move.w #1,10(a0)
  move.l $5e(a6),40(a0)
@@ -209,6 +212,9 @@ timing_pit_opponent_end
  move.w sr,-(sp)
  move.l a0,-(sp)
  bsr timing_pit_opponent_restore
+ IFNE TIMING_OPPONENT_MOTION
+ bsr timing_opponent_motion_capture
+ ENDC
  lea timing_pit_opponent_state(pc),a0
  add.l #TIMING_PERIOD,20(a0)
  addq.w #1,14(a0)

@@ -438,6 +438,29 @@ axes push the mouse −100 counts per field for fields 300–339 after the fixtu
 on the 060/50 with `ANCHOR=0xbc7c FIELDS=1300 TIMING_STATE=1` and probes `0xd058 0xccb2
 0xccd0 0xfc9e 0x100c2`; run it with `CUSTOM1=0` for the original.
 
+### Opponent movement checks
+
+```sh
+python3 tools/check_opponent_motion.py
+```
+
+Runs `timing_opponent_motion.s` under the shared Unicorn runtime beside the game's own
+code hunk (`tmp/extracted/pd`, in memory only; harness in `tmp/opponent-motion/`). On
+random path nodes it requires the native position, heading, segment and player distance
+for 10,000 progress values, the native advance of the next update for 20,000 speed, fuel,
+mode and damage-countdown combinations, and, over 300 sequences of native-style updates
+with random ±40 nudges, lap wraps and repositions, that every update starts from its
+authoritative progress and the shown progress never goes backwards within a lap or
+reaches the lap line first. `VASM_EXTRA=-DTIMING_OPPONENT_MOTION=0` builds the previous
+90-ms movement for comparisons.
+
+Contact soak: the coverage race (060/50, `CUSTOM1=1 CUSTOM4=1 CUSTOM5=4 NoCache`,
+`ANCHOR=0xbc7c FIELDS=66000 SWAP_ONLY=1 COVERAGE_STATE=1`) with
+`COVERAGE_PROBES='0xd3d6 0xfc9e 0x9a80 0x9b14 0x9c84 0x9d04 0x9b6a'`: opponent updates,
+track crashes, player contact, opponent–opponent slowdown, player knock, player damage and
+opponent bounce. The emulator's debugger stub holds about 20 breakpoints, so these replace
+the `--require-long` probe set rather than adding to it.
+
 ### Cockpit departure blending checks
 
 ```sh

@@ -37,7 +37,9 @@ work can fall behind; retaining time debt does not guarantee real-time throughpu
 | --- | --- |
 | Movement and geometric collision checks | 20 ms (crash depth over a 90 ms frame) |
 | Mouse orientation integration | 20 ms |
-| Control decisions/input consumption, joystick orientation, resources, engine decisions, opponents | 90 ms |
+| Opponent movement | 20 ms ([opponents](#opponent-movement-and-contact)) |
+| Control decisions/input consumption, joystick orientation, resources, engine decisions, opponent decisions | 90 ms |
+| Visible-opponent animation, contact and effects | 120 ms (measured A500 cadence with opponents in view) |
 | Repeated contact penalties, damage and age counters | Control epochs |
 | Fall/impulse displacement | Integrated over each world step, split at effect boundaries |
 | Weather generation | 80/140 ms according to effect state |
@@ -123,8 +125,48 @@ weather effect (174 draws). The trajectories diverge after the first crash at fi
 the tape is timed in PAL fields, and the old floor flash waited for the display inside
 world steps. A soak does not attribute the extra crashes to either change.
 
-The only player–opponent distance code (`$d724..$d7f0`) selects the nearest opponent and
-its closing speed for the engine sound; ships do not collide with each other.
+## Opponent movement and contact
+
+The native opponent update (`$d3d6`, every 90 ms control update) advances each opponent's
+track progress `$66` by speed × interval / 26, with fuel-empty and `$4b8` halving, damage
+countdown scaling and a minimum of 40, plus a random ±40 per call. It then rebuilds the
+position `$10..$14`, heading `$20` and segment `$2` by blending two path nodes
+(`$d626..$d69a`) and the player distance `$4c` (`$d724..$d756`). It also owns the per-call
+pit, damage-countdown, hold-zone and lap work, the race finish and the nearest-opponent
+engine sound.
+
+`timing_opponent_motion.s` (`TIMING_OPPONENT_MOTION`) leaves that update as the authority
+and moves the opponents between updates. Before an update it restores the progress the
+previous update produced, so the native work runs exactly as before. After it, the slave
+predicts the next update's advance with the native formula, without the random draw. Each
+20 ms world step then advances the shown progress by 4/18 of that, plus 4/18 of the gap
+between the shown and the authoritative progress, never backwards. Gaps over 1,024 units
+(repositioning) are applied at once. The shown progress stops at the lap line until the
+update that counts the lap, then carries across it. Position, heading, segment and
+distance are rebuilt from it with the native arithmetic. Pit and retired opponents keep
+the native progress. The per-opponent table is in the fast arena at `$9600`.
+
+The visible-opponent work at `$9950` holds the contact tests. Within a distance of 100,
+`$9a74..$9a94` knock the player in a random direction (`$9c84`, `$1da..$1e4`, integrated by
+`timing_forces.s`), add player damage (`$9d04`), bounce the opponent (`$9b6a`) and play
+the impact sound. A faster opponent within 80 progress units of another and closer than
+100 loses 50 speed (`$9b1a`). This work runs every six world steps (120 ms), the cadence
+measured for the A500 with opponents in view (nine animation updates in 920 ms). The
+native frame order adds a visible opponent's bounce offset `$36..$3a` to the position its
+update rebuilt; on world steps without that tick the slave does the same after rebuilding.
+
+| 060/50, coverage race | 90 ms movement | 20 ms movement |
+| --- | ---: | ---: |
+| Frames where an opponent moved (300 frames, about 46 fps) | 73 / 299 | 299 / 299 |
+| Speed per frame, mean / s.d. (world units per clock unit, pilot 1) | 24.7 / 44.4 | 25.1 / 7.0 |
+| 66,000-field soak: player contacts / opponent slowdowns / track crashes | 3 / 2 / 5 | 2 / 3 / 5 |
+| 66,000-field soak: native opponent updates | 58,990 | 58,992 |
+
+The soaks (`tmp/contact/base-race`, `new-race`) follow the same route: crashes at fields
+2430, 2473, 2528/2530 and 2651 in both. The new one passes all 15,693 drawing twins with no
+failures. The frame samples are `tmp/contact/frames-base`, `frames-new`. The contacts are
+too few to compare their rate. `tools/check_opponent_motion.py` checks the arithmetic
+against the native code. The CPU cost has not been measured.
 
 ## Fine mouse rotation
 

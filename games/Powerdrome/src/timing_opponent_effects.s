@@ -23,6 +23,9 @@ timing_opponent_effects_enabled
  rts
 
 timing_opponent_effects_initialize
+ IFNE TIMING_OPPONENT_MOTION
+ bsr timing_opponent_motion_reset
+ ENDC
  move.l a0,-(sp)
  lea timing_opponent_effects_state(pc),a0
  clr.w 10(a0)

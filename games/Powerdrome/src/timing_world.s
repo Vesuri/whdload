@@ -122,7 +122,13 @@ timing_world_end
  move.w (sp)+,ccr
  bra.w timing_world_render
 .ordinary_end
+ IFNE TIMING_OPPONENT_MOTION
+ bsr timing_opponent_motion_step
+ ENDC
  bsr timing_opponent_effects_tick
+ IFNE TIMING_OPPONENT_MOTION
+ bsr timing_opponent_motion_bounce
+ ENDC
  IFNE TIMING_WEATHER_CYCLE
  bsr timing_weather_cycle_tick
  ENDC
@@ -229,6 +235,9 @@ timing_world_phase dc.w 0
 
  INCLUDE timing_sync_test.s
  INCLUDE timing_opponent_effects.s
+ IFNE TIMING_OPPONENT_MOTION
+ INCLUDE timing_opponent_motion.s
+ ENDC
  INCLUDE timing_lap.s
  INCLUDE timing_player_lap.s
  INCLUDE timing_external.s
