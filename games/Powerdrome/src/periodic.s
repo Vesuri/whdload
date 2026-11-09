@@ -647,6 +647,27 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$d082 8 bit=C3
  PL_P $d082,timing_input_write_axes
  PL_NOP $d088,2
+ ; VBL mouse accumulation: EXT.W + ADD.W, entered only at the EXT.W (native BLT target).
+ ; TIMING_RANGE h0:$56d2 6 bit=C3
+ PL_PS $56d2,timing_input_mouse_x
+ ; TIMING_RANGE h0:$56fc 6 bit=C3
+ PL_PS $56fc,timing_input_mouse_y
+ ; Native stick resets: two complete MOVE.W #0 instructions each, no inner targets.
+ ; TIMING_RANGE h0:$b6e4 12 bit=C3
+ PL_PS $b6e4,timing_input_zero_axes
+ PL_NOP $b6ea,6
+ ; TIMING_RANGE h0:$eab2 12 bit=C3
+ PL_PS $eab2,timing_input_zero_axes
+ PL_NOP $eab8,6
+ ; TIMING_RANGE h0:$ebd0 12 bit=C3
+ PL_PS $ebd0,timing_input_zero_axes
+ PL_NOP $ebd6,6
+ ; TIMING_RANGE h0:$100c2 12 bit=C3
+ PL_PS $100c2,timing_input_zero_axes
+ PL_NOP $100c8,6
+ ; TIMING_RANGE h0:$140a4 12 bit=C3
+ PL_PS $140a4,timing_input_zero_axes
+ PL_NOP $140aa,6
  ; TIMING_RANGE h0:$d266 6 bit=C3
  PL_P $d266,timing_input_joystick
  ; TIMING_RANGE h0:$cf24 6 bit=C3

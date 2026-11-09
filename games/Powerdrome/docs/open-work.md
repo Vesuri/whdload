@@ -62,6 +62,17 @@ the earlier stock-A1200 exception. These runs contain no state probes, phase tim
 or drawing twins. Their hunk placement matches. The full release matrix below
 predates fine mouse steering and has not been repeated for it.
 
+## Mouse stick
+
+Part of **Enhanced framerate**; the unchecked and fallback paths are unchanged. The
+enhanced input layer queues only the per-field mouse counts. Native writes to the stick
+(contact damping, the A reposition and the other resets) reach the private stick the
+controls read, and every stick sum saturates at ±32767. Before, a damped stick reversed
+to full deflection after A. [Design](timing-implementation.md#inputs-pause-and-sessions).
+`tools/check_input_axes.py` checks it and reproduces the old reversal with `--baseline`.
+The 060 single-count mouse tape matches all 501 recorded mouse/matrix states. Not yet
+played by hand, and the release matrix has not been repeated for this change.
+
 ## Release baseline measurements
 
 All 20 measurements of the pre-steering release baseline are complete. The full intervals/fields, fps and mean

@@ -19,6 +19,28 @@ install_coverage_patches
 .done
  movem.l (sp)+,d0/a0-a2
  rts
+; Tape mouse movement enters exactly as VBL mouse counts would. d0.w delta, a0 game base.
+coverage_mouse_x
+ movem.l d0-d1/a0-a1,-(sp)
+ lea $a6e+$42a(a0),a0
+ IFNE TIMING_INPUT
+ lea timing_input_pending_x(pc),a1
+ ENDC
+ bra.s coverage_mouse
+coverage_mouse_y
+ movem.l d0-d1/a0-a1,-(sp)
+ lea $a6e+$42e(a0),a0
+ IFNE TIMING_INPUT
+ lea timing_input_pending_y(pc),a1
+ ENDC
+coverage_mouse
+ IFNE TIMING_INPUT
+ bsr timing_input_player
+ ELSE
+ add.w d0,(a0)
+ ENDC
+ movem.l (sp)+,d0-d1/a0-a1
+ rts
 install_coverage
  movem.l d0/a0-a1,-(sp)
  move.l perf_game(pc),a0
@@ -86,33 +108,40 @@ coverage_vbl
  cmp.l #440,d0
  bne.s .normal_axes
 .mouse_y_plus
- addq.w #1,$a6e+$42e(a0)
+ moveq #1,d0
+ bsr coverage_mouse_y
  bra.s .normal_axes
 .mouse_y_minus
- subq.w #2,$a6e+$42e(a0)
+ moveq #-2,d0
+ bsr coverage_mouse_y
  bra.s .normal_axes
 .mouse_x_plus
- addq.w #1,$a6e+$42a(a0)
+ moveq #1,d0
+ bsr coverage_mouse_x
  bra.s .normal_axes
 .mouse_x_minus
- subq.w #2,$a6e+$42a(a0)
+ moveq #-2,d0
+ bsr coverage_mouse_x
  bra.s .normal_axes
  ELSE
  move.l $48fe(a0),d0
  sub.l cov_epoch-coverage_status(a1),d0
  cmp.l #160,d0
  bne.s .timing_right
- add.w #40,$a6e+$42a(a0)
+ moveq #40,d0
+ bsr coverage_mouse_x
  bra.s .normal_axes
 .timing_right
  cmp.l #190,d0
  bne.s .timing_center
- sub.w #80,$a6e+$42a(a0)
+ moveq #-80,d0
+ bsr coverage_mouse_x
  bra.s .normal_axes
 .timing_center
  cmp.l #220,d0
  bne.s .normal_axes
- add.w #40,$a6e+$42a(a0)
+ moveq #40,d0
+ bsr coverage_mouse_x
  bra.s .normal_axes
  ENDC
 .force_axes
@@ -120,20 +149,26 @@ coverage_vbl
  sub.l cov_epoch-coverage_status(a1),d0
  cmp.l #60,d0
  bne.s .force_reverse
- add.w #40,$a6e+$42a(a0)
- add.w #24,$a6e+$42e(a0)
+ moveq #40,d0
+ bsr coverage_mouse_x
+ moveq #24,d0
+ bsr coverage_mouse_y
  bra.s .normal_axes
 .force_reverse
  cmp.l #120,d0
  bne.s .force_center
- sub.w #80,$a6e+$42a(a0)
- sub.w #48,$a6e+$42e(a0)
+ moveq #-80,d0
+ bsr coverage_mouse_x
+ moveq #-48,d0
+ bsr coverage_mouse_y
  bra.s .normal_axes
 .force_center
  cmp.l #180,d0
  bne.s .normal_axes
- add.w #40,$a6e+$42a(a0)
- add.w #24,$a6e+$42e(a0)
+ moveq #40,d0
+ bsr coverage_mouse_x
+ moveq #24,d0
+ bsr coverage_mouse_y
 .normal_axes
  lea coverage_tape(pc),a2
  move.l custom5(pc),d0

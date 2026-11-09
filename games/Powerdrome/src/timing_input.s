@@ -1,6 +1,60 @@
 ; VBL produces timestamped external input. Logical controls own corrected axis state.
 ; 256 sixteen-byte slots, with one empty slot. Overflow is explicit and invalidates a run.
 TIMING_INPUT_MASK = 4080
+; Every stick sum saturates here. Symmetric, so the native NEG.W of an axis cannot overflow.
+TIMING_AXIS_LIMIT = 32767
+
+; Player movement is the native per-VBL mouse count, taken where the VBL server adds it
+; to the raw counters (ext.w + add.w at $56d2 and $56fc). Only these counts are queued, so
+; a native write to the stick (contact damping, resets) is never mistaken for movement.
+; X keeps d1, which already holds the Y counter byte.
+timing_input_mouse_x
+ ext.w d0
+ movem.l d0-d1/a0-a1,-(sp)
+ lea $42a(a6),a0
+ lea timing_input_pending_x(pc),a1
+ bsr.s timing_input_player
+ movem.l (sp)+,d0-d1/a0-a1
+ rts
+
+timing_input_mouse_y
+ ext.w d1
+ movem.l d0-d1/a0-a1,-(sp)
+ move.w d1,d0
+ lea $42e(a6),a0
+ lea timing_input_pending_y(pc),a1
+ bsr.s timing_input_player
+ movem.l (sp)+,d0-d1/a0-a1
+ rts
+
+; d0.w player delta, a0 raw native axis, a1 pending axis. Both sums saturate. Uses d0-d1.
+timing_input_player
+ move.w d0,d1
+ ext.l d1
+ move.w (a0),d0
+ ext.l d0
+ add.l d1,d0
+ bsr.s timing_input_saturate
+ move.w d0,(a0)
+ move.w (a1),d0
+ ext.l d0
+ add.l d1,d0
+ bsr.s timing_input_saturate
+ move.w d0,(a1)
+ rts
+
+; d0.l -> d0 clamped to +-TIMING_AXIS_LIMIT.
+timing_input_saturate
+ cmp.l #TIMING_AXIS_LIMIT,d0
+ ble.s .not_high
+ move.l #TIMING_AXIS_LIMIT,d0
+ rts
+.not_high
+ cmp.l #-TIMING_AXIS_LIMIT,d0
+ bge.s .done
+ move.l #-TIMING_AXIS_LIMIT,d0
+.done
+ rts
 
 timing_input_initialize
  clr.l timing_input_read-timing_state(a1)
@@ -41,6 +95,9 @@ timing_input_initialize
  move.w $42e(a6),timing_input_sample_y-timing_state(a1)
  move.w $42a(a6),timing_input_x-timing_state(a1)
  move.w $42e(a6),timing_input_y-timing_state(a1)
+ ; Movement made before gameplay (menus) belongs to the pointer, not the stick.
+ clr.w timing_input_pending_x-timing_state(a1)
+ clr.w timing_input_pending_y-timing_state(a1)
  move.w $422(a6),timing_input_mode-timing_state(a1)
  move.w $422(a6),timing_input_last_mode-timing_state(a1)
  IFNE TIMING_WORLD20
@@ -53,10 +110,8 @@ timing_input_sample
  move.l perf_game(pc),a0
  swap d0
  move.w $f9e(a0),d0
- move.w $42a(a6),d4
- sub.w timing_input_sample_x-timing_state(a1),d4
- move.w $42e(a6),d5
- sub.w timing_input_sample_y-timing_state(a1),d5
+ move.w timing_input_pending_x-timing_state(a1),d4
+ move.w timing_input_pending_y-timing_state(a1),d5
  moveq #0,d6
  tst.w $422(a6)
  beq.s .joy_ready
@@ -94,6 +149,8 @@ timing_input_sample
  move.l d0,timing_input_last-timing_state(a1)
  move.w $42a(a6),timing_input_sample_x-timing_state(a1)
  move.w $42e(a6),timing_input_sample_y-timing_state(a1)
+ clr.w timing_input_pending_x-timing_state(a1)
+ clr.w timing_input_pending_y-timing_state(a1)
  move.w d6,timing_input_last_joy-timing_state(a1)
  move.w $422(a6),timing_input_last_mode-timing_state(a1)
  addq.l #1,timing_input_produced-timing_state(a1)
@@ -106,7 +163,7 @@ timing_input_sample
  rts
 
 timing_input_for_control
- movem.l d0-d2/a0-a1,-(sp)
+ movem.l d0-d2/a0-a2,-(sp)
  lea timing_state(pc),a1
 .next
  move.w timing_input_read-timing_state(a1),d0
@@ -119,9 +176,11 @@ timing_input_for_control
  bmi.s .done
  move.l 4(a0),timing_input_current-timing_state(a1)
  move.w 8(a0),d1
- add.w d1,timing_input_x-timing_state(a1)
+ lea timing_input_x(pc),a2
+ bsr.s .axis
  move.w 10(a0),d1
- add.w d1,timing_input_y-timing_state(a1)
+ lea timing_input_y(pc),a2
+ bsr.s .axis
  move.w 12(a0),timing_input_joy-timing_state(a1)
  move.w 14(a0),timing_input_mode-timing_state(a1)
  addq.l #1,timing_input_consumed-timing_state(a1)
@@ -131,7 +190,18 @@ timing_input_for_control
  bra.s .next
 .done
  move.w #1,timing_input_control_active-timing_state(a1)
- movem.l (sp)+,d0-d2/a0-a1
+ movem.l (sp)+,d0-d2/a0-a2
+ rts
+; d1.w queued delta added to the private axis (a2), saturating. Keeps d0.
+.axis
+ move.l d0,-(sp)
+ move.w (a2),d0
+ ext.l d0
+ ext.l d1
+ add.l d1,d0
+ bsr timing_input_saturate
+ move.w d0,(a2)
+ move.l (sp)+,d0
  rts
 
 timing_input_buttons
@@ -168,19 +238,52 @@ timing_input_read_axes
  move.w $42e(a6),d3
  bra.w timing_input_after_read_axes
 
+ ; Native contact damping. It sets the stick, so it sets both the private axes that
+; controls read and the raw counters, as the single native variable would.
 timing_input_write_axes
- bsr timing_input_is_active
- beq.s .live
  move.l a0,-(sp)
  lea timing_state(pc),a0
  move.w d2,timing_input_x-timing_state(a0)
  move.w d3,timing_input_y-timing_state(a0)
  movea.l (sp)+,a0
- bra.w timing_input_after_write_axes
-.live
  move.w d2,$42a(a6)
  move.w d3,$42e(a6)
  bra.w timing_input_after_write_axes
+
+; Native stick reset (two MOVE.W #0 to $42a/$42e): reposition (A), pit and session
+; starts. Native code resets one variable; here the raw counters, the private axes and
+; the movement not yet consumed (pending and queued) all belong to that stick, so they
+; are cleared together. Masked against the VBL producer.
+timing_input_zero_axes
+ movem.l d0-d1/a0-a1,-(sp)
+ move.w $dff01c,d1
+ move.w #$4000,$dff09a
+ clr.w $42a(a6)
+ clr.w $42e(a6)
+ lea timing_state(pc),a1
+ clr.w timing_input_sample_x-timing_state(a1)
+ clr.w timing_input_sample_y-timing_state(a1)
+ clr.w timing_input_x-timing_state(a1)
+ clr.w timing_input_y-timing_state(a1)
+ clr.w timing_input_pending_x-timing_state(a1)
+ clr.w timing_input_pending_y-timing_state(a1)
+ lea timing_input_queue(pc),a0
+ move.w timing_input_read-timing_state(a1),d0
+.pending
+ cmp.w timing_input_write-timing_state(a1),d0
+ beq.s .done
+ clr.l 8(a0,d0.w)
+ add.w #16,d0
+ and.w #TIMING_INPUT_MASK,d0
+ bra.s .pending
+.done
+ addq.l #1,timing_input_resets-timing_state(a1)
+ and.w #$4000,d1
+ beq.s .masked
+ move.w #$c000,$dff09a
+.masked
+ movem.l (sp)+,d0-d1/a0-a1
+ rts
 
 ; The original joystick body at d26c..d380 has no calls or stack-relative data.
 ; Run it against only its own input fields; IRQs retain the native VBL state pointer.
@@ -315,6 +418,11 @@ timing_input_paused dc.w 0
 timing_input_paused_fields dc.l 0
 timing_input_pauses dc.l 0
 timing_input_resumes dc.l 0
+; Native stick resets taken through timing_input_zero_axes.
+timing_input_resets dc.l 0
+; Player mouse counts since the producer last queued them.
+timing_input_pending_x dc.w 0
+timing_input_pending_y dc.w 0
 
 timing_input_pause_begin
  move.w sr,-(sp)

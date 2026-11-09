@@ -399,3 +399,24 @@ both axes after the render-rate fixture activates. Compare an unpaced build with
 `-DTIMING_RENDER_HZ_TEST=10` using `check_mouse_steering.py CAPTURE CAPTURE`.
 The checker compares complete private and native mouse/matrix states at common
 world steps, and requires visible matrix changes between control epochs.
+
+### Mouse stick checks
+
+```sh
+python3 tools/check_input_axes.py
+python3 tools/check_input_axes.py --baseline 9a249e5d
+```
+
+The first runs the enhanced input layer's actual assembly under the shared Unicorn
+runtime (harness in `tmp/input-axes/`, no game bytes). It pushes the stick forward 5,000
+counts, applies native contact damping forty times, then the native A reset, and requires
+the private stick to return to zero. It also checks that counts queued before a reset are
+discarded, that later counts are kept, and that 50,800 counts in one direction saturate
+the raw and private stick at ±32,767 without wrapping. `--baseline` runs the same scenario
+against `timing_input.s` from an earlier revision and reports the result; before the fix
+the stick ends at +4,927 after A, reversed.
+
+The 060 single-count mouse tape above also reproduces all 501 complete mouse/matrix
+states of the capture recorded before this change (`tmp/mouse-reset/tape-060` against
+`tmp/mouse-steering/current-060`).
+

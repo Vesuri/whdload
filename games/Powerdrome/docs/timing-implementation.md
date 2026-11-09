@@ -138,6 +138,27 @@ logical control deadlines. The scheduler does not repeatedly sample a new physic
 input for every catch-up step. Queue/accounting checks detect lost or duplicated
 work, release ordering and overflow.
 
+Natively the mouse stick is one pair of words, `a6+$42a`/`$42e`: the VBL server at
+`$56d2`/`$56fc` adds each field's mouse count to it, contact damping at `$d05e`..`$d086`
+writes it, and `$b6e4`, `$eab2`, `$ebd0`, `$100c2` (reached from the A reposition at
+`$c7e6` → `$fea6` → `$10092`) and `$140a4` reset it to zero. The controls read a
+private copy instead, so the enhanced layer keeps the two consistent:
+
+- Player movement is only the per-field mouse count, taken at the two VBL additions.
+  Those counts are queued; nothing the game writes to the stick is read back as
+  movement. Coverage tapes enter through the same routine.
+- Contact damping sets both the private copy and the raw words.
+- The five resets clear the raw words, the private copy and every count not yet
+  consumed (pending or queued), with interrupts masked, so A recentres the stick.
+- Every stick sum saturates at ±32767: the raw words, the pending counts and the private
+  copy. Nothing wraps, and the native `NEG.W` of an axis cannot overflow.
+
+The previous layer queued differences of the raw words. A reset was therefore queued as
+an equal and opposite movement and added to a private copy that damping had already
+reduced: pushing the nose into the floor, waiting, then pressing A left the stick at
+full deflection the other way. `tools/check_input_axes.py --baseline <revision>`
+reproduces that against an earlier `timing_input.s`.
+
 Pause entry `$be12` and the native clock restoration at `$beec` preserve the
 fractional control phase and pending work. Paused PAL fields are excluded from
 both scheduler and input time. Paused input changes do not leak into resumed play.
