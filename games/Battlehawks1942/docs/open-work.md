@@ -335,6 +335,22 @@ the cap, frame counts only); Unicorn 68000 and 68040 (routine checks). PAL only.
    and the full-frame one was 40% slower, `docs/c2p.md`), TFH's projection routines (BH's
    `bh:16cd8`..`16f58` counterparts are not 5% of the frame), and the pixel plot
    `bh:1a3d6` (2.2%).
-5. **Release:** Galahad's installer (`BattleHawks1942.lha`) with both `(SLOW)` and `(FAST)`
-   replaced by the release slave, `CUSTOM2=1` in its three icons, a ReadMe entry above
-   Galahad's; then play-testing on real machines.
+5. **Release:** packaged (`make dist`: `game.sh` `game_dist`, `release/release.json`):
+   Galahad's installer (`BattleHawks1942.lha`) with both `(SLOW)` and `(FAST)` replaced by
+   the release slave (`$VER: slave 2.0b`), `release/ReadMe` (the 2.0b entry above
+   Galahad's), `release/Install` (no slave question: they are the same) and both game icons
+   with `NOCACHE` replaced in place by `CUSTOM2=1` (`tools/icons.py`; every other byte is
+   Galahad's). `NOCACHE` must go: WHDLoad's NoCache makes `resload_SetCPU` do nothing, so
+   2.0b's caches would stay off. The icons are changed in the archive, not by the
+   installer, because Installer 43.3 cannot do it: run under it, `settooltype` found no
+   existing tooltype (deleting `NOCACHE` did nothing; setting `PRELOAD` appended a second
+   one), a statement that also deleted changed nothing at all, and rewriting an icon
+   through OS 3.1's icon.library dropped the OS 3.5 icon's colour image (11633 bytes to
+   189). **Run under Installer 43.3** (`tools/install_run.sh`, `tools/install_check.py`:
+   Kickstart 3.1 A1200, Workbench 2.04's C: and Libs:, WHDLoad and DIC, clicks through the
+   gdb stub; Average level, default drawer): to "Installation complete" with the NewIcon,
+   the installed slave equal to the release build, the icon equal to `tools/icons.py`'s,
+   `Disk.1` and `Disk.2` imaged by DIC from DF0 equal to the originals, `Disk.3`, the
+   ReadMe, manual, hints and cockpit map copied; with the OS 3.5 icon, the icon equal to
+   `tools/icons.py`'s (colour image kept). Left: play-testing on real machines (notably
+   the 68020/030 cache-line eviction and the blitter waits), then the release.

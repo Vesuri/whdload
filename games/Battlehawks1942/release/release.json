@@ -1,0 +1,18 @@
+{
+  "archives": [
+    {
+      "input": "BattleHawks1942.lha",
+      "output": "Battlehawks1942Enhanced-{version}-{date}.lha",
+      "replace": {
+        "BattleHawks1942HD/Battlehawks1942(FAST).slave": "build:Battlehawks1942",
+        "BattleHawks1942HD/Battlehawks1942(SLOW).slave": "build:Battlehawks1942",
+        "BattleHawks1942HD/Readme": "release/ReadMe",
+        "BattleHawks1942HD/Install": "release/Install",
+        "BattleHawks1942HD/BattleHawks1942.newicon": "tmp/release-icons/BattleHawks1942.newicon",
+        "BattleHawks1942HD/BattleHawks1942.coloricon": "tmp/release-icons/BattleHawks1942.coloricon"
+      },
+      "add": {},
+      "remove": []
+    }
+  ]
+}

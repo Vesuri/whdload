@@ -11,7 +11,10 @@ loop, and the slave flushes the caches after each write, or on a 68020 or 68030 
 the written words' cache lines). Any change to the game ships as
 patches in that slave; the Enhanced framerate (`CUSTOM2=1`, `src/timing.s`, ported from
 Their Finest Hour with `tools/xmatch.py`) makes game time follow real time. Goal:
-frame-rate-independent gameplay, 50 fps on faster Amigas. Nothing is released yet.
+frame-rate-independent gameplay, 50 fps on faster Amigas. Nothing is released yet;
+`make dist` packages Galahad's installer with the release slave (`release/`, the icons
+from `tools/icons.py`); `tools/install_run.sh` and `install_check.py` run it under
+Installer 43.3.
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.
 

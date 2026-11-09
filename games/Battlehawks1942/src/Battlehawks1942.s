@@ -84,6 +84,7 @@ slv_info	dc.b	"Installed by Galahad of Fairlight and Vesuri",10
 slv_CurrentDir	dc.b	0
 slv_config	dc.b	"C2:B:Enhanced framerate;"
 		dc.b	0
+	dc.b	"$","VER: slave 2.0b (09.11.2026)",0
 	EVEN
 
 _improve	dc.l	0			;1: enhanced framerate (CUSTOM2=1)

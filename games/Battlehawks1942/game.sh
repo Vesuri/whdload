@@ -25,6 +25,17 @@ game_drives() {
   GAME_FSUAE_ARGS+=(--record="$PWD/$FSUAE_RUN/playback.rec" --deterministic=1)
 }
 
+# The release archive: the shared packager (release/release.json), after tools/icons.py has
+# written the two game icons with NOCACHE replaced by CUSTOM2=1 (Installer 43.3 cannot edit
+# them: tools/icons.py).
+game_dist() {
+  local force=()
+  [ "${FORCE:-0}" != 1 ] || force=(--force)
+  (cd "$GAME_ROOT" && python3 tools/icons.py tmp/release-icons > /dev/null &&
+    python3 "$COMMON/tools/package_release.py" --game-root "$GAME_ROOT" --dist "$1" \
+      --variants "$VARIANTS" ${force[@]+"${force[@]}"})
+}
+
 # The reconstruction must still equal the installed slave, the instrumented builds must
 # assemble, the release slave must leave BH original without CUSTOM2 (tools/pl_check.py),
 # the Enhanced framerate routines must pass their Unicorn checks on the 68000 and 68040
