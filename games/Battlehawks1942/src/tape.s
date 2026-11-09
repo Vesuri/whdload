@@ -3,11 +3,13 @@
 ; the gdb stub cannot write memory; see docs/profiling.md.)
 ;
 ; The LoadSeg hook starts a task when BH is loaded. The task counts PAL fields with
-; graphics.library WaitTOF and sends each tape entry as an IECLASS_RAWKEY event with
-; IND_WRITEEVENT, so intuition and the game's own input handler see an ordinary key press.
-; Under DETERMINISTIC=1 the whole run then repeats exactly. When the tape ends (at the first
-; flight) the task Wait()s forever, so it costs nothing during a measurement window. Flight
-; input goes into BH's frame loop instead (tape_key below).
+; graphics.library WaitTOF and presses Return (IECLASS_RAWKEY events with IND_WRITEEVENT,
+; so intuition and the game's own input handler see an ordinary key press) every TAPE_GAP
+; fields from field TAPE_FIRST until the first flight frame (tape_key sets tape_flying).
+; Every screen on the way takes Return, so every CPU reaches the flight on its own
+; schedule. Under DETERMINISTIC=1 the whole run then repeats exactly. Then the task
+; Wait()s forever, so it costs nothing during a measurement window. Flight input goes into
+; BH's frame loop instead (tape_key below), which also keeps the flight record.
 ;
 ; The task, its stack and its I/O blocks live in the slave, not in Amiga memory, so the
 ; game's own allocations are unchanged.
@@ -30,28 +32,23 @@ BH_KEYCALL	= $75c4			;BH: return address of the flight loop's call of it
 BH_FRAME	= 26292			;(a4).w BH's flight frame counter (bh:6e52)
 CHAR_LEFT	= 3			;BH's character for cursor left (its key table)
 
-; Tape: (fields to wait before the event, raw key code); 0 ends it. Fields count from the
-; LoadSeg of BH. The boot shows the title and the credits by itself; then each screen waits
-; for Return: main menu (Select Training is highlighted), Select Training Mission (the first
-; mission), Ready Room (Begin Flight), and the Recognition Test (the manual check, shown
-; before the first flight; any answer passes). Measured with the KickEmu slave on the
-; A500-equivalent machine: the menu is up by field ~2800, so the first key comes at 3000 and
-; one more every 505 fields. Faster machines only reach each screen sooner.
+; Fields count from the LoadSeg of BH. The boot shows the title and the credits by itself;
+; then each screen waits for Return: main menu (Select Training is highlighted), Select
+; Training Mission (the first mission), Ready Room (Begin Flight), and the Recognition Test
+; (the manual check, shown before the first flight; any answer passes). With the KickEmu
+; slave on the 68000 the menu is up by field ~2800 and the screens are ~505 fields apart;
+; a Return that comes while a screen loads is taken by the next one or lost, and the next
+; press follows TAPE_GAP fields later.
 	IFND	TAPE_FIRST
 TAPE_FIRST	= 3000
 	ENDC
 	IFND	TAPE_GAP
-TAPE_GAP	= 500
+TAPE_GAP	= 300
 	ENDC
-
-tape:	dc.w	TAPE_FIRST,RAW_RETURN, 5,RAW_RETURN|RAW_UP
-	dc.w	TAPE_GAP,RAW_RETURN, 5,RAW_RETURN|RAW_UP
-	dc.w	TAPE_GAP,RAW_RETURN, 5,RAW_RETURN|RAW_UP
-	dc.w	TAPE_GAP,RAW_RETURN, 5,RAW_RETURN|RAW_UP
-	dc.w	0
 
 ; Called from the LoadSeg hook (a task, all registers saved by the caller).
 tape_start:
+	bsr	rec_alloc
 	move.l	(4).w,a6
 	lea	tape_task(pc),a1
 	move.b	#NT_TASK,LN_TYPE(a1)
@@ -92,9 +89,19 @@ tape_task_code:
 	moveq	#0,d0
 	moveq	#0,d1
 	jsr	_LVOOpenDevice(a6)
-	lea	tape(pc),a3
-.next:	move.w	(a3)+,d2
-	beq.s	.done
+	move.w	#TAPE_FIRST,d2
+.next:	bsr.s	.wait
+	lea	tape_flying(pc),a0
+	tst.b	(a0)
+	bne.s	.done
+	moveq	#RAW_RETURN,d0
+	bsr.s	.key
+	moveq	#5,d2
+	bsr.s	.wait
+	move.w	#RAW_RETURN|RAW_UP,d0
+	bsr.s	.key
+	move.w	#TAPE_GAP-5,d2
+	bra.s	.next
 .wait:	exg	a5,a6
 	jsr	_LVOWaitTOF(a6)
 	exg	a5,a6
@@ -102,15 +109,15 @@ tape_task_code:
 	addq.l	#1,(a0)
 	subq.w	#1,d2
 	bne.s	.wait
-	lea	tape_event(pc),a0
+	rts
+.key:	lea	tape_event(pc),a0
 	move.b	#IECLASS_RAWKEY,ie_Class(a0)
-	move.w	(a3)+,ie_Code(a0)
+	move.w	d0,ie_Code(a0)
 	lea	tape_io(pc),a1
 	move.w	#IND_WRITEEVENT,IO_COMMAND(a1)
 	move.l	a0,IO_DATA(a1)
 	move.l	#ie_SIZEOF,IO_LENGTH(a1)
-	jsr	_LVODoIO(a6)
-	bra.s	.next
+	jmp	_LVODoIO(a6)
 .done:	moveq	#0,d0
 	jsr	_LVOWait(a6)
 	bra.s	.done
@@ -126,6 +133,14 @@ tape_task_code:
 ; degrees, then one every 10 frames keeps it banked (the bank grows into a descending spiral:
 ; small banks level out by themselves, larger ones tighten).
 tape_key:
+	lea	tape_flying(pc),a0
+	tst.b	(a0)
+	bne.s	.flying
+	st	(a0)
+	lea	tape_t0(pc),a0		;the first flight frame's field
+	move.w	dt_fields(pc),(a0)
+.flying:
+	bsr	rec_frame
 	move.l	(sp),a0			;bh+BH_KEYCALL
 	jsr	(BH_KEY-BH_KEYCALL,a0)	;d0.w = this frame's character or 0
 	tst.w	d0
@@ -134,7 +149,12 @@ tape_key:
 	adda.w	tape_flight_pos(pc),a1
 	move.w	(a1),d1
 	beq.s	.store			;tape done
+	IFD	TAPE_TIME
+	add.w	tape_t0(pc),d1
+	cmp.w	dt_fields(pc),d1
+	ELSE
 	cmp.w	(BH_FRAME,a4),d1
+	ENDC
 	bhi.s	.store			;not yet
 	move.w	(2,a1),d0
 	lea	tape_flight_pos(pc),a0
@@ -162,6 +182,21 @@ R	SET	R-1
 	ENDR
 	ENDM
 tape_flight:
+	IFD	TAPE_TIME
+; TAPE_TIME: the same left turn by fields since the first flight frame instead of frame
+; numbers (the 68000's ~5.4 fields per frame): the same input in real time on every
+; machine, for comparing machines when game time follows real time (CUSTOM2=1).
+F	SET	160
+	REPT	8
+	dc.w	F,CHAR_LEFT
+F	SET	F+16
+	ENDR
+F	SET	330
+	REPT	400
+	dc.w	F,CHAR_LEFT
+F	SET	F+54
+	ENDR
+	ELSE
 F	SET	30
 	REPT	8
 	FLIGHT_KEY	F
@@ -172,6 +207,7 @@ F	SET	60
 	FLIGHT_KEY	F
 F	SET	F+10
 	ENDR
+	ENDC
 	dc.w	0
 tape_flight_pos:	dc.w	0		;offset of the next entry
 
@@ -185,12 +221,66 @@ t_scale:
 	lsr.w	#3,d0
 	rts
 
-; Read by tools/fixed_window.sh (gdb, read-only): fields counted so far, and the field of
-; the last Return (the window anchors on the first flight frame after it). The marker locates them in memory.
+; Read by tools/fixed_window.sh (gdb, read-only): fields counted so far, and the field to
+; arm the window's anchor from, ARM_EARLY (1000) fields before it: no flight starts before
+; the first Return. The marker locates them in memory.
 	CNOP	0,4
 	dc.b	"BHTAPE!!"
 tape_fields:	dc.l	0
-tape_end:	dc.l	TAPE_FIRST+5+3*(TAPE_GAP+5)
+tape_end:	dc.l	TAPE_FIRST+1000
+tape_flying:	dc.b	0
+	EVEN
+tape_t0:	dc.w	0
+
+; Flight record (tools/record.sh, tools/speed.py): one REC_SIZE entry per flight frame,
+; taken at the frame's key read (after timing.s has set the frame's T): the VERTB count
+; (timing.s's dt_fields, counted in VERIFY builds whatever CUSTOM2), T, the player's
+; (object 0) x, y, z, heading, roll, pitch and speed, and BH's frame counter. REC_FRAMES
+; entries in a buffer allocated at LoadSeg (none if that fails); then it stops.
+	IFND	REC_FRAMES
+REC_FRAMES	= 2048
+	ENDC
+REC_SIZE	= 28
+
+rec_alloc:
+	move.l	(4).w,a6
+	move.l	#REC_FRAMES*REC_SIZE,d0
+	move.l	#MEMF_PUBLIC|MEMF_CLEAR,d1
+	jsr	_LVOAllocMem(a6)
+	lea	rec_buf(pc),a0
+	move.l	d0,(a0)
+	rts
+
+rec_frame:
+	movem.l	d0/a0-a1,-(sp)
+	move.l	rec_buf(pc),d0
+	beq.s	.done
+	move.l	rec_count(pc),d0
+	cmp.l	#REC_FRAMES,d0
+	bhs.s	.done
+	mulu	#REC_SIZE,d0
+	move.l	rec_buf(pc),a0
+	add.l	d0,a0
+	move.w	dt_fields(pc),(a0)+
+	move.w	(BH_T,a4),(a0)+
+	move.l	(10908,a4),(a0)+	;x[0]
+	move.l	(11484,a4),(a0)+	;y[0]
+	move.l	(12060,a4),(a0)+	;z[0]
+	move.w	(14328,a4),(a0)+	;heading[0]
+	move.w	(15240,a4),(a0)+	;roll[0]
+	move.w	(14952,a4),(a0)+	;pitch[0]
+	move.w	(15696,a4),(a0)+	;speed[0]
+	move.w	(BH_FRAME,a4),(a0)+
+	lea	rec_count(pc),a0
+	addq.l	#1,(a0)
+.done:	movem.l	(sp)+,d0/a0-a1
+	rts
+
+	CNOP	0,4
+	dc.b	"BHREC!!!"
+rec_count:	dc.l	0
+rec_buf:	dc.l	0
+rec_frames:	dc.l	REC_FRAMES
 
 tape_name:	dc.b	"bh tape",0
 tape_gfx_name:	dc.b	"graphics.library",0

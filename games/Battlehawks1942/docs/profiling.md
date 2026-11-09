@@ -19,6 +19,10 @@ SLAVE=tmp/prof/turn/slave.slave python3 tools/c2p_stats.py tmp/prof/turn/trace.b
 python3 tools/compare_traces.py tmp/prof/turn/trace.bin tmp/prof/turn2/trace.bin
 STATE_ONLY=1 SKIP_FRAMES=8 tools/fixed_window.sh tmp/prof/state-a   # memory at flight frame 8
 python3 tools/compare_state.py tmp/prof/state-a tmp/prof/state-b
+MACHINE=030 WHD_ARGS='CUSTOM2=1' tools/record.sh tmp/rec/030-enh   # flight record (rectime build)
+python3 tools/speed.py --at 10,20 tmp/rec/030-enh tmp/rec/a500-enh  # game time against real time
+python3 tools/timing_check.py --cpu 68040                           # Enhanced framerate routines (Unicorn)
+python3 tools/xmatch.py site 154dc                                  # a Their Finest Hour offset in BH
 ```
 
 A capture takes about 10 minutes (one boot, ~4800 fields to the window in warp) and ~520 MB.
@@ -33,7 +37,7 @@ A capture takes about 10 minutes (one boot, ~4800 fields to the window in warp) 
 | Shipped slave | Galahad of Fairlight v1.0 (12/05/03), 1512 bytes, WHDLoad v15 header, no source. `ws_BaseMemSize` `$80000`, `ws_ExpMem` `$40000` (exactly the Kickstart image), flags `NoError\|EmulPriv`, quit F10. The Retroplay archive has the "SLOW" slave (no fast RAM); Galahad's installer package also has the "FAST" one (see Archives). |
 | Reconstruction | `src/original/Battlehawks1942.s` (`make build BUILD=original`, `-no-opt`) rebuilds the shipped slave byte-identically. Old-style Kick 1.3 boot: `resload_LoadKick` into ExpMem, a `resload_Patch` list on the Kickstart image (trackdisk → `Disk.N` via `resload_DiskLoad`, disk change, copper, a dos `LoadSeg` hook), and in the hook one patch to `BH`. Decode its list with `python3 -m amigaxdev.patchlist SLAVE 0x206`. |
 | Game patch | The manual check ("Recognition Test", shown before the first flight): `bh:025be move.b (0,a0,d1.l),d2; cmp.w d2,d0; beq.s` becomes `jsr fix; bra.s` — any answer passes, but Return must still be pressed. |
-| Built slave | `src/Battlehawks1942.s` (`make slave`): WHDLoad 20 KickEmu (`kick13.s` and the headers from the shared `$WHDLOAD`, following its `Src/slave-examples/kick13.asm`; `src/include/lvo/` adapts the official sources' include names to the NDK). 512 KB chip **plus 512 KB fast memory** (v1.0: chip only), `DISKSONBOOT`, `NUMDRIVES=3` (no swaps), `WPDRIVES=%1111` (as v1.0), the same `BH` patch via `_cb_dosLoadSeg` + `resload_PatchSeg`. `make verify` adds `tape.s`; `make build BUILD=c2pfull` the c2p experiment (`docs/c2p.md`). |
+| Built slave | `src/Battlehawks1942.s` (`make slave`): WHDLoad 20 KickEmu (`kick13.s` and the headers from the shared `$WHDLOAD`, following its `Src/slave-examples/kick13.asm`; `src/include/lvo/` adapts the official sources' include names to the NDK). 512 KB chip **plus 516 KB fast memory** (v1.0: chip only; 4 KB for timing.s), `DISKSONBOOT`, `NUMDRIVES=3` (no swaps), `WPDRIVES=%1111` (as v1.0), `CACHE` (WHDLoad's default caches; v1.0 and KickEmu without `CACHE` turn them off), the same `BH` patch via `_cb_dosLoadSeg` + `resload_PatchSeg` (`pl_bh`), and with `CUSTOM2=1` timing.s's own list (`docs/open-work.md`). `make verify` adds `tape.s`; `make build BUILD=rectime` the tape timed in fields (§3); `make build BUILD=c2pfull` the c2p experiment (`docs/c2p.md`). |
 
 **Memory.** Only what DMA needs is in chip RAM. `BH`'s three hunks are "any" memory; it
 allocates the sample data of its sound resources `MEMF_CHIP` (`bh:157d6`: resource id + 1000,
@@ -80,17 +84,18 @@ first capture takes ~30 s for the attach, later ones none.
    is kept (`game.sh`) in case a fixed FS-UAE turns up. The recordings also showed that the host
    mouse feeds port 0 when `JOY0=mouse`, even with input grab off.
 2. **The VERIFY input tape (`src/tape.s`) — used.** `_cb_dosLoadSeg` starts an Exec task
-   (TCB, stack and I/O blocks inside the slave, so the game's allocations do not move) that
-   counts fields with `WaitTOF` and sends `IECLASS_RAWKEY` events through `input.device`
-   `IND_WRITEEVENT`: Return at fields 3000, 3505, 4010, 4515 after BH's LoadSeg, then the
-   left circle (below). The screens:
-   title, credits (both by themselves), main menu (Return: Select Training), Select Training
-   Mission (Return: first mission), Ready Room (Return: Begin Flight), Recognition Test
-   (Return) → the flight. The menu is up by field ~2800 (KickEmu slave, 68000); the v1.0
-   slave reached the screens on a different schedule, so retime the tape when the slave or
-   the boot changes. After the tape the task sits in `Wait(0)`.
-   It publishes `"BHTAPE!!"`, its field count and the field of its last Return;
-   `fixed_window.sh` polls the count read-only.
+   (TCB, stack and I/O blocks inside the slave) that counts fields with `WaitTOF` and sends
+   `IECLASS_RAWKEY` events through `input.device` `IND_WRITEEVENT`: Return from field 3000
+   after BH's LoadSeg, then every 300 fields until the first flight frame (`tape_key` sets a
+   flag), then the left circle (below). The screens: title, credits (both by themselves),
+   main menu (Return: Select Training), Select Training Mission (Return: first mission),
+   Ready Room (Return: Begin Flight), Recognition Test (Return) → the flight. Every screen
+   takes Return and a press during a load is taken by the next screen or lost, so every CPU
+   reaches the flight on its own schedule (the 68030/50 too; the fixed schedule of four
+   Returns 505 fields apart that this replaced fitted only the 68000). After the tape the task
+   sits in `Wait(0)`. It publishes `"BHTAPE!!"`, its field count and the field to arm a
+   capture from (`TAPE_FIRST + 1000`: `fixed_window.sh` arms 1000 fields before it, and no
+   flight starts before the first Return); `fixed_window.sh` polls the count read-only.
 
 **How BH reads input** (it matters for scripting): its input handler only adds `RAWMOUSE`
 deltas into `25188/25190(a4)` (`bh:19a86`); once per frame `bh:3e98` takes the accumulated
@@ -113,6 +118,22 @@ this gives the same flight on every CPU and in every run. Two earlier versions d
 keys typed through `input.device` at fixed fields put the 68020's frame 90 before the bank,
 and the tape task polling the frame counter once per field let a press slip a frame when the
 debugger's stops (which are not cycle-transparent) shifted the frame/field phase.
+
+**Flight records** (`tools/record.sh OUTDIR`, `tools/speed.py`; for the Enhanced framerate).
+The VERIFY slave keeps a record of each flight frame at its key read: the field count (a VERTB
+server, timing.s's `dt_fields`, installed in VERIFY builds with or without `CUSTOM2`), T,
+the player's (slot 0) x, y, z, heading, roll, pitch and speed, and BH's frame counter
+(`"BHREC!!!"`, 2048 entries allocated at LoadSeg; `FASTMEMSIZE` is `$90000` in VERIFY builds
+for it). `record.sh` boots `MACHINE=a500` (the capture machine), `a1200` (68020, 2 MB chip +
+8 MB fast) or `030` (`a1200-030`), `WHD_ARGS='CUSTOM2=1'` for the Enhanced framerate, in
+warp with no window, and saves the record once it covers `RECORD_FIELDS` (2000) fields. Its
+default slave is the `rectime` build: the same left turn with the presses timed in fields
+since the first flight frame (`TAPE_TIME`), so every machine gets the same input in real time
+and, when game time follows real time, flies the same flight. `speed.py` prints frames per
+second, the T seen, game time against real time (each step 1/T s; also from the second second
+on, after the flight's first frames at the mission's T), the distance flown per second, the
+player's state at given seconds (`--at 5,10,20`) and the heading rate per 10° of roll. Records
+end where the plane stops moving (the turn ends in the sea after ~30 s).
 
 **Anchor.** `fixed_window.sh` boots once with no breakpoint (a breakpoint armed from reset
 made warp too slow to reach field ~4600 in 5 minutes), finds `BH` and the tape counter with
@@ -167,7 +188,39 @@ Kickstart handler past its prologue, `kick:fc0d18`).
 
 ## 6. Baselines
 
-### Current: the left turn on the 8 MB fast-RAM machine (2026-10-07)
+### Original mode, caches on (2026-11-09)
+
+The slave now sets KickEmu's `CACHE` (and VERIFY builds install a VERTB counter and keep the
+flight record, §3); the tape reaches the flight on its new schedule. `tools/fixed_window.sh`
+(VERIFY build, flight frame 90, 100 fields, `tmp/base/`), original mode (no `CUSTOM2`):
+
+| machine | instrument | fps | fields/frame |
+|---|---|---:|---:|
+| 68000, 512 KB chip + 8 MB fast | trace, `frames.py` | **9.0** | 5.53 |
+| 68020 (A1200, 2 MB chip + 8 MB fast) | trace, `frames.py` | **28.4** | 1.76 |
+| 68030/50 (`a1200-030`, `CHIP_KB=2048`) | `SWAP_ONLY=1` breakpoints | **55.6** | 0.90 |
+
+Not an A/B against the earlier caches-off numbers below: the boot reaches the flight on
+another schedule, and BH's second random generator (§9) makes the scene at frame 90 depend
+on it. The 68030/50 runs the original game faster than the display (up to two c2p passes per
+field), and its game time with it.
+
+**Enhanced framerate** (`CUSTOM2=1`; flight records, `tools/record.sh`, rectime build, the
+whole turn until the sea, `tmp/rec3/`; game time against real time from the second second on):
+
+| machine | fps (whole flight) | T | game time / real time | heading at 25 s |
+|---|---:|---|---:|---:|
+| 68000 | 12.4 | 6..18 | 1.0003 | 273.6° |
+| 68020 (A1200) | 39.5 | 7..50 | 1.0005 | 274.4° |
+| 68030/50 | 50.0 (one frame per field) | 7..50 | 1.0000 | 273.9° |
+
+The heading rate per 10° of roll agrees within 1% between the three (for example
+−23.99/−23.90/−23.94 °/s at 80–90°). In original mode the same input in real time turns at
+−27.9 to −41.4 °/s on the 68000 (game time 1.40 × real time there, 22.7 × on the 68030/50).
+The descent in the spiral does not agree yet: at 20 s the 68000 has lost 8091 units of
+altitude, the 68020 7649, the 68030 7169 (open-work.md, step 3).
+
+### The left turn on the 8 MB fast-RAM machine (2026-10-07, caches off)
 
 `tools/fixed_window.sh tmp/prof/turn` (68000, 512 KB chip + 8 MB fast, slave with 512 KB fast
 memory, flight frame 90, 100 fields; flight input injected on frame numbers, §3).
@@ -282,8 +335,12 @@ each press at frame 2F instead of F, so frame 2N is the game time of frame N at 
   number of steps they are elsewhere. Their motion goes through T.
 - **Countdowns** set from T follow it (`10320(a4)`: 3 at T = 7, 7 at T = 14).
 - **The pool at slot 128** (`bh:1351e`, 8 slots for T ≤ 10, else 16) is full at both T;
-  its objects respawn, so displacement does not compare. 16 slots is all there is (the arrays
-  end at slot 143), so at T = 50 these objects would recycle early. To find: what they are.
+  its objects respawn, so displacement does not compare. They are classes 15 and 16, which
+  the object loop (`bh:8266`, its class switch at `bh:869e`) skips; the flight start
+  (`bh:6b6a`) places them once from the mission's T, `bh:7202` draws them and the effects
+  routine `bh:aec8` animates them (phase `17248(a4)`, every T/8+1 steps). With the Enhanced
+  framerate T is still the mission's when the pool is set up; their animation is the
+  effects cadence (open-work.md, step 3).
 - **The stick does not follow T.** `bh:0110` sets `10308(a4)` per frame: mouse counts since
   the last frame × 128, or for a key −2112 (Left) for one step, ramping by 4096 when the same
   key repeats within T/2 frames. `bh:7920` divides it by T into `28506(a4)`, which the

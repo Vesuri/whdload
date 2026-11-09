@@ -6,8 +6,10 @@ under Galahad/Fairlight's WHDLoad install (slave v1.0, 12.05.2003, Retroplay pac
 traces and disassembly. Galahad's slave shipped without source; `src/original/` reconstructs
 it byte for byte, so the slave is credited to Galahad/Fairlight (game.conf `AUTHOR`,
 `UPSTREAM`). The slave that is built and patched is `src/Battlehawks1942.s` (WHDLoad 20
-KickEmu, 512 KB chip + 512 KB fast memory). Any change to the game ships as patches in that
-slave. Goal: frame-rate-independent gameplay, 50 fps on faster Amigas. Nothing is released yet.
+KickEmu, 512 KB chip + 516 KB fast memory, caches on). Any change to the game ships as
+patches in that slave; the Enhanced framerate (`CUSTOM2=1`, `src/timing.s`, ported from
+Their Finest Hour with `tools/xmatch.py`) makes game time follow real time. Goal:
+frame-rate-independent gameplay, 50 fps on faster Amigas. Nothing is released yet.
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.
 
@@ -28,8 +30,11 @@ Read `docs/open-work.md` first.
 | `docs/profiling.md` | running the game, driving it, tracing it, or quoting any performance number |
 | `docs/c2p.md` | touching the chunky-to-planar pass |
 
-The slave source is `src/` (`Battlehawks1942.s`, the VERIFY-only `tape.s` and `c2p_full.s`,
-`original/` the reconstruction); game.conf and game.sh define the builds (release, verify,
-c2pfull, tscale, original). `tools/` is the development harness and never ships: `bh.py` is
-the gdb-stub server, `fixed_window.sh` the capture runner, `bh_report.py`, `frames.py`,
-`c2p_stats.py` and the `compare_*.py` scripts read its captures.
+The slave source is `src/` (`Battlehawks1942.s`, `timing.s` the Enhanced framerate, the
+VERIFY-only `tape.s` and `c2p_full.s`, `original/` the reconstruction); game.conf and game.sh
+define the builds (release, verify, c2pfull, tscale, rectime, original). `tools/` is the
+development harness and never ships: `bh.py` is the gdb-stub server, `fixed_window.sh` the
+capture runner, `bh_report.py`, `frames.py`, `c2p_stats.py` and the `compare_*.py` scripts
+read its captures; `record.sh` and `speed.py` record and read flights (game time against real
+time); `timing_check.py` (Unicorn) and `pl_check.py` are part of `make check`; `xmatch.py`
+maps Their Finest Hour's code, patch sites and globals to BH's.

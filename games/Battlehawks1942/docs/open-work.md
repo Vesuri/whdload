@@ -42,6 +42,22 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   player and drones cover the same ground in the same game time (4.1 %, 1–2 %).
 - **Baselines, the turn:** 68000 9.2 fps (chip-only slave 8.8), 68020 28.8 fps (§6).
 
+2026-11-09, Enhanced framerate plan steps 0–2 (below):
+- **`tools/xmatch.py`**: TFH's `bob` against BH, matched runs, sites, globals, constants,
+  BH's jump table.
+- **Scaffolding:** `C2:B:Enhanced framerate` (`CUSTOM2=1`) applies timing.s's own patch
+  list; without it `pl_bh` is v1.0's manual-check patch alone (`tools/pl_check.py`, in
+  `make check`). Caches on (`CACHE`). The tape presses Return until the flight, on every
+  CPU. Fractions in a buffer allocated at install (none: no patches), `FASTMEMSIZE`
+  `$81000`. Flight records (`tools/record.sh`, `tools/speed.py`, the `rectime` build).
+  Original-mode baselines of the turn, caches on: 68000 9.0, 68020 28.4, 68030/50 55.6 fps
+  (profiling.md §6).
+- **Decoupling** (`src/timing.s`): game time follows real time from the flight's second
+  second on within 0.05% on the 68000, 68020 and 68030/50 (12.4, 39.5 and 50.0 fps), and the
+  same input in real time flies the same turn on all three (heading rate per roll within 1%).
+  The routines pass their Unicorn checks at T 4/7/25/50 on the 68000 and 68040
+  (`tools/timing_check.py`, in `make check`).
+
 ## What Their Finest Hour's work gives this one
 
 The work here paused for Their Finest Hour (`games/TheirFinestHour`, the same Lucasfilm
@@ -62,7 +78,8 @@ the details. What carries over, untested on BH:
   waits, mission waits, messages, replay and camera, field-based input, audio envelopes, fuel)
   is the checklist for BH's 25 `divu.w 10184(a4)` sites and the timers in units of T.
 - **The stick:** TFH scales the counts by T/8 (its reference T) at the end of its input
-  routine; BH's `STICKREF` experiment (divide by the reference T 7) is the same fix.
+  routine; BH's `STICKREF` experiment (divide by the reference T 7) is the same fix (done:
+  BH divides by the mission's T, plan step 2).
 - **Fractions at large T:** at T = 50 per-step increments truncate to nothing; TFH carries
   16.16 fractions per object for position, the player's rates and the AI turn. BH's
   integrators (`bh:79f0`, the world arrays at `10908/11484/12060(a4)`) will need the same.
@@ -78,7 +95,7 @@ the details. What carries over, untested on BH:
 ## How much of TFH's code BH shares (2026-11-09)
 
 Matched by normalised instruction runs (12 or more instructions, addresses, offsets and
-large immediates masked; prototype scripts in `tmp/xmatch/`, step 0 below makes them a tool):
+large immediates masked; `tools/xmatch.py`):
 
 - 40% of BH's hunk 0 equals TFH's `bob`. 602 TFH data globals pair with BH's: T
   `11700`→`10184(a4)`, T/8+1 `11702`→`10186`, heading `18162`→`14328`, roll `19198`→`15240`,
@@ -126,26 +143,40 @@ Machines: 68000 + 512 KB chip + 8 MB fast (the capture machine: slow reference, 
 68020 A1200 + 8 MB fast (traces of the fast path); 68030/50 + 8 MB fast (50 fps ceiling and
 the cap, frame counts only); Unicorn 68000 and 68040 (routine checks). PAL only.
 
-0. **Translation tool** `tools/xmatch.py`: matched runs, TFH→BH sites, globals, differing
-   constants. Retarget TFH's sources and checks with it; fix by hand what it flags.
-1. **Scaffolding:** the option through `resload_Control` and a separate patch list; a
-   `make check` that, off, BH equals the original but for Galahad's manual-check patch;
-   `CACHE`; the VERIFY tape presses Return every ~300 fields until `26292(a4)` moves (every
-   CPU reaches the flight); runtime buffers by `AllocMem` at install, patches skipped on
-   failure, `FASTMEMSIZE` raised to fit; baselines of the turn, original mode, caches on, on
-   all three machines.
-2. **Decoupling** (TFH 1.2b's core, `timing.s`): field count in `bh:1ac26`; `dt_rate`
-   unchanged; `dt_frame` at `bh:6e52` writing `10184`/`10186` (1/8 average, a quarter of the
-   debt, T at least 4, frames over 25 fields add no time); mission T saved and timing reset at
-   `bh:1344e`; before the c2p (`bh:6e8e`) wait for a new field if none passed; the stick
-   divisions `bh:7934`..`797a`, `bh:800e`..`8056` by the mission T and the per-frame mouse
-   limit in `bh:3e98` scaled by mission T / T; fractions: `dt_steplen`/`dt_polar` and
-   `dt_aiadd`/`dt_aisub` retargeted for 144 objects, the player's rates (`bh:79f0`..`7a6e`)
-   rewritten in 16.16; the slot-128 pool (`bh:1351e`) identified and its spawning made
-   time-based if per step; the busy waits `bh:30a`, `bh:12b8` as field waits of their A500
-   length (`1000·T·n` overflows 16 bits at T 50). Checks: TFH's `speed.py` and a turn rate on
-   the 68000 and 68030/50; Unicorn input, object step and AI turn at T 4/7/25/50. Done when
-   speed is within ~0.5% of nominal on both machines and turn rates agree.
+0. **Translation tool** `tools/xmatch.py` — **done.** `runs`, `sites` (TFH's patch lists:
+   48 sites exact, 14 GOOD, 31 WEAK, 81 NONE), `site`, `globals`, `consts`, `jt` (BH's
+   `jsr d16(a4)` table from its data hunk's relocations), `dis`. It extracts `BH` from
+   `Disk.1` and reads TFH's installed `data/BOB`, both checked by SHA-256.
+1. **Scaffolding** — **done.** `CUSTOM2` through `resload_Control` in `_cb_dosLoadSeg`;
+   `timing_patch` applies `_pl_timing` only then, after allocating its fractions (1160
+   bytes, `MEMF_PUBLIC|MEMF_CLEAR`; without them nothing is patched). `make check`:
+   `tools/pl_check.py` (pl_bh is the manual-check patch alone) and `tools/timing_check.py`.
+   `CACHE` in both modes. The tape presses Return every 300 fields from field 3000 until the
+   first flight frame. Baselines: profiling.md §6 (original mode, caches on).
+2. **Decoupling** — **done** (`src/timing.s`, the core of TFH's timing.s):
+   - a VERTB server (`AddIntServer`) counts fields; `dt_rate` as TFH;
+   - `dt_frame` at `bh:6e52` sets `10184`/`10186` as TFH, with two changes found by the
+     flight records: the game may run up to 4 fields ahead of real time, not one (at BH's
+     3–6 fields per frame on the 68000 the integer T swings the time owed by about a field,
+     and TFH's limit cut the swings off: 1% fast), and the frame average starts at the first
+     frame measured (from the mission's T, 1/8 at a time, the 68030 ran 0.9 s ahead in the
+     flight's first half second, which at T 50 the game cannot give back);
+   - the mission's T saved at `bh:1344e`, restored at the flight start (`bh:6b1c`) and when
+     the flight loop ends (`bh:6eb6`: the menus use T too);
+   - at most one c2p per field (`bh:6e8e`);
+   - the stick (`bh:7920`) and the view controller (`bh:800c`..`8054`) divide by the
+     mission's T: mouse counts and key presses both arrive per event, not per frame; the
+     mouse limit (`bh:3eb0`) scales by mission T / T in flight only (`bh:3e98` reads the
+     menus' input as well);
+   - 16.16 with carried fractions: the stick rates and the turn (`bh:79fe`), the object step
+     and polar split (`bh:8290`; `831c`, `839e`, `842a`, `855c`, `8622`), the AI turn
+     (`bh:11e50`, `11ee2`), all ported from TFH with BH's globals and 144 slots;
+   - the busy waits `bh:30a` and `bh:12ac` wait their 68000 length in fields;
+   - the slot-128 pool is set up once from the mission's T (profiling.md §9): nothing to do
+     here; its animation is the effects cadence (step 3).
+   Not yet agreeing between machines: the descent in the tape's spiral (at 20 s the 68000
+   has lost 13% more altitude than the 68030/50). Probably the attitude code TFH fixed as
+   FR-15 (`bh:11238`..`11d90`); step 3 starts there.
 3. **Timers and combat** (TFH's FR-01..FR-28, retargeted with BH's constants, each with its
    check at T 2/4/7/25/50 and changing T on Unicorn 68000/68040):
 

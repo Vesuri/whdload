@@ -6,6 +6,8 @@
 ;		in original/Battlehawks1942.s, which rebuilds it byte-identically)
 ;		06.10.26 rebased on WHDLoad 20.0 KickEmu (kick13.s) for the performance
 ;		study; behaviour as v1.0
+;		09.11.26 caches on (KickEmu CACHE); CUSTOM2=1 Enhanced framerate
+;		(timing.s, from Their Finest Hour 2.0b)
 ;  :Copyright.	Public Domain
 ;  :Language.	68000 Assembler
 ;  :Translator.	vasm
@@ -21,17 +23,27 @@
 ; no other.
 ; v1.0 patched the Kickstart image itself and hooked LoadSeg; here KickEmu does the OS part
 ; and _cb_dosLoadSeg patches BH. All addresses in patch lists are BH hunk-0 offsets.
+; pl_bh is v1.0's patch (the manual check) and the VERIFY instruments; everything for
+; CUSTOM2=1 is in timing.s's own patch list, so without it BH runs as in v1.0. v1.0 ran
+; with the caches off (KickEmu without CACHE turns them all off); they are on here
+; (WHDLoad's default, chip memory not cached), with or without CUSTOM2.
 
 	INCDIR	Include:
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
 	INCLUDE	lvo/dos.i
+	INCLUDE	exec/interrupts.i
+	INCLUDE	hardware/intbits.i
 
 ;============================================================================
 
 CHIPMEMSIZE	= $80000
 	IFND	FASTMEMSIZE
-FASTMEMSIZE	= $80000		;-DFASTMEMSIZE=0: chip only, like v1.0
+	IFD	VERIFY
+FASTMEMSIZE	= $90000		;and 56 KB for the flight record (tape.s)
+	ELSE
+FASTMEMSIZE	= $81000		;-DFASTMEMSIZE=0: chip only, like v1.0; 4 KB for timing.s
+	ENDC
 	ENDC
 NUMDRIVES	= 3		;Disk.1-3 in DF0-DF2: the game never asks for a swap
 WPDRIVES	= %1111		;v1.0 let the game write every disk (pilot records)
@@ -39,6 +51,7 @@ WPDRIVES	= %1111		;v1.0 let the game write every disk (pilot records)
 DISKSONBOOT
 SETPATCH
 CBDOSLOADSEG
+CACHE				;WHDLoad's default cache setup (chip memory not cached)
 
 ;============================================================================
 
@@ -59,8 +72,14 @@ slv_info	dc.b	"installed by Galahad of Fairlight",10
 		dc.b	"KickEmu (WHDLoad 20) rebase by Vesuri",10,10
 		dc.b	"Version 1.1-dev",0
 slv_CurrentDir	dc.b	0
-slv_config	dc.b	0
+slv_config	dc.b	"C2:B:Enhanced framerate;"
+		dc.b	0
 	EVEN
+
+_improve	dc.l	0			;1: enhanced framerate (CUSTOM2=1)
+_ctltags	dc.l	WHDLTAG_CUSTOM2_GET
+_custom2	dc.l	0
+		dc.l	TAG_DONE
 
 ;============================================================================
 ; < D0: BSTR filename
@@ -75,10 +94,22 @@ _cb_dosLoadSeg
 .cmp		cmpm.b	(a0)+,(a1)+
 		dbne	d2,.cmp
 		bne.b	.done
-		lea	pl_bh(pc),a0
 		move.l	_resload(pc),a2
+		move.l	d1,-(a7)
+		lea	_ctltags(pc),a0
+		jsr	resload_Control(a2)
+		lea	_improve(pc),a0
+		moveq	#0,d0
+		tst.l	_custom2-_improve(a0)
+		beq.b	.orig
+		moveq	#1,d0
+.orig		move.l	d0,(a0)
+		move.l	(a7),d1
+		lea	pl_bh(pc),a0
 		move.l	d1,a1			;seglist
 		jsr	resload_PatchSeg(a2)
+		move.l	(a7)+,d1
+		bsr	timing_patch
 	IFD VERIFY
 		bsr	tape_start
 	ENDC
@@ -117,6 +148,7 @@ manual_check	move.b	d0,(0,a0,d1.l)
 
 ;============================================================================
 
+	INCLUDE	timing.s
 	IFD	VERIFY
 	INCLUDE	tape.s
 	ENDC

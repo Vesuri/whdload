@@ -26,21 +26,30 @@ game_drives() {
 }
 
 # The reconstruction must still equal the installed slave, the instrumented builds must
-# assemble, and the tools must compile.
+# assemble, the release slave must leave BH original without CUSTOM2 (tools/pl_check.py),
+# the Enhanced framerate routines must pass their Unicorn checks on the 68000 and 68040
+# (tools/timing_check.py), and the tools must compile.
 game_check() {
   (
     cd "$GAME_ROOT"
     local b
-    for b in verify c2pfull tscale; do
+    for b in verify c2pfull tscale rectime; do
       "$COMMON/build.sh" "$b" > /dev/null && echo "$b: builds"
     done
+    "$COMMON/build.sh" release > /dev/null
+    python3 tools/pl_check.py
     if [ -f "tmp/game/$GAME_DIR/$SLAVE_FILE" ]; then
       "$COMMON/build.sh" original > /dev/null && echo "original: equals the installed slave"
+      for b in 68000 68040; do
+        python3 tools/timing_check.py --cpu "$b" > "tmp/timing_check-$b.log" ||
+          { tail -20 "tmp/timing_check-$b.log"; exit 1; }
+        echo "timing_check $b: $(tail -1 "tmp/timing_check-$b.log" | sed 's/^# //')"
+      done
     else
-      echo "skipped (no installed game; make unpack): the original build comparison"
+      echo "skipped (no installed game; make unpack): the original build comparison, timing_check"
     fi
     python3 -c 'import py_compile, sys; [py_compile.compile(f, doraise=True) for f in sys.argv[1:]]' tools/*.py &&
       echo "tools: compile"
-    bash -n tools/fixed_window.sh && echo "fixed_window.sh: parses"
+    bash -n tools/fixed_window.sh && bash -n tools/record.sh && echo "fixed_window.sh, record.sh: parse"
   )
 }

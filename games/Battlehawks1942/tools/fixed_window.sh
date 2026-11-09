@@ -56,10 +56,10 @@ grep -q serving "$RUN"/serve.log || { echo "server did not start" >&2; exit 1; }
 dump() {
   local reply
   for _ in $(seq 1 12); do
-    reply=$(bh gdb "dump binary memory tmp/bh-code.bin $BASE $(printf '%#x' $((BASE + SIZE)))
-dump binary memory tmp/bh-chip.bin 0 $CHIP_END")
-    if [ -f tmp/bh-code.bin ] && [ -f tmp/bh-chip.bin ]; then
-      mv tmp/bh-code.bin "$OUT/code.bin"; mv tmp/bh-chip.bin "$OUT/chip.bin"; return 0
+    reply=$(bh gdb "dump binary memory tmp/bh-code-${INSTANCE:-default}.bin $BASE $(printf '%#x' $((BASE + SIZE)))
+dump binary memory tmp/bh-chip-${INSTANCE:-default}.bin 0 $CHIP_END")
+    if [ -f tmp/bh-code-${INSTANCE:-default}.bin ] && [ -f tmp/bh-chip-${INSTANCE:-default}.bin ]; then
+      mv tmp/bh-code-${INSTANCE:-default}.bin "$OUT/code.bin"; mv tmp/bh-chip-${INSTANCE:-default}.bin "$OUT/chip.bin"; return 0
     fi
     echo "memory not ready, retrying: ${reply: -300}" >&2
     kill -0 "$(cat "$RUN"/fsuae.pid)" 2>/dev/null || return 1
