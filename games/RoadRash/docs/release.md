@@ -1,4 +1,9 @@
-# Road Rash 3.0b (22.10.2026)
+# Road Rash 3.0b (09.11.2026)
+
+3.0b was first released on 22.10.2026. The 09.11.2026 release replaces it, with the same
+version, the blitter waits in `visual-fixes.md` ("Unwaited blits") and a shorter ReadMe
+changelog. Its checks are at the end of this document; the rest describes the 22.10.2026
+release's validation, which those changes leave unchanged.
 
 G1–G4 are complete. This beta retains the agreed emulator-only validation scope:
 D1d physical 68040/68060 cache/coherency testing and F6a–F6d investigation of the
@@ -138,3 +143,14 @@ No FPS measurement was taken during this interactive session. The repeated
 39.6 fps 030 result in [framerate-comparison.md](framerate-comparison.md) comes
 from the separate controlled, no-MMU benchmark. Physical cache/coherency
 validation (D1d) and future fixed-address-global work (F6) remain outstanding.
+
+## 09.11.2026 release checks
+
+The release slave (`release/slaves.sha256`) differs from the one checked in
+`visual-fixes.md` ("Unwaited blits") only in the date strings, which keep their length. It was
+booted with fire pressed until a race started, then ridden for 400 fields, on every machine in
+`SETUPS` with CUSTOM2 off and on. With CUSTOM2=0 the native race's per-field hook was active
+on all six. With CUSTOM2=1 the screenshots show the race on all six. The 030, 040 and 060
+runs used the shared `fs-uae`, because the harness's private build hangs on those setups'
+`monitor fields`. The archive extracts with the pinned slave, the dated ReadMe and the
+`src/` files the slave was built from.

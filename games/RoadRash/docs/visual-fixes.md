@@ -56,7 +56,7 @@ trajectory is identical: changing rendering workload can change its cadence,
 and the native rider traversal derives pose only for eligible forward riders.
 The accelerated simulation retains authoritative pose ownership.
 
-## Unwaited blits (unreleased)
+## Unwaited blits (3.0b of 09.11.2026)
 
 A player reported glitches in the intro and on the bike selection screen on a
 68040 machine (8.11.2026, CUSTOM2 setting not known). Several routines start a

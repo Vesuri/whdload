@@ -2,12 +2,14 @@
 
 ## Where it stands
 
-3.0b (22.10.2026) is complete under the agreed emulator scope: plan items A–C and G
-complete, D, E and F1–F5 complete, H1/H2 investigated (`performance-plan.md`). The release
-slave is built from the tree submitted and merged upstream, the last commit of this history
-("Road Rash 3.0b: optional enhanced framerate"); `release/slaves.sha256` pins it.
+3.0b (09.11.2026) is complete under the agreed emulator scope: plan items A–C and G
+complete, D, E and F1–F5 complete, H1/H2 investigated (`performance-plan.md`). It replaces the
+release of 22.10.2026, which was built from the tree submitted and merged upstream ("Road
+Rash 3.0b: optional enhanced framerate"). The 09.11.2026 release adds the waits after
+unwaited blits (`visual-fixes.md`) and its ReadMe's shorter changelog. `release/slaves.sha256`
+pins its slave.
 
-That tree is the development branch reduced to its release configuration (no VERIFY
+The submitted tree is the development branch reduced to its release configuration (no VERIFY
 instrumentation, development notes or packager), so its slave differs from the development
 tip's (`55f24917…`, the build `release.md` and `framerate-comparison.md` describe, and the one
 the A1200-030 playtest used). Before it was submitted, the cleaned slave (`e3f92ce3…`) ran
@@ -37,13 +39,9 @@ password entry); the `PL_IFC2` move is a behaviour change to decide on, not a fi
 
 ## Open
 
-- Unreleased: blitter waits after the unwaited blits in the intro, title, loader,
-  menus and bike shop, in both modes (`visual-fixes.md`, "Unwaited blits"). They
-  address the player report of intro and bike-shop glitches (8.11.2026, 68040).
-  The emulator doesn't reproduce the glitches, so the fix needs a player's
-  confirmation on hardware. The release slave and `release/slaves.sha256` are
-  still 3.0b's. A release needs a version, a ReadMe history entry and the release
-  checks.
+- Hardware confirmation of the blitter waits (`visual-fixes.md`, "Unwaited blits"), which
+  address a player report of intro and bike-shop glitches (8.11.2026, 68040). The emulator
+  doesn't reproduce the glitches.
 - Race-start blits the observer still reports (CUSTOM2=0, `a1200-fast`): the CPU
   reads and writes the D area of the blit at main hunk `$346e0` (from `$33a3e`),
   and reprograms the blitter while the blits at `$32e14` (from `$32e2a`) and
