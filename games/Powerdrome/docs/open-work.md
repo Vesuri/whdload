@@ -79,8 +79,17 @@ Part of **Enhanced framerate**. One blended view is drawn between each pair of 1
 cockpit liftoff steps on 030/25 and 060/50 (20 instead of 10 presentations per second);
 native states, step period and final state are unchanged.
 [Design and measurements](timing-implementation.md#pit-departure-and-repair-display).
-The pit animations are still native. Not yet watched by hand, and the release matrix has
-not been repeated for this change.
+Not yet watched by hand, and the release matrix has not been repeated for this change.
+
+## Pit arrival blending
+
+Part of **Enhanced framerate**. The 15-step ship rise when the pit view opens is paced to
+the A500's 100 ms per step (natively it ran 40% fast on 040/060 and 25% fast on 020/14),
+and extra frames with blended heights are presented between steps: 24 instead of 15
+frames on 040/25 and 060/50, about 16.7 fps, which is the pit frame's own limit of three
+fields. [Design and measurements](timing-implementation.md#pit-departure-and-repair-display).
+The pit departure (`$14764`, paced already), the rescue arrival (`$1464c`) and the `$102`
+sprite flicker (`$145e2`) are still step-only. Not yet watched by hand.
 
 ## Release baseline measurements
 

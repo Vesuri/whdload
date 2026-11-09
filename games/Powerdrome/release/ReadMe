@@ -57,7 +57,8 @@
    a copy to the Chip RAM display buffer.
  - Fine mouse rotation at 50 updates per second, retaining calibration gain.
  - Fixed-step gameplay timing, so movement and other gameplay updates no
-   longer advance once per rendered frame. Cockpit liftoff is paced as well.
+   longer advance once per rendered frame. Cockpit liftoff and the ship
+   rising into the pit are paced as well.
 
  With the option off, on a 68000/68010, or without usable Fast RAM, the game
  retains its original rendering and frame-dependent timing.
@@ -91,6 +92,8 @@
    handling for input, opponents, resources, repairs, laps and weather.
  - Paced cockpit liftoff to the measured original A500 movement cadence, with
    intermediate views drawn between its steps when there is time.
+ - Paced the ship rising into the pit to the original A500 speed, with
+   intermediate frames drawn between its steps when there is time.
  - Added fractional mouse steering with smooth 20 ms rotation updates.
  - Kept the mouse stick in step with the game's own changes to it (wall and
    floor contact, repositioning with A) and limited its range.

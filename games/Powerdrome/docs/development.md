@@ -436,3 +436,19 @@ period and the final state; `0x8056` events count presentations. The `PDDEPI01` 
 slave (the last copy in `final-code.bin`) holds the last view cost in clock units, the
 number of blended views and the number of steps; `-DDEPARTURE_DIAGNOSTICS=1` adds the
 view-only and native-view costs.
+
+### Pit arrival rise checks
+
+```sh
+make build BUILD=verify VASM_EXTRA=-DTIMING_RISE=0   # native rise reference
+make verify                                          # paced and blended (default)
+```
+
+Capture each with `CPU=68060-NOMMU` (50 MHz), `68040-NOMMU` (25 MHz) or `68EC020`
+(14 MHz), A1200, fast RAM, `WHD_ARGS='CUSTOM1=1 CUSTOM5=2 NoCache' ANCHOR=0x1455c
+FIELDS=200 SWAP_ONLY=1 SWAP_MARKER=0xe296` after clicking Practice. The frame line shows
+one completion per pit frame; the rise is the first run of them (15 steps over 70 fields
+on the A500). The `PDRISE01` tag (the last copy in `final-code.bin`) holds the last extra
+frame cost in clock units, the deadline, the number of extra frames and the number of
+rises. `ANCHOR=0x145c0 FIELDS=2` stops at the rise's return to compare game state with
+the reference.

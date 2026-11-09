@@ -43,6 +43,7 @@ work can fall behind; retaining time debt does not guarantee real-time throughpu
 | Weather generation | 80/140 ms according to effect state |
 | Weather visual publication | 20 ms after its generation boundary |
 | Cockpit liftoff movement | 100 ms per native movement step |
+| Pit arrival rise | 100 ms per native height step |
 
 There is no render interpolation or additional display buffer. At lower rendering
 rates, a frame shows the latest completed simulation state. The renderer uses the
@@ -209,6 +210,27 @@ the A500 reference. With and without blending, the state at all 96 common world 
 on the 030 is identical except the native frame-interval word `$21c`, which the scheduler
 overwrites before every world step. More views per step would need a faster departure
 view; that has not been attempted.
+
+The pit arrival rise at `$1459a..$145bc` (`timing_pit_rise.s`, `TIMING_RISE`, default 1)
+draws the ship at 15 heights from the table at `$144ae`; each step calls the `$102`
+sprite (`$1461e`), the ship pieces (`$1432e`) and the pit frame (`$e296`). Natively a
+step lasts as long as its drawing: five PAL fields on the A500, four on a 68020/14 and
+three on a 68040/25 or 68060/50. The enhanced path starts a 100 ms deadline at the first
+step (`$1459a`) and, at its end (`$145b8`, the `MOVEM`/`DBF`), draws extra frames while
+one still fits before the deadline: the ship at the height blended towards the next
+table entry for the time the frame will be shown, skipped when the rounded height has not
+changed. During an extra frame `timing_repair_service_gate` reduces the pit frame's
+service part to the HUD clock, so the frame counter, keyboard and opponents advance only
+with the native steps. Deadlines retain overruns. The `PDRISE01` tag holds the last extra
+frame cost, the deadline, the number of extra frames and the number of rises.
+
+On the A1200 with fast RAM a pit frame costs three fields on the 040/25 and 060/50 and
+four on the 020/14 (`tmp/rise/m7`, `m5`, `m4`). The 15 steps now span 72 fields against
+the A500's 70 (`tmp/pit-anim/a500`) instead of 45 natively (`tmp/pit-anim/m7-c1`), with
+nine extra frames on the 040 and 060 (24 frames, about 16.7 fps) and one on the 020. At
+the rise's return (`$145c0`, `tmp/rise/r7` against `q7` with `-DTIMING_RISE=0`) the frame
+counter `$5e` is the same; the remaining differences are the display buffer parity
+(`$3b2..$3c0`) and clock-derived words. The later pit animations are unchanged.
 
 The external pit animation at `$14764` is a different native sequence. Menus,
 recorded title-camera progression and other presentation animations retain their

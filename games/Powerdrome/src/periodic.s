@@ -90,6 +90,14 @@ TIMING_REPAIR_DROP = TIMING_REPAIR
  FAIL "TIMING_REPAIR_DROP requires TIMING_REPAIR"
  ENDC
  ENDC
+ IFND TIMING_RISE
+TIMING_RISE = 0
+ ENDC
+ IFNE TIMING_RISE
+ IFEQ TIMING_REPAIR
+ FAIL "TIMING_RISE requires TIMING_REPAIR (its pit-frame service gate)"
+ ENDC
+ ENDC
  IFND TIMING_RETUNE_RESULT_TEST
 TIMING_RETUNE_RESULT_TEST = 0
  ENDC
@@ -526,6 +534,15 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$1479e 8 bit=C3
  PL_P $1479e,timing_external_end
  PL_NOP $147a4,2
+ IFNE TIMING_RISE
+ ; Pit arrival rise: the two native moves at the loop head (the only DBF target) and
+ ; the MOVEM/DBF loop tail. Nothing else branches into $1459a..$145bf.
+ ; TIMING_RANGE h0:$1459a 6 bit=C3
+ PL_P $1459a,timing_rise_step
+ ; TIMING_RANGE h0:$145b8 8 bit=C3
+ PL_P $145b8,timing_rise_end
+ PL_NOP $145be,2
+ ENDC
  IFNE TIMING_REPAIR
  ; Native entry save plus first coordinate load; no extra frame in game code.
  ; TIMING_RANGE h0:$148d0 8 bit=C3
@@ -1159,6 +1176,22 @@ timing_targets
  dc.w timing_repair_first_post+2-timing_targets
  dc.l $14aa6
  dc.w timing_repair_second_post+2-timing_targets
+ ENDC
+ IFNE TIMING_RISE
+ dc.l $1459a
+ dc.w timing_rise_loop+2-timing_targets
+ dc.l $145a0
+ dc.w timing_rise_continue+2-timing_targets
+ dc.l $145c0
+ dc.w timing_rise_return+2-timing_targets
+ dc.l $1461e
+ dc.w timing_rise_sprite+2-timing_targets
+ dc.l $1432e
+ dc.w timing_rise_ship+2-timing_targets
+ dc.l $e296
+ dc.w timing_rise_frame+2-timing_targets
+ dc.l $f0dc
+ dc.w timing_rise_hud+2-timing_targets
  ENDC
  dc.l $14764
  dc.w timing_external_loop+2-timing_targets

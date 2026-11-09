@@ -75,6 +75,14 @@ timing_repair_present_gate
 ; A dropped picture omits the HUD drawing call too, then rejoins before the
 ; native counter, timeout, input, opponent and keyboard operations.
 timing_repair_service_gate
+ IFNE TIMING_RISE
+ ; An extra pit-arrival frame: HUD clock only (MOVEA keeps the TST flags).
+ move.l a0,-(sp)
+ lea timing_rise_state(pc),a0
+ tst.w (a0)
+ movea.l (sp)+,a0
+ bne.w timing_rise_service
+ ENDC
  move.l a0,-(sp)
  lea timing_repair_drop_state(pc),a0
  tst.w 8(a0)
