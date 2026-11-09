@@ -13,7 +13,8 @@ printed beside it.  Checks (--only names):
 - periodic: FR-03 effects, FR-10 aircraft and FR-11 ship damage ticks (bh:aec8, de16,
   e28e); waits: FR-20 (bh:ecaa); timers: object lives with T changing (bh:c94c, 857e,
   ebb6); message: FR-21 (bh:8858, 8862);
-- falling: FR-01, a bomb's drop in 5 s (bh:83c0); lead: FR-13 (bh:cab0); flak: FR-06
+- falling: FR-01, a bomb's drop in 5 s (bh:83c0); torpedo: a torpedo or bomb released at
+  speed, 10 s of run, drag and fall from the object step on (bh:827e..8504); lead: FR-13 (bh:cab0); flak: FR-06
   jitter (bh:e9d4, e9e8); hit: the swept hit test (bh:dae6); replay: FR-22, the film's
   limits and each step's T (bh:77a2, 78aa, dt_film_t).
 Sounds and messages (bh:40bc, 40fa, 87f2) and the routines a check only counts are
@@ -414,6 +415,44 @@ def falling(fixed, orig):
             res[nm] = 1000000 - bh.get(12060 + 4 * slot, 'l')
         check(abs(res['fixed'] - exact) <= exact * 0.01,
               f'fall T {t:2d}: {res["fixed"]} (exact {exact:.0f}; original {res["orig"]})')
+
+
+@checker
+def torpedo(fixed, orig):
+    print('# FR-01/05 a torpedo or bomb (class 4) released at speed: 10 game seconds of run,'
+          ' drag and fall (bh:83c0..8504), against the original at the mission T 7')
+    slot, start = 20, 65536000
+
+    def run(bh, t, z):
+        bh.timing(t, 7)
+        bh.set(10452 + slot, 4, 'B')
+        bh.set(10596 + slot, 1, 'B')
+        bh.set(15696 + 2 * slot, 250)
+        bh.set(14328 + 2 * slot, 0x2000)
+        bh.set(14616 + 2 * slot, 0x4000)
+        bh.set(16008 + 2 * slot, 0)
+        bh.set(16816 + 2 * slot, 5 * t)
+        bh.set(10908 + 4 * slot, start, 'l')
+        bh.set(11484 + 4 * slot, start, 'l')
+        bh.set(12060 + 4 * slot, z, 'l')
+
+        def step():
+            bh.c.reg(D4, slot)
+            bh.c.reg(A5, STACK - 0x100)
+            bh.run(0x827e, 0x8504)          # from the object step (bh:8290), then the switch
+        seconds(bh, t, 10, step)
+        dx = bh.get(10908 + 4 * slot, 'l') - start
+        dy = bh.get(11484 + 4 * slot, 'l') - start
+        return round((dx * dx + dy * dy) ** 0.5), bh.get(15696 + 2 * slot, 'H'), bh.get(12060 + 4 * slot, 'l')
+
+    for z, name in ((0, 'on the water'), (60000, 'dropped')):
+        ref = run(orig, 7, z)
+        for t in TS:
+            f, o = run(fixed, t, z), run(orig, t, z)
+            ok = abs(f[0] - ref[0]) <= ref[0] * 0.02 and abs(f[1] - ref[1]) <= 1 and \
+                (f[2] == ref[2] == 0 or abs(f[2] - ref[2]) <= max(ref[2], 1) * 0.02)
+            check(ok, f'{name:12s} T {t:2d}: run {f[0]}, speed {f[1]}, height {f[2]} (original at'
+                      f' T 7: {ref[0]}, {ref[1]}, {ref[2]}; original at T {t}: {o[0]}, {o[1]}, {o[2]})')
 
 
 @checker
