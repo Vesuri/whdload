@@ -420,6 +420,24 @@ The 060 single-count mouse tape above also reproduces all 501 complete mouse/mat
 states of the capture recorded before this change (`tmp/mouse-reset/tape-060` against
 `tmp/mouse-steering/current-060`).
 
+### Track collision checks
+
+```sh
+python3 tools/check_collision_depth.py
+```
+
+Runs the crash-depth hook (`timing_collision.s`) under the shared Unicorn runtime for
+20,000 random planes, saved positions and step distances (harness in
+`tmp/collision-depth/`, no game bytes). It requires the native `BGT.S` outcome of the
+distance before the step plus 18/4 of the step's travel, exact in 64 bits, and every
+register kept. `check_mouse_math.py` covers the damped control update.
+
+For the in-game dive, build coverage from a scratch copy of `src/` whose `CUSTOM5=11`
+axes push the mouse −100 counts per field for fields 300–339 after the fixture epoch and
++50 for fields 1000–1019, with a tape that accelerates and then runs to field 1400. Capture
+on the 060/50 with `ANCHOR=0xbc7c FIELDS=1300 TIMING_STATE=1` and probes `0xd058 0xccb2
+0xccd0 0xfc9e 0x100c2`; run it with `CUSTOM1=0` for the original.
+
 ### Cockpit departure blending checks
 
 ```sh

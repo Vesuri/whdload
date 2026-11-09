@@ -97,6 +97,8 @@
  - Added fractional mouse steering with smooth 20 ms rotation updates.
  - Kept the mouse stick in step with the game's own changes to it (wall and
    floor contact, repositioning with A) and limited its range.
+ - Made a nose-first dive into the floor crash and reposition the ship as in
+   the original, instead of pinning it there with the mouse ignored.
  - Kept original rendering and timing on 68000/68010 and without Fast RAM.
  - Corrected the command-line arguments passed to the game at startup.
  - Retained user control of WHDLoad CACHE and DCACHE options.

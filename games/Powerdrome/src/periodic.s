@@ -216,7 +216,7 @@ install_periodic
  movem.l d0-d2/a0-a2,-(sp)
  move.l perf_game(pc),a1
  lea timing_targets(pc),a0
- moveq #(timing_targets_end-timing_targets)/6-1,d2
+ move.w #(timing_targets_end-timing_targets)/6-1,d2
 .fix
  move.l (a0)+,d0
  add.l a1,d0
@@ -458,6 +458,12 @@ pl_periodic PL_START
  ; Gate repeated contact feedback/damage at the slow cadence, after geometry.
  ; TIMING_RANGE h0:$fb64 6 bit=C3
  PL_P $fb64,timing_world20_contact
+ ; The floor-tile flash: BSR.W $16e6c and the BRA.S to the damage that follows.
+ ; TIMING_RANGE h0:$fb3e 6 bit=C3
+ PL_P $fb3e,timing_collision_floor
+ ; CMP.L #-819200,d4: the crash depth, measured over a native A500 frame of movement.
+ ; TIMING_RANGE h0:$ad5a 6 bit=C3
+ PL_PS $ad5a,timing_collision_depth
  IFNE TIMING_SETUP_SEED+1
  ; Fixed test seed before native initialization random draws.
  ; TIMING_RANGE h0:$b9a0 6 bit=C3
@@ -1261,6 +1267,10 @@ timing_targets
  dc.w timing_world20_contact_continue+2-timing_targets
  dc.l $fb8c
  dc.w timing_world20_damage_continue+2-timing_targets
+ dc.l $16e6c
+ dc.w timing_collision_floor_flash+2-timing_targets
+ dc.l $fb84
+ dc.w timing_collision_damage+2-timing_targets
  ENDC
  IFNE TIMING_WEATHER_EFFECTS
  dc.l $53f6
@@ -1365,4 +1375,7 @@ timing_control_phase dc.w 1
 
  IFNE TIMING_MOUSE
  INCLUDE timing_mouse.s
+ ENDC
+ IFNE TIMING_WORLD20
+ INCLUDE timing_collision.s
  ENDC

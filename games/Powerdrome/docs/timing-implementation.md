@@ -35,7 +35,7 @@ work can fall behind; retaining time debt does not guarantee real-time throughpu
 
 | Work | Logical cadence |
 | --- | --- |
-| Movement and geometric collision checks | 20 ms |
+| Movement and geometric collision checks | 20 ms (crash depth over a 90 ms frame) |
 | Mouse orientation integration | 20 ms |
 | Control decisions/input consumption, joystick orientation, resources, engine decisions, opponents | 90 ms |
 | Repeated contact penalties, damage and age counters | Control epochs |
@@ -80,6 +80,52 @@ repeated contact feedback/speed penalties at `$fb64`, damage at `$fb84` and age 
 `$cde2` are limited to control epochs. Different simulation policies need not give
 identical collision trajectories; there is only one enhanced physics rate here.
 
+### Track collision
+
+The track collision at `$fa18` runs once per world step (`$cece`). Its outcomes and how
+each is owned on the enhanced path (`timing_collision.s`, `timing_world20.s`):
+
+| Native test or effect | Depends on | Enhanced handling |
+| --- | --- | --- |
+| Plane distances `$ac72` (contact below 100) | position | every world step |
+| Crash depth `$ad5a`: one call ≥ 819,200 below a plane | movement per call | scaled to an A500 frame |
+| Impact speed `$fac8`: `$132`·normal / 7,500 > 110 | velocity | every world step |
+| Repeated contact `$fa7a` within 100 clock units (`$24c`) | clock | every world step |
+| Restore the saved position `$186..$18c` (`$fae2`, `$faf2`) | position | every world step |
+| Wall stop at zero speed, reposition `$fb44` | state | every world step |
+| Floor-tile palette flash `$fb3e` (`$16e6c`) | per call | control epochs |
+| Wall flash and speed −10 `$fb64` | per call | control epochs |
+| Contact count, nose-angle damage `$fb84..$fc9c` | per call | control epochs |
+| Orientation candidate rejection `$cc84..$ccb2` (`$24a`) | orientation | every world step |
+| Stick damping after a rejection `$d05e` | per control update | control epochs |
+
+The crash depth is the only geometric test whose result depends on how far the ship moved
+in one call. Natively a call covers one rendered frame, about 90 ms of movement on the
+A500 (11.4 fps); a world step covers 20 ms, and the contact response restores the saved
+position each step, so a nose-first dive never reached the depth. The ship was then held
+against the floor with every candidate rejected, the stick damped instead of read, and no
+crash or reposition to end it. `timing_collision_depth` compares the distance before the
+step (from `$186..$18a`) plus 18/4 of the step's travel towards the plane, in 64 bits.
+
+In a 060/50 capture that pushes the nose into the floor, the original game crashes at
+field 316 and repositions (`$fc9e` → `$109d8` → `$100c2`); the enhanced path now does the
+same at field 321, and the stick then answers the mouse (`tmp/floor/native-060`,
+`fixed2-060`). Before, it stayed rejected for the rest of the 1,300-field capture and a
+pull of 1,000 counts did not move the stick (`tmp/floor/old-060`).
+`tools/check_collision_depth.py` checks the arithmetic.
+
+The 66,000-field 060/50 coverage soak ([gameplay coverage](gameplay-coverage.md)) passes
+`--require-long` with no failures both before and after these changes
+(`tmp/collision/base-race`, `new-race`). Before: 2 track-collision responses, 23,214
+`$fb84` entries, 11.5 instrumented fps. After: 4, 23,015 and 12.4. Both runs reach the same
+2 rescues, 2 pit returns and 34 departure iterations; only the later run reaches the
+weather effect (174 draws). The trajectories diverge after the first crash at field 2,430;
+the tape is timed in PAL fields, and the old floor flash waited for the display inside
+world steps. A soak does not attribute the extra crashes to either change.
+
+The only player–opponent distance code (`$d724..$d7f0`) selects the nearest opponent and
+its closing speed for the engine sound; ships do not collide with each other.
+
 ## Fine mouse rotation
 
 `TIMING_MOUSE=1` is part of `TIMING_FULL`. It is selected by the existing
@@ -107,8 +153,11 @@ lookup-table units or renderer format change.
 
 The patch replaces the three-rotation call sequence at `$cc58`; native candidate
 validation/acceptance from `$cc66` remains in place. Rejected candidates clear
-pending fractional rotation. A native matrix replacement rebases the private
-matrix; session/pit initialization clears it. Joystick and animation paths retain
+pending fractional rotation. A control update that took contact damping (`$d05e`) uses
+the native whole-degree rates: the damped stick settles at −1..−9 under `ASR`, which the
+native division turns into 0 degrees, so the next candidate is the current orientation and
+damping ends; a retained fraction would keep pressing into the floor. A native matrix
+replacement rebases the private matrix; session/pit initialization clears it. Joystick and animation paths retain
 the native rotation routines. Weather/banking/control decisions retain their
 existing cadence. This is simulation rotation, not display interpolation.
 

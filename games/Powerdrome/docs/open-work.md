@@ -70,8 +70,13 @@ enhanced input layer queues only the per-field mouse counts. Native writes to th
 controls read, and every stick sum saturates at ±32767. Before, a damped stick reversed
 to full deflection after A. [Design](timing-implementation.md#inputs-pause-and-sessions).
 `tools/check_input_axes.py` checks it and reproduces the old reversal with `--baseline`.
-The 060 single-count mouse tape matches all 501 recorded mouse/matrix states. Not yet
-played by hand, and the release matrix has not been repeated for this change.
+The 060 single-count mouse tape matches all 501 recorded mouse/matrix states.
+
+A nose-first dive into the floor now crashes and repositions as in the original. Before,
+the ship stayed pinned with the stick damped and the mouse ignored. A damped control update
+uses native whole-degree rates. [Track collision](timing-implementation.md#track-collision);
+`tools/check_collision_depth.py`. Not yet played by hand, and the release matrix has not
+been repeated for these changes.
 
 ## Liftoff blending
 

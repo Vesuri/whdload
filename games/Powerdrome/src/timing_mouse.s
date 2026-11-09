@@ -38,8 +38,17 @@ timing_mouse_divide
  divs.w $1ec(a6),d1
  move.w ccr,-(sp)
  movem.l d0-d3/a0,-(sp)
+ ; A control update that took native contact damping keeps the native whole-degree
+ ; rates. A damped stick stays at -1 under ASR; natively that divides to 0, the next
+ ; candidate is the current orientation and is accepted, ending the damping. A retained
+ ; fraction would keep pushing into the floor, so the stick would never read the mouse.
+ lea timing_input_damped(pc),a0
+ move.w (a0),d2
+ clr.w (a0)
  lea timing_mouse_fraction_pitch(pc),a0
  clr.l (a0)
+ tst.w d2
+ bne.s .done
  move.w timing_input_mode(pc),d2
  bne.s .done
  ; DIVS's signed remainder retains the sub-degree part. The horizontal

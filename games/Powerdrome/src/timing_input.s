@@ -245,6 +245,7 @@ timing_input_write_axes
  lea timing_state(pc),a0
  move.w d2,timing_input_x-timing_state(a0)
  move.w d3,timing_input_y-timing_state(a0)
+ move.w #1,timing_input_damped-timing_state(a0)
  movea.l (sp)+,a0
  move.w d2,$42a(a6)
  move.w d3,$42e(a6)
@@ -423,6 +424,8 @@ timing_input_resets dc.l 0
 ; Player mouse counts since the producer last queued them.
 timing_input_pending_x dc.w 0
 timing_input_pending_y dc.w 0
+; Set by contact damping for the same control update's angle division (timing_mouse.s).
+timing_input_damped dc.w 0
 
 timing_input_pause_begin
  move.w sr,-(sp)

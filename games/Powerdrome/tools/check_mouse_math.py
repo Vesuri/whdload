@@ -25,7 +25,7 @@ names = ['timing_mouse_trig', 'timing_mouse_gain', 'timing_mouse_divide',
          'timing_mouse_native_trig', 'timing_mouse_native_pitch',
          'timing_mouse_native_yaw', 'timing_mouse_native_roll',
          'timing_mouse_after_rotate', 'timing_mouse_candidate',
-         'timing_input_mode', 'test_due']
+         'timing_input_mode', 'timing_input_damped', 'test_due']
 subprocess.run(['python3', str(root/'tools/mouse_sine.py'), str(root/'tmp/build/mouse-sine.i')], check=True)
 source = ' org $200000\n dc.l ' + ','.join(names) + '\n'
 source += ''' INCLUDE timing_mouse.s
@@ -33,6 +33,7 @@ timing_mouse_sine
  INCLUDE ../tmp/build/mouse-sine.i
 perf_game dc.l 0
 timing_input_mode dc.w 0
+timing_input_damped dc.w 0
 test_due dc.w 1
 timing_world20_test_control
  move.w test_due(pc),d0
@@ -136,6 +137,24 @@ for denominator in (1,2,3,7,16,31,38,55):
         expected=(delta*2176/denominator,-delta*2176/denominator)
         assert all(abs(x-y)<1.01 for x,y in zip(got,expected)),(denominator,delta,got,expected)
 print('2,056 signed mouse inputs/calibrations retain sensitivity to within 1/4096 degree per control epoch')
+# Contact damping leaves the stick at -1 under ASR. That control update must divide as
+# natively (0 degrees, no fraction), or the candidate keeps pressing into the floor and
+# damping never ends; the next update is fine again.
+word(0xa6e+0x1ec,7)
+word(0xa6e+0x1ee,7)
+for damped,expected in ((1,(0,0,0,0)),(0,None)):
+    word(syms['timing_input_damped'],damped)
+    reg(11,0xffff);reg(12,0xffff)
+    call('timing_mouse_gain')
+    reg(11,(-C.c_int16(reg(11)).value)&65535)
+    call('timing_mouse_divide')
+    got=(C.c_int16(reg(9)).value,C.c_int16(reg(10)).value)+struct.unpack('>hh',read(state+10,4))
+    assert struct.unpack('>h',read(syms['timing_input_damped'],2))[0]==0
+    if expected:
+        assert got==expected,got
+    else:
+        assert got[:2]==(0,0) and got[2]!=0,got
+print('A damped control update uses native whole-degree rates; the next keeps the fractions')
 
 # Run the real native matrix bodies with one held sub-degree yaw. Recompute
 # the epoch from its base on every fine step, as the game does. Compare the
