@@ -21,7 +21,8 @@
 ; no other.
 ; v1.0 patched the Kickstart image itself and hooked LoadSeg; here KickEmu does the OS part
 ; and _cb_dosLoadSeg patches BH. All addresses in patch lists are BH hunk-0 offsets.
-; pl_bh is v1.0's patch (the manual check), the cache flush below and the VERIFY
+; pl_bh is v1.0's patch (the manual check), the cache flush below, WaitBlit after BH's
+; RectFill and SetRast (gfx_rectfill) and the VERIFY
 ; instruments; everything for CUSTOM2=1 is in timing.s's own patch list, so without it BH
 ; runs as in v1.0. v1.0 ran with the caches off (KickEmu without CACHE turns them all off);
 ; they are on here (WHDLoad's default, chip memory not cached), with or without CUSTOM2.
@@ -41,6 +42,7 @@
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
 	INCLUDE	lvo/dos.i
+	INCLUDE	lvo/graphics.i
 	INCLUDE	exec/interrupts.i
 	INCLUDE	hardware/intbits.i
 
@@ -152,6 +154,10 @@ pl_bh		PL_START
 	; bh:18360 has rewritten code
 		PL_PS	$170e4,gen_flush
 		PL_NOP	$170ea,2
+	; bh:1c6c6 and bh:1c6e8, BH's RectFill and SetRast stubs (its only blitter use): the
+	; same call, then WaitBlit before BH's CPU draws into the planes
+		PL_P	$1c6c6,gfx_rectfill
+		PL_P	$1c6e8,gfx_setrast
 	IFD	VERIFY
 		PL_PS	$075be,tape_key		;flight input on exact frames (tape.s)
 		PL_NOP	$075c4,2		;the rest of move.w d0,10280(a4)
@@ -323,6 +329,23 @@ span_call	move.w	(0,a6,d1.w),d6
 		SPAN_POST
 		move.w	d6,(0,a6,d1.w)
 		rts
+
+; bh:1c6c6 (RectFill(rp, x0, y0, x1, y1), C arguments) and bh:1c6e8 (SetRast(rp, pen)),
+; each followed by WaitBlit.  graphics.library starts the blit and returns; BH then draws
+; text and the cockpit with the CPU, and on a fast CPU the blitter, still clearing the later
+; planes, overwrote those pixels in them: grey characters at the start of a message after
+; the bar was cleared (bh:19e46, a newline).  Registers as the stubs leave them (the library
+; keeps D2-D7/A2-A5; A6 is GfxBase in both).
+gfx_rectfill	movea.l	(4,a7),a1
+		movem.l	(8,a7),d0-d3
+		movea.l	(25152,a4),a6
+		jsr	(_LVORectFill,a6)
+		jmp	(_LVOWaitBlit,a6)
+gfx_setrast	movea.l	(4,a7),a1
+		move.l	(8,a7),d0
+		movea.l	(25152,a4),a6
+		jsr	(_LVOSetRast,a6)
+		jmp	(_LVOWaitBlit,a6)
 
 manual_check	move.b	d0,(0,a0,d1.l)
 		move.l	d0,d2

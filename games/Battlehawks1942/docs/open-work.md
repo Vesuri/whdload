@@ -101,6 +101,18 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   not write code (its generator `bob:2cd7a` fills a table of offsets and its span loop
   reads it), so TFH needed nothing.
 
+- **Grey first characters in the message bar** (the user's report, `a1200-040`). BH
+  draws text with the CPU (`bh:19d02`, one character); a newline clears the rest of the
+  line with graphics.library `RectFill` (`bh:19e46`), which starts the blit and returns.
+  The next message's first characters were drawn while the blitter was still clearing the
+  later planes, which then lost them: "Fl" of "Flight paused." grey, the rest white. BH's
+  only blitter use is `RectFill` (`bh:a1e`, `bh:19e46`) and `SetRast` (`bh:40a`,
+  `bh:7d68`), all through two stubs (no blitter registers are written); `pl_bh` follows
+  both with `WaitBlit` (`gfx_rectfill`, `gfx_setrast`; both modes). Checked with a 'p'
+  typed by a scratch tape on `a1200-040`, `CUSTOM2=1`: six screenshots of the paused bar,
+  116 grey pixels in each without the waits, none with them. The `a1200-030` preset
+  (cycle-exact blitter) did not show it.
+
 - **The main menu's selection raced** on fast machines. T is 0 until a mission is chosen
   (`bh:1e34`, `bh:2198` load it), so every `bh:30a` pause before that was none, among them
   the one after each selection move (`bh:28e2`); only the A500's slow redraw held the
