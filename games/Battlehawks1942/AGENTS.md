@@ -7,7 +7,8 @@ traces and disassembly. Galahad's slave shipped without source; `src/original/` 
 it byte for byte, so the slave is credited to Galahad/Fairlight (game.conf `AUTHOR`,
 `UPSTREAM`). The slave that is built and patched is `src/Battlehawks1942.s` (WHDLoad 20
 KickEmu, 512 KB chip + 516 KB fast memory, caches on; BH writes code, `bh:18360` and its span
-loop, and the slave flushes the caches after each write). Any change to the game ships as
+loop, and the slave flushes the caches after each write, or on a 68020 or 68030 replaces
+the written words' cache lines). Any change to the game ships as
 patches in that slave; the Enhanced framerate (`CUSTOM2=1`, `src/timing.s`, ported from
 Their Finest Hour with `tools/xmatch.py`) makes game time follow real time. Goal:
 frame-rate-independent gameplay, 50 fps on faster Amigas. Nothing is released yet.
@@ -34,7 +35,7 @@ Read `docs/open-work.md` first.
 The slave source is `src/` (`Battlehawks1942.s`, `timing.s` the Enhanced framerate with
 `combat.s` its timers and combat, the VERIFY-only `tape.s` and `c2p_full.s`, `original/`
 the reconstruction); game.conf and game.sh define the builds (release, verify, c2pfull,
-tscale, rectime, mouse, original). `tools/` is the development harness and never ships: `bh.py`
+tscale, rectime, mouse, spancheck, original). `tools/` is the development harness and never ships: `bh.py`
 is the gdb-stub server, `fixed_window.sh` the capture runner, `bh_report.py`, `frames.py`,
 `c2p_stats.py` and the `compare_*.py` scripts read its captures; `record.sh` and
 `speed.py` record and read flights (game time against real time); `timing_check.py` and

@@ -326,6 +326,8 @@ rec_frame:
 rec_count:	dc.l	0
 rec_buf:	dc.l	0
 rec_frames:	dc.l	REC_FRAMES
+rec_spans:	dc.l	0,0,0			;SPANCHECK: spans checked, ran past, of
+						;those, spans that ended before they began
 
 tape_name:	dc.b	"bh tape",0
 tape_gfx_name:	dc.b	"graphics.library",0

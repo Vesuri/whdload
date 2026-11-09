@@ -82,8 +82,22 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   comparing BH's code hunk in a flight dump with the file (only the relocations, the
   slave's patches and those blocks differ) and from the core dump, where the `rts` sat in
   the block. The slave flushes the caches after the generator when it rewrote the code
-  (`gen_flush`, `pl_bh`) and, on a 68020 or later, between each span's `rts` and its call
-  (`pl_span`, applied from WHDLoad's attention flags); both modes. TFH's later engine does
+  (`gen_flush`, `pl_bh`) and, on a 68040 or 68060, between each span's `rts` and its call
+  (`pl_span`). A 68020's or 68030's instruction cache is direct-mapped (the 68020's 64
+  lines of 4 bytes indexed by address bits 2-7, the 68030's 16 lines of 16 bytes by bits
+  4-7), so there only the lines of the two written words are replaced: after each write
+  the slave calls an `rts` at the same bits 2-7 in a 256-byte block of `rts` allocated at
+  install (`pl_span_evict`, `sled_alloc`; without the memory, the flush). Chosen from
+  WHDLoad's attention flags; both modes. The flush per span cost the 68020 12% of its frame rate: 33.09 fps
+  against 37.56 with the eviction (rectime, `CUSTOM2=1`, fields 50..1750 of one flight
+  each). Checked with the `spancheck` build (VERIFY): before each span it sets the end
+  row's byte to the span colour's complement and afterwards counts the spans whose end
+  row's nibble changed. Without the flush on the 68040: 45983 of 91707 spans ran past
+  their end; with it 0. A build whose spans never get their `rts` was counted at 32962 of
+  33043, so the check sees a span that runs on. The eviction gave 0 on the 68020, 68030
+  and 68040 (where it flushes). On the 68020 and 68030, FS-UAE also gave 0 with no
+  flush or eviction at all, so the emulator does not show stale code there, and the
+  eviction rests on the caches' documented organisation, not on a measurement. TFH's later engine does
   not write code (its generator `bob:2cd7a` fills a table of offsets and its span loop
   reads it), so TFH needed nothing.
 

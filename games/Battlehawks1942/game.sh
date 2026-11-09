@@ -34,7 +34,7 @@ game_check() {
   (
     cd "$GAME_ROOT"
     local b
-    for b in verify c2pfull tscale rectime mouse; do
+    for b in verify c2pfull tscale rectime mouse spancheck; do
       "$COMMON/build.sh" "$b" > /dev/null && echo "$b: builds"
     done
     "$COMMON/build.sh" release > /dev/null

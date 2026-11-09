@@ -8,8 +8,9 @@ The slave applies pl_bh always and timing.s's _pl_timing only with CUSTOM2=1
 (_cb_dosLoadSeg, timing_patch).  This decodes pl_bh from the built slave and checks it is
 v1.0's patch, PL_PS $25be (the typed character is stored as the expected one) and PL_W
 $25c4 = $6078 (bra.s ok), and the flush after bh:18360 (PL_PS $170e4 gen_flush, PL_NOP
-$170ea), which changes no game state.  pl_span (68020 and later only) replaces the span
-loop's two rts writes and calls with the same sequence and a flush.
+$170ea), which changes no game state.  pl_span (68040 and 68060) and pl_span_evict (68020
+and 68030) replace the span loop's two rts writes and calls with the same sequence and a
+flush, or with the written words' instruction-cache lines replaced.
 """
 import re, sys
 from pathlib import Path
@@ -28,11 +29,12 @@ want = [(0x25be, 'PS', f'{syms["manual_check"]:04x}'), (0x25c4, 'W', '6078'),
         (0x170e4, 'PS', f'{syms["gen_flush"]:04x}'), (0x170ea, 'NOP', '0002')]
 if got != want:
     sys.exit(f'pl_bh is {got}, expected {want}')
-got = [(adr, cmd, arg if cmd != 'PS' else arg.split(':')[1])
-       for adr, cmd, arg in decode(slave_code(slave), syms['pl_span']) if cmd != 'END']
-want = [(0x1734c, 'PS', f'{syms["span_call"]:04x}'), (0x17352, 'W', '600a'),
-        (0x173aa, 'PS', f'{syms["span_call_x8"]:04x}'), (0x173b0, 'W', '600c')]
-if got != want:
-    sys.exit(f'pl_span is {got}, expected {want}')
+for plist, call in (('pl_span', 'span_call'), ('pl_span_evict', 'span_evict')):
+    got = [(adr, cmd, arg if cmd != 'PS' else arg.split(':')[1])
+           for adr, cmd, arg in decode(slave_code(slave), syms[plist]) if cmd != 'END']
+    want = [(0x1734c, 'PS', f'{syms[call]:04x}'), (0x17352, 'W', '600a'),
+            (0x173aa, 'PS', f'{syms[call + "_x8"]:04x}'), (0x173b0, 'W', '600c')]
+    if got != want:
+        sys.exit(f'{plist} is {got}, expected {want}')
 print('pl_bh: only the manual-check patch and the cache flush (CUSTOM2 off leaves BH as v1.0 does);'
-      ' pl_span: the span flushes')
+      ' pl_span, pl_span_evict: the span loop with flushes or cache-line evictions')

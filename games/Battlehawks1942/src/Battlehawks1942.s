@@ -32,8 +32,9 @@
 ; see data writes (with a copyback data cache, 68040/68060, not even in memory), so it ran
 ; the old code: spans past their end (stray lines, polygons stretched to the edge of the
 ; view), then a span into the middle of an instruction (Illegal Instruction). The caches
-; are flushed after the generator (gen_flush) and, on a 68020 or later, before each span's
-; call (pl_span). Their Finest Hour's later engine does not write code: its span loop
+; are flushed after the generator (gen_flush) and, on a 68040 or 68060, before each span's
+; call (pl_span); on a 68020 or 68030 only the cache lines the span loop wrote are replaced
+; (pl_span_evict). Their Finest Hour's later engine does not write code: its span loop
 ; reads a table of offsets.
 
 	INCDIR	Include:
@@ -118,8 +119,17 @@ _cb_dosLoadSeg
 		move.l	_attnflags(pc),d0	;kick13.s's, from WHDLoad
 		btst	#AFB_68020,d0		;a 68020 or later: caches
 		beq.b	.nocache
-		move.l	(a7),d1
 		lea	pl_span(pc),a0
+		btst	#3,d0			;AFB_68040, also set on a 68060
+		bne.b	.span
+		bsr	sled_alloc
+		beq.b	.span			;no memory: flush
+		lea	pl_span_evict(pc),a0
+.span
+	IFD	SPANPLAIN
+		lea	pl_span_plain(pc),a0
+	ENDC
+		move.l	(a7),d1
 		move.l	d1,a1
 		jsr	resload_PatchSeg(a2)
 .nocache	move.l	(a7)+,d1
@@ -160,7 +170,57 @@ pl_bh		PL_START
 	ENDC
 		PL_END
 
-; On a 68020 or later: the span loop's rts written into code (see the top), with the caches
+; SPANCHECK (VERIFY): count the spans that ran past their end row, which only stale code
+; does: the byte the end row's and.b/or.b address (row E's displacement at E+2, from A1)
+; must be as before the call.  SPANPLAIN: the span loop with neither flush nor eviction,
+; to show the check sees stale code.
+SPAN_PRE	MACRO
+	IFD	SPANCHECK
+		movem.l	d0/a0-a1,-(a7)
+		movea.w	(2,a6,d1.w),a0
+		adda.l	a1,a0
+		lea	(span_byte,pc),a1
+		move.b	(a0),(a1)+		;the end row's byte, put back after the span
+		move.b	d3,d0			;the span's colour: a row (and.b dN,d16(a1);
+		lsl.b	#4,d0			;or.b, bh:18478) leaves it in one nibble, so a
+		or.b	d3,d0			;byte with its complement in both changes when
+		not.b	d0			;the written-over row runs
+		move.b	d0,(a1)
+		move.b	d0,(a0)
+		movem.l	(a7)+,d0/a0-a1
+	ENDC
+		ENDM
+SPAN_POST	MACRO
+	IFD	SPANCHECK
+		movem.l	d0/d2/a0-a1,-(a7)
+		movea.w	(2,a6,d1.w),a0
+		adda.l	a1,a0
+		lea	(rec_spans,pc),a1
+		addq.l	#1,(a1)
+		move.b	(span_byte+1,pc),d0
+		move.b	(a0),d2
+		eor.b	d2,d0			;only the nibble the end row writes (the row
+		btst	#9,d6			;before may write the other, a rotated span):
+		beq.b	.hi\@			;and.b d4 ($0f; %1100 100 ...) writes the high
+		and.b	#$0f,d0			;one, and.b d5 ($f0; %1100 101 ...) the low one
+		bra.b	.cmp\@
+.hi\@		and.b	#$f0,d0
+.cmp\@		beq.b	.ok\@
+		addq.l	#4,a1
+		move.l	(a7),d0
+		cmp.w	d0,d1
+		bgt.b	.past\@
+		addq.l	#4,a1			;the end row at or before the first
+.past\@		addq.l	#1,(a1)
+.ok\@		move.b	(span_byte,pc),(a0)
+		movem.l	(a7)+,d0/d2/a0-a1
+	ENDC
+		ENDM
+	IFD	SPANCHECK
+span_byte	dc.w	0
+	ENDC
+
+; On a 68040 or 68060: the span loop's rts written into code (see the top), with the caches
 ; flushed between the write and the call.  The jsr from here returns here; D6 is the saved
 ; word, as in the original.
 pl_span		PL_START
@@ -170,6 +230,87 @@ pl_span		PL_START
 		PL_W	$173b0,$600c		;bra.s 173be
 		PL_END
 
+; On a 68020 or 68030 the instruction cache is 256 bytes, direct-mapped (index: address
+; bits 2-7; the 68030's lines are 16 bytes, index bits 4-7), so the only stale entry a
+; write can leave is the line holding the written word.  Running one instruction at
+; another address with the same index replaces that line: after the rts goes in and again
+; after the word is restored, the span jumps to the rts at that index in a 256-byte-aligned
+; block of rts (sled_alloc), instead of flushing the whole cache before every span.  The
+; 68040 and 68060 caches are set-associative: they keep pl_span.
+pl_span_evict	PL_START
+		PL_PS	$1734c,span_evict
+		PL_W	$17352,$600a
+		PL_PS	$173aa,span_evict_x8
+		PL_W	$173b0,$600c
+		PL_END
+
+span_evict_x8	lsl.w	#3,d0
+span_evict	move.w	(0,a6,d1.w),d6
+		move.w	#$4e75,(0,a6,d1.w)
+		move.l	a0,-(a7)
+		bsr.b	.evict
+		SPAN_PRE
+		jsr	(0,a6,d0.w)
+		SPAN_POST
+		move.w	d6,(0,a6,d1.w)
+		bsr.b	.evict
+		move.l	(a7)+,a0
+		rts
+; the cache line of (0,a6,d1.w) replaced: to the sled's rts at its index, back to the caller
+.evict		move.l	d0,-(a7)
+		lea	(0,a6,d1.w),a0
+		move.l	a0,d0
+		and.l	#$fc,d0
+		add.l	(_sled,pc),d0
+		move.l	d0,a0
+		move.l	(a7)+,d0
+		jmp	(a0)
+
+	IFD	SPANPLAIN
+pl_span_plain	PL_START
+		PL_PS	$1734c,span_plain
+		PL_W	$17352,$600a
+		PL_PS	$173aa,span_plain_x8
+		PL_W	$173b0,$600c
+		PL_END
+span_plain_x8	lsl.w	#3,d0
+span_plain	move.w	(0,a6,d1.w),d6
+		move.w	#$4e75,(0,a6,d1.w)
+		SPAN_PRE
+		jsr	(0,a6,d0.w)
+		SPAN_POST
+		move.w	d6,(0,a6,d1.w)
+		rts
+	ENDC
+
+; > Z clear and _sled set: 256 bytes of rts at a 256-byte boundary (a buffer of 512 from
+; exec, kept for the session); Z set when there was no memory
+sled_alloc	movem.l	d0-d1/a0-a1/a6,-(a7)
+		lea	(_sled,pc),a0
+		tst.l	(a0)
+		bne.b	.done			;BH loaded again
+		move.l	(4).w,a6
+		move.l	#512,d0
+		moveq	#0,d1			;MEMF_ANY
+		jsr	(_LVOAllocMem,a6)
+		tst.l	d0
+		beq.b	.done
+		add.l	#255,d0
+		and.w	#$ff00,d0
+		lea	(_sled,pc),a0
+		move.l	d0,(a0)
+		move.l	d0,a0
+		moveq	#256/4-1,d1
+.fill		move.l	#$4e754e71,(a0)+	;rts, nop
+		dbf	d1,.fill
+		move.l	(_resload,pc),a0
+		jsr	(resload_FlushCache,a0)	;written as data
+.done		lea	(_sled,pc),a0
+		tst.l	(a0)			;movem keeps the flags
+		movem.l	(a7)+,d0-d1/a0-a1/a6
+		rts
+_sled		dc.l	0
+
 span_call_x8	lsl.w	#3,d0
 span_call	move.w	(0,a6,d1.w),d6
 		move.w	#$4e75,(0,a6,d1.w)
@@ -177,7 +318,9 @@ span_call	move.w	(0,a6,d1.w),d6
 		move.l	(_resload,pc),a0
 		jsr	(resload_FlushCache,a0)
 		move.l	(a7)+,a0
+		SPAN_PRE
 		jsr	(0,a6,d0.w)
+		SPAN_POST
 		move.w	d6,(0,a6,d1.w)
 		rts
 

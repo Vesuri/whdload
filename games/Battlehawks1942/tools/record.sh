@@ -5,7 +5,7 @@
 # the rectime build (the flight tape in fields, the same input in real time on any machine).
 #   tools/record.sh OUTDIR [SLAVE]
 # MACHINE: a500 (68000, 512 KB chip + 8 MB fast, the capture machine; default), a1200
-# (68020, 2 MB chip + 8 MB fast) or 030 (a1200-030: 68030/50, 8 MB fast).
+# (68020, 2 MB chip + 8 MB fast), 030 (a1200-030: 68030/50, 8 MB fast) or 040 (a1200-040).
 # WHD_ARGS='CUSTOM2=1' flies with the Enhanced framerate.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -21,9 +21,10 @@ case "${MACHINE:-a500}" in
   a1200) export SETUP=custom AMIGA_MODEL=A1200 KICKSTART="$KICKSTART_A1200" CPU=68020 \
            CHIP_KB=2048 FAST_KB=8192 ;;
   030) export SETUP=a1200-030 ;;
-  *) echo "MACHINE: a500, a1200 or 030" >&2; exit 2 ;;
+  040) export SETUP=a1200-040 ;;
+  *) echo "MACHINE: a500, a1200, 030 or 040" >&2; exit 2 ;;
 esac
-export DETERMINISTIC=1 SLAVE="$PWD/$OUT/slave.slave" JOY0=none JOY1=none
+export DETERMINISTIC="${DETERMINISTIC:-1}" SLAVE="$PWD/$OUT/slave.slave" JOY0=none JOY1=none
 echo "${MACHINE:-a500} ${WHD_ARGS:-}" > "$OUT/machine.txt"
 BASE=0x200000; SIZE=$((8192 * 1024)); CHIP_END=$((2048 * 1024))
 RUN="tmp/run/${INSTANCE:-default}/.run"
@@ -31,7 +32,7 @@ mkdir -p "$RUN"
 bh() { python3 tools/bh.py "$@"; }
 [ -S "$RUN"/bh.sock ] && { bh quit > /dev/null 2>&1 || true; sleep 1; }
 rm -f "$RUN"/serve.log
-WARP=1 WINDOW=none python3 tools/bh.py serve > "$RUN"/serve.log 2>&1 &
+WARP="${WARP:-1}" WINDOW=none python3 tools/bh.py serve > "$RUN"/serve.log 2>&1 &
 trap 'bh quit > /dev/null 2>&1 || true' EXIT
 SERVER=$!
 for _ in $(seq 1 120); do
@@ -67,8 +68,8 @@ done
 read -r header frames <<< "$loc"
 echo "flight record at $header, $frames frames"
 # Until the record is full or covers RECORD_FIELDS fields (default 2000: 40 s of flight).
-words() { bh gdb "x/3wx $header" | awk '/:/ {print $2, $3, $4}'; }
-field() { bh gdb "x/1hx $1" | awk '/:/ {print $2}'; }
+words() { bh gdb "x/3wx $header" | awk '/^0x[0-9a-f]*:/ {print $2, $3, $4}'; }
+field() { bh gdb "x/1hx $1" | awk '/^0x[0-9a-f]*:/ {print $2}'; }
 count=0
 for _ in $(seq 1 1800); do
   read -r count buf _ <<< "$(words)"
@@ -86,6 +87,9 @@ read -r count buf _ <<< "$(words)"
 bh gdb "dump binary memory tmp/rec-${INSTANCE:-default}.bin $buf $(printf '%#x' $((buf + count * 28)))" > /dev/null
 mv tmp/rec-${INSTANCE:-default}.bin "$OUT/record.bin"
 bh shot "$PWD/$OUT/last.png" > /dev/null || true
+# The SPANCHECK build counts the spans that ran past their end (src/Battlehawks1942.s).
+read -r _ _ _ spans past back <<< "$(bh gdb "x/6wx $header" | awk '/^0x[0-9a-f]*:/ {for (i = 2; i <= NF; i++) printf "%s ", $i} END {print ""}')"
+[ $((spans)) -gt 0 ] && echo "spans checked $((spans)), ran past their end $((past)), $((back)) of them ending at or before their start" | tee "$OUT/spans.txt"
 bh quit > /dev/null; trap - EXIT
 cp "$RUN"/fsuae.log "$OUT/fsuae.log" 2>/dev/null || true
 python3 tools/speed.py "$OUT"
