@@ -99,6 +99,9 @@
    floor contact, repositioning with A) and limited its range.
  - Made a nose-first dive into the floor crash and reposition the ship as in
    the original, instead of pinning it there with the mouse ignored.
+ - Fixed an access fault during races on 68040/68060 with the MMU active: the
+   game samples a screen pixel with a stale high word in its x coordinate,
+   which from the Fast RAM bitmap could read outside memory.
  - Kept original rendering and timing on 68000/68010 and without Fast RAM.
  - Corrected the command-line arguments passed to the game at startup.
  - Retained user control of WHDLoad CACHE and DCACHE options.

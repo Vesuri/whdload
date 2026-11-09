@@ -111,6 +111,8 @@ pl_planar PL_START
  ; Staged drawing touches only fast RAM until scene_copy_begin.
  ; PERF_RANGE h0:$112a6 6 bit=C1
  PL_PS $112a6,scene_wait
+ ; PERF_RANGE h0:$15646 6 bit=C1
+ PL_PS $15646,pixel_read
  PL_END
  IFD VERIFY
 pl_twin PL_START
@@ -119,6 +121,17 @@ pl_twin PL_START
  PL_P $15ee8,twin_poly
  PL_END
  ENDC
+; $15646 reads the colour of pixel (D0.L, D1.W) of the bitmap at $3BA. Its two callers
+; ($11780, $117a4) set only D0.W, so a high word left by earlier code moves the read by
+; $2000 bytes per unit. In Chip RAM that reads a wrong colour; from the Fast RAM staging
+; bitmap it can leave memory, and under WHDLoad's MMU that is an access fault (seen with
+; D0 = $00A1000A on a 68040). Use the x coordinate the callers set.
+pixel_read
+ movea.l $3ba(a6),a0
+ and.l #$ffff,d0
+ move.l d0,d2
+ rts
+
 native_scene
  ds.b 6
  dc.w $4ef9

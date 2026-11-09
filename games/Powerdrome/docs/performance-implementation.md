@@ -50,6 +50,17 @@ cockpit seam polygons extend to row 153. Only those four uncleared rows require 
 The wrapper requires the original 6,000-byte clear endpoint and 131-row clear length.
 The fast path leaves bitplane descriptors and front-buffer pointers in chip RAM.
 
+During the scene the game samples the colours at (10,148) and (309,148) through its pixel
+read at `$15646`. Its callers at `$11780` and `$117a4` set only `D0.W`, but the read uses
+all of `D0`, and the projection code before it leaves a high word there (`$FFD1`, `$FFFF`
+and others in a 68040 race replay). Each unit moves the read by `$2000` bytes. From
+chip RAM that samples a wrong colour; from the fast bitmap, allocated near the top of fast
+RAM, it can leave memory, and under WHDLoad's MMU it faults (a user's 68040 with 8 MB of
+fast RAM read `$B155B0` with `D0` = `$00A1000A`). The fast path replaces the first six
+bytes of `$15646` with a stub that clears the high word. A 68040/MMU replay that stopped
+on a frame with `D0` = `$FFFFC800` read at bitmap offset 5,920, row 148 at x 10
+(`tmp/d0hi/fixed040`). The native path is unchanged.
+
 ### Rasterizer and static dispatch
 
 The original planar rasterizer at game `$15b68–$1609b` is copied to fast RAM. Its sixteen
