@@ -93,6 +93,15 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   selection back. With `CUSTOM2=1`, `dt_delay` times these pauses with BH's base T
   (`10182(a4)` = 7, `bh:54a`), as after a flight. Original mode keeps v1.0's behaviour.
 
+- **Mouse up raised the nose, as mouse down did** (`CUSTOM2=1`, every machine). BH keeps the
+  pitch rate `28508(a4)` as |stick| / T (`bh:795a..797e` negate the stick but not the
+  quotient; the roll rate is signed) and its readers (`bh:7a24`, `bh:7b44`) take the
+  direction from the stick. `dt_stick` gave it the stick's sign, negated twice for up.
+  Found with the `mouse` build's flight records (pitch against mouse down, still, up; the
+  68030 in original mode went the other way) and `timing_check.py`'s new pitch check, which
+  runs BH's attitude step `bh:79f0..7a72` original against patched for both signs. TFH's
+  stick fix scales the input (`muls`) and leaves the game's rate code alone: not affected.
+
 ## What Their Finest Hour's work gives this one
 
 The work here paused for Their Finest Hour (`games/TheirFinestHour`, the same Lucasfilm
@@ -203,7 +212,8 @@ the cap, frame counts only); Unicorn 68000 and 68040 (routine checks). PAL only.
      mission's T: mouse counts and key presses both arrive per event, not per frame; the
      mouse limit (`bh:3eb0`) scales by mission T / T in flight only (`bh:3e98` reads the
      menus' input as well);
-   - 16.16 with carried fractions: the stick rates and the turn (`bh:79fe`), the object step
+   - 16.16 with carried fractions: the stick rates (the pitch rate a magnitude, as BH's)
+     and the turn (`bh:79fe`), the object step
      and polar split (`bh:8290`; `831c`, `839e`, `842a`, `855c`, `8622`), the AI turn
      (`bh:11e50`, `11ee2`), all ported from TFH with BH's globals and 144 slots;
    - the busy waits `bh:30a` and `bh:12ac` wait their 68000 length in fields;

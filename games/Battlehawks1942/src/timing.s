@@ -491,7 +491,9 @@ dt_mouse_limit	movem.l	d0-d1,-(a7)
 		rts
 
 ; bh:7920: the stick 10308/10310(a4) / mission T into the roll and pitch rates
-; 28506/28508(a4), exact with the fractions carried; 28508 in 16.16 kept for dt_turn
+; 28506/28508(a4), exact with the fractions carried; 28508 in 16.16 kept for dt_turn.
+; The roll rate is signed, the pitch rate |stick| / T (bh:795a..797e negate the stick but
+; not the quotient): its readers (bh:7a24, bh:7b44) take the direction from the stick.
 dt_stick	movem.l	d0-d2/a0,-(a7)
 		move.w	(BH_STICK,a4),d0
 		moveq	#0,d1			;roll slot
@@ -511,10 +513,13 @@ dt_stick	movem.l	d0-d2/a0,-(a7)
 		swap	d0			;|stick| << 16
 		move.w	(dt_tm,pc),d2
 		bsr	dt_ldiv			;16.16
-		tst.w	(a7)+
+		tst.w	d1
+		bne.b	.sign			;pitch: the magnitude
+		tst.w	(a7)
 		bpl.b	.sign
 		neg.l	d0
-.sign		tst.w	d1
+.sign		addq.l	#2,a7
+		tst.w	d1
 		beq.b	dt_rcarry
 		lea	(dt_v,pc),a0
 		move.l	d0,(a0)
@@ -549,7 +554,7 @@ dt_turn		movem.l	d0-d4/a0,-(a7)
 		movem.l	(a7)+,d0-d4/a0
 		add.l	#$7a24-$7a04,(a7)
 		rts
-; < D4.l v (16.16, signed), D2.w angle; > D0.l v sin(angle)
+; < D4.l v (16.16), D2.w angle; > D0.l v sin(angle)
 .mul		move.l	d4,d0
 		bpl.b	.vpos
 		neg.l	d0

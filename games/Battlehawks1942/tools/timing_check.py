@@ -170,10 +170,44 @@ def stick(fixed, orig):
                     r[1] += bh.get(28508)
                 sums[name] = r
             exact = [abs(s10308) * t / 7 * (1 if s10308 >= 0 else -1),
-                     abs(s10310) * t / 7 * (1 if s10310 >= 0 else -1)]
+                     abs(s10310) * t / 7]           # the pitch rate is a magnitude
             ok = all(abs(f - e) <= 1 for f, e in zip(sums['fixed'], exact))
             check(ok, f'stick {s10308:6d},{s10310:6d} T {t:2d}: fixed {sums["fixed"]}, '
                       f'exact {[round(e, 1) for e in exact]}, original {sums["orig"]}')
+
+
+def pitch(fixed, orig):
+    print('# pitch: the player attitude over T steps (bh:7920, bh:79f0..7a72), stick signs')
+    for s10310, roll in ((-256, 0), (256, 0), (-1536, 0x1800), (2112, 0xe000)):
+        for t in TS:
+            got = {}
+            for name, bh in (('fixed', fixed), ('orig', orig)):
+                bh.timing(t, t if name == 'orig' else 7)
+                bh.set(14952, 16384)
+                bh.set(14328, 0)
+                bh.set(15240, roll)
+                for _ in range(t):
+                    bh.set(10308, 0)
+                    bh.set(10310, s10310)
+                    bh.run(0x7920, 0x7982)
+                    bh.run(0x79f0, 0x7a72)
+                got[name] = bh.get(14952) - 16384
+            # the original at T 7 sets the response per step; the fixed one keeps it per step
+            # (the stick is per frame) at every T, so its change is t/7 of T 7's per step
+            orig.timing(7, 7)
+            orig.set(14952, 16384)
+            orig.set(14328, 0)
+            orig.set(15240, roll)
+            for _ in range(7):
+                orig.set(10308, 0)
+                orig.set(10310, s10310)
+                orig.run(0x7920, 0x7982)
+                orig.run(0x79f0, 0x7a72)
+            ref = (orig.get(14952) - 16384) * t / 7
+            same = got['fixed'] == 0 and ref == 0 or got['fixed'] * ref > 0
+            check(same and abs(got['fixed'] - ref) <= max(2, abs(ref) * 0.02),
+                  f'pitch stick {s10310:6d} roll {roll:#06x} T {t:2d}: fixed {got["fixed"]:+d}, '
+                  f'original at T 7 x t/7 {ref:+.1f}, original at T {t} {got["orig"]:+d}')
 
 
 def turn(fixed):
@@ -191,7 +225,7 @@ def turn(fixed):
                 fixed.run(0x79fe, 0x7a24)
                 h += fixed.get(28510)
                 p += fixed.get(28512)
-            v = s10310 * t / 7
+            v = abs(s10310) * t / 7
             sgn = lambda a: -1 if a & 0x8000 else 1
             eh = v * sin(roll) / 65536 * sgn(roll) / 4
             ep = v * sin(roll + 0x4000) / 65536 * sgn(roll + 0x4000)
@@ -299,6 +333,7 @@ def main():
     print(f'# Unicorn {a.cpu}')
     stick(fixed, orig)
     turn(fixed)
+    pitch(fixed, orig)
     mouse(fixed)
     objstep(fixed, orig)
     aiturn(fixed, orig)

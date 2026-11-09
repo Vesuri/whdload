@@ -141,10 +141,16 @@ tape_key:
 	move.w	dt_fields(pc),(a0)
 .flying:
 	bsr	rec_frame
+	IFD	TAPE_MOUSE
+	bsr	tape_mouse
+	ENDC
 	move.l	(sp),a0			;bh+BH_KEYCALL
 	jsr	(BH_KEY-BH_KEYCALL,a0)	;d0.w = this frame's character or 0
 	tst.w	d0
 	bne.s	.store			;a real key wins
+	IFD	TAPE_MOUSE
+	bra.s	.store			;the mouse only, no keys
+	ENDC
 	lea	tape_flight(pc),a1
 	adda.w	tape_flight_pos(pc),a1
 	move.w	(a1),d1
@@ -161,6 +167,45 @@ tape_key:
 	addq.w	#4,(a0)
 .store:	move.w	d0,(10280,a4)		;as the replaced move.w d0,10280(a4)
 	rts
+
+	IFD	TAPE_MOUSE
+; TAPE_MOUSE (the mouse build): the stick from the mouse alone. Before the frame's input
+; read, MOUSE_DY counts per field since the last frame are added to BH's vertical mouse
+; accumulator 25190(a4) (as its input handler bh:19a86 adds RAWMOUSE counts): down
+; (positive) from field 100 to 300 after the first flight frame, still until 500, up until
+; 700. A rate per field: the same movement in real time on every machine.
+	IFND	MOUSE_DY
+MOUSE_DY	= 2
+	ENDC
+tape_mouse:
+	movem.l	d0-d2/a0,-(sp)
+	move.w	dt_fields(pc),d0
+	lea	tape_mlast(pc),a0
+	move.w	(a0),d1
+	move.w	d0,(a0)
+	tst.w	(2,a0)
+	bne.s	.go
+	st	(2,a0)			;first frame: nothing owed
+	bra.s	.done
+.go	sub.w	d1,d0			;fields since the last frame
+	move.w	dt_fields(pc),d1
+	sub.w	tape_t0(pc),d1		;fields into the flight
+	moveq	#MOUSE_DY,d2
+	cmp.w	#100,d1
+	blo.s	.done
+	cmp.w	#300,d1
+	blo.s	.add
+	cmp.w	#500,d1
+	blo.s	.done
+	cmp.w	#700,d1
+	bhs.s	.done
+	neg.w	d2
+.add	muls	d2,d0
+	add.w	d0,(25190,a4)
+.done	movem.l	(sp)+,d0-d2/a0
+	rts
+tape_mlast:	dc.w	0,0
+	ENDC
 
 ; (flight frame, character); 0 ends it.
 ; With TSCALE (the T experiment, t_scale below) a step is 1/TSCALE as long: each press at
