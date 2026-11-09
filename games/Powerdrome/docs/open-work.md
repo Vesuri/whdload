@@ -1,12 +1,13 @@
 # Current status and limits
 
 The release has a single **Enhanced framerate** checkbox (`CUSTOM1=1`), off by
-default. It enables fast planar rendering and fixed-step timing together on
+default in the slave. The installer sets `CUSTOM1=1` in the game icon, so an installed
+copy starts with it on (user decision). It enables fast planar rendering and fixed-step timing together on
 68020+ with real fast RAM. Unchecked, on 68000/68010, or without real fast RAM,
 both paths stay original and gameplay remains frame-dependent. CUSTOM3 is no
 longer a user option. WHDLoad CACHE/DCACHE remain user-controlled.
 
-The splash version is **2.0 (13.10.2026)**. The single-checkbox revision is built
+The splash and `$VER` version is **2.0b (09.11.2026)**. The single-checkbox revision is built
 and checked. Evidence is
 under `tmp/release-opt-in/`: M7 enabled runs the scheduler and passes 29 completed
 drawing twins; M7 unchecked, M3 checked without fast RAM and M2 checked on 68000
@@ -17,11 +18,11 @@ include the accepted stock A1200 Practice exception; their captures predate this
 UI/default-selection change. Enhanced runs now require `CUSTOM1=1` explicitly.
 
 The release installer text is maintained in `release/`. `make dist` packages it
-(`release/release.json`), but only once the slave carries a `$VER` string, which names the
-archive and the release: the slave has the version only in its splash text. Adding it
-changes the release bytes, so `make record` follows. The earlier hand-packaged archive is
-`tmp/Powerdrome-2.0.lha` ([packaging](development.md#release-installer-archive)).
-End-to-end AmigaOS Installer execution has not been tested.
+(`release/release.json`) as `dist/PowerdromeEnhanced-2.0b-20261109.lha`, named from the
+slave's `$VER` string. The installer writes `CUSTOM1=1` into the game icon. The earlier
+hand-packaged archive is `tmp/Powerdrome-2.0.lha`
+([packaging](development.md#release-installer-archive)). End-to-end AmigaOS Installer
+execution, including that tooltype, has not been tested.
 
 ## Fine mouse steering
 
@@ -120,9 +121,8 @@ The user approved these when the completion plan was made:
   options. No performance claim without a measurement.
 
 The plan originally switched the enhancements on automatically on 68020+, with opt-outs.
-After the stock A1200 regression the release made them a single opt-in checkbox
-(`CUSTOM1=1`, default off). The planning session has no record of the user approving
-this change, so confirm it before the release.
+After the stock A1200 regression the user chose a single opt-in checkbox instead:
+`CUSTOM1=1` is off by default in the slave and set in the icon the installer writes.
 
 ## Known limits and deferred work
 

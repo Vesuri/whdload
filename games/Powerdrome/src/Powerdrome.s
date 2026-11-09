@@ -64,7 +64,7 @@ slv_keyexit = $59
  INCLUDE whdload/kick13.s
 slv_name dc.b "Powerdrome",0
 slv_copy dc.b "1989 Electronic Arts",0
-slv_info dc.b "Installed by Galahad/Fairlight",10,"Enhancements by Vesuri",10,"Version 2.0 (13.10.2026)",0
+slv_info dc.b "Installed by Galahad/Fairlight",10,"Enhancements by Vesuri",10,"Version 2.0b (09.11.2026)",0
 slv_CurrentDir dc.b 0
 slv_config
  dc.b "C1:B:Enhanced framerate;"
@@ -78,6 +78,7 @@ slv_config
  ENDC
  ENDC
  dc.b 0
+ dc.b "$","VER: slave 2.0b (09.11.2026)",0
  EVEN
 
 _cb_dosLoadSeg

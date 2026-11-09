@@ -2,7 +2,8 @@
 
 Performance and timing improvements for the Amiga PAL release. Enable the
 **Enhanced framerate** checkbox (`CUSTOM1=1`) to use fast planar rendering and
-fixed-step gameplay together on **68020+ with real fast RAM**. It is off by default.
+fixed-step gameplay together on **68020+ with real fast RAM**. The slave defaults to off;
+the installer sets `CUSTOM1=1` in the game icon, so installed copies start with it on.
 Unchecked, or on unsupported machines, both rendering and timing remain original
 and frame-dependent. There is no separate timing option; WHDLoad CACHE/DCACHE
 remain user-controlled.

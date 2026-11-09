@@ -12,13 +12,13 @@
  Supported version: PAL original release.
 
  Original install by Galahad/Fairlight.
- Version 2.0 enhancements by Vesuri.
+ Version 2.0b enhancements by Vesuri.
 
  Requirements:
  -------------
  This install requires WHDLoad version 18.0 or later and DIC in the path.
  These programs can be found in the WHDLoad package.
- Version 2.0 has been tested with WHDLoad 20.0.
+ Version 2.0b has been tested with WHDLoad 20.0.
  To install from a different drive than DF0: select installation mode Expert.
 
  The installed program requires 512 KiB ChipMem and 384 KiB additional memory.
@@ -47,8 +47,10 @@
 
  Enhanced framerate:
  -------------------
- Select "Enhanced framerate" in the WHDLoad splash screen, or add the tooltype
- CUSTOM1=1 to the game icon. This option is OFF by default.
+ The installed game icon has the tooltype CUSTOM1=1, so Enhanced framerate is
+ ON. Set CUSTOM1=0 in the icon, or untick "Enhanced framerate" in the WHDLoad
+ splash screen, for the original rendering and timing. Without the tooltype
+ the option is off.
 
  On a 68020 or faster CPU with usable Fast RAM, it enables:
  - Faster rendering of the original planar graphics in Fast RAM, followed by
@@ -76,11 +78,12 @@
 
  History:
  --------
- version 2.0 (13.10.2026) done by Vesuri:
+ version 2.0b (09.11.2026) done by Vesuri:
  - Updated the installer to the WHDLoad 20.0 template, retaining the original
    single-disk imaging settings, documentation and icon choices.
  - Reworked the slave using the WHDLoad KickEmu support from version 20.0.
- - Added the single, opt-in Enhanced framerate option (CUSTOM1=1).
+ - Added the single Enhanced framerate option (CUSTOM1=1), set in the
+   installed icon; the slave defaults to off.
  - Added Fast RAM planar rendering and static polygon drawing loops.
  - Overlapped Fast RAM rendering with display synchronization and added a
    block copy to publish the completed scene to Chip RAM.

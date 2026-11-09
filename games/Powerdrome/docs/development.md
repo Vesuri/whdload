@@ -57,7 +57,7 @@ slave with interface 17 and the full timing scheduler. `make verify` builds
 `tmp/build/verify/Powerdrome.Slave`; `CUSTOM5=1` submits an empty pilot name through the
 native name-entry routine. `CUSTOM5=2` also selects Practice and submits Space in the pit.
 The normal splash has one checkbox, **Enhanced framerate** (`CUSTOM1=1`), off by
-default. It enables fast planar rendering and the scheduler together on 68020+
+default in the slave; the installer sets `CUSTOM1=1` in the game icon. It enables fast planar rendering and the scheduler together on 68020+
 with real fast RAM. Unchecked, on 68000/68010, or without real fast RAM, both paths
 remain native, including original frame-dependent timing. CUSTOM3 is no longer a
 user option. The normal

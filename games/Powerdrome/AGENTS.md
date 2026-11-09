@@ -1,7 +1,7 @@
 # Powerdrome
 
 Performance and timing improvements for the PAL release: one **Enhanced framerate** option
-(`CUSTOM1=1`, default off) enables fast planar rendering in Fast memory and fixed-step
+(`CUSTOM1=1`; off in the slave, on in the installed icon) enables fast planar rendering in Fast memory and fixed-step
 gameplay timing together on a 68020+ with real Fast memory; otherwise the game stays
 original. The original slave is Galahad/Fairlight's v1.0 (2003), which shipped without
 source; `src/original/` reconstructs it byte for byte (game.conf `AUTHOR`, `UPSTREAM`).
