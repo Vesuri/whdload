@@ -6,7 +6,8 @@ under Galahad/Fairlight's WHDLoad install (slave v1.0, 12.05.2003, Retroplay pac
 traces and disassembly. Galahad's slave shipped without source; `src/original/` reconstructs
 it byte for byte, so the slave is credited to Galahad/Fairlight (game.conf `AUTHOR`,
 `UPSTREAM`). The slave that is built and patched is `src/Battlehawks1942.s` (WHDLoad 20
-KickEmu, 512 KB chip + 516 KB fast memory, caches on). Any change to the game ships as
+KickEmu, 512 KB chip + 516 KB fast memory, caches on; BH writes code, `bh:18360` and its span
+loop, and the slave flushes the caches after each write). Any change to the game ships as
 patches in that slave; the Enhanced framerate (`CUSTOM2=1`, `src/timing.s`, ported from
 Their Finest Hour with `tools/xmatch.py`) makes game time follow real time. Goal:
 frame-rate-independent gameplay, 50 fps on faster Amigas. Nothing is released yet.

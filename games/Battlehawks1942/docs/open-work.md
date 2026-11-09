@@ -46,7 +46,7 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
 - **`tools/xmatch.py`**: TFH's `bob` against BH, matched runs, sites, globals, constants,
   BH's jump table.
 - **Scaffolding:** `C2:B:Enhanced framerate` (`CUSTOM2=1`) applies timing.s's own patch
-  list; without it `pl_bh` is v1.0's manual-check patch alone (`tools/pl_check.py`, in
+  list; without it `pl_bh` is v1.0's manual-check patch and the cache flush (`tools/pl_check.py`, in
   `make check`). Caches on (`CACHE`). The tape presses Return until the flight, on every
   CPU. Fractions in a buffer allocated at install (none: no patches), `FASTMEMSIZE`
   `$81000`. Flight records (`tools/record.sh`, `tools/speed.py`, the `rectime` build).
@@ -68,6 +68,24 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   1.0010 on the A500 and 1.0000 on the 68030/50, and both machines fly the tape to its end.
   The A500 rendered 12.4 fps against 12.9 at step 2 (one record each; another step-3 run
   gave 12.2), so step 3 costs about 4%. Not profiled.
+
+2026-11-09, the 68040 (reported from `make run SETUP=a1200-040`, `CUSTOM2=1`):
+- **BH writes code, and the caches did not see it.** `bh:18360` (from the view setup,
+  `bh:170e8`) rewrites the opcodes (`and.b`/`or.b dN,d16(a1)`) and displacements of the
+  unrolled plane writes `bh:18478..19a7e` whenever the view's angle changes, and the span
+  loop (`bh:1734c`, `bh:173aa`) ends each span by writing an `rts` into that code at the
+  span's last row, calling it at the first row and restoring the word. With `CACHE` the
+  68040's instruction cache ran stale code (its copyback data cache held the writes): spans
+  past their end (stray lines, a grey band from a drone along the horizon), then a span
+  entered mid-instruction (Illegal Instruction at `bh:18c90`, WHDLoad `COREDUMP`; earlier an
+  Access Fault in Intuition). Original mode did the same; `NOCACHE` did not. Found by
+  comparing BH's code hunk in a flight dump with the file (only the relocations, the
+  slave's patches and those blocks differ) and from the core dump, where the `rts` sat in
+  the block. The slave flushes the caches after the generator when it rewrote the code
+  (`gen_flush`, `pl_bh`) and, on a 68020 or later, between each span's `rts` and its call
+  (`pl_span`, applied from WHDLoad's attention flags); both modes. TFH's later engine does
+  not write code (its generator `bob:2cd7a` fills a table of offsets and its span loop
+  reads it), so TFH needed nothing.
 
 ## What Their Finest Hour's work gives this one
 
@@ -161,7 +179,7 @@ the cap, frame counts only); Unicorn 68000 and 68040 (routine checks). PAL only.
 1. **Scaffolding** — **done.** `CUSTOM2` through `resload_Control` in `_cb_dosLoadSeg`;
    `timing_patch` applies `_pl_timing` only then, after allocating its fractions (1160
    bytes, `MEMF_PUBLIC|MEMF_CLEAR`; without them nothing is patched). `make check`:
-   `tools/pl_check.py` (pl_bh is the manual-check patch alone) and `tools/timing_check.py`.
+   `tools/pl_check.py` (pl_bh is the manual-check patch and the cache flush) and `tools/timing_check.py`.
    `CACHE` in both modes. The tape presses Return every 300 fields from field 3000 until the
    first flight frame. Baselines: profiling.md §6 (original mode, caches on).
 2. **Decoupling** — **done** (`src/timing.s`, the core of TFH's timing.s):

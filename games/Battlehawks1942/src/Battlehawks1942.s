@@ -4,10 +4,8 @@
 ;  :Original	PAL v1.0
 ;  :History.	12.05.03 v1.0 Galahad of Fairlight (no source distributed; reconstructed
 ;		in original/Battlehawks1942.s, which rebuilds it byte-identically)
-;		06.10.26 rebased on WHDLoad 20.0 KickEmu (kick13.s) for the performance
-;		study; behaviour as v1.0
-;		09.11.26 caches on (KickEmu CACHE); CUSTOM2=1 Enhanced framerate
-;		(timing.s, from Their Finest Hour 2.0b)
+;		09.11.26 v2.0b by Vesuri: caches on, flushed after BH's code writes;
+;		CUSTOM2=1 Enhanced framerate (timing.s, from Their Finest Hour 2.0b)
 ;  :Copyright.	Public Domain
 ;  :Language.	68000 Assembler
 ;  :Translator.	vasm
@@ -23,10 +21,20 @@
 ; no other.
 ; v1.0 patched the Kickstart image itself and hooked LoadSeg; here KickEmu does the OS part
 ; and _cb_dosLoadSeg patches BH. All addresses in patch lists are BH hunk-0 offsets.
-; pl_bh is v1.0's patch (the manual check) and the VERIFY instruments; everything for
-; CUSTOM2=1 is in timing.s's own patch list, so without it BH runs as in v1.0. v1.0 ran
-; with the caches off (KickEmu without CACHE turns them all off); they are on here
-; (WHDLoad's default, chip memory not cached), with or without CUSTOM2.
+; pl_bh is v1.0's patch (the manual check), the cache flush below and the VERIFY
+; instruments; everything for CUSTOM2=1 is in timing.s's own patch list, so without it BH
+; runs as in v1.0. v1.0 ran with the caches off (KickEmu without CACHE turns them all off);
+; they are on here (WHDLoad's default, chip memory not cached), with or without CUSTOM2.
+; BH writes code. bh:18360 rewrites the opcodes and displacements of its unrolled plane
+; writes (bh:18478..19a7e) whenever the view's angle changes, and its span loop
+; (bh:1734c, bh:173aa) ends each span by writing an rts into that code at the span's last
+; row, calling it at the first row and restoring the word. The instruction cache does not
+; see data writes (with a copyback data cache, 68040/68060, not even in memory), so it ran
+; the old code: spans past their end (stray lines, polygons stretched to the edge of the
+; view), then a span into the middle of an instruction (Illegal Instruction). The caches
+; are flushed after the generator (gen_flush) and, on a 68020 or later, before each span's
+; call (pl_span). Their Finest Hour's later engine does not write code: its span loop
+; reads a table of offsets.
 
 	INCDIR	Include:
 	INCLUDE	whdload.i
@@ -68,9 +76,8 @@ slv_keyexit	= $59		;F10
 
 slv_name	dc.b	"Battlehawks 1942",0
 slv_copy	dc.b	"1990 Lucasfilm Games",0
-slv_info	dc.b	"installed by Galahad of Fairlight",10
-		dc.b	"KickEmu (WHDLoad 20) rebase by Vesuri",10,10
-		dc.b	"Version 1.1-dev",0
+slv_info	dc.b	"Installed by Galahad of Fairlight and Vesuri",10
+		dc.b	"Version 2.0b (09.11.2026)",0
 slv_CurrentDir	dc.b	0
 slv_config	dc.b	"C2:B:Enhanced framerate;"
 		dc.b	0
@@ -108,7 +115,14 @@ _cb_dosLoadSeg
 		lea	pl_bh(pc),a0
 		move.l	d1,a1			;seglist
 		jsr	resload_PatchSeg(a2)
-		move.l	(a7)+,d1
+		move.l	_attnflags(pc),d0	;kick13.s's, from WHDLoad
+		btst	#AFB_68020,d0		;a 68020 or later: caches
+		beq.b	.nocache
+		move.l	(a7),d1
+		lea	pl_span(pc),a0
+		move.l	d1,a1
+		jsr	resload_PatchSeg(a2)
+.nocache	move.l	(a7)+,d1
 		bsr	timing_patch
 	IFD VERIFY
 		bsr	tape_start
@@ -124,6 +138,10 @@ pl_bh		PL_START
 	; always take the ok branch.
 		PL_PS	$025be,manual_check
 		PL_W	$025c4,$6078		;bra.s ok
+	; bh:170e4 jsr 1612a(pc); jsr 18360(pc), the view setup: flush the caches once
+	; bh:18360 has rewritten code
+		PL_PS	$170e4,gen_flush
+		PL_NOP	$170ea,2
 	IFD	VERIFY
 		PL_PS	$075be,tape_key		;flight input on exact frames (tape.s)
 		PL_NOP	$075c4,2		;the rest of move.w d0,10280(a4)
@@ -142,9 +160,51 @@ pl_bh		PL_START
 	ENDC
 		PL_END
 
+; On a 68020 or later: the span loop's rts written into code (see the top), with the caches
+; flushed between the write and the call.  The jsr from here returns here; D6 is the saved
+; word, as in the original.
+pl_span		PL_START
+		PL_PS	$1734c,span_call	;move.w (0,a6,d1.w),d6; move.w #$4e75,(0,a6,d1.w)
+		PL_W	$17352,$600a		;bra.s 1735e: jsr (0,a6,d0.w); move.w d6,(0,a6,d1.w)
+		PL_PS	$173aa,span_call_x8	;the same with lsl.w #3,d0 before the jsr
+		PL_W	$173b0,$600c		;bra.s 173be
+		PL_END
+
+span_call_x8	lsl.w	#3,d0
+span_call	move.w	(0,a6,d1.w),d6
+		move.w	#$4e75,(0,a6,d1.w)
+		move.l	a0,-(a7)
+		move.l	(_resload,pc),a0
+		jsr	(resload_FlushCache,a0)
+		move.l	(a7)+,a0
+		jsr	(0,a6,d0.w)
+		move.w	d6,(0,a6,d1.w)
+		rts
+
 manual_check	move.b	d0,(0,a0,d1.l)
 		move.l	d0,d2
 		rts
+
+; bh:170e4: as jsr 1612a(pc); jsr 18360(pc), then the caches flushed if bh:18360 wrote
+; code: it does when the view's angle word (-5974(a4)) differs from the one its code was
+; made for (5912(a4)).  The registers are free after it: bh:170ec restores D0-A3/A6.
+gen_flush	pea	(.gen,pc)
+		move.l	(4,a7),-(a7)		;bh:170ea
+		add.l	#$1612a-$170ea,(a7)
+		rts				;bh:1612a with the caller's registers, to .gen
+.gen		move.l	(-5974,a4),a0
+		move.l	(5912,a4),a1
+		move.w	(a0),d4
+		cmp.w	(a1),d4
+		sne	d4			;D4: bh:18360 leaves it
+		move.l	(a7),a0
+		add.l	#$18360-$170ea,a0
+		jsr	(a0)
+		tst.b	d4
+		beq.b	.same
+		move.l	(_resload,pc),a0
+		jsr	(resload_FlushCache,a0)
+.same		rts
 
 ;============================================================================
 
