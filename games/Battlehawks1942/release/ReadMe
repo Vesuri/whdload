@@ -30,10 +30,22 @@ Author: Vesuri, after Galahad / Fairlight (v1.0)
  - One slave replaces v1.0's two; the installer no longer asks which.
  - From v1.0: the manual check is removed, quit with F10.
 
+ Source: github.com/Vesuri/whdload.
+
  History:
  --------
- 2.0b (09.11.2026) Vesuri: the above. Source: github.com/Vesuri/whdload.
- 1.0  (12.05.2003) Galahad / Fairlight: the original install (below).
+ version 2.0b (09.11.2026) done by Vesuri:
+ - Enhanced framerate (CUSTOM2=1), enabled in the installed icon: game time
+   follows real time, with up to 50 frames per second on a 68030/50 and faster
+ - faster point transform, horizon fill and cockpit overlay
+ - the menu selection moves by mouse distance
+ - code and data in fast memory with the caches on; the icon no longer sets
+   NOCACHE
+ - fixed grey characters in the message bar on fast CPUs
+ - one slave replaces v1.0's two; the installer no longer asks which
+
+ version 1.0 (12.05.2003) done by Galahad / Fairlight:
+ - the original install (below)
 
  Galahad's v1.0 ReadMe follows.
 
