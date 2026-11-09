@@ -30,11 +30,12 @@ Read `docs/open-work.md` first.
 | `docs/profiling.md` | running the game, driving it, tracing it, or quoting any performance number |
 | `docs/c2p.md` | touching the chunky-to-planar pass |
 
-The slave source is `src/` (`Battlehawks1942.s`, `timing.s` the Enhanced framerate, the
-VERIFY-only `tape.s` and `c2p_full.s`, `original/` the reconstruction); game.conf and game.sh
-define the builds (release, verify, c2pfull, tscale, rectime, original). `tools/` is the
-development harness and never ships: `bh.py` is the gdb-stub server, `fixed_window.sh` the
-capture runner, `bh_report.py`, `frames.py`, `c2p_stats.py` and the `compare_*.py` scripts
-read its captures; `record.sh` and `speed.py` record and read flights (game time against real
-time); `timing_check.py` (Unicorn) and `pl_check.py` are part of `make check`; `xmatch.py`
-maps Their Finest Hour's code, patch sites and globals to BH's.
+The slave source is `src/` (`Battlehawks1942.s`, `timing.s` the Enhanced framerate with
+`combat.s` its timers and combat, the VERIFY-only `tape.s` and `c2p_full.s`, `original/`
+the reconstruction); game.conf and game.sh define the builds (release, verify, c2pfull,
+tscale, rectime, original). `tools/` is the development harness and never ships: `bh.py`
+is the gdb-stub server, `fixed_window.sh` the capture runner, `bh_report.py`, `frames.py`,
+`c2p_stats.py` and the `compare_*.py` scripts read its captures; `record.sh` and
+`speed.py` record and read flights (game time against real time); `timing_check.py` and
+`combat_check.py` (Unicorn) and `pl_check.py` are part of `make check`; `xmatch.py` maps
+Their Finest Hour's code, patch sites and globals to BH's.

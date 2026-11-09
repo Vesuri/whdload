@@ -28,7 +28,8 @@ game_drives() {
 # The reconstruction must still equal the installed slave, the instrumented builds must
 # assemble, the release slave must leave BH original without CUSTOM2 (tools/pl_check.py),
 # the Enhanced framerate routines must pass their Unicorn checks on the 68000 and 68040
-# (tools/timing_check.py), and the tools must compile.
+# (tools/timing_check.py; tools/combat_check.py for step 3's timers and combat), and the
+# tools must compile.
 game_check() {
   (
     cd "$GAME_ROOT"
@@ -40,13 +41,17 @@ game_check() {
     python3 tools/pl_check.py
     if [ -f "tmp/game/$GAME_DIR/$SLAVE_FILE" ]; then
       "$COMMON/build.sh" original > /dev/null && echo "original: equals the installed slave"
-      for b in 68000 68040; do
-        python3 tools/timing_check.py --cpu "$b" > "tmp/timing_check-$b.log" ||
-          { tail -20 "tmp/timing_check-$b.log"; exit 1; }
-        echo "timing_check $b: $(tail -1 "tmp/timing_check-$b.log" | sed 's/^# //')"
+      local t
+      for t in timing_check combat_check; do
+        for b in 68000 68040; do
+          python3 "tools/$t.py" --cpu "$b" > "tmp/$t-$b.log" ||
+            { grep FAIL "tmp/$t-$b.log" | head -20; tail -1 "tmp/$t-$b.log"; exit 1; }
+          echo "$t $b: $(tail -1 "tmp/$t-$b.log" | sed 's/^# //')"
+        done
       done
     else
-      echo "skipped (no installed game; make unpack): the original build comparison, timing_check"
+      echo "skipped (no installed game; make unpack): the original build comparison," \
+        "timing_check, combat_check"
     fi
     python3 -c 'import py_compile, sys; [py_compile.compile(f, doraise=True) for f in sys.argv[1:]]' tools/*.py &&
       echo "tools: compile"

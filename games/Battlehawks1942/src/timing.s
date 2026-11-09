@@ -63,7 +63,15 @@ BH_SIN		= 670		;(a4) sin magnitudes, 2048 words, sign from angle bit 15
 DTB_FRAC	= 0				;x, y, z per object (dt_polar)
 DTB_AIFRAC	= DTB_FRAC+DT_OBJECTS*6		;AI turn per object
 DTB_RFRAC	= DTB_AIFRAC+DT_OBJECTS*2	;roll, pitch, heading, pitch-change rates
-DTB_SIZE	= DTB_RFRAC+8
+DTB_STEP3	= DTB_RFRAC+8			;combat.s's state (its DTB3_ offsets)
+DTB_STATE	= (DTB_STEP3+DTB3_SIZE+3)&-4	;the state: cleared at a flight's start
+DT_FILM		= 7680				;combat.s: replay steps (128 s at T 60)
+DT_FILMSEC	= 128
+DTB_FILM	= DTB_STATE			;the film: 4 words a step
+DTB_FILMT	= DTB_FILM+DT_FILM*8		;  and each step's T
+DTB_COMPA	= DTB_FILMT+DT_FILM*2		;the state at the film's start
+DTB_COMPB	= DTB_COMPA+DTB_STATE		;  and of the flight left for a replay
+DTB_SIZE	= DTB_COMPB+DTB_STATE
 
 ; < A2: resload, D1: seglist (BPTR); all registers saved by the caller
 timing_patch	move.l	d1,d7
@@ -137,6 +145,112 @@ _pl_timing	PL_START
 		PL_PS	$11ee2,dt_aisub		;same bytes
 		PL_P	$30e,dt_delay		;bh:30a after its link
 		PL_P	$12b8,dt_keywait	;bh:12ac after its link and movem
+; combat.s (step 3): FR-15 attitude, FR-28 fuel
+		PL_PS	$11238,dt_att_roll	;moveq #0,d0; move.w d4,d0; lea 15540(a4),a0
+		PL_NOP	$1123e,2
+		PL_PS	$112ae,dt_att_roll_done	;move.b #2,(a0,d0.l)
+		PL_PS	$112fa,dt_att_roll_done
+		PL_PS	$11324,dt_att_pitch	;moveq #0,d0; move.w d4,d0; lea 15576(a4),a0
+		PL_NOP	$1132a,2
+		PL_PS	$113a6,dt_att_pitch_done ;move.b #3,(a0,d0.l)
+		PL_PS	$1146c,dt_att_pitch_done
+		PL_PS	$113e6,dt_att_reflect	;neg.w (a0,d0.l); moveq #0,d0
+		PL_PS	$114ac,dt_att_reflect
+		PL_PS	$11538,dt_att_bank	;swap d0; clr.w d0; swap d0
+		PL_NOP	$1153e,4		;divu.w 10184(a4),d0
+		PL_PS	$11592,dt_att_bank
+		PL_NOP	$11598,4
+		PL_PS	$115d6,dt_att_syncpitch	;move.w (a0,d0.l),(a1,d1.l)
+		PL_PS	$1164e,dt_att_slow8	;move.w -12(a5),d0; lsr.w #8,d0
+		PL_PS	$116fc,dt_att_slow10	;moveq #10,d0; lsr.w d0,d2; swap d2
+		PL_PS	$117ec,dt_att_sink	;addi.w #16,(a0); moveq #0,d0
+		PL_PS	$11804,dt_att_syncfall	;move.w (a0,d0.l),(a1,d1.l)
+		PL_PS	$11b3c,dt_att_fall	;divu.w 10184(a4),d0; add.w d0,(a0)
+		PL_PS	$11b5e,dt_att_fall_limit ;move.w #-32768,(a0,d0.l)
+		PL_PS	$11b78,dt_att_syncfall
+		PL_PS	$11c40,dt_att_fall
+		PL_PS	$11c62,dt_att_fall_limit
+		PL_PS	$11c7c,dt_att_syncfall
+		PL_PS	$11d38,dt_att_spin	;divu.w 10184(a4),d0; add.w d0,(a0)
+		PL_PS	$11d80,dt_att_ground	;move.w #16384,(a0,d0.l)
+		PL_PS	$11d90,dt_att_ground
+		PL_PS	$111dc,dt_fuel		;divu.w 10184(a4),d1; moveq #0,d0
+; FR-07 guns
+		PL_PS	$c388,dt_gun_step	;moveq #0,d0; move.w d4,d0; lea 19768(a4),a0
+		PL_NOP	$c38e,2
+		PL_PS	$c70c,dt_gun_fire0	;move.w 10184(a4),d0; swap d0
+		PL_PS	$c76a,dt_gun_fire1
+; FR-12, FR-14 AI decisions
+		PL_P	$f074,dt_air_ai
+		PL_P	$12d22,dt_surface_ai
+		PL_PS	$f010,dt_ai_reset4	;move.w 10184(a4),d1; asl.w #1,d1
+		PL_PS	$12d14,dt_ai_reset94
+; FR-03 effects, FR-10/11 damage
+		PL_P	$aec8,dt_effects
+		PL_P	$de16,dt_air_damage
+		PL_P	$e28e,dt_ship_damage
+; FR-20 mission waits
+		PL_PS	$ecd0,dt_wait40		;tst.w 10142(a4); beq.s ecdc
+		PL_PS	$ed12,dt_wait4		;tst.w 10140(a4); bne.w ef18
+		PL_NOP	$ed18,2
+		PL_PS	$ef12,dt_wait40_arm	;clr.w 10142(a4); bra.s ef1c
+; timers k x T: FR-08 the release wait, FR-05 and the others' object timers
+		PL_PS	$ce34,dt_bombcd_set	;move.w 10184(a4),d0; mulu.w #5,d0
+		PL_NOP	$ce3a,2
+		PL_PS	$c36c,dt_bombcd_dec	;tst.w 10216(a4); beq.s c376
+		PL_PS	$8858,dt_msg_set	;move.w #80,28522(a4)
+		PL_PS	$886c,dt_msg_dec	;subq.w #1,28522(a4); tst.w 28522(a4)
+		PL_NOP	$8872,2
+		PL_NOP	$c372,4			;subq.w #1,10216(a4)
+		PL_PS	$c958,dt_life2		;move.w 10184(a4),d1; asl.w #1,d1
+		PL_PS	$ce02,dt_life5		;move.w 10184(a4),d1; mulu.w #5,d1
+		PL_NOP	$ce08,2
+		PL_PS	$cf26,dt_life5
+		PL_NOP	$cf2c,2
+		PL_PS	$8408,dt_life5
+		PL_NOP	$840e,2
+		PL_PS	$d542,dt_life180	;move.w 10184(a4),d1; mulu.w #180,d1
+		PL_NOP	$d548,2
+		PL_PS	$83ea,dt_life_drag	;subq.w #1,(a0,d0.l); bra.s 8414
+		PL_PS	$8512,dt_life_step	;subq.w #1,(a0,d0.l); tst.w (a0,d0.l)
+		PL_NOP	$8518,2
+		PL_PS	$8588,dt_life_step
+		PL_NOP	$858e,2
+		PL_PS	$ebd2,dt_life_flak	;subq.w #1,(a0,d0.l); moveq #0,d0
+; FR-01 falling objects
+		PL_PS	$8440,dt_fall_g		;moveq #11,d0; swap d0; clr.w d0
+		PL_PS	$8470,dt_fall_z		;moveq #0,d0; move.w d4,d0; asl.l #1,d0
+; FR-06 flak
+		PL_PS	$e7b2,dt_flak_delay	;mulu.w 10184(a4),d0; move.w d0,-4(a5)
+		PL_NOP	$e7b8,2
+		PL_PS	$e9d4,dt_flak_jadd	;move.w -22(a5),d0; add.w d0,(a0)
+		PL_PS	$ead0,dt_flak_jadd
+		PL_PS	$e9e8,dt_flak_jsub	;move.w -22(a5),d0; sub.w d0,(a0)
+		PL_PS	$eae4,dt_flak_jsub
+		PL_PS	$ea16,dt_flak_j7	;and.w #7,d0; move.w d0,(a0,d1.l)
+		PL_NOP	$ea1c,2
+		PL_PS	$eb12,dt_flak_j7
+		PL_NOP	$eb18,2
+		PL_PS	$eb40,dt_flak_j7
+		PL_NOP	$eb46,2
+		PL_P	$e580,dt_flak_end	;movem.l (sp)+,d4-d5; unlk a5; rts
+; FR-13 gunner lead
+		PL_PS	$cac6,dt_lead		;jsr -32244(a4); moveq #0,d1
+		PL_PS	$caf2,dt_lead
+		PL_PS	$cb1e,dt_lead
+; the swept hit test
+		PL_PS	$dae6,dt_hit		;move.l -18(a5),d0; move.l -6(a5),d1
+; FR-22 the replay
+		PL_PS	$77a2,dt_film_start	;move.l 24852(a4),24864(a4)
+		PL_PS	$8eae,dt_film_start
+		PL_PS	$78aa,dt_film_rec	;movea.l 24864(a4),a0; addq.l #2,24864(a4)
+		PL_NOP	$78b0,2
+		PL_PS	$7902,dt_film_count	;addq.w #1,28498(a4); cmpi.w #1023,28498(a4)
+		PL_NOP	$7908,4
+		PL_PS	$371a,dt_state_save	;link.w a5,#-6; movem.l d4-d5,-(sp)
+		PL_NOP	$3720,2
+		PL_PS	$377a,dt_state_load
+		PL_NOP	$3780,2
 		PL_END
 
 ; VERTB server: fields since install
@@ -191,7 +305,8 @@ dt_flight	move.l	a0,-(a7)
 		tst.w	(a0)
 		bne.b	.tm
 		move.w	(BH_T,a4),(a0)		;no mission record seen: this T
-.tm		lea	(dt_live,pc),a0
+.tm		bsr	dt_clear		;no fraction or clock from the last flight
+		lea	(dt_live,pc),a0
 		clr.w	(a0)
 		st	(dt_flying-dt_live,a0)
 		move.l	(a7)+,a0
@@ -206,6 +321,14 @@ dt_flight_end	bsr	dt_restore
 		move.w	#64,-(a7)
 		clr.w	-(a7)
 		jmp	(a0)
+
+dt_clear	movem.l	d0/a0,-(a7)
+		move.l	(dt_buf,pc),a0
+		move.w	#DTB_STATE/2-1,d0
+.clr		clr.w	(a0)+
+		dbf	d0,.clr
+		movem.l	(a7)+,d0/a0
+		rts
 
 dt_restore	move.l	d0,-(a7)
 		move.w	(dt_tm,pc),d0
@@ -229,6 +352,12 @@ dt_frame	move.w	(dt_fields,pc),d0
 		lea	(dt_last,pc),a0
 		move.w	(a0),d1
 		move.w	d0,(a0)
+		cmp.b	#1,(28474,a4)		;a replay: T from the film (combat.s)
+		bne.b	.real
+		lea	(dt_live,pc),a0		;and frame timing anew after it
+		clr.w	(a0)
+		bra	dt_film_t
+.real
 		lea	(dt_live,pc),a0
 		tst.w	(a0)
 		bne.b	.live
@@ -685,3 +814,5 @@ dt_avg		dc.w	0			;average frame, fields*DT_ONE
 dt_len		dc.w	0,0,0,0,0		;valid, integer, fraction, rounded, object
 dt_vbint	dcb.b	IS_SIZE,0
 	EVEN
+
+	INCLUDE	combat.s

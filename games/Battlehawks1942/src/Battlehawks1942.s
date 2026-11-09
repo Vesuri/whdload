@@ -40,9 +40,9 @@
 CHIPMEMSIZE	= $80000
 	IFND	FASTMEMSIZE
 	IFD	VERIFY
-FASTMEMSIZE	= $90000		;and 56 KB for the flight record (tape.s)
+FASTMEMSIZE	= $A7000		;and 56 KB for the flight record (tape.s)
 	ELSE
-FASTMEMSIZE	= $81000		;-DFASTMEMSIZE=0: chip only, like v1.0; 4 KB for timing.s
+FASTMEMSIZE	= $98000		;-DFASTMEMSIZE=0: chip only, like v1.0; 92 KB for timing.s (DTB_SIZE)
 	ENDC
 	ENDC
 NUMDRIVES	= 3		;Disk.1-3 in DF0-DF2: the game never asks for a swap

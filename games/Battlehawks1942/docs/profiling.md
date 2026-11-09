@@ -22,6 +22,7 @@ python3 tools/compare_state.py tmp/prof/state-a tmp/prof/state-b
 MACHINE=030 WHD_ARGS='CUSTOM2=1' tools/record.sh tmp/rec/030-enh   # flight record (rectime build)
 python3 tools/speed.py --at 10,20 tmp/rec/030-enh tmp/rec/a500-enh  # game time against real time
 python3 tools/timing_check.py --cpu 68040                           # Enhanced framerate routines (Unicorn)
+python3 tools/combat_check.py --only guns,timers                     # step 3's timers and combat (Unicorn)
 python3 tools/xmatch.py site 154dc                                  # a Their Finest Hour offset in BH
 ```
 

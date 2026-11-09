@@ -131,6 +131,9 @@ class BH:
 
     def run(self, start, end):
         self.c.reg(A4, self.a4)
+        if end != getattr(self, 'last_end', None):
+            self.c.flush()              # a block translated before may run past a new stop
+            self.last_end = end
         self.c.run(CODE + start, CODE + end)
 
     def timing(self, t, tm):

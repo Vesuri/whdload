@@ -58,6 +58,17 @@ does not depend on the frame rate, and 50 fps on faster Amigas.
   The routines pass their Unicorn checks at T 4/7/25/50 on the 68000 and 68040
   (`tools/timing_check.py`, in `make check`).
 
+2026-11-09, plan step 3 (below):
+- **Timers and combat** (`src/combat.s`): what the game counted in steps lasts its time in
+  seconds at any T. The routines pass their Unicorn checks at T 4/7/25/50, and with T
+  changing, on the 68000 and 68040 (`tools/combat_check.py`, in `make check`).
+- The tape's spiral now descends alike on the 68000 and the 68030/50: altitude lost by
+  20 s differs by 1.2% (it was 13%).
+- Flight records (rectime, `CUSTOM2=1`): game time / real time from the second second on is
+  1.0010 on the A500 and 1.0000 on the 68030/50, and both machines fly the tape to its end.
+  The A500 rendered 12.4 fps against 12.9 at step 2 (one record each; another step-3 run
+  gave 12.2), so step 3 costs about 4%. Not profiled.
+
 ## What Their Finest Hour's work gives this one
 
 The work here paused for Their Finest Hour (`games/TheirFinestHour`, the same Lucasfilm
@@ -174,28 +185,58 @@ the cap, frame counts only); Unicorn 68000 and 68040 (routine checks). PAL only.
    - the busy waits `bh:30a` and `bh:12ac` wait their 68000 length in fields;
    - the slot-128 pool is set up once from the mission's T (profiling.md §9): nothing to do
      here; its animation is the effects cadence (step 3).
-   Not yet agreeing between machines: the descent in the tape's spiral (at 20 s the 68000
-   has lost 13% more altitude than the 68030/50). Probably the attitude code TFH fixed as
-   FR-15 (`bh:11238`..`11d90`); step 3 starts there.
-3. **Timers and combat** (TFH's FR-01..FR-28, retargeted with BH's constants, each with its
-   check at T 2/4/7/25/50 and changing T on Unicorn 68000/68040):
+   The descent in the tape's spiral, which differed by 13% between machines after this step,
+   was the attitude code (FR-15, step 3).
+3. **Timers and combat** — **done** (`src/combat.s`, included by timing.s; its state is in
+   timing.s's buffer, cleared at each flight's start; `FASTMEMSIZE` grew by $17000 for its
+   85 KB). The policy: a rate per second divides by the live T and carries its fraction. A
+   quantity the original counted in steps is kept as it was at the mission's T (tm, what
+   the A500 was tuned for) and timed in seconds, for example a T/3 reload = floor(tm/3)/tm
+   s. A countdown set as k·T lasts k s, whatever T does meanwhile. Each has a check in
+   `tools/combat_check.py`.
 
-   | BH system | BH sites | TFH item |
-   |---|---|---|
-   | guns: reload, bursts | `c366`, `c70c`, `c76a` | FR-07 |
-   | bullets: life, damage age, swept hit | `c958`, `8588`, `da6e` | FR-05, hit test |
-   | bombs and torpedoes | `c378`, `8742`, `ecaa` (slots 20–27) | FR-08, FR-09 |
-   | debris | `ce02`, `cf26`, `8408`..`8480` | FR-01 |
-   | effects (T/8+1 cadence) | `aec8`, `aedc`, `6d2e` | FR-03 |
-   | damage: aircraft, ships, sinking 180T, flak | `de16`, `e28e`, `d542`, `e556`..`ebb6` | FR-10, 11, 06 |
-   | AI: decisions, aim, script waits, attitude | `f074`, `12b22`, `ca76`, `10200`, `11238`..`11d90` | FR-12..15 |
-   | mission waits, messages, contact, fuel | `ed02`, ~`8850`, `d106`, `111e2` | FR-20, 21, 19, 28 |
-   | replay camera | `78aa`, `3772`, `37ca` | FR-22, reduced |
+   | BH system | BH sites | TFH item | Change |
+   |---|---|---|---|
+   | attitude | `11238`..`11d90` | FR-15 | rates with carried fractions per plane and channel; pole reflection; the climb loss tm·max(1, floor(r/tm)) a second and the sink 16·tm a second |
+   | fuel | `111dc` | FR-28 | the fraction carried |
+   | guns, bursts | `c36c`, `c388`, `c70c`, `c76a` | FR-07 | Q24 reload clocks of floor(tm/3)/tm s, armed once a shot (the fire code runs once per barrel); bursts count shots, so they follow |
+   | release wait, object lives | `ce34`, `c958`, `ce02`, `cf26`, `8408`, `d542`, `83ea`, `8512`, `8588`, `ebd2` | FR-05, 08 | countdowns in seconds beside the count, which is rewritten each step as ceil(seconds·T) |
+   | falling objects | `8440`, `8470` | FR-01 | gravity tm·max(1, floor(11/tm)) a second; the height moves by the step's mean speed, fractions carried (a 5 s drop is the same at every T; the original at T 7 fell 2% further) |
+   | effects, aircraft and ship damage | `aec8`, `de16`, `e28e` | FR-03, 10, 11 | Q24 clocks at tm/(floor(tm/8)+1), tm/(floor(tm/3)+1), tm/(4tm+1) Hz |
+   | flak | `e7b2`, `e9d4`..`eb40`, `e580` | FR-06 | delay limited to a word; jitter × T/tm; the delay becomes a timer when the burst is made; the aim point (`e7d8`, velocity × (delay + T) steps) is consistent already |
+   | AI decisions | `f010`, `f074`, `12d14`, `12d22` | FR-12, 14 | every 2 s for each eligible object, the earliest due first (the original served one object a step) |
+   | AI and gunner lead | `cac6`, `caf2`, `cb1e` | FR-13 | n steps at tm = n/tm s of the target's motion; the AI lead `12b22` is consistent already |
+   | hit test | `dae6` | — | TFH's swept test with BH's 400 box |
+   | mission waits | `ecd0`, `ed12`, `ef12` | FR-20 | (40tm+1)/tm and (4tm+1)/tm s |
+   | messages | `8858`, `886c` | FR-21 | 80 steps at tm (11.4 s at T 7) |
+   | replay | `77a2`, `8eae`, `78aa`, `7902`, `371a`, `377a` | FR-22, reduced | the film in the buffer: 7680 steps or 128 s, each step's T kept and replayed (`dt_frame`); timing.s's state saved and restored with the game's two states |
 
-   The replay camera has a 1023-step in-memory film and no files: store each step's T in an
-   allocated buffer, size the film for 128 s, replay with the recorded T. Plus: every stored
-   multiple of T must fit its byte or word at T 50 (TFH's FR-02). Probably absent, to confirm
-   and close: FR-02, 04, 16, 17, 18, 23, 24, 25; FR-26 matters only on NTSC.
+   Corrections to the plan's table: BH has no bomb guidance (`bh:ecaa` is the mission scan,
+   FR-20; `bh:8742` clamps a position); `bh:10200` (script waits) is an empty stub; contact
+   (`bh:d106`, FR-19) uses no T and keeps no count. Also consistent already: the slot-128
+   pool (`bh:13524`, the mission's T), `bh:12404` (dz·T·3), the decelerator `bh:1207c`
+   (it carries its own fraction in 15984), the drag's speed loss `bh:83fa` (once per drag
+   interval, now a timer), and the AI script counters 16688 (counted per decision). The AI
+   muzzle offset `bh:c9f2` (2000/T) is left as it is. Every remaining step-counted
+   countdown was listed (`subq`/`addq` on globals and tables); the rest count events,
+   statistics, menus or frames.
+
+   Closed as absent or already covered:
+   - FR-02 (group timer): BH has no group scheduler. Overflow audit: every stored multiple
+     of T is a word, the largest at T 50 is 180T = 9000; the one overflow was the flak
+     delay, now limited.
+   - Not in BH: FR-04 (no world clock or daylight), FR-18 (no drift terms), FR-25 (input
+     arrives through `input.device` events).
+   - FR-16 (attitude recovery), FR-17 (ground steering) and FR-24 (gunner aim): BH has no
+     T site or step count for them beyond those above (all 67 uses of 10184/10186 were
+     listed); the player's recovery is the attitude code (FR-15).
+   - Covered by step 2: FR-23 (the replay camera, `bh:7982`, goes through the view
+     controller `bh:7f30`, which step 2 changed).
+   - FR-26 (audio envelopes) matters only on NTSC.
+
+   A patch must not cover a branch target. The release wait's first patch (`bh:c372`)
+   overwrote `bh:c376`, the target of the `beq` before it; the guns check crashed on it. All
+   94 patch sites were then checked against every branch target in the disassembly.
 4. **Rendering** (after a 68020 profile of the turn, caches on): TFH's register point
    transform (`mulu.l` on 68020+) at `bh:16bca`, keeping BH's entry and cull; BH's
    counterparts of TFH's projection routines (near `bh:16cd8`..`16f58`); TFH's merge c2p
