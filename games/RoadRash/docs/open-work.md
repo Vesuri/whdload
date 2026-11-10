@@ -2,11 +2,12 @@
 
 ## Where it stands
 
-3.0b (09.11.2026) is complete under the agreed emulator scope: plan items A–C and G
+3.0b (10.11.2026) is complete under the agreed emulator scope: plan items A–C and G
 complete, D, E and F1–F5 complete, H1/H2 investigated (`performance-plan.md`). It replaces the
-release of 22.10.2026, which was built from the tree submitted and merged upstream ("Road
-Rash 3.0b: optional enhanced framerate"). The 09.11.2026 release adds the waits after
-unwaited blits (`visual-fixes.md`) and its ReadMe's shorter changelog. `release/slaves.sha256`
+releases of 22.10.2026, built from the tree submitted and merged upstream ("Road Rash 3.0b:
+optional enhanced framerate"), and of 09.11.2026. Those added the waits after unwaited blits
+(`visual-fixes.md`) and a shorter ReadMe changelog; 10.11.2026 fixes the bike shop's bikes with
+Enhanced framerate (`blitter-performance.md`, "Menu and shop bobs"). `release/slaves.sha256`
 pins its slave.
 
 The submitted tree is the development branch reduced to its release configuration (no VERIFY
@@ -39,10 +40,6 @@ password entry); the `PL_IFC2` move is a behaviour change to decide on, not a fi
 
 ## Open
 
-- Unreleased: the bike shop's bikes are drawn without the Enhanced mask cache
-  (`blitter-performance.md`, "Menu and shop bobs"), which fixes the player report of
-  corrupted or missing bikes after a few races (10.11.2026, A1200 with Fast RAM).
-  The release slave and `release/slaves.sha256` are still those of 09.11.2026.
 - Hardware confirmation of the blitter waits (`visual-fixes.md`, "Unwaited blits"), which
   address a player report of intro and bike-shop glitches (8.11.2026, 68040). The emulator
   doesn't reproduce the glitches.

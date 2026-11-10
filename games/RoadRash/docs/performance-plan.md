@@ -1,7 +1,7 @@
 # Road Rash: race trace analysis and plan for smooth play on faster CPUs
 
 Status: A–C and G complete; D, E and F1–F5 complete under the agreed emulator
-scope. Release: 3.0b (09.11.2026; first dated 22.10.2026). D1d real-hardware coherency and F6a–F6d
+scope. Release: 3.0b (10.11.2026; first dated 22.10.2026). D1d real-hardware coherency and F6a–F6d
 future fixed-address relocation work remain open. H1/H2 investigations are
 complete; H1c evaluated a correction without adopting it. G validation is recorded in
 [release.md](release.md). Accepted A evidence

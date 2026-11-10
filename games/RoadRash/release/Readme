@@ -9,7 +9,7 @@
  PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
  This install applies to "Road Rash" (c) 1992 Electronic Arts - 2 disks.
- Road Rash Enhanced 3.0b (09.11.2026)
+ Road Rash Enhanced 3.0b (10.11.2026)
 
  Requirements:
  -------------
@@ -92,13 +92,12 @@ Source: GameWinners.com ,  http://www.gamewinners.com
 
  History:
  --------
- Version 3.0b (09.11.2026) done by Vesa Halttunen:
+ Version 3.0b (10.11.2026) done by Vesa Halttunen:
  - Enhanced framerate: smoother, vsynced play on Fast RAM Amigas, enabled in
    the installed icon (CUSTOM2=1)
  - steady game speed with Enhanced framerate, less steering lag and correct
    opponent lane positions
- - fixed graphics glitches in the intro, title, menus and bike shop on fast
-   CPUs
+ - fixed graphics glitches in the intro, title, menus and bike shop
  - fixed distant and mirror bike flicker and vertical jumps on hills
  - fixed joystick steering recentring and keyboard/CD32 pause handling
  - fixed a loading crash on uncached 68030 machines

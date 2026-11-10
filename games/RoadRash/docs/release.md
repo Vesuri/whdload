@@ -1,9 +1,11 @@
-# Road Rash 3.0b (09.11.2026)
+# Road Rash 3.0b (10.11.2026)
 
-3.0b was first released on 22.10.2026. The 09.11.2026 release replaces it, with the same
+3.0b was first released on 22.10.2026. The 09.11.2026 release replaced it, with the same
 version, the blitter waits in `visual-fixes.md` ("Unwaited blits") and a shorter ReadMe
-changelog. Its checks are at the end of this document; the rest describes the 22.10.2026
-release's validation, which those changes leave unchanged.
+changelog; the 10.11.2026 release replaces that, adding the bike-shop fix in
+`blitter-performance.md` ("Menu and shop bobs"). The checks of both are at the end of this
+document; the rest describes the 22.10.2026 release's validation, which those changes leave
+unchanged.
 
 G1–G4 are complete. This beta retains the agreed emulator-only validation scope:
 D1d physical 68040/68060 cache/coherency testing and F6a–F6d investigation of the
@@ -154,3 +156,11 @@ on all six. With CUSTOM2=1 the screenshots show the race on all six. The 030, 04
 runs used the shared `fs-uae`, because the harness's private build hangs on those setups'
 `monitor fields`. The archive extracts with the pinned slave, the dated ReadMe and the
 `src/` files the slave was built from.
+
+## 10.11.2026 release checks
+
+The release slave differs from the one checked in `blitter-performance.md` ("Menu and shop
+bobs") only in the date strings, which keep their length. The same race-entry check as
+09.11.2026's passed on every machine in `SETUPS` with CUSTOM2 off and on (030, 040 and 060
+on the shared `fs-uae`). The archive extracts with the pinned slave, the dated ReadMe and
+the `src/` files the slave was built from.

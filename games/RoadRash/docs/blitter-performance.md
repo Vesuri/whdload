@@ -120,7 +120,7 @@ images but retains native mask generation for mutable bike/rider images in
 `$19a7e..$5c2cb`. Recolour caching starts at 030; CPU pixel drawing starts at 040.
 No additional option or presentation delay is introduced.
 
-### Menu and shop bobs (unreleased fix)
+### Menu and shop bobs (3.0b of 10.11.2026)
 
 The bob routine has two entries that join its blit at main hunk `$33c78`: the race's
 (`$33ba2`, hooked by `e_mask_enter`) and an A5-relative one at `$33ae0`, which the menus and
