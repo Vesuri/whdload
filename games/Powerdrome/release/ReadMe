@@ -80,33 +80,15 @@
  History:
  --------
  version 2.0b (10.11.2026) done by Vesuri:
- - Updated the installer to the WHDLoad 20.0 template, retaining the original
-   single-disk imaging settings, documentation and icon choices.
- - Reworked the slave using the WHDLoad KickEmu support from version 20.0.
- - Added the single Enhanced framerate option (CUSTOM1=1), set in the
-   installed icon; the slave defaults to off.
- - Added Fast RAM planar rendering and static polygon drawing loops.
- - Overlapped Fast RAM rendering with display synchronization and added a
-   block copy to publish the completed scene to Chip RAM.
- - Added 20 ms movement steps and 90 ms control updates, with elapsed-time
-   handling for input, opponents, resources, repairs, laps and weather.
- - Paced cockpit liftoff to the measured original A500 movement cadence, with
-   intermediate views drawn between its steps when there is time.
- - Paced the ship rising into the pit to the original A500 speed, with
-   intermediate frames drawn between its steps when there is time.
- - Added fractional mouse steering with smooth 20 ms rotation updates.
- - Kept the mouse stick in step with the game's own changes to it (wall and
-   floor contact, repositioning with A) and limited its range.
- - Made a nose-first dive into the floor crash and reposition the ship as in
-   the original, instead of pinning it there with the mouse ignored.
- - Moved the opponents every 20 ms between their 90 ms race decisions, so
-   they glide along the track instead of jumping in steps.
- - Fixed an access fault during races on 68040/68060 with the MMU active: the
-   game samples a screen pixel with a stale high word in its x coordinate,
-   which from the Fast RAM bitmap could read outside memory.
- - Kept original rendering and timing on 68000/68010 and without Fast RAM.
- - Corrected the command-line arguments passed to the game at startup.
- - Retained user control of WHDLoad CACHE and DCACHE options.
+ - New Enhanced framerate option for 68020+ with Fast RAM, on in the
+   installed icon: faster 3D rendering, with the game running at the same
+   speed whatever the frame rate.
+ - Finer, smoother mouse steering.
+ - Opponents glide along the track instead of moving in steps.
+ - Smoother cockpit liftoff and pit animations.
+ - Installer and slave updated for WHDLoad 20.0.
+ - With the option off, on 68000/68010 or without Fast RAM, the game runs as
+   before.
 
  version 1.0 (22.05.2003) done by Galahad/Fairlight:
  - Initial release.
