@@ -2,7 +2,7 @@
   "archives": [
     {
       "input": "@GAME@.lha",
-      "output": "@GAME@-{version}.lha",
+      "output": "@GAME@Enhanced-{version}-{date}.lha",
       "replace": {
         "@GAME@/@GAME@.Slave": "build:@GAME@",
         "@GAME@/ReadMe": "release/ReadMe"
