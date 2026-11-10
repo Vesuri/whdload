@@ -1417,9 +1417,9 @@ member against its stage and the original. Bump `DECL_VERSION` and the `$VER` da
 
 ```sh
 make dist
-lha xqw=tmp/g4/new ../../dist/FormulaOneGrandPrixEnhanced-2.0b-20261102.lha
+lha xqw=tmp/g4/new ../../dist/FormulaOneGrandPrixEnhanced-2.0b-20261111.lha
 AMIGA_SETUP=a1200-040 SLAVE=tmp/g4/new/FormulaOneGrandPrixHD/FormulaOneGrandPrix.slave \
-  WHD_ARGS='CUSTOM1=1 MEMCONFIG=1' WARP=1 JOY0=none JOY1=none \
+  WHD_ARGS='CUSTOM1=1 CUSTOM2=1 MEMCONFIG=1' WARP=1 JOY0=none JOY1=none \
   python3 tools/f1gp.py serve > tmp/g4/serve.log 2>&1 &
 python3 tools/f1gp.py quickrace && python3 tools/f1gp.py gdb monitor fields 1500
 python3 tools/f1gp.py shot "$PWD/tmp/g4/race.png"; python3 tools/f1gp.py quit

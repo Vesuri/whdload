@@ -33,14 +33,10 @@ FEATURES:
 - Normal, RomIcon, NewIcons and OS3.5+ Colour Icons (created by Frank,
   Mad-Matt and myself) and 2 Exoticons from http://exotica.fix.no/
 - Quit option (default key is 'F10')
-- "Enhanced frame rate" (CUSTOM2=1, set in the supplied icons) turns on
-  the enhancements listed under 2.0b; without it the game plays as the
-  original, apart from the spin fix. "F1GP-Ed frame rate and speed
-  factors" (CUSTOM2=2) works with or without it
 
 HISTORY:
 
-Version 2.0b (02.11.2026) by Vesuri (beta):
+Version 2.0b (11.11.2026) by Vesuri (beta):
 - Consistent game speed on a 68020 or better: the race runs in real time
   however long the 3D view takes to draw. A 68000 keeps the original timing
 - Smooth motion on a 68020 or better: the 3D view is drawn between the
@@ -60,8 +56,9 @@ Version 2.0b (02.11.2026) by Vesuri (beta):
 - Fixed: at finer world steps (20 Hz, or F1GP-Ed's 25 fps) a car carrying
   a lot of fuel spun by itself, as F1GP-Ed's guide warns for long races.
   The original rate is unaffected
-- All of the above are on by default. "Original game" in the WHDLoad
-  startup options (CUSTOM2=1) turns them off, apart from the spin fix
+- All of the above are turned on by "Enhanced frame rate" in the WHDLoad
+  startup options (CUSTOM2=1), which the supplied icons set. Without it
+  the game plays as the original, apart from the spin fix
 - "F1GP-Ed frame rate and speed factors" (CUSTOM2=2) plays the game as
   F1GP-Ed sets it up: the world updates at the game file's frame rate (8
   times a second unless F1GP-Ed changed it), the computer cars keep the
@@ -69,7 +66,7 @@ Version 2.0b (02.11.2026) by Vesuri (beta):
   Factors of an F1GP-Ed datafile saved as F1GP-Ed.f1gp in the data
   directory, as F1GP-Ed's memory patch does, in place of the game file's
   Speed Factor. The wet weather reduction and risk factors are not
-  applied
+  applied. It works with or without "Enhanced frame rate"
 - F1GP-Ed's frame rate setting (used by its 1995-2002 datafiles) sets how
   often the world updates wherever the 20 Hz step is not used; the race
   runs in real time at that rate, and motion stays smooth between the

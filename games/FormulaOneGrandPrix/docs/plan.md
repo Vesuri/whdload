@@ -554,9 +554,9 @@ internals; the ReadMe's requirements (memory, CPU) and options, and which F1GP-E
 settings the slave honours, overrides or rejects (`F`).
 
 **G4 Release archive** (AmigaXDev playbook §13). *Released as a beta* before G2 and G3
-(user decision): `make dist` builds 2.0b (02.11.2026), Codetapper's archive with the
-release slave, `release/ReadMe` (a 2.0b history entry) and the nine game icons with
-`MEMCONFIG=1`. The user's A1200/040 ran the
+(user decision): `make dist` builds 2.0b (11.11.2026; first released 02.11.2026), Codetapper's archive
+with the release slave, `release/ReadMe` (a 2.0b history entry) and the nine game icons
+with `CUSTOM2=1` and `MEMCONFIG=1`. The user's A1200/040 ran the
 earlier developer-slave archive (after the 24-bit edge-pool fix in E4).
 
 ## H. Finer simulation (optional; only on the user's request)
