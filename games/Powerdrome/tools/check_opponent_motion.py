@@ -18,6 +18,10 @@ Source ../../common/env.sh first. Requires vasm, AMIGA_UNICORN and the extracted
    from the authoritative progress.
 4. With the gate closed (grid before the start, pause, menus) the step and the bounce leave
    the tracked records unchanged whatever D0 holds, since the gate's result is in the flags.
+5. On the starting grid, timing_opponent_motion_grid runs the native view of a record once
+   per native update and only projects in its other views, across random interleavings of
+   updates and views; outside the grid (race, timing stopped, $b6, records past the slots)
+   it leaves the view native. D0 and A1 come back unchanged.
 """
 import ctypes as C
 import os
@@ -33,7 +37,7 @@ GAME, HARNESS, ARENA, RECORDS, PATH = 0x10000, 0x200000, 0x300000, 0x340000, 0x3
 STATE = GAME + 0xa6e
 SLOT = ARENA + 0x9600
 (out/'harness.s').write_text(f''' org ${HARNESS:x}
- dc.l place,predict,restore,capture,step,bounce,gate
+ dc.l place,predict,restore,capture,step,bounce,gate,grid,timing_opponent_motion_native,natives,gridccr,timing_started
 place
  bsr timing_opponent_motion_place
  rts
@@ -52,6 +56,18 @@ step
 bounce
  bsr timing_opponent_motion_bounce
  rts
+grid
+ bsr timing_opponent_motion_grid
+ move.w ccr,gridccr
+ rts
+gridccr dc.w 0
+; The native view: counted, with the record it was given.
+timing_opponent_effects_native
+ addq.l #1,natives
+ move.l a5,natives+4
+ rts
+natives dc.l 0,0
+timing_started dc.w 1
 TIMING_PERIOD = 18
 ; Like the real gate: the result is in Z, D0 comes back unchanged.
 timing_opponent_effects_enabled
@@ -126,7 +142,8 @@ write(GAME, code)
 write(GAME+0x53f6, bytes.fromhex('70004e75'))            # random: moveq #0,d0 / rts
 blob = (out/'harness.bin').read_bytes()
 write(HARNESS, blob)
-entries = dict(zip(('place', 'predict', 'restore', 'capture', 'step', 'bounce', 'gate'), struct.unpack_from('>7I', blob)))
+names = ('place', 'predict', 'restore', 'capture', 'step', 'bounce', 'gate', 'grid', 'updates', 'natives', 'gridccr', 'started')
+entries = dict(zip(names, struct.unpack_from(f'>{len(names)}I', blob)))
 write(GAME+0x682, struct.pack('>I', PATH))
 
 
@@ -280,6 +297,54 @@ for case in range(200):
     run(entries['bounce'], d0=rng.randrange(1, 1 << 32))
     assert read(RECORDS, OPPONENTS*0xbe) == before, case
     closed += 1
+
+# 5. Grid views: one native view per record and native update, projection otherwise.
+u32 = lambda addr: struct.unpack('>I', read(addr, 4))[0]
+write(SLOT, bytes(16*32))
+write(STATE+0xbe, struct.pack('>h', 0))
+write(STATE+0xb6, struct.pack('>h', 0))
+write(STATE+0x340, struct.pack('>hI', OPPONENTS-1, RECORDS))
+seen = [u32(entries["updates"])]*OPPONENTS     # cleared slots: nothing placed since
+grid_native = grid_projected = 0
+
+
+def view(a5, regs=True):
+    d0, a1 = rng.randrange(1 << 32), rng.randrange(1 << 32)
+    calls = u32(entries['natives'])
+    run(entries['grid'], d0=d0, a1=a1, a5=a5)
+    assert reg(D[0]) == d0 and reg(A[1]) == a1
+    return s16(read(entries['gridccr'], 2), 0) & 0xc, u32(entries['natives']) - calls
+
+
+for event in range(5000):
+    write(STATE+0x43a, struct.pack('>h', rng.randrange(0, 8)))
+    if rng.random() < 0.3:
+        write(entries['updates'], struct.pack('>I', u32(entries['updates']) + 1))
+        continue
+    i = rng.randrange(OPPONENTS)
+    flags, calls = view(RECORDS+i*0xbe)
+    update = u32(entries['updates'])
+    if seen[i] != update:
+        assert flags == 8 and calls == 1 and u32(entries['natives']+4) == RECORDS+i*0xbe, (event, i, flags, calls)
+        seen[i] = update
+        grid_native += 1
+    else:
+        assert flags == 0 and calls == 0, (event, i, flags, calls)
+        grid_projected += 1
+for offset, value, a5 in ((0x43a, -1, RECORDS), (0xb6, 1, RECORDS), (0xbe, 1, RECORDS),
+                          (None, None, RECORDS+16*0xbe), (None, None, RECORDS-0xbe), ('started', 0, RECORDS)):
+    write(entries['updates'], struct.pack('>I', u32(entries['updates']) + 1))
+    write(STATE+0x43a, struct.pack('>h', 3))
+    if offset == 'started':
+        write(entries['started'], struct.pack('>h', value))
+    elif offset is not None:
+        write(STATE+offset, struct.pack('>h', value))
+    assert view(a5) == (4, 0), (offset, value)
+    if offset == 'started':
+        write(entries['started'], struct.pack('>h', 1))
+    elif offset is not None:
+        write(STATE+offset, struct.pack('>h', 0))
+print(f'{grid_native} native and {grid_projected} projection-only grid views, one native view per update')
 print(f'{closed} closed-gate steps leave the records unchanged')
 print(f'{places} placements and {predictions} predictions match native code; '
       f'{sequences} update/step sequences ({wraps} lap wraps, {snaps} repositions) keep their bounds')

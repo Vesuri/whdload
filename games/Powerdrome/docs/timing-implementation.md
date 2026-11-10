@@ -146,8 +146,19 @@ update that counts the lap, then carries across it. Position, heading, segment a
 distance are rebuilt from it with the native arithmetic. Pit and retired opponents keep
 the native progress. The per-opponent table is in the fast arena at `$9600`. The
 movement follows the opponent effects gate: none on the starting grid (`$43a` ≥ 0), in
-pause or in modal work. The grid ships keep the native pose, so they start from where
-they stood.
+pause or in modal work.
+
+On the grid the native update only places each ship, and the grid branch of `$9950`
+(`$9966..$997c`, `$99dc..$99f0`) adds a random height of −8..+3, a zero heading and a
+visible ship's bounce offset to that pose on every call. The A500 draws one frame per
+update, so each placement gets them once. With several views between two placements,
+every native call added them again: in a 68040 capture the ships drifted up to 400 units
+sideways and 100 in height over four or five views, fell back at the next placement
+and dropped into place at the green light. `timing_opponent_motion_grid` now counts the
+native update calls and gives each record one native view per update; its other views
+only project (`$9d9e`) the pose that view produced. The same capture keeps every ship
+at its A500 grid position with the native height shake, once per update, and the start
+is continuous (`tmp/race-input/g040`, `g040fix`).
 
 The visible-opponent work at `$9950` holds the contact tests. Within a distance of 100,
 `$9a74..$9a94` knock the player in a random direction (`$9c84`, `$1da..$1e4`, integrated by

@@ -18,6 +18,7 @@ OPM_REM = 14                           ; remainder of V*4/18
 OPM_LEFT = 16                          ; gap still to spread
 OPM_CORR = 20                          ; gap spread per world step
 OPM_FLAGS = 24                         ; bit 0 valid, 1 lap wrap pending, 2 moved this step
+OPM_GRID = 28                          ; native update count of this record's last grid view
 OPM_SIZE = 32
 
 timing_opponent_motion_reset
@@ -445,6 +446,52 @@ timing_opponent_motion_bounce
  movem.l (sp)+,d0/d4-d7/a0-a1/a5
  rts
 
+; A view of one opponent on the starting grid ($43a >= 0), from the scene's JSR $9950.
+; The grid branch of $9950 adds a random height and a visible opponent's bounce offset to
+; the pose its update placed ($9966..$997c, $99dc..$99f0), once per drawn frame. On the
+; A500 one frame is drawn per update; here several views fall between two placements, and
+; each native call would add them again until the next placement. Run the native view once
+; per native update and only project the pose it produced in the other views.
+; Z set: not a grid view (the native call). N set: viewed natively here. Else project only.
+timing_opponent_motion_grid
+ movem.l d0/a1,-(sp)
+ move.w timing_started(pc),d0
+ beq.s .not
+ tst.w $43a(a6)
+ bmi.s .not
+ tst.w $be(a6)
+ bne.s .not
+ tst.w $b6(a6)
+ bne.s .not
+ move.l perf_arena(pc),d0
+ beq.s .not
+ movea.l d0,a1
+ adda.l #TIMING_OPPONENT_ARENA,a1
+ move.l a5,d0
+ sub.l $342(a6),d0
+ bmi.s .not
+ cmp.l #TIMING_OPPONENT_SLOTS*$be,d0
+ bhs.s .not
+ divu.w #$be,d0
+ lsl.w #5,d0                           ; OPM_SIZE
+ adda.w d0,a1
+ move.l timing_opponent_motion_native(pc),d0
+ cmp.l OPM_GRID(a1),d0
+ beq.s .project
+ move.l d0,OPM_GRID(a1)
+ bsr timing_opponent_effects_native    ; returns with D0-A4 restored
+ move #8,ccr
+ bra.s .done
+.project
+ move #0,ccr
+ bra.s .done
+.not
+ move #4,ccr
+.done
+ movem.l (sp)+,d0/a1
+ rts
+
+timing_opponent_motion_native dc.l 0    ; native opponent update calls
 timing_opponent_motion_state dc.b 'PDOPMOT1'
  dc.l 0 ; +8 lap wraps carried across the line
  dc.l 0 ; +12 gaps applied at once

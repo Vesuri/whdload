@@ -49,6 +49,12 @@ timing_pit_opponents
 .no_update
  rts
 .native
+ IFNE TIMING_OPPONENT_MOTION
+ move.l a0,-(sp)
+ lea timing_opponent_motion_native(pc),a0
+ addq.l #1,(a0)                        ; a new placement for the grid views
+ movea.l (sp)+,a0
+ ENDC
  move.w $340(a6),d7
  bmi.w timing_pit_opponent_empty
  bra.w timing_pit_opponent_body

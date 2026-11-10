@@ -98,7 +98,16 @@ timing_opponent_effects_tick
 ; the native projection tail, which restores it at A268.
 timing_opponent_effects_render
  bsr timing_opponent_effects_enabled
+ IFNE TIMING_OPPONENT_MOTION
+ bne.s .split
+ bsr timing_opponent_motion_grid
  beq.w timing_opponent_effects_native
+ bpl.s .split
+ rts                                   ; the grid view ran natively
+.split
+ ELSE
+ beq.w timing_opponent_effects_native
+ ENDC
  movem.l d0-d7/a0-a4,-(sp)
  move.l a0,-(sp)
  lea timing_opponent_effects_state(pc),a0

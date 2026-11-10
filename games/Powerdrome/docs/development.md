@@ -452,7 +452,10 @@ mode and damage-countdown combinations, and, over 300 sequences of native-style 
 with random ±40 nudges, lap wraps and repositions, that every update starts from its
 authoritative progress and the shown progress never goes backwards within a lap or
 reaches the lap line first. With the gate closed, as on the starting grid, the step and
-the bounce must leave tracked records unchanged whatever D0 holds.
+the bounce must leave tracked records unchanged whatever D0 holds. Over 5,000 random
+interleavings of native updates and views on the grid, each record must get exactly one
+native view per update and only projection otherwise, and views in the race, with timing
+stopped, with `$b6` or `$be` set or outside the slots must stay native.
 `VASM_EXTRA=-DTIMING_OPPONENT_MOTION=0` builds the previous 90-ms movement for
 comparisons.
 
