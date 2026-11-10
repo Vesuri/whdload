@@ -8,7 +8,7 @@ holds the cleaned production source in one commit (060c1dc), submitted upstream 
 (PR #26 is superseded and closed); upstream has not merged it.
 
 The release here is built from this development source: `make slave` gives the
-production SHA256 below (38544 bytes). The cleaned PR build is a different binary
+production SHA256 below (38788 bytes). The cleaned PR build is a different binary
 (37344 bytes, SHA256 `ed819a7ed650a23b4f5b05bf18095dbbbd2ef57d646108f04972903e21b1a997`),
 and the fork's earlier local testing archives hold that one.
 
@@ -47,7 +47,8 @@ A4000 changes are integrated for both cars, without tuning. All795 live body rec
 match the offline candidate in each start position. CommonY1442 and commonSpeed7719
 remain failed; commonPitch11 passes. Phase failures are53/70/69. Criteria unchanged.
 
-Replay ABI10 rejects older A4000 recordings. Fresh save/load matches1510 semantic
+Replay ABI 11 (the mouse hold input below) loads ABI 10 too and rejects older A4000
+recordings; slaves before it reject ABI 11. Fresh save/load matches1510 semantic
 bytes at1500/1550/1600 plus1802 route bytes; native10/20 match1120 bytes at tick200.
 The38 disabled ranges and hook audit pass. Opponent crash/restart/finish passes on
 D/E without overflow (D196.60s, E86.54s with shortened idle prelude). FULL FPS is
@@ -87,7 +88,7 @@ CPU renderer)". Other options remain advanced tooltypes. Credits include
 ## Validation and measurements
 
 The current production SHA256 is
-`a78fd23cf07f86905929c10ead01038dd4135c833553bc1da934aec8887f6522` (38544 bytes).
+`92ee48d366ce01d36b0e88e4f4bb117989011b8d32cbab0ba99699abf6687b4d` (38788 bytes).
 No one-shot leaves its sample as Paula's reload any more. Paula reloads AUDxLC/AUDxLEN
 at the end of every sample (Hardware Reference Manual, audio), and both of the game's
 drivers stop a one-shot only at its second audio interrupt, after the sample has been
@@ -101,7 +102,22 @@ first interrupt of a one-shot (music h0:28184; race/replay h0:1b262, 1b28e, 1b2b
 1b2e6) and at every stop of the race/replay driver (h0:1b434, 1b448, 1b45c, 1b470,
 1b48a). Loops are unchanged. With it the user found the title/menu bass drum whine
 gone and could no longer reproduce the replay-start right-channel whine (play a while,
-then ||<). Replay playback
+then ||<). A stopped channel must also go idle. With its DMA off, Paula ends a word and
+goes idle only if the channel's interrupt request is still pending (FS-UAE `audio.cpp`
+state 3, `isirq`); otherwise it requests one and replays the same word. The race
+driver's handler acknowledges every audio interrupt, so a stopped skid loop kept
+replaying its last word at the skid period (~4 kHz): silent at volume 0, a whine at the
+volume the CIA sound tick (h0:6f8) writes while the game still marks the skid playing
+(between h0:e0c's stop and h0:e16). The user heard it holding a corner at the skid
+edge, where the skid starts and stops every few steps. Its own starts get away with it
+because they write period 1 first. Every stop now disables the channel's interrupt
+(h0:1b434..1b470, 1b48a) and every start clears the request and enables it again just
+before DMA (h0:1b57a, 1b5e6, 1b652, 1b6be), as the driver's install does. Counted by an
+`SFX_COUNT` build (`make build BUILD=sfxcount VASM_EXTRA=-DSFX_COUNT=1`, counters at
+`sfx_idle_irqs`) in an A4000 race on `a1200-040`, mouse ramped into a corner and held at
+the skid edge (about 30 skid stops): channel 2 took 33341 interrupts while stopped
+before, 32 after. Neither run's recording had sound on that channel while stopped
+(volume 0 there), and the skid still starts and loops. Replay playback
 staged 300 CPU frames in 300 fields both before and after the replay panel fix (a1200-040,
 race with a skid, ||< then play), so the frame rate did not measurably drop.
 Mouse steering (`src/mouse_steering.s`) was coarse for two reasons. The target angle
@@ -114,7 +130,14 @@ target comes from the raw counter with no dead zone, interpolated between table
 entries (limit still 127). h0:9020 is replaced by a choice of whichever of right,
 left or neutral leaves the wheel nearest the target (at 50 Hz with the two-fifths
 step), carrying the remaining error into the next step (bounded by the larger gap
-between outcomes). That error is the only state kept; it is cleared when the
+between outcomes). In A4000 mode the wheel can also hold still: input bit 6 with no
+steering bits (unused by the game, which reads bits 0-1 at h0:f430, 2-3 at h0:e81e, 4-5
+at h0:f144) keeps the wheel and its fraction (`sim_a4000_steering`), and the decision
+holds whenever that is nearer the target than any move, carrying no error. Neutral
+stays neutral when it equals holding, so no input byte turns nonzero at rest (h0:e606).
+The same ramp in A4000 mode now steps 2, 4, ... 14 and holds each, instead of
+swinging between 10 and 16 for a target of about 13.5; coming back it holds up to
+about half a centring step (2-3 units of 240) before centring. That error is the only state kept; it is cleared when the
 game centres the mouse (h0:8ffc: race start, M, around its dialogs) and whenever
 the history slot is not the one after the last decision (restart, replay, keyboard
 steps). A run left race 1 with error -9; the race entered from the main menu started at 0. Patches: h0:7b08 (native sampler, `CUSTOM3=1`), the field sampler

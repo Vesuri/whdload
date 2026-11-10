@@ -59,8 +59,9 @@
  - Fixed the flickering blue background in the DSI intro.
  - Fixed the click at every loop of the engine and skid sounds.
  - Fixed glitches in the replay control panel with Enhanced framerate.
- - Fixed whining after sounds in the title music and at replay start.
- - Finer mouse steering: no dead zone, and small movements steer.
+ - Fixed whining after sounds in the title music, at replay start and after skids.
+ - Finer mouse steering: no dead zone, small movements steer, and in A4000 mode
+   the wheel holds still at the mouse position.
  - Faster rendering with a single "Enhanced framerate" option, enabled in the
    installed icon (CUSTOM2=1).
  - Correct game speed and race timing regardless of rendering speed.

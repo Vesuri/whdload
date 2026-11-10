@@ -555,6 +555,15 @@ SFX_LATCH	MACRO
 sfx_latch_\1:
 	move.l	(sp),a0
 	lea	-($48+$2a*\1)(a0),a0	; the channel's status word
+	IFD	SFX_COUNT
+	tst.w	(a0)
+	bne.s	.count\@
+	move.l	a0,-(sp)
+	lea	sfx_idle_irqs(pc),a0
+	addq.l	#1,4*\1(a0)
+	move.l	(sp)+,a0
+.count\@:
+	ENDC
 	cmp.w	#1,(a0)
 	bne.s	.neg\@
 	pea	($a0+$10*\1)(a1)
@@ -568,11 +577,26 @@ sfx_latch_\1:
 	SFX_LATCH 1
 	SFX_LATCH 2
 	SFX_LATCH 3
+	IFD	SFX_COUNT
+sfx_idle_irqs:	dc.l	0,0,0,0		; audio interrupts of stopped channels
+	ENDC
 
-; Stop one channel (h0:1b42e..1b476; A1 = $dff000): the stolen VOL write, then silence.
+; A stopped channel must go idle. With its DMA off, Paula ends a word and goes idle only
+; if the channel's interrupt request is still pending; otherwise it requests one and
+; replays the same word. The driver's handler acknowledges every audio interrupt, so a
+; stopped loop (the skid) kept repeating its last word at its period (~4 kHz) for as long
+; as the channel was stopped: silent at volume 0, a whine once the CIA sound tick wrote
+; the skid volume between the stop and the game marking the skid stopped (h0:e0c..e16).
+; So a stop also disables the channel's interrupt (its request then stays pending and the
+; channel goes idle within two words), and a start clears the request and enables it
+; again just before DMA, as the driver's install does (h0:1b330..1b360).
+
+; Stop one channel (h0:1b42e..1b476; A1 = $dff000): the stolen VOL write, the channel's
+; interrupt off, then silence.
 SFX_STOP	MACRO
 sfx_stop_\1:
 	move.w	#0,($a8+$10*\1)(a1)	; stolen
+	move.w	#$80<<\1,$9a(a1)	; INTENA: this channel off
 	pea	($a0+$10*\1)(a1)
 	bsr	sfx_silence_channel
 	addq.l	#4,sp
@@ -583,9 +607,28 @@ sfx_stop_\1:
 	SFX_STOP 2
 	SFX_STOP 3
 
-; Stop all channels (h0:1b47e, DMA already off; A1 = $dff000).
+; Start one channel (h0:1b57a+$6c*n, the DMACON write that starts a note; A1 = $dff000).
+; Only a channel that a stop left without its interrupt: clear the request, enable it.
+SFX_START	MACRO
+sfx_start_\1:
+	btst	#(7+\1)&7,$1d-((7+\1)>>3)(a1) ; INTENAR: this channel
+	bne.s	.on\@
+	move.w	#$80<<\1,$9c(a1)	; INTREQ: clear
+	move.w	#$8000|($80<<\1),$9a(a1) ; INTENA: on
+.on\@:
+	move.w	#$8000|(1<<\1),$96(a1)	; stolen: DMACON on
+	rts
+	ENDM
+	SFX_START 0
+	SFX_START 1
+	SFX_START 2
+	SFX_START 3
+
+; Stop all channels (h0:1b47e, DMA already off; A1 = $dff000). The install (h0:1b300)
+; and remove (h0:1b38e) paths that call it set the interrupts themselves next.
 sfx_stop_all:
 	move.w	#0,$a8(a1)		; stolen
+	move.w	#$0780,$9a(a1)		; INTENA: all four channels off
 	pea	$a0(a1)
 	bsr	sfx_silence_channel
 	move.l	#$dff0b0,(sp)
@@ -875,6 +918,10 @@ pl_main
     PL_PS   $1B45C,sfx_stop_2 ; FIX_RANGE h0:1b45c 6 stopped channel reload to silence
     PL_PS   $1B470,sfx_stop_3 ; FIX_RANGE h0:1b470 6 stopped channel reload to silence
     PL_PS   $1B48A,sfx_stop_all ; FIX_RANGE h0:1b48a 6 stopped channels reload to silence
+    PL_PS   $1B57A,sfx_start_0 ; FIX_RANGE h0:1b57a 6 started channel interrupt on
+    PL_PS   $1B5E6,sfx_start_1 ; FIX_RANGE h0:1b5e6 6 started channel interrupt on
+    PL_PS   $1B652,sfx_start_2 ; FIX_RANGE h0:1b652 6 started channel interrupt on
+    PL_PS   $1B6BE,sfx_start_3 ; FIX_RANGE h0:1b6be 6 started channel interrupt on
     PL_PS   $28196,after_dma_write_d1
     PL_PS   $28460,dma_write_1
     PL_PS   $28490,dma_write_2

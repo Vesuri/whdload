@@ -17,7 +17,9 @@
 ; Here the target loses the dead zone and is interpolated between table entries,
 ; and the decision picks whichever of right, left or neutral leaves the wheel
 ; nearest the target, carrying the remaining error into the next step so the
-; wheel's average follows the mouse.
+; wheel's average follows the mouse. In A4000 mode there is a fourth choice, hold
+; (bit 6, which the game never reads; sim_a4000_steering keeps the wheel), so the
+; wheel moves to the target and stays there instead of averaging around it.
 
 ; d0.b <- signed target angle (-127..127) from the mouse counter. Others preserved.
 mouse_steer_target:
@@ -169,9 +171,9 @@ mouse_steer_decide:
  lea mouse_steer_error(pc),a1
  ; A target the wheel cannot reach this step: steer flat out, no carried error.
  cmp.w d0,d6
- bge.s .go_right
+ bge .go_right
  cmp.w d1,d6
- ble.s .go_left
+ ble .go_left
  move.w d6,d3
  add.w (a1),d3             ; d3 = target plus carried error
  ; Bound the carried error by the larger gap between neighbouring outcomes:
@@ -210,9 +212,27 @@ mouse_steer_decide:
 .l_abs:
  cmp.w d4,d5
  bhs.s .chosen
+ move.w d5,d4
  moveq #8,d7
  move.w d1,a0
 .chosen:
+ cmp.w #50,-$15fa(a4)
+ bne.s .carry
+ ; A4000: holding the wheel (bit 6, sim_a4000_steering) when that is nearer still.
+ ; It is never needed to average, so nothing is carried.
+ move.w -$90e(a4),d0
+ muls #5,d0
+ sub.w d3,d0
+ bpl.s .h_abs
+ neg.w d0
+.h_abs:
+ cmp.w d4,d0
+ bhs.s .no_hold
+ moveq #$40,d7
+.no_hold:
+ clr.w (a1)
+ bra.s .publish
+.carry:
  move.w a0,d0
  sub.w d0,d3               ; the error left after this step
  move.w d6,d4

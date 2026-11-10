@@ -127,6 +127,16 @@ sim_a4000_steering:
  move.l d0,-(sp)
  rts
 .new:
+ ; Mouse hold (mouse_steering.s): input bit 6 with no steering bits keeps the wheel and
+ ; its fraction. The input byte is h0:e7b8's argument; its frame is the saved A5.
+ move.l (a5),a0
+ btst #6,8(a0)
+ beq.s .steer
+ tst.b 8(a5)
+ bne.s .steer
+ unlk a5
+ rts
+.steer:
  movem.l d2-d3,-(sp)
  move.w -$902(a4),d0
  moveq #10,d1

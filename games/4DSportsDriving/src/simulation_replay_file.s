@@ -59,8 +59,13 @@ sim_replay_validate:
  bne .bad
  cmp.l #$4c303530,4(a0)   ; L050
  bne .bad
- cmp.l #$0002000a,8(a0)  ; format2, physics ABI10 (format1 omitted the opponent route)
+ ; Format 2, physics ABI 11 (format 1 omitted the opponent route). ABI 10 is the same
+ ; physics without the mouse hold input (bit 6), which it never records: it loads too.
+ cmp.l #$0002000b,8(a0)
+ beq.s .abi
+ cmp.l #$0002000a,8(a0)
  bne .bad
+.abi:
  cmp.l #$00320014,12(a0) ; 50Hz,20 slots
  bne .bad
  cmp.l #SIM_REPLAY_PREFIX,16(a0)
@@ -185,7 +190,7 @@ sim_replay_pack:
  movea.l a6,a0
  move.l #$34445250,(a0)+
  move.l #$4c303530,(a0)+
- move.l #$0002000a,(a0)+
+ move.l #$0002000b,(a0)+     ; format 2, physics ABI 11
  move.l #$00320014,(a0)+
  move.l #SIM_REPLAY_PREFIX,(a0)+
  move.l d4,(a0)+
