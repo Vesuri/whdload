@@ -60,12 +60,18 @@ vasm_build() {
     die "the $BUILD build of $VARIANT failed (tmp/build/$BUILD/$VARIANT.log)"
   fi
   # The files the slave is made of, for the release archive's source (common/tools/
-  # package_release.py). vasm lists every include it opened; keep the game's own.
+  # package_release.py). vasm lists every include it opened except those found through an
+  # absolute -I directory, so the game's own directories go in relative to the game (the
+  # build runs there); keep the game's own files, not those generated in its tmp/.
+  local deps_incs=(-Isrc)
+  for inc in ${INCLUDES:-}; do deps_incs+=(-I"$inc"); done
+  deps_incs+=(-I"$AMIGA_INCLUDE" -I"$WHDLOAD/Include" -I"$WHDLOAD/Src/sources" -I"$NDK")
   # shellcheck disable=SC2086
-  "$VASM" $flags ${DEFINES:-} $defines "${incs[@]}" -quiet -depend=list \
+  "$VASM" $flags ${DEFINES:-} $defines "${deps_incs[@]}" -quiet -depend=list \
     -o "$OUT/$VARIANT.Slave" "$SOURCE" 2>/dev/null |
     while IFS= read -r d; do
       case "$d" in "$GAME_ROOT"/*) d="${d#"$GAME_ROOT"/}" ;; /*) continue ;; esac
+      case "$d" in tmp/*) continue ;; esac
       [ -f "$d" ] && printf '%s\n' "$d"
     done | sort -u > "$OUT/$VARIANT.deps.tmp"
   { printf '%s\n' "$SOURCE"; cat "$OUT/$VARIANT.deps.tmp"; } | awk '!seen[$0]++' > "$OUT/$VARIANT.deps"
