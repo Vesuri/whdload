@@ -1,0 +1,15 @@
+{
+  "archives": [
+    {
+      "input": "Encounter.lha",
+      "output": "EncounterEnhanced-{version}-{date}.lha",
+      "replace": {
+        "EncounterHD/encounter.slave": "build:Encounter",
+        "EncounterHD/Readme": "release/ReadMe",
+        "EncounterHD/source/EncounterHD.asm": "src/EncounterHD.s"
+      },
+      "add": {},
+      "remove": []
+    }
+  ]
+}
