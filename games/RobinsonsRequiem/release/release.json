@@ -1,0 +1,16 @@
+{
+  "archives": [
+    {
+      "input": "RobinsonsRequiem.lha",
+      "output": "RobinsonsRequiemEnhanced-{version}-{date}.lha",
+      "replace": {
+        "RobinsonsRequiemHd/RobinsonSRequiemECS.Slave": "build:RobinsonsRequiem",
+        "RobinsonsRequiemHd/RobinsonSRequiemAga.Slave": "build:RobinsonsRequiemAGA",
+        "RobinsonsRequiemHd/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "RobinsonsRequiemHd/.src", "variants": ["RobinsonsRequiem", "RobinsonsRequiemAGA"]}
+    }
+  ]
+}

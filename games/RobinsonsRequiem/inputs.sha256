@@ -1,0 +1,7 @@
+# "<sha256>  <file name>" per original archive or disk image (shasum -a 256).
+# CFou!'s v1.2 install package from whdload.de: both slaves and their source.
+74c74047ec203160ea4b9cf9b96eb153aa6a54061c5521e574f8cd8f4031ffcd  RobinsonsRequiem.lha
+# Retroplay's installed ECS/OCS game (drawer RobinsonsRequiem, data-ecs/).
+ef310743d400af7bc44776ade63e3cfc3790a796ce4066d38bf8ef0199edcf9b  RobinsonsRequiem_v1.2.lha
+# Retroplay's installed AGA game (drawer RobinsonsRequiemAGA, data-aga/).
+6607c4131ef78d9a6fd3c1004df090158283a8d675dedf3669b64d17fdb04e60  RobinsonsRequiem_v1.2_AGA_1866.lha
