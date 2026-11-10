@@ -598,6 +598,9 @@ pl_periodic PL_START
  ; TIMING_RANGE h0:$ce1e 10 bit=C3
  PL_P $ce1e,timing_pit_call
  PL_NOP $ce24,4
+ ; Pit-lane stop: BSR $139fa plus TST.W D0; the BEQ at $f83a stays native.
+ ; TIMING_RANGE h0:$f834 6 bit=C3
+ PL_P $f834,timing_lane_pit_call
  ; TIMING_RANGE h0:$fb84 8 bit=C3
  PL_P $fb84,timing_world20_damage
  PL_NOP $fb8a,2
@@ -1251,6 +1254,10 @@ timing_targets
  dc.w timing_pit_native+2-timing_targets
  dc.l $ce28
  dc.w timing_pit_continue+2-timing_targets
+ dc.l $139fa
+ dc.w timing_lane_pit_native+2-timing_targets
+ dc.l $f83a
+ dc.w timing_lane_pit_continue+2-timing_targets
  dc.l $bc44
  dc.w timing_initial_pit_continue+2-timing_targets
  dc.l $13514

@@ -92,6 +92,7 @@ timing_retune_result_gate
 
 ; Entered by BRA after the native pit RTS, with no helper return address.
 timing_retune_deliver_result
+ bsr timing_pit_lane_clear              ; a pit-lane stop already runs at this depth
  lea timing_retune_state(pc),a0
  addq.l #1,40(a0)
  bsr timing_pit_is_initial

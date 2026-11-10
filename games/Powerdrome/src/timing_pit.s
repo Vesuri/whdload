@@ -4,9 +4,26 @@ timing_initial_pit_call
  bra.s timing_pit_run
 timing_pit_call
  bsr timing_pit_enter
+ bra.s timing_pit_run
+; Pit-lane stop: $f834 BSR $139fa / TST.W D0 inside $f754, one return deeper than the
+; rescue call at $ce1e (its session exit drops 8 bytes where $ce32 drops 4). Hold $f754's
+; return aside so the native pit, the opponent flush and any deferred result run at the
+; rescue call's depth, then restore it and replay the TST.
+timing_lane_pit_call
+ move.l a0,-(sp)
+ lea timing_lane_pit_return(pc),a0
+ move.l 4(sp),(a0)
+ move.w #1,timing_pit_lane-timing_lane_pit_return(a0)
+ movea.l (sp)+,a0
+ addq.l #4,sp
+ bsr timing_pit_enter
+ bsr timing_lane_pit_native
+ bsr timing_pit_leave
+ bra.s timing_pit_after
 timing_pit_run
  bsr timing_pit_native
  bsr timing_pit_leave
+timing_pit_after
  move.l d0,-(sp)
  move.w timing_retune_state+10(pc),d0
  movem.l (sp)+,d0
@@ -36,8 +53,17 @@ timing_pit_run
 .continue
  bsr timing_pit_is_initial
  bne.s .initial_return
+ move.l d0,-(sp)
+ move.w timing_pit_lane(pc),d0
+ movem.l (sp)+,d0
+ bne.s .lane_return
  move.w #0,$dc(a6)
  bra.w timing_pit_continue
+.lane_return
+ move.l timing_lane_pit_return(pc),-(sp)
+ bsr timing_pit_lane_clear
+ tst.w d0
+ bra.w timing_lane_pit_continue
 .initial_return
  ; No world-call frame exists yet. Let the first world allocation drain the
  ; departure tail, where native opponent nonlocal exits have their proper stack.
@@ -146,6 +172,7 @@ timing_pit_abort
  ENDC
  ENDC
  bsr timing_pit_opponent_restore
+ bsr timing_pit_lane_clear
  lea timing_retune_state(pc),a0
  clr.l 8(a0)
  lea timing_pit_opponent_flushing(pc),a0
@@ -189,6 +216,14 @@ timing_pit_is_retiring
  movem.l (sp)+,d0
  rts
 
+; Keeps registers and CCR.
+timing_pit_lane_clear
+ move.l a0,-(sp)
+ lea timing_pit_lane(pc),a0
+ clr.w (a0)
+ movea.l (sp)+,a0
+ rts
+
 timing_pit_is_initial
  move.l d0,-(sp)
  move.w timing_pit_initial(pc),d0
@@ -201,6 +236,12 @@ timing_pit_native dc.w $4ef9
  dc.l 0
 timing_pit_continue dc.w $4ef9
  dc.l 0
+timing_lane_pit_native dc.w $4ef9
+ dc.l 0
+timing_lane_pit_continue dc.w $4ef9
+ dc.l 0
+timing_lane_pit_return dc.l 0 ; $f754's return while a pit-lane stop runs
+timing_pit_lane dc.w 0 ; the active pit sequence came from the pit lane
 
 timing_pit_state dc.b 'PDPIT001'
  dc.w 0 ; active native pit sequence

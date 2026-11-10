@@ -275,6 +275,23 @@ inactive player simulation from modal opponent work; any interrupted assigned
 steps are recorded as discarded session work rather than silently lost time.
 Returning from a same-session pit visit preserves the appropriate residual phase.
 
+The game enters the pit sequence (`$139fa`) from three places: the initial pit (`$bc3a`) and
+a rescue (`$ce1e`), both through `$103a2`, and a pit-lane stop, where `$f754` calls it
+directly at `$f834` once the ship is within one segment of the pit segment at speed 50 or
+less. All three are hooked (`timing_pit.s`). The pit-lane hook replaces the `BSR`/`TST.W D0`
+at `$f834`. It runs one return deeper than the rescue call (its session exit drops 8 bytes
+where `$ce32` drops 4), so it holds `$f754`'s return aside. The native pit, the opponent flush
+and any deferred race result then run at the rescue call's depth, after which it restores the
+return and replays the `TST`. Before this hook a pit-lane stop left the scheduler running
+through the pit. The whole stop became time debt, and after the departure the scheduler
+caught it up at its limit of 32 world steps per frame: the race clock ran about 30 times too
+fast and the ship shot through the pit lane. Measured on the 68040 with a test copy of the
+coverage slave that forces a pit-lane stop in Practice and leaves the pit with E
+(`tmp/pit-exit/t-old`, `t-new`): the old slave kept `timing_started` set in the pit and,
+at the same field after the departure, had run 846 world steps against the new slave's 387.
+The difference, about 460 steps, is the stop's length. The new slave stops the scheduler
+in the pit and adds no steps.
+
 Opponent simulation and projection are separated. Modal pit updates and flight
 updates use logical deadlines, while projection retains presentation-specific
 scratch. Opponent repair start/expiry at `$d4b6/$d4fe` read the same continuous
