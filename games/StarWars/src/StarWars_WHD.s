@@ -68,7 +68,7 @@ BOOTDOS
 ;CBDOSLOADSEG
 ;CBDOSREAD
 CACHE
-DEBUG
+;DEBUG		; the shipped slave was built without it
 ;DISKSONBOOT
 ;DOSASSIGN
 FONTHEIGHT	= 8
@@ -98,7 +98,7 @@ slv_keyexit	= $46	; Del
 
 ;============================================================================
 
-	INCLUDE	Sources:whdload/kick13.s
+	INCLUDE	whdload/kick13.s
 
 ;============================================================================
 
@@ -467,3 +467,5 @@ SetStack
 
 
 
+
+	ENDC	; IFD BOOTDOS: the original leaves it open, which vasm refuses

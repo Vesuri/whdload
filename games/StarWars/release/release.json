@@ -1,0 +1,15 @@
+{
+  "archives": [
+    {
+      "input": "StarWars.lha",
+      "output": "StarWarsEnhanced-{version}-{date}.lha",
+      "replace": {
+        "StarWars_Install/StarWars.slave": "build:StarWars",
+        "StarWars_Install/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "StarWars_Install/Source", "variants": ["StarWars"]}
+    }
+  ]
+}
