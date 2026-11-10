@@ -52,6 +52,44 @@ starts its attract-mode demo (in play, score counting) within a few seconds unde
 `WHD_ARGS=BUTTONWAIT` holds the title screen ("Loading - please wait") for a screenshot.
 `SLAVE=original` boots the shipped 1.2.
 
+## Benchmark
+
+`tools/bench.py OUT` is the repeatable level-1 profiling run: `tools/boot.sh` boots a
+server stopped at the game's entry (`BOOT_BREAK=0xD7E2`, `WARP=1 DETERMINISTIC=1 JOY0=none`),
+`tools/route.py` plays the route (`start`: fire on the 60th pass of the title loop, which
+seeds the level; `aim`: 25 fields, 8 fields of right turn, fire held), and the next 500
+fields (10 s) are traced in 100-field chunks and reduced. Results go to `OUT/report.txt`
+(fps, fields per frame, work per frame and its timeline, pacing wait, DMA slots, hot PCs, the
+main-loop routines), `OUT/profile.pkl.gz`, `OUT/chip.pkl.gz` with `OUT/chip.txt`, and
+`OUT/end.png`.
+
+```sh
+EXTRA_ARGS=--uae_mmu_model=0 python3 tools/bench.py tmp/prof/030   # a1200-030 (the default SETUP)
+SETUP=a500 INSTANCE=a500 python3 tools/bench.py tmp/prof/a500
+```
+
+- Traces need a cycle-exact CPU without an MMU model, hence `--uae_mmu_model=0` on the
+  a1200-030 (WHDLoad does not use a 68030's MMU without its `MMU` option). Two such runs give
+  byte-identical reports.
+- In the window the level-1 enemy appears ahead, fires one shot that misses, and is destroyed
+  at fields 140–200 (a1200-030) or 200–300 (a500). The run ends at score 15, targets 16,
+  shield 4 on the a1200-030 with and without MMU emulation and on the a500. Check
+  `end.png` after any change: the world is stepped per frame, so a build that changes the frame
+  timing can change what happens ([internals.md](internals.md), "Frames and time").
+- `start` anchors fire on the title loop, not on a field count, because the title calls the
+  RNG once per pass and its setup takes a different number of fields on each machine.
+  Anchored this way the a500 and the a1200-030 get the same level (17 targets).
+- `tools/chipprofile.py` reduces the same chunks to the CPU's chip accesses per routine.
+  It splits them into code fetches, data reads and writes and custom-register accesses,
+  assigning each colour-clock slot to the instruction running at that point of the field
+  (accurate to a few slots). Kept per top-level routine are the 16-byte granules read,
+  written and fetched with their counts, and per DMA channel the 256-byte pages it
+  touched. `python3 tools/chipprofile.py OUT/chip.pkl.gz` prints the summary (`chip.txt`).
+  Interrupt context is told by the SR mask (IPL above 2), not by trace gaps, which on the
+  68020/030 core also follow `rte`.
+- `route.py` also takes `sheet N K NAME` (a contact sheet) for finding new routes; each
+  screenshot traces one field, which changes the frame timing on the 68030 core.
+
 ## Traps
 
 - The program region `$6000`–`$13000` is encrypted in `disk.1`; read patched instructions

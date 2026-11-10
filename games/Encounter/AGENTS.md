@@ -16,5 +16,6 @@ Read `docs/open-work.md` first.
 | `docs/internals.md` | how the game loads, memory map, every slave patch as disk.1 file offsets, limitations |
 
 The slave source is `src/` (`EncounterHD.s`, the install package's `source/EncounterHD.asm`);
-`tools/` is the development harness (`tools/encounter.py`, the gdb-stub server) and never
-ships.
+`tools/` is the development harness (`tools/encounter.py`, the gdb-stub server;
+`tools/bench.py`, the level-1 benchmark, with `boot.sh`, `route.py` and `chipprofile.py`)
+and never ships.
