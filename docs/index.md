@@ -12,7 +12,7 @@ Amiga knowledge shared with other projects is AmigaXDev's: start at
 | Build, VERIFY builds, patch conventions, byte identity | [Building](building.md) |
 | Package and publish a release | [Releasing](releasing.md) |
 | Credit, bring a game in, follow upstream changes | [Upstream](upstream.md) |
-| Start a new game | `make new GAME=<Game>`, then [Layout](layout.md) and [Upstream](upstream.md) |
+| Start a new game from a released slave | [Upstream: starting a game](upstream.md#starting-a-game-from-a-released-slave), then [Layout](layout.md) |
 | Improve a slave: profiling, game time, patches | AmigaXDev `docs/playbooks/new-game-playbook.md` (JOTD and StingRay variants beside it) |
 
 ## Where knowledge goes

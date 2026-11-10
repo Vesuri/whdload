@@ -13,6 +13,55 @@ Every game here improves a slave someone else made. That work stays credited and
   ReadMe keeps the original credits and history; the new entry goes above.
 - Source files taken from upstream keep their headers.
 
+## Starting a game from a released slave
+
+A game nobody has worked on yet starts from the released slave, in two commits, before any
+improvement. AmigaXDev's WHDLoad playbook §2 ("Unpack and identify the game") has the generic
+part: where slave sources are, reconstructing one without source, and why a rebuild may not
+be byte-identical.
+
+1. **Inputs.** The whdload.de install package (it usually ships the source) and each installed
+   game version (Retroplay archives: OCS and AGA, PAL and NTSC are separate variants). Download
+   them into the game's `tmp/archives/`, pin them in `inputs.sha256`, and use `make unpack`;
+   the default unpack installs every archive, so `game_unpack` is only for disk images and
+   installers. Never record where Kickstarts or Workbench came from.
+2. **Source and credit.** Look in JOTD's (`jotd666/whdload_slaves`, `<L>/<Game>/usr/`) and
+   StingRay's (`MK1Roxxor/WHDLoad_Patches`, `Games/`) repositories first, then the install
+   package; with none, `src/` is a reconstruction that rebuilds the shipped slave
+   byte-identically and `UPSTREAM="none"`. `AUTHOR` and `UPSTREAM` follow [Credit](#credit);
+   `UPSTREAM` forms in use:
+   - `"https://github.com/jotd666/whdload_slaves <L>/<Game>/usr <commit>"`, the commit whose
+     source matches the shipped slave;
+   - `"https://github.com/MK1Roxxor/WHDLoad_Patches Games/<file> <commit>"`;
+   - `"<Package>.lha (<author>'s v<version> installer) <path of the source in it>"`.
+
+   The ReadMe's history may name earlier authors; the game's `AGENTS.md` credits them too.
+3. **First commit**, the source exactly as published, in `src/`: `Import <Title> slave source
+   from <jotd666/whdload_slaves at <commit> | StingRay's WHDLoad_Patches at <commit> | the
+   whdload.de install package at v<version>> (by <author>)`.
+4. **Second commit**, `<Title>: set up on the repository layout`, from `make new GAME=<Game>`:
+   - `game.conf`: a variant per shipped slave, `SOURCE` when it is not `src/<Variant>.s`,
+     `KICKS` from the kickemu include (none for a direct slave), `SETUP` sized from the
+     slave's `ws_BaseMemSize` and `ws_ExpMem` (a kick13 slave with ExpMem needs more than a
+     512 KB A500: `a500-1.5m`; AGA variants an A1200 setup), `SETUPS` the machines booted;
+   - the edits vasm needs (include paths without an Amiga assign, a stray `DEBUG`, an unclosed
+     `IFD`), each commented in place, and `src/include` bridges for LVO names the shared
+     includes spell differently (`INCLUDES="src/include"`);
+   - `release/ReadMe` as shipped; `release/release.json` for the install package (the template
+     shows the form; a `source` drawer with `keep` for shipped source of unchanged binaries,
+     [releasing](releasing.md)); `make record` writes `release/slaves.sha256`;
+   - `AGENTS.md` from the template; `docs/development.md` (inputs, the build against the
+     shipped slave, traps), `docs/internals.md` (how it loads, memory, every slave patch as
+     code-hunk or file offsets) and `docs/open-work.md`: no improvement work yet, what a
+     first release still needs (a dated `$VER`, a ReadMe entry), and the candidates seen;
+   - `tools/` only for commands `make serve` lacks; delete the template's `game.sh` when no
+     hook is used, and `tools/_amigaxdev.py` when no tool imports `amigaxdev`.
+5. **Verify**: the build equals the shipped slave, or the playbook's equivalence proof holds
+   and `docs/development.md` says what differs and why; each variant boots through
+   `make serve` (`WARP=1 WINDOW=none`, `wait`, `shot`) to its title or menu, judged from the
+   screenshot; `make check`; `common/check.sh repo`. The game's row in the root `README.md`
+   ("not yet released") is its own commit.
+
 ## Bringing a game in
 
 A game comes in with its history from the first commit of this work, rewritten into
