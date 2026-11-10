@@ -243,6 +243,21 @@ updates match exactly, with zero endpoint debt. Natural-weather validation
 is deferred by the user after a ten-minute retry without a weather episode; expiry
 and restoration remain untested; see the [current gate ledger](open-work.md#phase-e-gate-ledger).
 
+## Race start
+
+The race starts with the engine off (`a6+$e4` = 0). The qualifying liftoff turns it on
+(`$10662`), but the race doesn't; the player presses E (manual: "Engine on/off", toggled
+at `$c4b4`; turning it on while thrust is held turns it off again). Thrust at `$cf2e` needs
+`$e4` ≠ 0 and fuel `$1ba` > 0. Without the engine the ship sinks from the grid height
+(−20) to the track (about −620) at speed `$194` = 0. There the track collision stops it at
+every call (`$fb44..$fb5a`: contact at zero speed sets `$258` = −1), and with `$258` set
+`$ca78` zeroes the rotation rates and skips the controls, so neither mouse thrust nor
+steering has any effect. Measured on the 68040 with the coverage race route, with the
+option on and off alike: held thrust leaves the ship there; E after the lights go out
+(thrust released, then held) gives speed 133 within a second (`tmp/race-input`). E about
+140 fields before the start had no effect in either mode; which part of the start sequence
+ignores it was not established.
+
 ## Development slave and reproducible title-demo profile
 
 `src/Powerdrome.s` uses unmodified WHDLoad 20 KickEmu sources, interface 17, one disk,
