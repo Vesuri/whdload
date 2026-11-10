@@ -1,5 +1,14 @@
 # Formula One Grand Prix hooks (common/template/game.sh lists them).
 
+# make run (and tools/f1gp.py serve) on the release slave: "Enhanced frame rate" on, as the
+# shipped icons set it (G1), unless WHD_ARGS names CUSTOM2. Other builds and slaves, whose
+# CUSTOM2 bits mean something else, are left alone.
+game_prepare() {
+  [ -z "${SLAVE:-}" ] && [ "${BUILD:-release}" = release ] || return 0
+  case " ${WHD_ARGS:-} " in *" CUSTOM2="*) return 0 ;; esac
+  WHD_ARGS="${WHD_ARGS:+$WHD_ARGS }CUSTOM2=1"
+}
+
 # The build: verify the toolchain and the pinned game, generate the original loader's
 # payload and the E2, E4 and F5 tables from the game into tmp/slave/ (derived bytes, never
 # committed), then assemble src/F1GP.s. OUT also gets build.json (the slave's and the

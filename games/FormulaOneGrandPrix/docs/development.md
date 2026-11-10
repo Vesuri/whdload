@@ -24,7 +24,11 @@ do not merge into modified game data.
 `make run` builds the release slave, copies `tmp/game/FormulaOneGrandPrix4Disk` to the
 disposable `tmp/run/default/.run/dh1` with that slave as `FormulaOneGrandPrix4Disk.Slave`,
 boots Kickstart 3.1 with the Workbench 2.04 floppy and runs
-`WHDLoad FormulaOneGrandPrix4Disk.Slave PRELOAD SPLASHDELAY=0 CONFIGDELAY=0 NOREQ`.
+`WHDLoad FormulaOneGrandPrix4Disk.Slave PRELOAD SPLASHDELAY=0 CONFIGDELAY=0 NOREQ`, with
+`CUSTOM2=1` ("Enhanced frame rate", as the shipped icons set it) added by `game.sh`'s
+`game_prepare` when the release build is booted and `WHD_ARGS` names no `CUSTOM2`
+(`WHD_ARGS=CUSTOM2=0` boots the original game). `tools/f1gp.py serve` gets the same
+default; the capture tools pass `CUSTOM2` themselves. The icons' `MEMCONFIG=1` is not added.
 `make run SLAVE=original` boots Codetapper's installed slave instead. The default machine
 is the A500-equivalent: 68000, 512 KB chip, 1.5 MB slow, no fast RAM (`SETUP=custom` in
 `game.conf`). `AMIGA_SETUP` (or `SETUP`), `CHIP_KB`/`SLOW_KB`/`FAST_KB`, `WHD_ARGS` (for
