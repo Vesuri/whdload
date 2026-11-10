@@ -79,7 +79,7 @@
 
  History:
  --------
- version 2.0b (09.11.2026) done by Vesuri:
+ version 2.0b (10.11.2026) done by Vesuri:
  - Updated the installer to the WHDLoad 20.0 template, retaining the original
    single-disk imaging settings, documentation and icon choices.
  - Reworked the slave using the WHDLoad KickEmu support from version 20.0.

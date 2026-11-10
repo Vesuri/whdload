@@ -7,7 +7,7 @@ copy starts with it on (user decision). It enables fast planar rendering and fix
 both paths stay original and gameplay remains frame-dependent. CUSTOM3 is no
 longer a user option. WHDLoad CACHE/DCACHE remain user-controlled.
 
-The splash and `$VER` version is **2.0b (09.11.2026)**. The single-checkbox revision is built
+The splash and `$VER` version is **2.0b (10.11.2026)**. The single-checkbox revision is built
 and checked. Evidence is
 under `tmp/release-opt-in/`: M7 enabled runs the scheduler and passes 29 completed
 drawing twins; M7 unchecked, M3 checked without fast RAM and M2 checked on 68000
@@ -18,7 +18,7 @@ include the accepted stock A1200 Practice exception; their captures predate this
 UI/default-selection change. Enhanced runs now require `CUSTOM1=1` explicitly.
 
 The release installer text is maintained in `release/`. `make dist` packages it
-(`release/release.json`) as `dist/PowerdromeEnhanced-2.0b-20261109.lha`, named from the
+(`release/release.json`) as `dist/PowerdromeEnhanced-2.0b-20261110.lha`, named from the
 slave's `$VER` string. The installer writes `CUSTOM1=1` into the game icon. The earlier
 hand-packaged archive is `tmp/Powerdrome-2.0.lha`
 ([packaging](development.md#release-installer-archive)). End-to-end AmigaOS Installer
@@ -183,6 +183,12 @@ After the stock A1200 regression the user chose a single opt-in checkbox instead
 - Enhanced timing assumes PAL; NTSC is not handled. Native fallbacks remain
   frame-dependent. Menus, external pit animation and title-camera playback stay native.
 - Physical accelerator-board/cache certification is outside the selected scope.
+- **Opponents vanish after a pit visit (open):** in a user recording on the default course
+  with Enhanced framerate, all three opponents stop being drawn about 1 s after the player
+  crosses the line following a pit-lane stop, and are drawn again about 2 s later. It is
+  culling, not occlusion. The 2 s native lap guard in `$d7f2` is not supported by a
+  measured run, and a forced pit-lane stop does not reproduce it. Whether the original
+  timing does the same is unknown.
 - Steady A500 handling and unseeded natural-weather expiry/restoration were deferred
   by the user. Neither gate is passed, and their original bounds remain unchanged.
 
