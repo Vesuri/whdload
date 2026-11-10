@@ -75,7 +75,7 @@ slv_MemConfig dc.l CHIPMEMSIZE,$40000+FASTMEMSIZE+E_AREAS  ; kick13.s's KICKSIZE
 slv_config
         dc.b 'C1:B:Skip intro;'
         IFNE PLAYER
-        dc.b 'C2:X:Original game (no enhancements):0;'
+        dc.b 'C2:X:Enhanced frame rate:0;'
         dc.b 'C2:X:F1GP-Ed frame rate and speed factors:1;'
         ELSE
         dc.b 'C2:X:Enable CPU caches:0;'
@@ -312,12 +312,13 @@ wrong_version
         jmp (resload_Abort,a2)
 
         IFNE PLAYER
-; G1: the release's options become the developer bits. Unchecked: caches, the clock, smooth
-; motion, the faster routines and the fast-RAM work (bits 0, 1, 3-8 and 10, each where the
-; machine supports it), and on a 68020+ with real fast RAM the 20 Hz step (bit 9) with
-; H2's cornering correction. "F1GP-Ed frame rate and speed factors" keeps the file's
-; step and the native cornering loss and adds F6's factors (bit 11) instead. "Original
-; game" clears every bit. g1_bits gets a byte per bit (-1 set) for G1_IFC2X.
+; G1: the release's options become the developer bits. Unchecked, the original game.
+; "Enhanced frame rate" (set in the shipped icons): caches, the clock, smooth motion, the
+; faster routines and the fast-RAM work (bits 0, 1, 3-8 and 10, each where the machine
+; supports it), and on a 68020+ with real fast RAM the 20 Hz step (bit 9) with H2's
+; cornering correction. "F1GP-Ed frame rate and speed factors" keeps the file's step and
+; the native cornering loss and adds F6's factors (bit 11), with or without the
+; enhancements. g1_bits gets a byte per bit (-1 set) for G1_IFC2X.
 G1_ENHANCED = 1531
 G1_20HZ = 1<<9
 G1_FACTORS = 1<<11
@@ -325,14 +326,15 @@ g1_options
         movem.l d0-d2/a0/a6,-(sp)
         move.l (cache_options,pc),d1
         moveq #0,d0
-        btst #0,d1
-        bne.s .store
-        move.l #G1_ENHANCED,d0
         btst #1,d1
-        beq.s .step
-        or.w #G1_FACTORS,d0
-        bra.s .store
-.step
+        beq.s .enhanced
+        move.w #G1_FACTORS,d0
+.enhanced
+        btst #0,d1
+        beq.s .store
+        or.w #G1_ENHANCED,d0
+        btst #1,d1
+        bne.s .store            ; F1GP-Ed: the file's step
         move.l (_attnflags,pc),d2
         btst #1,d2              ; AFF_68020
         beq.s .store

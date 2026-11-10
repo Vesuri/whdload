@@ -112,9 +112,9 @@ def capture(name, build, custom5, game=None, custom2=0):
         proc.wait(timeout=30)
 
 
-# G1: the release's options are off with "Original game" (CUSTOM2=1).
+# G1: the release's options are off without "Enhanced frame rate" (CUSTOM2=0).
 CASES = (
-    ('release-off','tmp/build/release',0,1), ('developer-off','tmp/build/developer',0,0),
+    ('release-off','tmp/build/release',0,0), ('developer-off','tmp/build/developer',0,0),
     ('verify-off','tmp/build/verify',0,0), ('verify-on','tmp/build/verify',1,0),
 )
 

@@ -9,9 +9,9 @@ Output: <dist>/FormulaOneGrandPrixEnhanced-<version>-<YYYYMMDD>.lha (the reposit
 dist/; version and date from the slave's $VER, common/tools/package_release.py), with exactly
 the input's members, and its .sha256 beside it.
 Changed members are the current release build, tmp/build/release/F1GP.Slave, which make dist
-has just built and whose build.json must match it and the source (G1: the enhancements on unless the
-player picks "Original game"), release/ReadMe and the nine game launch icons, which get a
-MEMCONFIG tooltype; everything else is copied byte for byte. The archive is re-extracted and
+has just built and whose build.json must match it and the source (G1: the enhancements on with
+"Enhanced frame rate", which the icons set), release/ReadMe and the nine game launch icons, which get a
+CUSTOM2=1 and a MEMCONFIG tooltype; everything else is copied byte for byte. The archive is re-extracted and
 checked member by member against its stage and the original. LHA names LHa for UNIX
 (Lhasa, the usual `lha`, cannot create archives).
 """
@@ -39,9 +39,9 @@ TOP, SLAVE = 'FormulaOneGrandPrixHD', 'FormulaOneGrandPrix.slave'
 ICONS = ('inf', 'romicon', 'newicon', 'newintro', 'newexot', 'newexot2', 'colicon', 'colintro',
          'colbox')
 BUILD = ROOT / 'tmp/build/release'
-# The release's enhancements need no tooltype (G1); E's fast areas need the alternative
-# memory configuration.
-TOOLTYPES = (b'MEMCONFIG=1',)
+# G1: the icons turn the release's enhancements on ("Enhanced frame rate", CUSTOM2 bit 0);
+# E's fast areas need the alternative memory configuration.
+TOOLTYPES = (b'CUSTOM2=1', b'MEMCONFIG=1')
 
 
 def members(archive):
@@ -123,7 +123,7 @@ def main():
     assert meta['slave_sha256'] == hashlib.sha256(slave).hexdigest(), 'stale build.json'
     assert meta['source_sha256'] == hashlib.sha256((ROOT / 'src/F1GP.s').read_bytes()).hexdigest(), \
         'stale build: make slave'
-    assert b'Original game' in slave and b'Developer - ' not in slave, 'build'
+    assert b'Enhanced frame rate' in slave and b'Developer - ' not in slave, 'build'
     assert b'C3:' not in slave and b'C5:' not in slave and b'VERIFY' not in slave, 'build'
     version, date = re.search(rb'\$VER: ' + SLAVE.encode() + rb' ([0-9.a-z]+) \(([0-9.]+)\)',
                               slave).groups()

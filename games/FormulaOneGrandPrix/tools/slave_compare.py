@@ -64,7 +64,7 @@ def capture(case, phase, fields):
     # SLAVE=original: common/run.sh boots the installed slave unchanged.
     env['SLAVE'] = 'original' if case == 'original' else str(slave)
     if slave == BUILT:
-        env['WHD_ARGS'] = 'CUSTOM2=1'   # G1: the release's "Original game"
+        env['WHD_ARGS'] = 'CUSTOM2=0'   # G1: the release without "Enhanced frame rate"
     sock = RUN/'f1gp.sock'
     if sock.exists():
         # Quit through the project server; do not terminate unidentified processes.

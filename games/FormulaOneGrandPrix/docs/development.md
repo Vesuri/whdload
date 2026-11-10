@@ -282,8 +282,7 @@ an artifact based only on its filename; inspect the build manifest and rebuild n
 prior evidence. Move a rejected attempt aside explicitly before retrying. It starts and
 stops only project servers, verifies input/source/build hashes, reaches Quick Race and
 captures 50 fields for each of release-off, developer-off, VERIFY-off and VERIFY-on.
-The release is off with `CUSTOM2=1` ("Original game", G1); every other case has all
-`CUSTOM` values zero.
+Every case has all `CUSTOM` values zero, which leaves the release off (G1).
 Each case also checks the B3 loader patches/names and real F10 return. The enabled case
 uses only `CUSTOM5=1`, a VERIFY relay to the original pacer. `--check` audits retained
 captures against current binaries, runs adversarial checker tests and writes the combined
@@ -1407,7 +1406,7 @@ packages the release build `make dist` has just made in `tmp/build/release` (G1)
 checking its `build.json` against the slave and the source, takes the version and date from
 the slave's `$VER` and requires a matching entry, `Version:` header and "Formula One Grand
 Prix Enhanced V<ver>" `Short:` line in `release/ReadMe`. The archive keeps the original's 18
-members; the slave, the ReadMe and the nine game icons change, and the icons get `MEMCONFIG=1` after `PRELOAD`, every other
+members; the slave, the ReadMe and the nine game icons change, and the icons get `CUSTOM2=1` and `MEMCONFIG=1` after `PRELOAD`, every other
 byte kept. The tool re-extracts the archive and checks every
 member against its stage and the original. Bump `DECL_VERSION` and the `$VER` date in
 `src/F1GP.s` and the ReadMe together. A boot check of the packaged slave:

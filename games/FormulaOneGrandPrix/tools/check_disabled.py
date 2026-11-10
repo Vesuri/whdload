@@ -136,8 +136,8 @@ def check(capture, source=SOURCE):
         raise ValueError('capture input pins differ')
     if meta['source_sha256'] != hashlib.sha256(source.read_bytes()).hexdigest():
         raise ValueError('capture source is stale')
-    # G1: the release turns its options off with "Original game" (CUSTOM2 bit 0).
-    if meta['custom'] != ([0,1,0,0,0] if meta.get('build') == 'release' else [0]*5):
+    # G1: the release's options are off without "Enhanced frame rate" (CUSTOM2 bit 0).
+    if meta['custom'] != [0]*5:
         raise ValueError('every option must be off for the disabled gate')
     mem=image((capture/'chip.bin').read_bytes(),(capture/'fast.bin').read_bytes(),b'')
     actual=locate(mem,game_hunks())

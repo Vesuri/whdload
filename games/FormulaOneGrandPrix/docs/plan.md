@@ -69,9 +69,9 @@ replace the original baseline or prove the projected implementation below.
    the risk to F1GP's physics and AI is the reason they are optional here.
 4. **Caches on** (the user's decision). Code that breaks with caches on is fixed (`B5`).
 5. **Original behaviour one switch away:** every change behind a `CUSTOMn` bit with the
-   original bytes untouched when off; the release turns the enhancements on by default,
-   gates them per CPU and memory automatically, and offers "Original game" and F1GP-Ed's
-   timing and speed factors as its two options (`G1`, user decision).
+   original bytes untouched when off; the release's "Enhanced frame rate" option,
+   set in the shipped icons, turns the enhancements on and gates them per CPU and memory
+   automatically; F1GP-Ed's timing and speed factors is its other option (`G1`, user decision).
 
 ## Rules for every step
 
@@ -388,7 +388,7 @@ now interpolated too. *Complete:* the user accepted the feel, the extra lag incl
 **E1 Caches:** `B5`. *Complete for the current scope:* B5's gate, plus the gain with the
 C2 loop and interpolation on the 030 — 13–14% more pictures over a whole race with caches
 on. The developer slave keeps them opt-in (all bits zero stay original); the release turns
-them on unless the player picks "Original game" (`G1`).
+them on with "Enhanced frame rate", which the icons set (`G1`).
 
 **E2 Hunk 2's code in fast RAM** (68020+ with real fast RAM). Copy hunk 2's code ranges
 (static disassembly plus trace coverage) into a fast block. Redirect absolute references
@@ -538,12 +538,12 @@ the risk factors, GPPatch and the library fixes are left out.
 ## G. Release
 
 **G1 Options.** *Complete* ([options](internals.md#g1-options--complete)). The release
-build (`make slave`) turns the enhancements on by default and gates them per machine:
+build (`make slave`) turns the enhancements on with "Enhanced frame rate" (set in the
+shipped icons) and gates them per machine:
 caches, `C`, `D`, `E` and `E7` wherever each applies (the 68000 keeps the native pacer,
-C6), and on a 68020+ with real fast RAM the 20 Hz step with H2's correction. Its two
-options (user decisions): "Original game" turns everything off; "F1GP-Ed frame rate and
-speed factors" keeps the file's step and the native cornering loss and adds F6's
-factors. The developer build keeps the individual `CUSTOMn` bits.
+C6), and on a 68020+ with real fast RAM the 20 Hz step with H2's correction. Its other
+option (user decisions): "F1GP-Ed frame rate and speed factors" keeps the file's step and
+the native cornering loss and adds F6's factors, with or without the enhancements. The developer build keeps the individual `CUSTOMn` bits.
 
 **G2 Regression routes.** Quick Race, practice, qualifying, a full race weekend, a pit
 stop, a retirement, a replay, every view, menus and options, a second race (tables and

@@ -9,8 +9,8 @@ No source is available for the supplied slave; this repository contains a rebuil
 loader. The mapping (A), the rebuild (B), the real-time world clock (C), smooth
 presentation between the game's updates (D), the performance work (E), F1GP-Ed
 compatibility (F) and the step-dependence fixes (H) are complete. The release slave turns
-them on by default where the machine supports them, with "Original game" one option away
-(G1); the developer build keeps each behind its own `CUSTOM2` bit. The release (G) is in
+them on where the machine supports them with its "Enhanced frame rate" option, which the
+shipped icons set (G1); the developer build keeps each behind its own `CUSTOM2` bit. The release (G) is in
 progress: `make dist` builds the 2.0b beta archive.
 
 See [current status and next steps](docs/open-work.md) for the scope, and

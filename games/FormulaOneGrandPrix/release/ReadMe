@@ -33,6 +33,10 @@ FEATURES:
 - Normal, RomIcon, NewIcons and OS3.5+ Colour Icons (created by Frank,
   Mad-Matt and myself) and 2 Exoticons from http://exotica.fix.no/
 - Quit option (default key is 'F10')
+- "Enhanced frame rate" (CUSTOM2=1, set in the supplied icons) turns on
+  the enhancements listed under 2.0b; without it the game plays as the
+  original, apart from the spin fix. "F1GP-Ed frame rate and speed
+  factors" (CUSTOM2=2) works with or without it
 
 HISTORY:
 
