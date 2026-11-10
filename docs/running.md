@@ -78,9 +78,19 @@ so any number of games and instances run at once. Screenshots go to `tmp/shots/`
 ## Driving it
 
 `common/tools/game_server.py` wires AmigaXDev's gdb-stub server (`amigaxdev.gdbserve`) to
-this launcher: a game tool is a few lines (the module's docstring), and
-`python3 tools/<game>.py serve` boots with `DEBUG=1` and every run option above. Commands
-such as `shot`, `wait`, `profile` and `quit` then go to the running server.
+this launcher. `make serve &` boots with `DEBUG=1` and every run option above, and
+`make server CMD='...'` sends the built-in commands (`stop`, `cont`, `gdb`, `shot`, `wait`,
+`until`, `profile`, `quit`) to it once it prints `serving on` (a few seconds; before that the
+client fails to find the socket):
+
+```sh
+make serve WARP=1 WINDOW=none &
+make server CMD='wait 20'; make server CMD='shot tmp/shots/menu.png'; make server CMD=quit
+```
+
+A game that needs commands of its own (named addresses, captures) adds `tools/<game>.py`, a
+few lines on `game_server()` (the module's docstring); `python3 tools/<game>.py serve` then
+takes the same options. A new game starts with `make serve`.
 
 ## Game data
 
