@@ -5,11 +5,20 @@
       "output": "EncounterEnhanced-{version}-{date}.lha",
       "replace": {
         "EncounterHD/encounter.slave": "build:Encounter",
-        "EncounterHD/Readme": "release/ReadMe",
-        "EncounterHD/source/EncounterHD.asm": "src/EncounterHD.s"
+        "EncounterHD/Readme": "release/ReadMe"
       },
       "add": {},
-      "remove": []
+      "remove": [],
+      "source": {
+        "dir": "EncounterHD/source",
+        "variants": [
+          "Encounter"
+        ],
+        "keep": [
+          "encounterimager05.asm",
+          "Makefile"
+        ]
+      }
     }
   ]
 }
