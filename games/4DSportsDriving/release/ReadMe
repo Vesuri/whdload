@@ -1,5 +1,5 @@
 
- 4D Sports Driving Enhanced 2.0b (13.10.2026)
+ 4D Sports Driving Enhanced 2.0b (10.11.2026)
 
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
@@ -55,10 +55,12 @@
    enables only the CPU renderer.
    CUSTOM3=1 restores original simulation timing and disables A4000 mode.
 
- version 2.0b (13.10.2026) - enhancements by Vesuri:
+ version 2.0b (10.11.2026) - enhancements by Vesuri:
  - Fixed the flickering blue background in the DSI intro.
  - Fixed the click at every loop of the engine and skid sounds.
  - Fixed glitches in the replay control panel with Enhanced framerate.
+ - Fixed whining after sounds in the title music and at replay start.
+ - Finer mouse steering: no dead zone, and small movements steer.
  - Faster rendering with a single "Enhanced framerate" option, enabled in the
    installed icon (CUSTOM2=1).
  - Correct game speed and race timing regardless of rendering speed.

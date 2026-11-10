@@ -5,7 +5,7 @@ Written 2026-10-11 on HEAD `c70ea93` (branch `4dsportsdriving`). This plan super
 versions remain reference material for addresses and evidence, not a to-do list.
 P1-P7 are complete; the A500 FAST target is deferred. A4000 remains experimental,
 with the P7 partial handling correction accepted at the unchanged 27/29 gate.
-Current release: 2.0b (13.10.2026), 37440-byte slave. Runtime buffers are allocated
+Current release: 2.0b (10.11.2026), 38544-byte slave. Runtime buffers are allocated
 at startup; the DSI intro buffer-reuse flicker is fixed (see sections below).
 Current binary SHA256: `f9ec3a551ade96b648c83ad5266aaae0e431a09321be9f243f8a07a3e6ea0d2a`.
 Testing archive: `dist/4DSportsDriving_v2.0b_1461.lha` (926691 bytes), SHA256

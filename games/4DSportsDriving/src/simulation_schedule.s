@@ -54,24 +54,7 @@ sim_schedule_field:
  bra .gears
 .mouse:
  moveq #1,d4
- move.w $2102(a4),d0      ; native mouse x, as read by $2A6DE
- sub.w #160,d0
- asr.w #1,d0
- ext.w d0                ; native conversion truncates to signed byte
- tst.b d0
- beq .steer_ready
- bmi .negative
- and.w #$ff,d0
- lea -$7514(a4),a0
- move.b (a0,d0.w),d0
- bra .steer_ready
-.negative:
- ext.w d0
- neg.w d0
- lea -$7514(a4),a0
- move.b (a0,d0.w),d0
- neg.b d0
-.steer_ready:
+ bsr mouse_steer_target   ; finer than the native $7B08 conversion
  move.b d0,d3
  moveq #0,d5
  btst #0,-$3360+1(a4)

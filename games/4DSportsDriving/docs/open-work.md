@@ -8,7 +8,7 @@ holds the cleaned production source in one commit (060c1dc), submitted upstream 
 (PR #26 is superseded and closed); upstream has not merged it.
 
 The release here is built from this development source: `make slave` gives the
-production SHA256 below (37664 bytes). The cleaned PR build is a different binary
+production SHA256 below (38544 bytes). The cleaned PR build is a different binary
 (37344 bytes, SHA256 `ed819a7ed650a23b4f5b05bf18095dbbbd2ef57d646108f04972903e21b1a997`),
 and the fork's earlier local testing archives hold that one.
 
@@ -23,7 +23,7 @@ P1-P7 are complete. P6 unifies the production build and refreshes validation,
 documentation and the local testing archive. A4000 remains experimental by user
 decision: the frozen handling gate is 27/29. The A500 9.5-10 FPS target is deferred.
 
-The release is 4D Sports Driving Enhanced 2.0b (13.10.2026), a beta: `make dist` packages
+The release is 4D Sports Driving Enhanced 2.0b (10.11.2026), a beta: `make dist` packages
 it, and the installed icon enables Enhanced framerate (CUSTOM2=1). Its evidence is
 emulator measurement only; no real-hardware play-test is recorded.
 
@@ -33,17 +33,12 @@ emulator measurement only; no real-hardware play-test is recorded.
   ground band, dark-green strip under it, flickers over the ramp road in the F3 chase
   camera. Not reproduced on `a1200-040`; the chase camera's Y moves smoothly through
   the hilltop. Needs the tester's .rpl and whether `CUSTOM2=0` shows it.
-- **Whine on the right channel at replay start** until a sound effect plays there.
-  Static candidates: the SFX driver's pause/resume (h0:2516a, h0:25248) rewriting
-  stale AUDxPER/VOL after shutdown (h0:25a50), or the skid stop (h0:00dce) skipping
-  its stop. Needs a trace of the AUD2/AUD3 and DMACON writes.
-- **Whine after one-shot samples in the intro and menu music.** Paula reloads
-  AUDxLC/AUDxLEN at the end of every sample and keeps playing (Hardware Reference
-  Manual, audio: the location and length registers are reloaded each time the data
-  ends). A one-shot sample must be followed by a write of a silent (zeroed) loop, or
-  by turning that channel's DMA off, after it has started; the music driver leaves the
-  sample's own data looping. Not yet checked whether 2.0b's original slave behaves
-  the same.
+- **A skid sound at replay restart**: after playing a replay that skids later on and
+  pressing ||< then play, the skid loop plays on channel 2 for about 1.5 s from the
+  start, where the car only accelerates; the first playback from the same start has
+  none. Also with `CUSTOM3=1` (native timing), so it is the game's own sound state
+  carried over the rewind (its sound records queue at 1334(a4), consumer h0:7984). Not
+  checked against JOTD's slave; not reported by the user.
 
 ## P7 integrated
 
@@ -87,12 +82,50 @@ Numeric `*` quits WHDLoad. CUSTOM2=0 uses original rendering, 1 all optimization
 2 Fast-RAM renderer alone. CUSTOM3=1 restores original timing and its hook bytes.
 Only CUSTOM2 bit 0 appears in the splash: "Enhanced framerate (68020+Fast for
 CPU renderer)". Other options remain advanced tooltypes. Credits include
-"Enhancements by Vesuri"; current version is 2.0b (13.10.2026).
+"Enhancements by Vesuri"; current version is 2.0b (10.11.2026).
 
 ## Validation and measurements
 
 The current production SHA256 is
-`4719fff0117708307b0707e02f7941e7f761d34b095585db55d36547f989c267` (37664 bytes).
+`a78fd23cf07f86905929c10ead01038dd4135c833553bc1da934aec8887f6522` (38544 bytes).
+No one-shot leaves its sample as Paula's reload any more. Paula reloads AUDxLC/AUDxLEN
+at the end of every sample (Hardware Reference Manual, audio), and both of the game's
+drivers stop a one-shot only at its second audio interrupt, after the sample has been
+reloaded. Stopped channels' DMA was found on again with no new note: the title music
+driver's state 0 (stopped) with DMA on for up to ~120 fields while its tick
+(h0:28550) restores the volume. The writer was not identified (candidates: the
+kickemu Kickstart 1.3 audio.device, which writes DMACON from its unit state, and
+WHDLoad's OS switches; the slave writes no audio DMA bits). Whatever turns DMA on, the
+reload is now a 256-byte zeroed chip buffer (allocated at install). It is set at the
+first interrupt of a one-shot (music h0:28184; race/replay h0:1b262, 1b28e, 1b2ba,
+1b2e6) and at every stop of the race/replay driver (h0:1b434, 1b448, 1b45c, 1b470,
+1b48a). Loops are unchanged. With it the user found the title/menu bass drum whine
+gone and could no longer reproduce the replay-start right-channel whine (play a while,
+then ||<). Replay playback
+staged 300 CPU frames in 300 fields both before and after the replay panel fix (a1200-040,
+race with a skid, ||< then play), so the frame rate did not measurably drop.
+Mouse steering (`src/mouse_steering.s`) was coarse for two reasons. The target angle
+came from (x-160)/2 into the table at -$7514(a4), whose first 7 entries are 0: 56
+mouse counts of dead zone, then 1 unit per 8 counts. Then h0:9020 pressed right only
+when the target was a whole step (the car table's byte 1, 1..8 units by speed, x4 when
+countersteering) past the wheel, else neutral, which centres by twice the step while
+moving. Small targets never steered, larger ones gave a sawtooth below them. Now the
+target comes from the raw counter with no dead zone, interpolated between table
+entries (limit still 127). h0:9020 is replaced by a choice of whichever of right,
+left or neutral leaves the wheel nearest the target (at 50 Hz with the two-fifths
+step), carrying the remaining error into the next step (bounded by the larger gap
+between outcomes). That error is the only state kept; it is cleared when the
+game centres the mouse (h0:8ffc: race start, M, around its dialogs) and whenever
+the history slot is not the one after the last decision (restart, replay, keyboard
+steps). A run left race 1 with error -9; the race entered from the main menu started at 0. Patches: h0:7b08 (native sampler, `CUSTOM3=1`), the field sampler
+in `simulation_schedule.s`, h0:9020 and h0:8ffc. Only the recorded left/right bits change, so
+replays and the simulation are unchanged. In a race with the throttle held and the
+mouse moved right 2 counts every 2 fields to 100 counts, the old slave left the wheel
+at 0 throughout (once 1) in A4000 mode. The new one followed from about 20 counts,
+averaging about 12 at 100 counts (target 13.5), and returned to 0 at the centre.
+A2500 (`a1200-030`) and `CUSTOM3=1` follow too, dithering a step or two around the
+target (5/15/20 for a target of about 13), the finest the recorded bits allow there.
+Hook audit passes.
 The CPU renderer draws a line only inside a staged frame, the plain `$bca` line, and
 only within the band it copies back; fills only in the game's set/clear mode
 (`$dfc`/`$d0c`). Lines straight into chip RAM had left the replay panel's selection
@@ -111,7 +144,7 @@ VBL before the next frame can reuse the old front bitmap. The racing pipeline
 is unchanged. `tmp/prof/intro-fix-validation.json` records 250-field before/after
 captures for original and enhanced rendering, 47/50 -> 0/50 premature reuse,
 five CPU gameplay rows, replay state equivalence, legacy bytes and hook audit.
-The ReadMe has a concise user-facing fix entry under 2.0b (13.10.2026).
+The ReadMe has a concise user-facing fix entry under 2.0b (10.11.2026).
 
 Simulation/history/replay buffers remain allocated at startup; historical
 workspace validation is `tmp/prof/runtime-workspace/validation.json`. Buffer

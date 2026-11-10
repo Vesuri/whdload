@@ -253,7 +253,7 @@ slv_keyexit	= $5D	; num '*'
 	ENDC
 
 DECL_VERSION:MACRO
-	dc.b	"2.0b (13.10.2026)"
+	dc.b	"2.0b (10.11.2026)"
 	ENDM
 
 	dc.b	"$","VER: slave "
@@ -317,6 +317,7 @@ _bootdos
 		jsr	(_LVOOldOpenLibrary,a6)
 		move.l	d0,a6			;A6 = dosbase
 		
+		bsr	silence_alloc
         IFD	CHIP_ONLY
         movem.l a6,-(a7)
         move.l  4,A6
@@ -511,6 +512,103 @@ after_dma_write_d1:
 	MOVE	#$0000,12(A0)	; stolen
 	rts
     
+; Paula reloads AUDxLC/AUDxLEN at the end of every sample and keeps playing. The music
+; driver's first audio interrupt of a one-shot (h0:28184, the sample is latched by then)
+; only marks it for a stop at the next one, leaving the sample itself as the reload. A
+; channel whose DMA is on again without a new note (seen in the title music) then
+; replays it under the tick routine's volume (h0:28550): the bass drum whines. Reload a
+; zeroed chip buffer instead, as the Hardware Reference Manual's one-shot method does.
+SILENCE_BYTES = 256			; a loop ends at most every ~9 ms: few interrupts
+
+silence_alloc:
+	movem.l	d0-d1/a0-a1/a6,-(sp)
+	move.l	4.w,a6
+	move.l	#SILENCE_BYTES,d0
+	move.l	#MEMF_CHIP|MEMF_CLEAR,d1
+	jsr	_LVOAllocMem(a6)
+	lea	silence_chip(pc),a0
+	move.l	d0,(a0)
+	movem.l	(sp)+,d0-d1/a0-a1/a6
+	rts
+
+; A0 = voice, A2 = this channel's AUDxLC; D0 is free (reloaded per channel)
+one_shot_silence:
+	move.l	silence_chip(pc),d0
+	beq.s	.stolen
+	move.l	d0,(a2)
+	move.w	#SILENCE_BYTES/2,4(a2)
+.stolen:
+	move.w	#2,12(a0)		; stolen: stop at the next interrupt
+	rts
+
+silence_chip:
+	dc.l	0
+
+	include "mouse_steering.s"
+
+; Race/replay driver, audio interrupt (A1 = $dff000; D1 = INTREQR is live, A0 is free).
+; Its status word is 1 for a one-shot (2 for a loop) until this first interrupt, which
+; negates it; the next one stops the channel. Latched by now, so a one-shot's reload
+; becomes silence here. The status words sit at h0:1b220+2n, the patch at
+; h0:1b262+$2c*n, so each lies $48+$2a*n bytes before the JSR's return address.
+SFX_LATCH	MACRO
+sfx_latch_\1:
+	move.l	(sp),a0
+	lea	-($48+$2a*\1)(a0),a0	; the channel's status word
+	cmp.w	#1,(a0)
+	bne.s	.neg\@
+	pea	($a0+$10*\1)(a1)
+	bsr	sfx_silence_channel
+	addq.l	#4,sp
+.neg\@:
+	neg.w	(a0)			; stolen
+	rts
+	ENDM
+	SFX_LATCH 0
+	SFX_LATCH 1
+	SFX_LATCH 2
+	SFX_LATCH 3
+
+; Stop one channel (h0:1b42e..1b476; A1 = $dff000): the stolen VOL write, then silence.
+SFX_STOP	MACRO
+sfx_stop_\1:
+	move.w	#0,($a8+$10*\1)(a1)	; stolen
+	pea	($a0+$10*\1)(a1)
+	bsr	sfx_silence_channel
+	addq.l	#4,sp
+	rts
+	ENDM
+	SFX_STOP 0
+	SFX_STOP 1
+	SFX_STOP 2
+	SFX_STOP 3
+
+; Stop all channels (h0:1b47e, DMA already off; A1 = $dff000).
+sfx_stop_all:
+	move.w	#0,$a8(a1)		; stolen
+	pea	$a0(a1)
+	bsr	sfx_silence_channel
+	move.l	#$dff0b0,(sp)
+	bsr	sfx_silence_channel
+	move.l	#$dff0c0,(sp)
+	bsr	sfx_silence_channel
+	move.l	#$dff0d0,(sp)
+	bsr	sfx_silence_channel
+	addq.l	#4,sp
+	rts
+
+; 4(sp) = a channel's AUDxLC: reload the zeroed chip buffer (if allocated).
+sfx_silence_channel:
+	movem.l	d0/a0,-(sp)
+	move.l	silence_chip(pc),d0
+	beq.s	.none
+	move.l	12(sp),a0
+	move.l	d0,(a0)
+	move.w	#SILENCE_BYTES/2,4(a0)
+.none:
+	movem.l	(sp)+,d0/a0
+	rts
+
 sound_wait:
 	movem.l	D0,-(A7)
 	moveq.l	#6,D0
@@ -760,6 +858,23 @@ pl_main
     PL_I    $1AFCC  ; temp illegal
     ; write 000x
     
+    ; Finer mouse steering (mouse_steering.s): no dead zone, nearest-outcome steps.
+    PL_PS   $7B08,mouse_steer_native ; FIX_RANGE h0:07b08 70 mouse steering target
+    PL_S    $7B0E,$7B4E-$7B0E
+    PL_P    $9020,mouse_steer_decide ; FIX_RANGE h0:09020 8 mouse steering decision
+    PL_PSS  $8FFC,mouse_steer_centre,2 ; FIX_RANGE h0:08ffc 8 mouse centred: reset steering
+    PL_PS   $28184,one_shot_silence ; FIX_RANGE h0:28184 6 one-shot reload to silence
+    ; The race and replay sound driver (h0:1b228..1b6d2) leaves a stopped or ended sample
+    ; as the reload too: the replay started with a whine on the right channel.
+    PL_PS   $1B262,sfx_latch_0 ; FIX_RANGE h0:1b262 6 one-shot reload to silence
+    PL_PS   $1B28E,sfx_latch_1 ; FIX_RANGE h0:1b28e 6 one-shot reload to silence
+    PL_PS   $1B2BA,sfx_latch_2 ; FIX_RANGE h0:1b2ba 6 one-shot reload to silence
+    PL_PS   $1B2E6,sfx_latch_3 ; FIX_RANGE h0:1b2e6 6 one-shot reload to silence
+    PL_PS   $1B434,sfx_stop_0 ; FIX_RANGE h0:1b434 6 stopped channel reload to silence
+    PL_PS   $1B448,sfx_stop_1 ; FIX_RANGE h0:1b448 6 stopped channel reload to silence
+    PL_PS   $1B45C,sfx_stop_2 ; FIX_RANGE h0:1b45c 6 stopped channel reload to silence
+    PL_PS   $1B470,sfx_stop_3 ; FIX_RANGE h0:1b470 6 stopped channel reload to silence
+    PL_PS   $1B48A,sfx_stop_all ; FIX_RANGE h0:1b48a 6 stopped channels reload to silence
     PL_PS   $28196,after_dma_write_d1
     PL_PS   $28460,dma_write_1
     PL_PS   $28490,dma_write_2
