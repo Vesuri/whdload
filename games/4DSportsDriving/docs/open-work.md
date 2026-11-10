@@ -8,7 +8,7 @@ holds the cleaned production source in one commit (060c1dc), submitted upstream 
 (PR #26 is superseded and closed); upstream has not merged it.
 
 The release here is built from this development source: `make slave` gives the
-production SHA256 below (37440 bytes). The cleaned PR build is a different binary
+production SHA256 below (37664 bytes). The cleaned PR build is a different binary
 (37344 bytes, SHA256 `ed819a7ed650a23b4f5b05bf18095dbbbd2ef57d646108f04972903e21b1a997`),
 and the fork's earlier local testing archives hold that one.
 
@@ -26,6 +26,24 @@ decision: the frozen handling gate is 27/29. The A500 9.5-10 FPS target is defer
 The release is 4D Sports Driving Enhanced 2.0b (13.10.2026), a beta: `make dist` packages
 it, and the installed icon enables Enhanced framerate (CUSTOM2=1). Its evidence is
 emulator measurement only; no real-hardware play-test is recorded.
+
+## Open
+
+- **Green band in the replay** (tester report, Amiga Forever A4000/40): a light-green
+  ground band, dark-green strip under it, flickers over the ramp road in the F3 chase
+  camera. Not reproduced on `a1200-040`; the chase camera's Y moves smoothly through
+  the hilltop. Needs the tester's .rpl and whether `CUSTOM2=0` shows it.
+- **Whine on the right channel at replay start** until a sound effect plays there.
+  Static candidates: the SFX driver's pause/resume (h0:2516a, h0:25248) rewriting
+  stale AUDxPER/VOL after shutdown (h0:25a50), or the skid stop (h0:00dce) skipping
+  its stop. Needs a trace of the AUD2/AUD3 and DMACON writes.
+- **Whine after one-shot samples in the intro and menu music.** Paula reloads
+  AUDxLC/AUDxLEN at the end of every sample and keeps playing (Hardware Reference
+  Manual, audio: the location and length registers are reloaded each time the data
+  ends). A one-shot sample must be followed by a write of a silent (zeroed) loop, or
+  by turning that channel's DMA off, after it has started; the music driver leaves the
+  sample's own data looping. Not yet checked whether 2.0b's original slave behaves
+  the same.
 
 ## P7 integrated
 
@@ -74,8 +92,16 @@ CPU renderer)". Other options remain advanced tooltypes. Credits include
 ## Validation and measurements
 
 The current production SHA256 is
-`aa17dd5743f016396510d001fb66a03a923f7ae03743f74a0e39ca722dddcc55`
-(37440 bytes). The engine and skid loops no longer click: every `ameng1.vce`
+`4719fff0117708307b0707e02f7941e7f761d34b095585db55d36547f989c267` (37664 bytes).
+The CPU renderer draws a line only inside a staged frame, the plain `$bca` line, and
+only within the band it copies back; fills only in the game's set/clear mode
+(`$dfc`/`$d0c`). Lines straight into chip RAM had left the replay panel's selection
+frames in one display buffer only (stray pixels, striped buttons, flickering edges);
+the game's line core also draws AND, OR and XOR lines (h0:2cd88, 2cd9e, 2cdb4), and
+its fills have the same modes (h0:2a9ae..2aace). Panel navigation on `a1200-040`
+compared both display buffers: damaged in every `CUSTOM2=1`/`2` run before, clean in
+3/3 after; `CUSTOM2=0` clean. A race plus replay route had 2 fallbacks before and after.
+The engine and skid loops no longer click: every `ameng1.vce`
 sample starts with 4 non-waveform bytes, and `sound_loop_patch` plus two
 `PL_W` (code $422, $438) loop ENGI, SKID and SKI2 from byte 4 to the sample end
 (ENGI keeps 16 whole periods). A race-start recording on a1200-040 counted clicks

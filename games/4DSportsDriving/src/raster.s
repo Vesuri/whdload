@@ -231,7 +231,34 @@ raster_before:
  bne .done
  move.w raster_kind(pc),d0
  cmp.w #2,d0
- beq .copy_start
+ bne .polygon
+ ; The line core also serves the game's AND ($b8a), OR ($bea) and XOR ($b6a)
+ ; entries (h0:2cd88, 2cd9e, 2cdb4); raster_line draws only the $bca line.
+ cmp.w #$bca,-$32ec(a4)
+ bne .done
+ IFD P3_FRAME
+ ; Only inside a staged frame (fast RAM). Straight into chip RAM the CPU line
+ ; left the replay panel's selection frames in only one display buffer.
+ move.w raster_frame_phase(pc),d0
+ cmp.w #1,d0
+ bne .done
+ ENDC
+ move.w raster_line_data+6(pc),d1
+ move.w raster_line_data+14(pc),d2
+ cmp.w d1,d2
+ bge .rows
+ exg d1,d2
+ bra .rows
+.polygon:
+ ; raster_solid's native fill takes its set/clear minterms from these; the
+ ; game's AND, OR and XOR fills (h0:2a9ae..2aace, 2c68c..2c6a8) stay native.
+ tst.w d0
+ bne .fill_ready
+ cmp.w #$dfc,-$32ec(a4)
+ bne .done
+ cmp.w #$d0c,-$32ea(a4)
+ bne .done
+.fill_ready:
  tst.w -$2c(a5)
  ble .done
  move.w -$2e(a5),d0
@@ -239,7 +266,37 @@ raster_before:
  add.w -$2c(a5),d0
  cmp.w #200,d0
  bhi .done
+ move.w -$2e(a5),d1
+ move.w d0,d2
+ subq.w #1,d2
+.rows:
+ IFD P3_FRAME
+ IFD P3_BAND
+ ; A staged frame copies only its band back to chip. Anything drawn outside it
+ ; (the unclipped replay-panel outlines, h0:337a4) must stay native.
+ move.w raster_frame_phase(pc),d0
+ cmp.w #1,d0
+ bne .copy_start
+ moveq #0,d0
+ move.w raster_band_offset(pc),d0
+ divu #40,d0
+ cmp.w d0,d1
+ blt .done
+ add.w raster_band_rows(pc),d0
+ cmp.w d0,d2
+ bge .done
+ ENDC
+ ENDC
  .copy_start:
+ IFD P3_PIPELINE
+ ; Outside a staged frame the CPU draws straight into chip RAM: like a native
+ ; writer (raster_own_blitter), wait for the pending buffer switch first.
+ move.w raster_frame_phase(pc),d0
+ cmp.w #1,d0
+ beq .switched
+ bsr raster_present_wait
+.switched:
+ ENDC
  IFD P3_BACKGROUND
  bsr raster_bg_seed
  ENDC
@@ -632,6 +689,7 @@ raster_degenerate_continue: dc.l 0
 raster_degenerate:
  dc.w $42e7
  movem.l d0-a6,-(sp)
+ move.w #$bca,-$32ec(a4) ; as the native entry h0:2cdd6 does
  IFD P3_BACKGROUND
  move.w raster_background(pc),d0
  beq .bg_done
