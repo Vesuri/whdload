@@ -39,6 +39,21 @@ e_masks_init:
  lea e_mask_other(pc),a0
  move.w #$4eb9,(a1)
  move.l a0,2(a1)
+ ; The A5-relative entry (the menus' and bike shop's bobs) joins the blit at
+ ; $33c78 too; without its own reset it drew through the last race bob's mask.
+ move.l a5,a1
+ adda.l #$33ae0,a1
+ cmpi.l #$31fcffff,(a1)
+ bne .no_alt
+ cmpi.l #$055c4278,4(a1)
+ bne .no_alt
+ cmpi.w #$055e,8(a1)
+ bne .no_alt
+ lea e_mask_alt(pc),a0
+ move.w #$4eb9,(a1)
+ move.l a0,2(a1)
+ move.l #$4e714e71,6(a1)
+.no_alt:
  move.l a5,a1
  adda.l #$33c78,a1
  lea e_mask_draw(pc),a0
@@ -238,6 +253,16 @@ e_mask_other:
  clr.l (a0)
  move.l (a7)+,a0
  move.w #$ffff,$55c.w
+ rts
+
+; Replaces $33ae0's move.w #-1,$55c and clr.w $55e: native masks, no cache.
+e_mask_alt:
+ move.l a0,-(a7)
+ lea e_mask_current(pc),a0
+ clr.l (a0)
+ move.l (a7)+,a0
+ move.w #$ffff,$55c.w
+ clr.w $55e.w
  rts
 
 e_mask_draw:

@@ -120,6 +120,30 @@ images but retains native mask generation for mutable bike/rider images in
 `$19a7e..$5c2cb`. Recolour caching starts at 030; CPU pixel drawing starts at 040.
 No additional option or presentation delay is introduced.
 
+### Menu and shop bobs (unreleased fix)
+
+The bob routine has two entries that join its blit at main hunk `$33c78`: the race's
+(`$33ba2`, hooked by `e_mask_enter`) and an A5-relative one at `$33ae0`, which the menus and
+the bike shop use. Only the race entry set `e_mask_current`, so a `$33ae0` bob was blitted
+through whichever cache entry the last race bob had left, with that image's mask, width
+and modulos. The shop's bikes then came out sheared and mixed with the background, or were
+missing. A player reported it on an A1200 with Fast RAM in WinUAE (10.11.2026, after a few
+races). In the emulator it follows a race that ends with the player busted. After a normal
+finish the last race bob leaves the pointer clear, so the shop is unaffected.
+
+`e_mask_alt` now replaces `$33ae0`'s `move.w #-1,$55c` / `clr.w $55e` (checked before
+patching) and clears `e_mask_current` too, so these bobs take the native blit, as in the
+original game. Checks (`a1200-fast`, CUSTOM2=1, ignored `tmp/shopbug/`):
+
+- Shop traces: after the busted race all 218 shop bobs entered at `$33ae0` and skipped the
+  native blit at `$33c7e`; after a normal finish they took it.
+- With a cache entry forced into `e_mask_current` on the results screen (test-only key),
+  the 09.11.2026 slave draws corrupted bikes and the fixed one doesn't.
+- Six full-length races, one of them busted, leave every shop visit's bikes intact.
+- 50 race fields don't use `$33ae0`. Race rates (`tools/check_a.py --normal`, one run each)
+  are unchanged: `a1200-fast` 12.5 / 18.6 and 040 25 MHz 22.7 / 49.6 fps (CUSTOM2 off / on),
+  for both slaves.
+
 ## Final emulator validation
 
 Normal-build sampled race rates (PAL, Enhanced framerate enabled):

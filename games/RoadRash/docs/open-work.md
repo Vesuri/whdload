@@ -39,6 +39,10 @@ password entry); the `PL_IFC2` move is a behaviour change to decide on, not a fi
 
 ## Open
 
+- Unreleased: the bike shop's bikes are drawn without the Enhanced mask cache
+  (`blitter-performance.md`, "Menu and shop bobs"), which fixes the player report of
+  corrupted or missing bikes after a few races (10.11.2026, A1200 with Fast RAM).
+  The release slave and `release/slaves.sha256` are still those of 09.11.2026.
 - Hardware confirmation of the blitter waits (`visual-fixes.md`, "Unwaited blits"), which
   address a player report of intro and bike-shop glitches (8.11.2026, 68040). The emulator
   doesn't reproduce the glitches.
