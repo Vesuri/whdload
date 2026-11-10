@@ -440,6 +440,7 @@ patch_main
 	bsr		install_profiler_vbl_hook
 	ENDC
 	
+	bsr	sound_loop_patch
 	move.l	D7,A1
 	addq.l	#4,A1
 
@@ -448,6 +449,42 @@ patch_main
 	jsr	resload_Patch(a2)
 	bsr perf_patch
 	rts
+
+; Every ameng1.vce sample starts with 4 click bytes before its waveform, and the
+; engine and skid loops repeat from the first byte, so each loop pass clicks.
+; Loop from byte 4 to the sample end instead: the engine still holds 16 whole
+; waveform periods (unchanged pitch) and both joins become a 1-step change.
+; Data hunk (a4-$7ffe): $734 engine loop bytes, $758 engine sample offset,
+; $740/$744 SKID/SKI2 loop bytes. Each is written only over its original value.
+; D7 = segment list (APTR); the data hunk is the second segment.
+sound_loop_patch:
+	movem.l	d0-d1/a0-a1,-(sp)
+	move.l	d7,a0
+	move.l	(a0),d0
+	lsl.l	#2,d0
+	beq.s	.done
+	move.l	d0,a0
+	addq.l	#4,a0
+	lea	sound_loop_words(pc),a1
+.word:
+	move.w	(a1)+,d0
+	bmi.s	.done
+	move.w	(a1)+,d1
+	cmp.w	(a0,d0.w),d1
+	bne.s	.skip
+	move.w	(a1),(a0,d0.w)
+.skip:
+	addq.l	#2,a1
+	bra.s	.word
+.done:
+	movem.l	(sp)+,d0-d1/a0-a1
+	rts
+sound_loop_words:
+	dc.w	$736,$0627,1572		; ENGI loop: 786 words
+	dc.w	$75a,$005c,$005c+4	; ENGI start after the click
+	dc.w	$742,$038b,904		; SKID loop: 452 words
+	dc.w	$746,$038b,904		; SKI2 loop: 452 words
+	dc.w	-1
 
 ; The DSI intro swaps copper lists but otherwise immediately starts the next
 ; frame. The old front bitmap remains visible until the next VBL; reusing it
@@ -523,6 +560,9 @@ dma_write_8
 pl_main
     PL_START
     PL_PSS $2302C,intro_present,2 ; FIX_RANGE h0:2302c 8 DSI intro VBL handoff
+    ; The skid loops (SKID, SKI2) skip the 4 click bytes at their sample start.
+    PL_W $422,$60 ; FIX_RANGE h0:0041e 6 SKID loop start
+    PL_W $438,$60 ; FIX_RANGE h0:00434 6 SKI2 loop start
  IFD SIM_NATIVE
     PL_IFC3X 0
     PL_ELSE

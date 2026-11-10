@@ -57,6 +57,7 @@
 
  version 2.0b (13.10.2026) - enhancements by Vesuri:
  - Fixed the flickering blue background in the DSI intro.
+ - Fixed the click at every loop of the engine and skid sounds.
  - Faster rendering with a single "Enhanced framerate" option, enabled in the
    installed icon (CUSTOM2=1).
  - Correct game speed and race timing regardless of rendering speed.

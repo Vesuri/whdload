@@ -74,8 +74,13 @@ CPU renderer)". Other options remain advanced tooltypes. Credits include
 ## Validation and measurements
 
 The current production SHA256 is
-`f9ec3a551ade96b648c83ad5266aaae0e431a09321be9f243f8a07a3e6ea0d2a`
-(37440 bytes). The DSI intro flicker is fixed: its buffer swap now waits for
+`aa17dd5743f016396510d001fb66a03a923f7ae03743f74a0e39ca722dddcc55`
+(37440 bytes). The engine and skid loops no longer click: every `ameng1.vce`
+sample starts with 4 non-waveform bytes, and `sound_loop_patch` plus two
+`PL_W` (code $422, $438) loop ENGI, SKID and SKI2 from byte 4 to the sample end
+(ENGI keeps 16 whole periods). A race-start recording on a1200-040 counted clicks
+(steps over 12x the local step) idle 22 -> 3, accelerating 14 -> 0, coasting
+4 -> 3 at unchanged RMS; the skid loops are checked from the data only. The DSI intro flicker is fixed: its buffer swap now waits for
 VBL before the next frame can reuse the old front bitmap. The racing pipeline
 is unchanged. `tmp/prof/intro-fix-validation.json` records 250-field before/after
 captures for original and enhanced rendering, 47/50 -> 0/50 premature reuse,
