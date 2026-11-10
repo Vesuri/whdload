@@ -7,13 +7,14 @@ GAME_TARGETS := slave verify developer build run stop unpack release record clea
 export CALLER_DIR := $(CURDIR)
 
 .DEFAULT_GOAL := help
-.PHONY: help list new check dist $(GAME_TARGETS)
+.PHONY: help list new check dist prune-dist $(GAME_TARGETS)
 
 help:
 	@echo 'make list                       the games'
 	@echo 'make <target> GAME=<Game>       slave verify developer build run stop unpack dist release check record clean'
 	@echo 'make dist | make check          every game (or GAME=<Game>); check also runs the repo checks'
 	@echo 'make new GAME=<Game>            start a game from common/template'
+	@echo 'make prune-dist [DRY=1]         delete all but the latest archive of each release in dist/'
 	@echo 'Inside games/<Game>, the same targets without GAME=. Run options: common/run.sh.'
 
 list:
@@ -39,3 +40,6 @@ dist:
 check:
 	@$(if $(GAME),$(need_game);) common/check.sh repo
 	@set -e; for g in $(or $(GAME),$(GAMES)); do $(MAKE) --no-print-directory -C "games/$$g" check; done
+
+prune-dist:
+	@. common/env.sh && python3 common/tools/prune_dist.py $(if $(DRY),--dry-run) dist

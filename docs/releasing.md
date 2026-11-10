@@ -3,6 +3,7 @@
 ```sh
 make dist             # inside games/<Game>, or GAME=<Game> at the root; FORCE=1 overwrites
 make dist             # at the root without GAME: every game
+make prune-dist       # at the root: delete all but the latest archive of each game; DRY=1 lists them
 ```
 
 `make dist` builds the release slaves and repacks the game's original installer archive,
