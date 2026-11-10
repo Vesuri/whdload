@@ -451,8 +451,10 @@ for 10,000 progress values, the native advance of the next update for 20,000 spe
 mode and damage-countdown combinations, and, over 300 sequences of native-style updates
 with random ±40 nudges, lap wraps and repositions, that every update starts from its
 authoritative progress and the shown progress never goes backwards within a lap or
-reaches the lap line first. `VASM_EXTRA=-DTIMING_OPPONENT_MOTION=0` builds the previous
-90-ms movement for comparisons.
+reaches the lap line first. With the gate closed, as on the starting grid, the step and
+the bounce must leave tracked records unchanged whatever D0 holds.
+`VASM_EXTRA=-DTIMING_OPPONENT_MOTION=0` builds the previous 90-ms movement for
+comparisons.
 
 Contact soak: the coverage race (060/50, `CUSTOM1=1 CUSTOM4=1 CUSTOM5=4 NoCache`,
 `ANCHOR=0xbc7c FIELDS=66000 SWAP_ONLY=1 COVERAGE_STATE=1`) with

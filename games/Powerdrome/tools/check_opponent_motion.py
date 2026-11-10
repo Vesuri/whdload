@@ -16,6 +16,8 @@ Source ../../common/env.sh first. Requires vasm, AMIGA_UNICORN and the extracted
    shown progress never decreases within a lap, never reaches the lap line before the
    update that counts the lap, and is never more than one update plus the snap limit away
    from the authoritative progress.
+4. With the gate closed (grid before the start, pause, menus) the step and the bounce leave
+   the tracked records unchanged whatever D0 holds, since the gate's result is in the flags.
 """
 import ctypes as C
 import os
@@ -31,7 +33,7 @@ GAME, HARNESS, ARENA, RECORDS, PATH = 0x10000, 0x200000, 0x300000, 0x340000, 0x3
 STATE = GAME + 0xa6e
 SLOT = ARENA + 0x9600
 (out/'harness.s').write_text(f''' org ${HARNESS:x}
- dc.l place,predict,restore,capture,step
+ dc.l place,predict,restore,capture,step,bounce,gate
 place
  bsr timing_opponent_motion_place
  rts
@@ -47,10 +49,15 @@ capture
 step
  bsr timing_opponent_motion_step
  rts
-TIMING_PERIOD = 18
-timing_opponent_effects_enabled
- move #0,ccr
+bounce
+ bsr timing_opponent_motion_bounce
  rts
+TIMING_PERIOD = 18
+; Like the real gate: the result is in Z, D0 comes back unchanged.
+timing_opponent_effects_enabled
+ tst.w gate
+ rts
+gate dc.w 1
 perf_arena dc.l ${ARENA:x}
 perf_game dc.l ${GAME:x}
 timing_world_state dc.l 0,0
@@ -119,7 +126,7 @@ write(GAME, code)
 write(GAME+0x53f6, bytes.fromhex('70004e75'))            # random: moveq #0,d0 / rts
 blob = (out/'harness.bin').read_bytes()
 write(HARNESS, blob)
-entries = dict(zip(('place', 'predict', 'restore', 'capture', 'step'), struct.unpack_from('>5I', blob)))
+entries = dict(zip(('place', 'predict', 'restore', 'capture', 'step', 'bounce', 'gate'), struct.unpack_from('>7I', blob)))
 write(GAME+0x682, struct.pack('>I', PATH))
 
 
@@ -252,5 +259,27 @@ for sequence in range(300):
                 assert abs(gap) <= 2*(1400*18//26 + 40) + 1024, (sequence, update, i, a, p, flags)
                 shown[i] = p
     sequences += 1
+
+# 4. A closed gate (grid, pause, menus) leaves every record alone, whatever D0 holds.
+write(entries['gate'], struct.pack('>h', 0))
+closed = 0
+for case in range(200):
+    for i in range(OPPONENTS):
+        record = bytearray(rng.randbytes(0xbe))
+        struct.pack_into('>h', record, 0x56, 0)
+        struct.pack_into('>h', record, 0x8, 0)
+        struct.pack_into('>h', record, 0x3c, 1)
+        struct.pack_into('>h', record, 0x16, rng.randrange(100, 1400))
+        struct.pack_into('>i', record, 0x66, rng.randrange(lap))
+        write(RECORDS+i*0xbe, record)
+    write(STATE+0x2f0, struct.pack('>h', 0))
+    write(STATE+0xb6, struct.pack('>h', 0))
+    run(entries['capture'])                    # the slots track these records
+    before = read(RECORDS, OPPONENTS*0xbe)
+    run(entries['step'], d0=rng.randrange(1, 1 << 32))
+    run(entries['bounce'], d0=rng.randrange(1, 1 << 32))
+    assert read(RECORDS, OPPONENTS*0xbe) == before, case
+    closed += 1
+print(f'{closed} closed-gate steps leave the records unchanged')
 print(f'{places} placements and {predictions} predictions match native code; '
       f'{sequences} update/step sequences ({wraps} lap wraps, {snaps} repositions) keep their bounds')

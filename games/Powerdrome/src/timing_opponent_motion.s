@@ -198,7 +198,7 @@ timing_opponent_motion_predict
 timing_opponent_motion_active
  move.l d0,-(sp)
  bsr timing_opponent_effects_enabled
- beq.s .done
+ beq.s .no                             ; its result is in the flags; D0 is the caller's
  move.w timing_world_state+8(pc),d0
  beq.s .done
  move.w timing_pit_state+8(pc),d0
@@ -406,6 +406,8 @@ timing_opponent_motion_bounce
  bne.s .done
  tst.w $b6(a6)
  bne.s .done
+ bsr timing_opponent_motion_active     ; the moved bits are only current while active
+ beq.s .done
  bsr timing_opponent_motion_first
  beq.s .done
  move.w $11e(a6),d6

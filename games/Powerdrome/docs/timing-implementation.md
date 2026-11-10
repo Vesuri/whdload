@@ -144,7 +144,10 @@ between the shown and the authoritative progress, never backwards. Gaps over 1,0
 (repositioning) are applied at once. The shown progress stops at the lap line until the
 update that counts the lap, then carries across it. Position, heading, segment and
 distance are rebuilt from it with the native arithmetic. Pit and retired opponents keep
-the native progress. The per-opponent table is in the fast arena at `$9600`.
+the native progress. The per-opponent table is in the fast arena at `$9600`. The
+movement follows the opponent effects gate: none on the starting grid (`$43a` ≥ 0), in
+pause or in modal work. The grid ships keep the native pose, so they start from where
+they stood.
 
 The visible-opponent work at `$9950` holds the contact tests. Within a distance of 100,
 `$9a74..$9a94` knock the player in a random direction (`$9c84`, `$1da..$1e4`, integrated by
