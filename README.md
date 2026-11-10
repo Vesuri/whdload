@@ -25,7 +25,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Indianapolis 500 Enhanced | StingRay | [4.0b (10.10.2026)](https://github.com/Vesuri/whdload/releases/tag/Indianapolis500Enhanced-4.0b-20261010) |
 | Legends of Valour Enhanced | CFou! | [2.0b (09.11.2026)](https://github.com/Vesuri/whdload/releases/tag/LegendsOfValourEnhanced-2.0b-20261109) |
 | Mercenary 3 Enhanced | Harry, Graham and Wepl | [2.0b (09.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Mercenary3Enhanced-2.0b-20261109) |
-| Powerdrome Enhanced | Galahad/Fairlight | not yet released |
+| Powerdrome Enhanced | Galahad/Fairlight | [2.0b (10.11.2026)](https://github.com/Vesuri/whdload/releases/tag/PowerdromeEnhanced-2.0b-20261110) |
 | Prince of Persia Enhanced | JOTD | released upstream as JOTD's 5.2 (24.10.2026) |
 | Red Baron Enhanced | JOTD | [3.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/RedBaronEnhanced-3.0b-20261013) |
 | Road Rash Enhanced | JOTD | [3.0b (10.11.2026)](https://github.com/Vesuri/whdload/releases/tag/RoadRashEnhanced-3.0b-20261110) |
