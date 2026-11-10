@@ -29,10 +29,19 @@ slv_Version = 17
 slv_Flags = WHDLF_NoError|WHDLF_EmulPriv|WHDLF_ClearMem|WHDLF_Examine
 slv_keyexit = $59
 CHIPMEMSIZE = $80000
-FASTMEMSIZE = $80000
+GAMEFASTSIZE = $80000           ; the game's fast memory, Codetapper's FASTMEMSIZE
+        IFNE DEVELOPER
+; The slave's buffers (b_reserve): ExpMem grows by B_RESERVE, which b_reserve takes at its
+; top before anything else allocates, so the game keeps the same free memory.
+B_RESERVE = $33000
+FASTMEMSIZE = GAMEFASTSIZE+B_RESERVE
+        ELSE
+FASTMEMSIZE = GAMEFASTSIZE
+        ENDC
 ; Developer: MEMCONFIG=1 adds ExpMem for E2's copy, E3's picture, E4's shadows and E4's
-; renderer data on machines with fast RAM. The default stays the release's, which a chip-only 2 MB A1200
-; can still allocate (it cannot spare about 32 KB more).
+; renderer data on machines with fast RAM. The default adds only the slave's buffers, which
+; were in the slave before, so a chip-only 2 MB A1200 still boots (it cannot spare about
+; 32 KB more).
 E_AREAS = $29000
 NUMDRIVES = 1
 WPDRIVES = %1111
@@ -146,6 +155,9 @@ RUN_SEGMENT MACRO
         ENDM
 
 _bootdos
+        IFNE DEVELOPER
+        bsr b_reserve
+        ENDC
         move.l (_resload,pc),a2
         lea (_dosname,pc),a1
         move.l 4.w,a6
@@ -261,6 +273,11 @@ patch_game
         btst #2,(cache_options+3,pc)
         beq.s .corner
 .clock
+        move.l (b_buffers,pc),d0
+        bne.s .buffers
+        moveq #0,d1             ; no buffers: the clock's patches stay out
+        bra.s .corner
+.buffers
         lea (patch_582992_clock,pc),a0
         move.l d7,a1
         jsr (resload_PatchSeg,a2)
@@ -831,6 +848,57 @@ c2_init
         movem.l (sp)+,d0-d2/a0-a2
         rts
 
+; The slave's buffers, one cleared block that b_reserve takes with AllocAbs at the top of
+; ExpMem on entry to _bootdos, before the frontend, the game or the OS allocate, so the
+; game gets the same free memory as without it. If it cannot, the clock's patches (every
+; user of these buffers) stay out. All are CPU-only: D1's snapshots, D3's saved and staged
+; inputs, E4's sky strip, E3's twin (VERIFY) and C2's HUD list.
+B_D1 = 0                        ; two D1 snapshots, cur and prev
+B_D3_SAVED = B_D1+2*D1_SIZE
+B_D3_STAGED = B_D3_SAVED+D3_SIZE
+B_STRIP = (B_D3_STAGED+D3_SIZE+15)&-16
+        IFNE VERIFY
+B_TWIN = B_STRIP+$1000
+B_HUD = (B_TWIN+E3_BLOCK+15)&-16
+        ELSE
+B_HUD = B_STRIP+$1000
+        ENDC
+B_SIZE = B_HUD+C2_HUD_STRIDE*C2_HUD_CAPACITY
+B_LEA MACRO                     ; B_LEA offset,An: An = that buffer
+        movea.l (b_buffers,pc),\2
+        lea (\1,\2),\2
+        ENDM
+b_reserve
+        movem.l d0-d1/a0-a1/a6,-(sp)
+        move.l 4.w,a6
+        lea ($142,a6),a0        ; MemList
+.header
+        move.l (a0),a0
+        tst.l (a0)
+        beq.s .done
+        btst #2,($f,a0)         ; MEMF_FAST: ExpMem
+        beq.s .header
+        move.l ($18,a0),d0      ; mh_Upper
+        sub.l #B_RESERVE,d0
+        movea.l d0,a1
+        move.l #B_RESERVE,d0
+        jsr (_LVOAllocAbs,a6)
+        lea (b_buffers,pc),a0
+        move.l d0,(a0)
+        beq.s .done
+        movea.l d0,a0
+        move.w #B_RESERVE/16-1,d0
+.clear
+        clr.l (a0)+
+        clr.l (a0)+
+        clr.l (a0)+
+        clr.l (a0)+
+        dbf d0,.clear
+.done
+        movem.l (sp)+,d0-d1/a0-a1/a6
+        rts
+b_buffers dc.l 0
+
 ; E2: hunk 2's main code (E2_LOW-E2_HIGH, tools/e2_tables.py) runs from a fast-RAM copy.
 ; At load, a span at the top of ExpMem is reserved when ExpMem is real fast RAM with
 ; MEMCONFIG=1's spare (68020+, with the clock patches); at the
@@ -858,6 +926,7 @@ e2_reserve
         bsr e_spare
         bcs.s .done
         move.l ($18,a0),d0      ; mh_Upper
+        sub.l #B_RESERVE,d0     ; below the slave's buffers
         sub.l #E2_HIGH-E2_LOW,d0
         and.w #$fff0,d0
         movea.l d0,a1
@@ -1004,6 +1073,7 @@ e3_reserve                      ; below hunk 2's copy, or at the top of real fas
         bsr e_spare
         bcs.s .done
         move.l ($18,a0),d0      ; mh_Upper
+        sub.l #B_RESERVE,d0     ; below the slave's buffers
         move.l (e2_copy,pc),d1
         beq.s .top
         move.l d1,d0
@@ -1068,6 +1138,7 @@ e4_reserve
         bsr e_spare
         bcs.s .done
         move.l ($18,a0),d0      ; mh_Upper
+        sub.l #B_RESERVE,d0     ; below the slave's buffers
         move.l (e2_copy,pc),d1
         beq.s .e3
         move.l d1,d0
@@ -1267,7 +1338,7 @@ e4_strip_build
         jsr (a0)
         movem.l d0/a0-a1,-(sp)
         bsr.s e4_strip_chip
-        lea (e4_strip,pc),a1
+        B_LEA B_STRIP,a1
         move.w #$1000/4-1,d0
 .copy
         move.l (a0)+,(a1)+
@@ -1282,7 +1353,7 @@ e4_sky_source                   ; -> A0 the strip + 2, as lea h3+$706
         move.w (e3_soft,pc),d0
         and.w (e4_strip_valid,pc),d0
         beq.s .chip
-        lea (e4_strip+2,pc),a0
+        B_LEA B_STRIP+2,a0
         bra.s .done
 .chip
         bsr.s e4_strip_chip
@@ -1314,8 +1385,6 @@ e6_table
         move.b (a0,d0.w),(-3,a3)
         movea.l (sp)+,a0
         rts
-        CNOP 0,4
-e4_strip ds.b $1000
 
 ; From c2_acquire: the chip back buffer is the one not submitted last; draw in fast RAM.
 e3_acquire
@@ -1937,7 +2006,7 @@ E3_BLOCK = 512
 e3_twin_queue
         movem.l d0-d3/a0-a2,-(sp)
         bsr e3_twin_begin
-        lea (e3_twin_block,pc),a1
+        B_LEA B_TWIN,a1
         move.w (a0)+,d0         ; words - 1
         cmpi.w #E3_BLOCK/2-2,d0
         bls.s .fits
@@ -1986,7 +2055,7 @@ e3_twin_queue
         bra.s .command
 .copied
         bsr e3_twin_chip
-        lea (e3_twin_block,pc),a0
+        B_LEA B_TWIN,a0
         bsr.s .queue
         bsr c2_drain
         bsr e3_twin_fast
@@ -2154,7 +2223,6 @@ e4_checks dc.l 0                ; E4 copies compared with the fast picture
 e4_faults dc.l 0                ; that differ
 e4_first dc.l 0                 ; the first difference's byte offset + 1
 e4_first_tick dc.l 0
-e3_twin_block ds.b E3_BLOCK
         ENDC
 
 c2_live_entry
@@ -2849,7 +2917,7 @@ d1_record                       ; A4 record base, A1 destination
 d1_snapshot
         lea (d1_current,pc),a0
         eori.w #1,(a0)
-        lea (d1_buffers,pc),a1
+        B_LEA B_D1,a1
         tst.w (a0)
         beq.s .header
         adda.w #D1_SIZE,a1
@@ -2879,11 +2947,11 @@ d1_snapshot
 .records
         movea.l (c2_h1,pc),a3
         lea ($256,a3),a4        ; synthetic camera
-        bsr.s d1_record
+        bsr d1_record
         lea ($5d6,a3),a4
         moveq #25,d2
 .car
-        bsr.s d1_record
+        bsr d1_record
         lea ($c0,a4),a4
         dbf d2,.car
         IFNE VERIFY
@@ -3061,7 +3129,7 @@ d3_stage                        ; D0 = kind
         addq.l #1,(a0)
         ; History is the snapshot of the tick before the one drawn: cur inside a
         ; tick (its own snapshot is taken at the pacer), prev between ticks.
-        lea (d1_buffers,pc),a3
+        B_LEA B_D1,a3
         move.w (d1_current,pc),d1
         move.l (c2_clock+WC_TICKS,pc),d2
         tst.w d0
@@ -3129,10 +3197,10 @@ d3_stage                        ; D0 = kind
 .stage
         lea (d5_track,pc),a0
         clr.l (a0)
-        lea (d3_saved,pc),a2
+        B_LEA B_D3_SAVED,a2
         lea (d3_copy_game,pc),a5
         bsr d3_walk
-        lea (d3_staged,pc),a2
+        B_LEA B_D3_STAGED,a2
         cmpi.w #1,d7
         bne.s .build
         lea (d3_copy_history,pc),a5
@@ -3150,7 +3218,7 @@ d3_stage                        ; D0 = kind
 .load
         lea (d3_source,pc),a0
         move.w d7,(a0)
-        lea (d3_staged,pc),a2
+        B_LEA B_D3_STAGED,a2
         lea (d3_load,pc),a5
         bsr d3_walk
         move.l (d5_track,pc),d0
@@ -3180,9 +3248,9 @@ d3_restore
         move.l (a0),d0
         clr.l (a0)
         bsr d5_flags
-        lea (d1_buffers,pc),a3
+        B_LEA B_D1,a3
         IFNE VERIFY
-        lea (d3_staged,pc),a2
+        B_LEA B_D3_STAGED,a2
         lea (d3_compare_game,pc),a5
         bsr d3_walk
         tst.w d5
@@ -3191,7 +3259,7 @@ d3_restore
         addq.l #1,(a0)
 .kept
         ENDC
-        lea (d3_saved,pc),a2
+        B_LEA B_D3_SAVED,a2
         lea (d3_load,pc),a5
         bsr d3_walk
         IFNE VERIFY
@@ -3328,12 +3396,12 @@ d3_tick_check
         beq.s .none
         lea (d3_check_tick,pc),a0
         clr.l (a0)
-        lea (d1_buffers,pc),a3
+        B_LEA B_D1,a3
         move.w (d1_current,pc),d1
         beq.s .cur
         adda.w #D1_SIZE,a3
 .cur
-        lea (d3_saved,pc),a2
+        B_LEA B_D3_SAVED,a2
         lea (d3_compare_saved,pc),a5
         bsr d3_walk
         move.l (c2_clock+WC_TICKS,pc),d1
@@ -3398,15 +3466,15 @@ d3_fields
 D4_JUMP = $100000
 d4_camera                       ; A3 = history snapshot, d3_staged = the game's values
         movem.l d0-d6/a0-a6,-(sp)
-        lea (d3_staged,pc),a2
+        B_LEA B_D3_STAGED,a2
         movea.l (c2_h0,pc),a0
         adda.l #$3a820,a0
         lea (d4_spring,pc),a1
         move.w (a0),(a1)
         IFNE VERIFY
         bsr d4_derive
-        lea (d3_staged,pc),a0
-        lea (d3_saved,pc),a1
+        B_LEA B_D3_STAGED,a0
+        B_LEA B_D3_SAVED,a1
         moveq #D3_GLOBALS/2-1,d1
 .same
         cmpm.w (a0)+,(a1)+
@@ -3615,7 +3683,7 @@ d5_cars                         ; A3 = history snapshot
         movea.l (c2_h1,pc),a4
         lea ($5d6,a4),a4        ; the game's record
         lea (D1_HEADER+D1_RANGES+D1_RECORD,a3),a3 ; the history's (after the synthetic camera)
-        lea (d3_staged+D3_GLOBALS+38,pc),a2 ; the staged
+        B_LEA B_D3_STAGED+D3_GLOBALS+38,a2 ; the staged
         moveq #25,d7
 .car
         move.b ($7e,a4),d6
@@ -3853,7 +3921,7 @@ d7_aim                          ; A3 = history snapshot, d3_staged with predicte
         IFNE VERIFY
         movea.l ($238,a5),a0
         movea.l ($12,a0),a6
-        lea (d3_saved+4,pc),a1
+        B_LEA B_D3_SAVED+4,a1
         bsr d7_place
         cmp.l ($a,a1),d0
         bne.s .fault
@@ -3883,7 +3951,7 @@ d7_aim                          ; A3 = history snapshot, d3_staged with predicte
         btst d0,d5
         sne d5                  ; drawn in the other representation (D5)
         mulu.w #38,d0
-        lea (d3_staged+D3_GLOBALS+38,pc),a2
+        B_LEA B_D3_STAGED+D3_GLOBALS+38,a2
         adda.w d0,a2
         movea.l ($238,a5),a1
         lea (d7_record,pc),a0
@@ -3897,7 +3965,7 @@ d7_aim                          ; A3 = history snapshot, d3_staged with predicte
         move.l (24,a2),($28,a0)
         move.l (28,a2),($2c,a0)
         movea.l (10,a2),a6
-        lea (d3_staged+4,pc),a1
+        B_LEA B_D3_STAGED+4,a1
         bsr d7_place
         move.l d0,($a,a1)
         move.l d1,($e,a1)
@@ -4163,7 +4231,7 @@ c2_hud_enqueue
         move.w d2,(a1)
 .high
         mulu.w #C2_HUD_STRIDE,d1
-        lea (c2_hud_buffer,pc),a1
+        B_LEA B_HUD,a1
         adda.l d1,a1
         move.w d0,(a1)+
         move.w d0,d1
@@ -4398,7 +4466,7 @@ c2_hud_flush
         lea (c2_hud_remaining,pc),a0
         move.w (c2_hud_count,pc),(a0)
         lea (c2_hud_read,pc),a0
-        lea (c2_hud_buffer,pc),a1
+        B_LEA B_HUD,a1
         move.l a1,(a0)
         lea (c2_hud_saved,pc),a1
         movea.l (c2_h2,pc),a0
@@ -4882,7 +4950,6 @@ d2_leads dc.w 0,0               ; last measured lead per kind
 d2_weight dc.w 0                ; the history's, unsigned Q14 (D10)
 d10_pits ds.b 3*D10_PIT          ; per pit sprite (D10)
 d1_current dc.w 0
-d1_buffers ds.b 2*D1_SIZE
 d3_pictures dc.l 0              ; pictures seen
 d3_staged_pictures dc.l 0
 d3_latest dc.l 0                ; alpha 0: no history used
@@ -4911,8 +4978,7 @@ d7_record ds.b $80              ; a staged car as the pose accessor reads it
 d3_active dc.w 0
 d3_kind dc.w 0
 d3_source dc.w 0                ; 0 authoritative, 1 previous tick, 2 predicted
-d3_saved ds.b D3_SIZE
-d3_staged ds.b D3_SIZE
+d3_end                          ; the saved and staged inputs follow in the buffers (B_D3_SAVED)
         ENDC
 
 ; BASELINE_PATCHES_BEGIN: mandatory B3 loader patches and H3's fix, never feature-gated.
@@ -5129,6 +5195,7 @@ names_rnc
         EVEN
 
         IFNE DEVELOPER
-        CNOP 0,4
-c2_hud_buffer ds.b C2_HUD_STRIDE*C2_HUD_CAPACITY
+        IFGT B_SIZE-B_RESERVE
+        FAIL the slave's buffers exceed B_RESERVE
+        ENDC
         ENDC

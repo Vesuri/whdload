@@ -71,13 +71,26 @@ def swapped(pointers, h1):
     return [(1, 0x53de, join+0x2e-0x53de), (1, branch, end+0x2e-branch)]
 
 
-def regions(base, bases, symbols, game=GAME):
-    """D2 state, c3 counters, D1 buffers, the D3 block and the game stage memory."""
-    assert symbols['d3_staged'] - symbols['d3_saved'] == SIZE
+# The saved inputs' offset in the slave's buffer block, the staged follow (B_D3_SAVED).
+BUFFERS_SAVED = d1.BUFFERS_D1 + 2*d1.SIZE
+
+
+def staged_offsets(symbols):
+    """(saved, staged) offsets in the captured D3 block: after d3_end, where the slave
+    kept them before they moved to its buffer block."""
+    value = lambda key: int(symbols[key], 16) if isinstance(symbols[key], str) else symbols[key]
+    saved = value('d3_end' if 'd3_end' in symbols else 'd3_saved') - value('d3_pictures')
+    return saved, saved+SIZE
+
+
+def regions(base, bases, symbols, block, game=GAME):
+    """D2 state, c3 counters, D1 buffers, the D3 block (with the saved and staged inputs
+    from the buffer block at BLOCK) and the game stage memory."""
     slave = [(base+symbols['c2_serial'], symbols['d1_current']-symbols['c2_serial']),
              (base+symbols['c3_epochs'], 20),
-             (base+symbols['d1_current'], 2+2*d1.SIZE),
-             (base+symbols['d3_pictures'], symbols['d3_staged']+SIZE-symbols['d3_pictures'])]
+             d1.Pieces([(base+symbols['d1_current'], 2), (block+d1.BUFFERS_D1, 2*d1.SIZE)]),
+             d1.Pieces([(base+symbols['d3_pictures'], symbols['d3_end']-symbols['d3_pictures']),
+                        (block+BUFFERS_SAVED, 2*SIZE)])]
     return slave + [(bases[h]+offset, size) for h, offset, size in game]
 
 
@@ -150,6 +163,7 @@ def check(directory, mutate=None, collect=None, drawn=None):
         tick_cur[key(d1.HEADER.unpack_from(cur)[2], item['tick'])] = cur
     at_slave = lambda name: symbols[name]-symbols['c2_serial']
     at_d3 = lambda name: symbols[name]-symbols['d3_pictures']
+    saved_at, staged_at = staged_offsets(symbols)
     camera = 'd4_predicted' in symbols
     if camera:
         import d4_camera
@@ -182,8 +196,8 @@ def check(directory, mutate=None, collect=None, drawn=None):
         epochs = struct.unpack_from('>I', counters)[0]
         values = dict(zip(COUNTERS, struct.unpack_from('>10I', block)))
         kind, source = (struct.unpack_from('>H', block, at_d3(name))[0] for name in ('d3_kind', 'd3_source'))
-        saved = block[at_d3('d3_saved'):at_d3('d3_saved')+SIZE]
-        staged = block[at_d3('d3_staged'):at_d3('d3_staged')+SIZE]
+        saved = block[saved_at:saved_at+SIZE]
+        staged = block[staged_at:staged_at+SIZE]
         cur, prev = d1.split(buffers)
         history = cur if kind == TICK else prev
         tick = ticks + (1 if kind == TICK else 0)
@@ -303,13 +317,6 @@ def check(directory, mutate=None, collect=None, drawn=None):
                 failure_ticks=sorted({f.get("tick") for f in failures if "tick" in f}))
 
 
-def symbols_offset(directory, name):
-    """Offset of a slave symbol in the captured D3 block."""
-    symbols = json.loads((Path(directory)/'meta.json').read_text())['symbols']
-    value = lambda key: int(symbols[key], 16) if isinstance(symbols[key], str) else symbols[key]
-    return value(name) - value('d3_pictures')
-
-
 def negative(directory, camera=False, cars=False, aim=False):
     """Each injected defect must be rejected."""
     def flip(where, stop=200):
@@ -319,8 +326,9 @@ def negative(directory, camera=False, cars=False, aim=False):
         return mutate
     game_h0 = lambda sizes, offset: sum(sizes[:5]) + offset - 0x3a70c   # restored game, h0 part
     game_camera = lambda sizes: [game_h0(sizes, 0x3a7fc)]     # published coarse X
-    staged = lambda sizes: sum(sizes[:3]) + symbols_offset(directory, 'd3_staged')
-    saved = lambda sizes: sum(sizes[:3]) + symbols_offset(directory, 'd3_saved')
+    offsets = staged_offsets(json.loads((Path(directory)/'meta.json').read_text())['symbols'])
+    saved = lambda sizes: sum(sizes[:3]) + offsets[0]
+    staged = lambda sizes: sum(sizes[:3]) + offsets[1]
     staged_byte = lambda sizes: [staged(sizes) + SIZE - 100]  # staged car byte
     saved_byte = lambda sizes: [saved(sizes) + SIZE - 100]    # saved car byte
     # The same published-camera byte (third byte of world X) in both D1 buffers (cur and prev).

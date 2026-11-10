@@ -14,6 +14,7 @@ import gzip
 import hashlib
 import json
 from pathlib import Path
+import re
 import struct
 
 # Header: field number, tick, epoch, rebased fields, reconstructions, mode, draw mode.
@@ -38,11 +39,39 @@ GAME = ((1, 0x224, 0x316-0x224), (0, 0x3a70c, 0x3a910-0x3a70c), (2, 0x231d4, 20)
         (2, 0x231a0, 2))
 
 
-def regions(base, bases, symbols):
-    """Extra (start, size) regions for c5_capture.states: slave counters, buffers, game."""
+# The two snapshots' offset in the slave's buffer block (B_D1 in src/F1GP.s).
+BUFFERS_D1 = 0
+
+
+class Pieces(tuple):
+    """A capture region (start, size) whose bytes are appended from several pieces in
+    turn, so a capture keeps the layout of one region."""
+    def __new__(cls, pieces):
+        region = super().__new__(cls, (pieces[0][0], sum(size for _, size in pieces)))
+        region.pieces = tuple(pieces)
+        return region
+
+
+def pieces(region):
+    return getattr(region, 'pieces', (region,))
+
+
+def buffers(command, base, symbols):
+    """The address of the slave's buffer block (b_reserve), read from b_buffers."""
+    reply = command('gdb', f'p/x *(unsigned int*){base+symbols["b_buffers"]:#x}')
+    found = re.search(r'=\s*(0x[0-9a-fA-F]+)', reply)
+    if not found or not int(found[1], 16):
+        raise ValueError(f'the slave buffers are not reserved: {reply}')
+    return int(found[1], 16)
+
+
+def regions(base, bases, symbols, block):
+    """Extra (start, size) regions for c5_capture.states: slave counters, d1_current with
+    the two snapshots from the buffer block at BLOCK, game."""
     epochs = symbols['c3_epochs']
     assert symbols['c3_reconstructions'] == epochs+12 and symbols['c3_rebased'] == epochs+16
-    slave = [(base+epochs, 20), (base+symbols['d1_current'], 2+2*SIZE)]
+    slave = [(base+epochs, 20),
+             Pieces([(base+symbols['d1_current'], 2), (block+BUFFERS_D1, 2*SIZE)])]
     return slave + [(bases[h]+offset, size) for h, offset, size in GAME]
 
 

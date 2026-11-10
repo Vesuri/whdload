@@ -1087,6 +1087,29 @@ With WHDLoad's `CACHE` option the green window's work per frame fell from 71.7 t
 is off under the supplied slave by default. (That run's race differed: green came 124
 fields earlier and hunk 2 loaded `$A8` lower.)
 
+### The slave's buffers
+
+The developer and release slaves keep their buffers out of the slave file: D1's two
+snapshots, D3's saved and staged inputs, E4's sky strip, E3's twin block (VERIFY) and
+C2's HUD list (2048 commands of 96 bytes), 207,344 bytes in all (`B_SIZE`). `FASTMEMSIZE`
+grows by `B_RESERVE` (`$33000`), so `ws_ExpMem` is `$F3000`, and `b_reserve` takes the top
+`B_RESERVE` bytes of the ExpMem header with `AllocAbs` and clears them on entry to
+`_bootdos`, before the frontend, the game or the OS allocate. The game therefore sees the
+memory it saw before; E2–E4's `MEMCONFIG=1` areas are taken below the block. Every user of
+the buffers is in the clock's patch list, which stays out if the reserve fails. The slave
+reaches them through `b_buffers` (`B_LEA`), and the capture tools read that pointer
+(`d1_snapshot.buffers`) and append the snapshots and staged inputs after the slave's own
+words, so captures keep their layout.
+
+The release slave fell from 232,844 to 25,688 bytes. Against the previous release build
+(`26f81292…`), at the first race field of `quickrace`, the free chunks of both memory
+headers (offsets from `mh_Lower`), the free totals (24,568 ExpMem and 60,600 chip bytes;
+26,472 ExpMem with `MEMCONFIG=1`) and the four hunks' offsets are identical on the
+A500-equivalent, the chip-only A1200, the 030 and the 030 with `MEMCONFIG=1`. Every run
+reached the race and quit with F10. On the VERIFY build (030, `CUSTOM2=11`), D1's current
+snapshot read through the pointer equals the game's renderer inputs, and D3's saved inputs
+equal the restored game bytes. These are single stops, not whole-race captures.
+
 ## Frame pacing
 
 The main loop ends each frame in a busy-wait at hunk 0 `$127C–$128B` (f1gp 582992 bytes):
@@ -2783,14 +2806,14 @@ operands: 151 in hunk 0 and 316 in hunk 2. The tables contain offsets derived fr
 game and are generated under `tmp/`.
 
 **At run time.** Developer builds are WHDLoad 20 slaves (`slv_Version` 20) with one
-alternative memory configuration: `MEMCONFIG=1` adds `E_AREAS` (`$25000`, 148 KB) of ExpMem
-for E2's copy, E3's picture and E4's shadows. The default stays the release's
-(`FASTMEMSIZE` `$80000`), because a chip-only 2 MB A1200 cannot allocate even about 32 KB
+alternative memory configuration: `MEMCONFIG=1` adds `E_AREAS` (`$29000`, 164 KB) of ExpMem
+for E2's copy, E3's picture, E4's shadows and E4's renderer data. The default adds only the
+slave's buffers ([the slave's buffers](#the-slaves-buffers)) to the game's `$80000`, because a chip-only 2 MB A1200 cannot allocate even about 32 KB
 more (WHDLoad's "Can't allocate ExpMem"), whether in ExpMem or in the slave, and the
 game leaves only about 24 KB of ExpMem free in a race. After patching, on a 68020 or
 later whose fast memory header lies in real fast RAM (at or above `$200000`) and spans
-more than `FASTMEMSIZE` (the spare is present), `e2_reserve` takes the top of it with
-`AllocAbs`, where the game never allocates. `c2_capture.py` passes `MEMCONFIG=1` with
+more than `FASTMEMSIZE` (the spare is present), `e2_reserve` takes the top of it below the
+slave's buffers with `AllocAbs`, where the game never allocates. `c2_capture.py` passes `MEMCONFIG=1` with
 `--e2`/`--e3`/`--e4` on machines with fast RAM (`--memconfig` overrides). At the first live epoch, `e2_enable` copies the span and flushes the caches.
 It then adds the copy's offset to each listed operand that still holds `JSR`/`JMP`
 absolute with a target in the span, in the chip original and, for hunk 2 operands in the
@@ -2841,7 +2864,7 @@ buffer into the back one, chip to chip. In a 100-field profile window on the 030
 VBL wait 9.8%), so the CPU spends most of a picture waiting for the display.
 
 **Design.** `e3_reserve` allocates a 32,000-byte buffer F with `AllocAbs` below E2's copy
-(or at the top of real fast RAM), under the same conditions as E2 (`MEMCONFIG=1`'s spare
+(or below the slave's buffers at the top of real fast RAM), under the same conditions as E2 (`MEMCONFIG=1`'s spare
 ExpMem in real fast RAM, 68020 or later); with E4 the same block also holds E4's two
 shadows. F always holds the last published picture.
 

@@ -60,7 +60,7 @@ def capture(args):
     if build['slave_sha256'] != sha(slave) or build['source_sha256'] != sha(SOURCE):
         raise ValueError('stale C2 build')
     symbols = {n: int(o, 16) for n, o in re.findall(
-        r'^([cde][1-9]_\w+)\s+00:([0-9A-F]+)$',
+        r'^((?:[cde][1-9]|b)_\w+)\s+00:([0-9A-F]+)$',
         (slave.parent / 'F1GP.lst').read_text(errors='replace'), re.M)}
     sock = RUN/'f1gp.sock'
     if sock.exists():

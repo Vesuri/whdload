@@ -207,15 +207,17 @@ def states(args, command, out, base, bases, symbols, meta):
     if getattr(args, 'snapshot', False):
         # D1: stop after the snapshot, still before the pacer counts the tick.
         import d1_snapshot
-        regions += d1_snapshot.regions(base, bases, symbols)
+        regions += d1_snapshot.regions(base, bases, symbols, d1_snapshot.buffers(command, base, symbols))
         stop, condition = 'd1_done', ''
     paths = [out/f'ticks-{n}.bin' for n in range(len(regions))]
     for path in paths:
         path.write_bytes(b'')
     # gdb appends each region at every tick's pacer entry and continues by itself,
     # so the whole race needs one client round trip; the epoch close stops it.
+    import d1_snapshot
     appends = '\n'.join(f'append binary memory {path} {start:#x} {start+size:#x}'
-                         for path, (start, size) in zip(paths, regions))
+                         for path, region in zip(paths, regions)
+                         for start, size in d1_snapshot.pieces(region))
     command('gdb', 'delete breakpoints')
     command('gdb', f'break *{base+symbols[stop]:#x}')
     if condition:
@@ -238,12 +240,14 @@ def states(args, command, out, base, bases, symbols, meta):
         # D7: the track stretches the pit lane swaps with, from the start wrap pointers.
         command('gdb', f'dump binary memory {out}/track-start-h2.bin {bases[2]+0x1fab8:#x} {bases[2]+0x1fae8:#x}')
         game = d3_stage.GAME + tuple(d3_stage.swapped((out/'track-start-h2.bin').read_bytes(), bases[1]))
-        stage_regions = d3_stage.regions(base, bases, symbols, game)
+        stage_regions = d3_stage.regions(base, bases, symbols,
+                                         d3_stage.d1.buffers(command, base, symbols), game)
         stage_paths = [out/f'stages-{n}.bin' for n in range(len(stage_regions))]
         for path in stage_paths:
             path.write_bytes(b'')
         stage_appends = '\n'.join(f'append binary memory {path} {start:#x} {start+size:#x}'
-                                   for path, (start, size) in zip(stage_paths, stage_regions))
+                                   for path, region in zip(stage_paths, stage_regions)
+                                   for start, size in d3_stage.d1.pieces(region))
         command('gdb', f'break *{base+symbols["d3_restored"]:#x}')
         command('gdb', f'commands $bpnum\nsilent\n{stage_appends}\ncontinue\nend')
     if getattr(args, 'twin', False):

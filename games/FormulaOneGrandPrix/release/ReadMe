@@ -10,9 +10,9 @@ Supported: - 4 disk original release/PowerPlus budget release (Mad-Matt)
 
 REQUIREMENTS:
 - Slave requires WHDLoad V20+ and an installed A500 Kickstart 1.3 image
-- Game requires 512k chip mem and 768k other memory (+3.2Mb other memory 
+- Game requires 512k chip mem and 972k other memory (+3.2Mb other memory 
   for preload option). MEMCONFIG=1, set in the supplied icons, raises
-  this to 932k other memory. Remove the MEMCONFIG tooltype on machines
+  this to 1136k other memory. Remove the MEMCONFIG tooltype on machines
   without fast memory
 
 FEATURES:
