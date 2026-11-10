@@ -32,7 +32,9 @@ Driven by the game's release/release.json:
 - source (optional): the archive's slave source drawer. Its files are replaced by exactly
   the game's src/ files the listed variants' release builds were assembled from (the .deps
   lists), keeping src/-relative paths in the files' own spelling (an include may name a
-  file in another case). Only an archive that already ships source gets one.
+  file in another case). Only an archive that already ships source gets one. "keep" lists
+  shipped members of the drawer that stay as shipped: the source of a binary the release
+  does not change (an install imager), its makefile.
 
 Checks: every replaced slave and ReadMe must differ from the original, a replaced ReadMe
 must mention the version, the archive must pass `lha t`, and its extraction must hold
@@ -157,6 +159,9 @@ def main():
                 shipped = {m for m in before if m.startswith(drawer + '/')}
                 if not shipped:
                     sys.exit(f'{entry["input"]}: ships no source in {drawer}/')
+                keep = {f'{drawer}/{m}' for m in source.get('keep', [])}
+                if keep - shipped:
+                    sys.exit(f'{entry["input"]}: keep names no shipped {", ".join(sorted(keep - shipped))}')
                 wanted = {}
                 for variant in source['variants']:
                     deps = build / f'{variant}.deps'
@@ -167,7 +172,9 @@ def main():
                         if not dep.startswith('src/'):
                             sys.exit(f'{variant} is built from {dep}, outside src/; ship it by hand')
                         wanted[f'{drawer}/{dep[len("src/"):]}'] = root / dep
-                for member in shipped - set(wanted):
+                if keep & set(wanted):
+                    sys.exit(f'{entry["input"]}: the build replaces kept {", ".join(sorted(keep & set(wanted)))}')
+                for member in shipped - set(wanted) - keep:
                     (stage / member).unlink()
                     removed.add(member)
                 for member, path in wanted.items():
@@ -207,7 +214,8 @@ def main():
             for member in sorted(got):
                 if not filecmp.cmp(check / member, stage / member, shallow=False):
                     sys.exit(f'{member} differs from the staged file')
-            changed = set(replace) | added | {m for m in got if source and m.startswith(source['dir'].rstrip('/') + '/')}
+            changed = set(replace) | added | {m for m in got if source and m.startswith(source['dir'].rstrip('/') + '/')
+                                               and m[len(source['dir'].rstrip('/')) + 1:] not in source.get('keep', [])}
             for member in sorted(got - changed):
                 if not filecmp.cmp(check / member, orig_dir / member, shallow=False):
                     sys.exit(f'{member} changed but was not declared')

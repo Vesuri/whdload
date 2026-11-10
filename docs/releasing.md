@@ -35,7 +35,8 @@ What the packager enforces, after AmigaXDev's WHDLoad playbook §13:
   Every other member is byte-identical to the original; replaced slaves and ReadMes differ.
 - Source ships only where the original shipped source, and then exactly the `src/` files the
   release build was assembled from (`tmp/build/release/<Variant>.deps`). The original
-  source of a binary the release ships unchanged (an install imager) stays as shipped.
+  source of a binary the release ships unchanged (an install imager) and its makefile stay
+  as shipped: list them in the source drawer's `keep`, and the packager checks they are.
 - LHa for UNIX, level-1 headers, lh5 (`a1o5q2`); the result must pass `lha t` and extract
   to exactly the staged files.
 - A replaced ReadMe mentions the version.
