@@ -21,6 +21,9 @@
 EXP_HEAP	= $c000				;public allocations, after the program
 EXP_WORK	= $1c000			;the slave's buffers
 EXP_STACK	= $2000				;the stack
+GFX_SIZE	= 240000			;alloc 2
+GFX_BUGGY	= $d3a8				;the player's buggy in it: 4 planes, 8000 apart,
+BUGGY_BYTES	= 40*40				;of 40 rows of 40 bytes; the logic animates plane 1
 
 W_SAVE		= 0				;the state saved around a frame between ticks
 W_PREV		= $600				;the state of the tick before the last
@@ -28,14 +31,16 @@ W_SCREEN	= $1000				;fast memory: the road's screen (as a chip one)
 W_ROADGFX	= $9000				;fast memory: copy of alloc 4 (the road's source)
 W_BLT		= $17000			;the clear's blitter registers, recorded (_QClear)
 W_QUEUE		= $17080			;the recorded blits, Q_ENTRY bytes each
+W_GFX		= $17800			;fast memory: copy of alloc 2 (the graphics)
+W_END		= W_GFX+GFX_SIZE
 	IFD VERIFY
-W_VERIFY	= $17800			;copy of the program
-W_LOG		= $22800			;the log (tools/verify.py)
-W_VCOURSES	= $22c00			;copy of COURSES.DAT
-W_VCLEAR	= $32800			;the queued clear's rows 0 to 103, against 1.3's
-W_SIZE		= $37000
+W_VERIFY	= $52800			;copy of the program
+W_LOG		= W_VERIFY+$b000		;the log (tools/verify.py)
+W_VCOURSES	= W_LOG+$400			;copy of COURSES.DAT
+W_VCLEAR	= W_VCOURSES+$10000		;the queued clear's rows 0 to 103, against 1.3's
+W_SIZE		= (W_VCLEAR+$4800+$fff)&-$1000
 	ELSE
-W_SIZE		= $18000
+W_SIZE		= (W_END+$fff)&-$1000
 	ENDC
 EXPSIZE		= $10000+EXP_WORK+W_SIZE+EXP_STACK	;ws_ExpMem (optional)
 	IFNE EXPSIZE&$fff
@@ -62,6 +67,7 @@ REGIONS_SIZE	= ($9d6c-$9860)+$10+$20		;_StateRegions
 P_PROJECT	= $2352				;the road projection (part of the logic)
 P_SCREENSEL	= $9818				;word: 0 or 4, then the two screens' pointers
 P_ROADGFX	= $982a				;pointer to alloc 4
+P_GFX		= $982e				;pointer to alloc 2 (the graphics)
 ROADGFX_SIZE	= 57088
 SCREEN_SIZE	= 32000				;4 planes of 8000 bytes
 ROAD_TOP	= 104*40			;the road: rows 104 to 199 of every plane
@@ -264,13 +270,16 @@ _TickPatch	movem.l	d0-d1/a0-a2,-(sp)
 		move.l	_Work(pc),a0
 		add.l	#W_LOG,a0
 		move.l	a0,$3c0			;for the tools
-		move.w	#$350/4-1,d0
+		move.w	#$360/4-1,d0
 .clr		clr.l	(a0)+
 		dbf	d0,.clr
 	ENDC
 		lea	_PL_Tick(pc),a0
 		move.l	a5,a1
 		move.l	_resload(pc),a2
+		jsr	resload_Patch(a2)
+		lea	_PL_Plot(pc),a0
+		move.l	a5,a1
 		jsr	resload_Patch(a2)
 		TSTPC	_FastExp
 		beq.b	.no
@@ -615,6 +624,47 @@ _QSync		TSTPC	_QBusy
 		rts
 
 	IFD VERIFY
+; Alloc 2 against its fast copy, but for the buggy's plane 1, every 16th
+; frame of the race loop: log + $350 counts the frames, + $354 the longwords
+; that differ, + $358 and + $35C the lowest and highest offset.
+_CompareGfx	movem.l	d0-d1/a0-a2,-(sp)
+		move.l	_Work(pc),a2
+		add.l	#W_LOG+$350,a2
+		TSTPC	_FastExp
+		beq.b	.none
+		lea	_VGfxCount(pc),a0
+		addq.w	#1,(a0)
+		and.w	#15,(a0)
+		bne.b	.none
+		addq.l	#1,(a2)+
+		move.l	_GfxLo(pc),a0
+		move.l	_Work(pc),a1
+		add.l	#W_GFX,a1
+		move.l	#GFX_SIZE/4-1,d0
+.cmp		cmpm.l	(a0)+,(a1)+
+		beq.b	.same
+		move.l	a0,d1
+		sub.l	_GfxLo(pc),d1
+		sub.l	#GFX_BUGGY+8000+4,d1
+		cmp.l	#BUGGY_BYTES,d1
+		blo.b	.same			;the animated plane
+		addq.l	#1,(a2)
+		move.l	a0,d1
+		sub.l	_GfxLo(pc),d1
+		subq.l	#4,d1
+		tst.l	4(a2)
+		beq.b	.min
+		cmp.l	4(a2),d1
+		bhs.b	.max
+.min		move.l	d1,4(a2)		;+ $358: the lowest offset that differed
+.max		cmp.l	8(a2),d1
+		bls.b	.same
+		move.l	d1,8(a2)		;+ $35C: the highest
+.same		subq.l	#1,d0
+		bpl.b	.cmp
+.none		movem.l	(sp)+,d0-d1/a0-a2
+		rts
+
 ; The queued clear's rows 0 to 103 against 1.3's clear drawn after it, from
 ; the same horizon: log + $348 counts the frames (its high word those whose
 ; horizon differs), + $34C the longwords that differ.
@@ -665,6 +715,208 @@ _CompareClear	movem.l	d0-d7/a0-a6,-(sp)
 		rts
 	ENDC
 
+; The CPU's masked plotters, each screen word or longword read and written
+; once per plane instead of an and and an or in place (half the chip
+; accesses); every register and flag they leave is the original's. With
+; fast ExpMem and between _PreDraw and _PostDraw (_GfxDelta set), the column
+; plotter reads its source from the fast copy of alloc 2 that _RaceInit
+; makes, unless the source overlaps the player's buggy: the logic ($1434)
+; animates that graphic in place, the only part of alloc 2 that changes in a
+; race (the VERIFY build compares the rest).
+_PL_Plot	PL_START
+		PL_P	$3dc4,_PlotColumn	;the column loop to its rts
+		PL_P	$41a4,_PlotBuggy	;the buggy's loops to their rts
+		PL_PSS	$4a94,_PlotText,62	;the 8 rows of a HUD character
+		PL_END
+
+; a1 = source, d4.w = rows - 1, (a3) = the source's stride up per row (2 or
+; 42), a0 = the screen (a2 = a0 + 2), d6 = shift, d3/d5 = the colours.
+_PlotColumn	movem.l	a4-a5,-(sp)
+		move.w	d4,-(sp)
+		sub.l	a5,a5
+		move.l	_GfxDelta(pc),d0
+		beq.b	.go
+		move.l	a1,d1			;the rows the source spans
+		cmp.l	_GfxLo(pc),d1
+		blo.b	.go
+		moveq	#0,d2
+		move.w	(a3),d2
+		subq.w	#2,d2
+		moveq	#0,d7
+		move.w	d4,d7
+		addq.l	#1,d7
+		mulu.w	d7,d2
+		sub.l	d2,d1
+		cmp.l	_GfxLo(pc),d1
+		blo.b	.go
+		move.l	a1,d2
+		add.l	#24002,d2
+		cmp.l	_GfxHi(pc),d2
+		bhi.b	.go
+		sub.l	#24000,d2		;[d1, d2): the span of plane 0
+		move.l	_GfxLo(pc),d7
+		add.l	#GFX_BUGGY+3*8000+BUGGY_BYTES,d7
+		moveq	#7-1,d4			;the buggy's planes, from 3 below to 3 above
+.buggy		cmp.l	d7,d1
+		bhs.b	.clear
+		move.l	d7,a4
+		suba.w	#BUGGY_BYTES,a4
+		cmp.l	a4,d2
+		bls.b	.clear
+		move.w	(sp),d4			;overlaps: from chip
+		bra.b	.go
+.clear		sub.l	#8000,d7
+		dbf	d4,.buggy
+		move.w	(sp),d4
+		move.l	d0,a5
+		add.l	a5,a1
+.go		addq.l	#2,sp
+.row		move.w	d4,-(sp)
+		moveq	#-1,d0
+		moveq	#0,d1
+		moveq	#0,d2
+		moveq	#0,d7
+		moveq	#0,d4
+		move.w	(a1)+,d1
+		move.w	7998(a1),d2
+		move.w	15998(a1),d7
+		move.w	23998(a1),d4
+		move.w	d4,d0
+		not.w	d0
+		or.w	d1,d0
+		or.w	d2,d0
+		or.w	d7,d0
+		not.w	d0
+		rol.l	d6,d0			;the mask: 1 keeps the screen
+		lsl.l	d6,d1
+		lsl.l	d6,d2
+		lsl.l	d6,d7
+		lsl.l	d6,d4
+		not.l	d0
+		and.l	d0,d4
+		swap	d3
+		swap	d1
+		and.w	d3,d1
+		swap	d1
+		and.w	d3,d1
+		swap	d3
+		swap	d2
+		and.w	d3,d2
+		swap	d2
+		and.w	d3,d2
+		swap	d5
+		swap	d7
+		and.w	d5,d7
+		swap	d7
+		and.w	d5,d7
+		swap	d5
+		swap	d4
+		and.w	d5,d4
+		swap	d4
+		and.w	d5,d4
+		not.l	d0
+		move.l	d6,a4
+		move.l	(a0),d6
+		and.l	d0,d6
+		or.l	d1,d6
+		move.l	d6,(a0)
+		move.l	8000(a0),d6
+		and.l	d0,d6
+		or.l	d2,d6
+		move.l	d6,8000(a0)
+		move.l	16000(a0),d6
+		and.l	d0,d6
+		or.l	d7,d6
+		move.l	d6,16000(a0)
+		move.l	24000(a0),d6
+		and.l	d0,d6
+		or.l	d4,d6
+		move.l	d6,24000(a0)
+		move.l	a4,d6
+		not.l	d0
+		addq.l	#2,a0
+		addq.l	#2,a2
+		move.w	(sp)+,d4
+		suba.w	#42,a0
+		suba.w	#42,a2
+		suba.w	(a3),a1
+		dbf	d4,.row
+		suba.l	a5,a1
+		movem.l	(sp)+,a4-a5		;flags: the move.w (sp)+,d4's
+		rts
+
+; a0 = the screen, a1 = alloc 2 + $D3A8: 40 rows of 4 longwords; source
+; plane 0 is the mask, 1 goes to screen plane 0, 2 to 1 and 2, 3 to 3.
+_PlotBuggy	movem.l	d0/d5-d6,-(sp)
+		moveq	#24,d2
+		moveq	#39,d4
+.row		moveq	#3,d3
+.long		move.l	(a1)+,d1		;the mask
+		move.l	24000(a0),d0
+		and.l	d1,d0
+		or.l	23996(a1),d0
+		move.l	d0,24000(a0)
+		move.l	15996(a1),d6
+		move.l	16000(a0),d0
+		and.l	d1,d0
+		or.l	d6,d0
+		move.l	d0,16000(a0)
+		move.l	8000(a0),d0
+		and.l	d1,d0
+		or.l	d6,d0
+		move.l	d0,8000(a0)
+		move.l	7996(a1),d5
+		move.l	(a0),d0
+		and.l	d1,d0
+		move.l	d5,d1
+		or.l	d5,d0
+		move.l	d0,(a0)+		;flags as the original's last or.l
+		dbf	d3,.long
+		adda.w	d2,a0
+		adda.w	d2,a1
+		dbf	d4,.row
+		movem.l	(sp)+,d0/d5-d6
+		rts
+
+; a1/a2 = the two glyphs' rows, a0 = the screen, d2/d3 = the colours.
+_PlotText	move.l	d6,-(sp)
+		moveq	#7,d4
+.row		move.w	(a1)+,d7
+		move.w	(a2)+,d0
+		move.w	d0,d1
+		move.b	d7,d1
+		rol.w	#8,d1
+		move.b	d1,d7
+		move.b	d0,d1
+		move.w	d1,d0
+		swap	d0
+		move.w	d1,d0
+		move.l	d0,d1
+		and.l	d2,d0
+		and.l	d3,d1
+		move.w	24000(a0),d6
+		and.w	d7,d6
+		or.w	d1,d6
+		move.w	d6,24000(a0)
+		swap	d1
+		move.w	16000(a0),d6
+		and.w	d7,d6
+		or.w	d1,d6
+		move.w	d6,16000(a0)
+		move.w	8000(a0),d6
+		and.w	d7,d6
+		or.w	d0,d6
+		move.w	d6,8000(a0)
+		swap	d0
+		move.w	(a0),d6
+		and.w	d7,d6
+		or.w	d0,d6
+		move.w	d6,(a0)
+		lea	40(a0),a0
+		dbf	d4,.row
+		movem.l	(sp)+,d6		;flags: the last write's, as the original's or.w
+		rts
+
 ; Before the race loop: the first pass runs the logic and draws its result.
 _RaceInit	move.l	a0,-(sp)
 		lea	_Pending(pc),a0
@@ -684,6 +936,27 @@ _RaceInit	move.l	a0,-(sp)
 		move.w	#ROADGFX_SIZE/4-1,d0
 .gfx		move.l	(a0)+,(a1)+
 		dbf	d0,.gfx
+		move.l	_ProgBase(pc),a0
+		add.l	#P_GFX,a0
+		move.l	(a0),a0
+		lea	_GfxLo(pc),a1
+		move.l	a0,(a1)+		;_GfxLo
+		move.l	a0,d0
+		add.l	#GFX_SIZE,d0
+		move.l	d0,(a1)+		;_GfxHi
+		move.l	_Work(pc),d0
+		add.l	#W_GFX,d0
+		sub.l	a0,d0
+		move.l	d0,(a1)			;_GfxRace
+		move.l	_Work(pc),a1
+		add.l	#W_GFX,a1
+		move.l	#GFX_SIZE/16-1,d0
+.gfx2		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		subq.l	#1,d0
+		bpl.b	.gfx2
 		movem.l	(sp)+,d0/a1
 .nogfx		move.l	(sp)+,a0
 		lea	$dff000,a0		;stolen
@@ -743,12 +1016,15 @@ _PreDraw	movem.l	d0-d7/a0-a6,-(sp)
 		bsr	_CompareRoad
 		bsr	_CpuSky
 		bsr	_QSync
-		bra	_CompareClear
+		bsr	_CompareClear
 	ELSE
 		bsr	_CopyRoad
 		bsr	_CpuSky
-		bra	_QSync
+		bsr	_QSync
 	ENDC
+		lea	_GfxDelta(pc),a0	;the objects' and the buggy's source
+		move.l	_GfxRace(pc),(a0)
+		rts
 
 ; The pose of a frame between ticks, in the live state (S_next, the last
 ; tick's result; W_PREV holds S_prev, the tick before, in the same layout).
@@ -850,6 +1126,11 @@ _Pose		move.w	d0,d7
 ; restores the state and goes straight back to the loop: the checks after
 ; the swap (race end, right button, left button delay) see only tick frames.
 _PostDraw	movem.l	d0-d1/a0-a1,-(sp)
+		lea	_GfxDelta(pc),a0
+		clr.l	(a0)
+	IFD VERIFY
+		bsr	_CompareGfx
+	ENDC
 		TSTPC	_Staged
 		beq.b	.swap
 		bsr	_RestoreState
@@ -1044,11 +1325,16 @@ _AddrRoad	dc.l	0
 _AddrSwap	dc.l	0
 _AddrLoop	dc.l	0
 _ExpFree	dc.l	0			;next public allocation
-_QHead		dc.l	0			;the next blit to start
+_QHead		dc.l	0			;the next blit to start; these two in this order
 _QTail		dc.l	0			;the end of the recorded blits
+_GfxLo		dc.l	0			;alloc 2, and its end; these three in this order
+_GfxHi		dc.l	0
+_GfxRace	dc.l	0			;W_GFX - alloc 2, from the race's start
+_GfxDelta	dc.l	0			;_GfxRace while the loop draws, else 0
 _NextTick	dc.w	0			;P_FIELDS value the next tick is due at
 	IFD VERIFY
 _VHorizon	dc.w	0			;V_HORIZON before the queued clear
+_VGfxCount	dc.w	0			;_CompareGfx runs every 16th frame
 	ENDC
 _Enh		dc.b	0			;-1: the enhanced path (word-aligned)
 _FastExp	dc.b	0			;-1: the ExpMem is fast memory

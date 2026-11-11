@@ -135,16 +135,21 @@ checked.
    | the clear's blits queued to the blitter interrupt, run during the road | 1.864 | 0.993 |
    | the sky's blits queued at the frame's start, before the logic and the pose | | 0.988 |
    | of the sky only planes 0 and 2 by the blitter, 1 and 3 by the CPU after the copy (1.3's split) | 1.865 | 0.967 |
+   | the masked plotters' and/or merged, the column plotter's source from a fast copy of alloc 2 | 1.768 | 0.846 |
 
-   On the 030 that is 40.25 fps, 121 of 160 frames in one field (p90 1.038, max 1.113;
-   the a500 is unchanged at 5.092). The tick states still match 1.3's for 600 ticks. All
+   On the 030 that is 50 fps in the window: all 199 frames in one field, p90 0.927, max
+   0.965 (the a1200 24.75 fps; the a500 unchanged at 5.092). The tick states match 1.3's
+   for 599 ticks (one tick later in the recording). Next for this step: the margin
+   elsewhere (other courses, a full race, more objects on screen, the start sequence) and
+   the a1200-fast setup.
+   Before the plotters, the 030 measured 40.25 fps, p90 1.038. All
    four sky planes by the CPU measured 0.977, the CPU's two before the copy 0.966. The
    road's copy is slowed while the queue runs: 0.22 fields a frame with all four sky planes
    queued, against 0.11 alone (the blitter fills a word in 2 cycles, the CPU a longword in
    one access). A CPU access to chip costs
    about 60 cycles of the 030 (1.2 µs, several bus slots), so the bus has room the CPU
-   cannot use: what is left is to make fewer CPU accesses (now per frame about 9,600 by
-   the objects, 6,700 by `$448A`, 3,900 by the road copy) or to give
+   cannot use: what was left was to make fewer CPU accesses (before the plotters, per frame
+   about 9,600 by the objects, 6,700 by `$448A`, 3,900 by the road copy) or to give
    work to the blitter, which uses free slots at full speed. Candidates:
    - the object plotter (`$3D94`, `$418C`: CPU-masked `and`/`or` on the screen) by the
      blitter, from the graphics already in chip;

@@ -88,7 +88,11 @@ SETUP=a1200-030 PROG_BASE=auto EXTRA_ARGS=--uae_mmu_model=0 WHD_ARGS="CUSTOM2=1"
   (`$9860`–`$9D6F`) at the swap for N frames, with the fields between them. `AT=153E`
   records at the logic instead: once per tick in 2.0b, comparable with 1.3 at
   `CUSTOM2=5` (`SLAVE=original`). Compare only `$9860`–`$9D69`; the rest is code with
-  relocated addresses. A recording that runs past the race's end waits for ever.
+  relocated addresses. A recording that runs past the race's end waits for ever. The
+  first logic step recorded depends on where the route's 100 fields end against the tick:
+  compare at offsets of a tick or two (at 50 fps 2.0b's tick *i* is 1.3's *i* + 1).
+- `tools/plotcheck.py [DUMP] [N]` checks the merged plotters against the original loops in
+  Unicorn (needs a chip dump with the program at `$400`, such as `tmp/dumps/attract.bin`).
 - `BUILD=verify` checks every frame drawn between ticks; `tools/verify.py` on its server
   prints what changed (nothing, when it works), and the road and the clear drawn the 2.0b
   way against the original's.

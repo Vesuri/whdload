@@ -205,7 +205,7 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
 
 - **The gate** is `WHDLTAG_ATTNFLAGS_GET`: a 68020 or better takes the enhanced path, a
   68000 or 68010 runs 1.3's code. The disk versions never reach it.
-- **ExpMem** is optional, `$46000` bytes (`$65000` in the VERIFY build; WHDLoad wants a multiple of `$1000`). It counts as fast memory unless it is below
+- **ExpMem** is optional, `$81000` bytes (`$A1000` in the VERIFY build; WHDLoad wants a multiple of `$1000`). It counts as fast memory unless it is below
   `$200000` (chip) or in `$C00000`–`$DFFFFF` (slow memory on the chip bus). Fast ExpMem
   holds:
 
@@ -213,7 +213,7 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
   |---|---|
   | base | the program (to `$B4D0` with its relocation table; the hunk header in the 32 bytes before). The base is the first 64 KB boundary at least `$20` bytes into the ExpMem, so the program does not cross one, as at `$400` in chip (word-sized address arithmetic would break there) |
   | base + `$C000` | the game's public allocations: COURSES.DAT (63072 bytes) |
-  | base + `$1C000` | the slave's buffers (below) |
+  | base + `$1C000` | the slave's buffers: saved state, the road's screen and source, the blit queue, and from + `$17800` a copy of alloc 2 (240000 bytes, the graphics; only with fast ExpMem) |
   | the top `$2000` bytes | the stack (SSP set to the top before `jsr` to the program) |
 
   Without fast memory the base is the ExpMem's start and only the buffers are there.
@@ -232,7 +232,7 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
   since those CPUs slow down on cacheable chip accesses. The 68060 also gets the branch
   cache and superscalar dispatch.
 - **Program base.** The level-3 vector `$6C` holds the base + `$4DAC`. On the a1200-030
-  setup the base is `$9B0000` (`$9A0000` in the VERIFY build).
+  setup the base is `$980000` (`$960000` in the VERIFY build).
 
 ### The fixed tick
 
@@ -296,3 +296,22 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
   the objects, the next to use the blitter. All the later blit code sets every register it
   uses. The VERIFY build runs 1.3's clear after the queued one from the same horizon and
   compares rows 0 to 103 (`tools/verify.py`: no difference in 1317 frames).
+- **The CPU's masked plotters** (`_PL_Plot`, on any 68020 or better with ExpMem). Each read
+  the screen twice and wrote it twice per plane (`and` then `or` in place); the
+  replacements read and write each word or longword once, leaving every register and
+  flag as the original does:
+
+  | Offset | Original | 2.0b |
+  |---|---|---|
+  | `$3DC4` | the column plotter's loop (`$3D94`, `$3D60`: one word column, bottom up) | `_PlotColumn` |
+  | `$41A4` | the player's buggy (`$418C`: 40 rows of 4 longwords, from alloc 2 + `$D3A8`) | `_PlotBuggy` |
+  | `$4A94` | the 8 rows of a HUD character (`$4A70`) | `_PlotText` |
+
+  With fast ExpMem, `_RaceInit` copies alloc 2 to fast memory and, between `_PreDraw` and
+  `_PostDraw`, the column plotter reads its source from the copy, unless the source spans
+  overlap the buggy's 4 planes. The logic (`$1434`) animates the buggy's plane 1 in place
+  (alloc 2 + `$F2E8`, 1600 bytes): over 3000 fields of the route it is the only part of
+  alloc 2 that changes (the VERIFY build compares the rest every 16th frame). The buggy
+  reads its source from chip. `tools/plotcheck.py` runs the original loops (from a chip dump)
+  and the replacements in Unicorn's 68020 on random registers and memory (3000 cases each)
+  and compares registers, condition codes and memory: no difference.

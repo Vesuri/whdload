@@ -22,4 +22,4 @@ The slave source is `src/` (`BuggyBoyHD.s` with `ReadJoypad.s` and `Enhanced.s`,
 RawDIC imager slave for the disk versions, not assembled here). `game.sh` generates the
 `keyboard.s` the build uses ([development.md](docs/development.md)). `tools/` is the
 harness: `buggyboy.py` (the gdb-stub server), `boot.sh`, `route.py`, `bench.py` (the race
-benchmark), `chipprofile.py`, `states.py` and `verify.py`.
+benchmark), `chipprofile.py`, `states.py`, `verify.py` and `plotcheck.py`.
