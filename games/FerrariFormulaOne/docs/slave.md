@@ -314,3 +314,25 @@ with WHDLoad's MMU option and data-cache emulation, and 040 with the MMU.
 Removing the old fine-path SetCPU also removed the cache flush after the fine
 installs; the policy's SetCPU now provides it. Without it, 020+Fast froze
 mid-race.
+
+### Audio stop delay (both modes)
+
+The game's audio interrupt (root hunk 41, +$70) stops a channel whose sample queue has run
+dry: volume 0, period 124, a 400-iteration CPU loop, then DMA off. Paula keeps playing a
+channel whose DMA goes off and raises its interrupt after every sample word (70 µs at
+period 124) unless the previous request is still pending, which stops the channel. The
+handler clears the request on entry, so the channel stops only if the handler outlasts two
+words. The loop's 1 ms on a 68000 does; a cached 68040/060 leaves it within one word, and
+the interrupt then comes every 70 µs and runs the stop path each time. On `a1200-060`
+(`CUSTOM2=1 Cache`, the Spa race start) the CPU sat in the loop for 0.3–2.5 s at a time,
+4,625 stop-path interrupts in 16 fields; the user identifies it as the real A1200/040's
+hang (2026-11-11). At install
+(`FF1AudioDelayPatch`, both modes) a 68020 or faster gets a 5-line beam wait (at least
+256 µs) instead of the loop; the 68000 and 68010 keep it. The path is found by its 22 bytes
+at hunk 41, or anywhere in the root segments for another layout (Irek's version is not
+tested). With it, no PC sample in the Spa crash or on the title falls in the handler.
+Frame rate (`ff1check.py fps`, 300 presentations, against the same build without it):
+030-50 BCE 49.920 and 040-40 BCE 29.597 FPS, unchanged; A500+Fast 4.845, unchanged
+(287 intervals: the 68000 cannot fill the window). The 020+Fast demo leaves the race
+inside the window with and without it (15.80 against 15.47 FPS over the 237 intervals both
+have), so that check fails as before.

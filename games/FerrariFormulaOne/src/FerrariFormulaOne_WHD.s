@@ -126,6 +126,8 @@ TAGLIST		dc.l	WHDLTAG_CUSTOM1_GET
 NOTIMINGFIX	dc.l	0
 		dc.l	WHDLTAG_CUSTOM2_GET
 FF1PublicEnabled	dc.l 0
+	dc.l	WHDLTAG_ATTNFLAGS_GET
+FF1AttnFlags	dc.l	0
 	dc.l	TAG_DONE
 DOSbase	dc.l	0
 
@@ -180,6 +182,7 @@ _bootdos
 	move.l	a5,a0
 	move.l	d7,a1
 	jsr	resload_PatchSeg(a2)
+	bsr.w FF1AudioDelayPatch
 	bsr.w FF1PublicResident
 
 	move.l	d7,d1
@@ -434,6 +437,102 @@ FF1PublicResident:
  jsr resload_FlushCache(a2)
 .done:
  movem.l (sp)+,d0-d7/a0-a6
+ rts
+; The game's audio interrupt (SPS 0481: root hunk 41, +$70) stops a channel whose
+; sample queue has run dry: volume 0, period 124, a 400-iteration CPU loop, then DMA
+; off. Paula keeps playing a channel whose DMA goes off and raises its interrupt
+; after every sample word (2 x 124 colour clocks, 70 us), unless the previous one is
+; still pending, which stops the channel. The handler clears it on entry, so the
+; channel stops only if the handler outlasts two words. On a 68000 the loop lasts
+; about 1 ms and it does. A cached 68040/060 leaves the loop within one word: the
+; interrupt then comes every 70 us and runs this path each time, which stalls the
+; game for seconds (a1200-060 in the emulator, at the Spa start). On a 68020 or
+; faster the loop becomes a 5-line beam wait (at least 256 us); the 68000 and 68010
+; keep it. The path is found by its 22 bytes: at hunk 41, or for another layout
+; anywhere in the root segments. D7 = root segment list (BPTR). All registers preserved.
+FF1AudioDelayPatch:
+ movem.l d0-d2/a0-a1,-(sp)
+ move.l FF1AttnFlags(pc),d0
+ btst #AFB_68020,d0
+ beq.b .done
+ move.l d7,d0
+ moveq #41-1,d1
+.walk:
+ lsl.l #2,d0
+ beq.b .scanall
+ move.l d0,a0
+ move.l (a0),d0
+ dbf d1,.walk
+ lsl.l #2,d0
+ beq.b .scanall
+ move.l d0,a0
+ lea 4+$70(a0),a0
+ bsr.b .match
+ beq.b .found
+.scanall:
+ move.w #$317c,d1
+ move.l d7,d0
+.seg:
+ lsl.l #2,d0
+ beq.b .done
+ move.l d0,a1
+ move.l -4(a1),d2		; segment: allocation size, next BPTR, code
+ sub.l #8+22,d2
+ bmi.b .next
+ lsr.l #1,d2
+ lea 4(a1),a0
+.scan:
+ cmp.w (a0),d1
+ bne.b .skip
+ bsr.b .match
+ beq.b .found
+.skip:
+ addq.l #2,a0
+ subq.l #1,d2
+ bpl.b .scan
+.next:
+ move.l (a1),d0
+ bra.b .seg
+.found:
+ move.w #$4eb9,$c(a0)		; JSR FF1AudioDelay, NOP, NOP over the loop
+ pea FF1AudioDelay(pc)
+ move.l (sp)+,$e(a0)
+ move.l #$4e714e71,$12(a0)
+ move.l _resload(pc),a0
+ jsr resload_FlushCache(a0)
+.done:
+ movem.l (sp)+,d0-d2/a0-a1
+ rts
+; Z set if A0 is at MOVE.W #0,8(A0); MOVE.W #$7C,6(A0); MOVE.W #$190,D0;
+; SUBI.W #1,D0; BNE.B *-4.
+.match:
+ cmpi.l #$317c0000,(a0)
+ bne.b .no
+ cmpi.l #$0008317c,4(a0)
+ bne.b .no
+ cmpi.l #$007c0006,8(a0)
+ bne.b .no
+ cmpi.l #$303c0190,12(a0)
+ bne.b .no
+ cmpi.l #$04400001,16(a0)
+ bne.b .no
+ cmpi.w #$66fa,20(a0)
+.no:
+ rts
+
+; At least 4 full beam lines (the line byte of VHPOSR changing 5 times). D0 = 0, as
+; the replaced loop left it.
+FF1AudioDelay:
+ move.l d1,-(sp)
+ moveq #5-1,d1
+.line:
+ move.b $dff006,d0
+.same:
+ cmp.b $dff006,d0
+ beq.b .same
+ dbf d1,.line
+ move.l (sp)+,d1
+ moveq #0,d0
  rts
 FF1PublicPatchError: dc.l 0
 FF1PublicBoot:

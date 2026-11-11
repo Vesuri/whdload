@@ -42,6 +42,7 @@
  - Crash when starting race fixed
  - Wrong blit fixed
  - CPU dependent delay fixed
+ - Sound stop delay fixed (stalls and freezes on a 68040/060 with caches)
  - Timing fixed (can be disabled with CUSTOM1)
  - Manual included 
  - lots of nice icons (one created by me, all others by Irek)
@@ -100,6 +101,8 @@
  - drawing in Fast memory on 68030 and faster Amigas
  - uses Fast memory when available
  - uses all safe CPU caches on 68020 and faster
+ - fixed the sound stop delay that stalled or froze 68040/060 machines with
+   caches
 
  version 1.01 (07.08.2016)
  - support for another version added, thanks to Irek Kloska for

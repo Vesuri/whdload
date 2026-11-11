@@ -15,28 +15,15 @@
   (06.11.2026)` after the payloads, from `slv_info`'s version and date, so no host or payload
   byte moves. The installed icon enables performance mode: `release/Install` writes
   `CUSTOM2=1` into it (the user's decision, 2026-11-06; not yet run under Installer).
-- **Release blocker: hangs on a real A1200/040 (2026-11-07, the user's report).** On an
-  A1200 with a 68040, MMU and 32 MB, performance mode hung every time on Esc to pause then
-  Esc to resume, and in collisions with the track edges: the game stops with the clock
-  sample looping. Not reproduced in the emulator (`a1200-040` with 32 MB Zorro III,
-  data-cache emulation on, the 2.0b release slave `9008bdb0…`, `CUSTOM2=1`). The user's
-  emulator recording of the same situations (running off track; contact in the start
-  pack) shows the view swinging from far right to far left within a few frames, the car
-  bouncing, a white strip at the bottom edge and, for one frame, a large red wedge at the
-  bottom left. Suspected, not tested: the 20 ms player simulation applies native
-  collision impulses undivided (`FerrariFormulaOne_Velocity.s`), so a contact seen on
-  several 20 ms steps kicks the car several times, into positions the original never
-  reaches, where projection and polygon code can break. The only wall-contact test is one
-  synthetic contact on the native paths (GAME_TIME.md). Ruled out: pause writes no game
-  code (its sites are patched at install), and the opponents' pose blending never moves
-  the player's view. The hanging machine had a PCMCIA network card in the slot, which has
-  caused random failures with other WHDLoad installs there. The card may be the cause of
-  the hangs: for example, an interrupt the card raises through Gayle that nothing
-  acknowledges once WHDLoad has taken over the system. The glitches in the recording come
-  from an emulator without the card, so they need explaining either way. Next: the hang
-  situations on the real machine without the card; the same situations with `CUSTOM2=0`
-  in the emulator and on the real machine; then a repeated-contact check on the 20 ms
-  path against the native response. Do not publish the release until this is understood.
+- **The real A1200/040 hangs: the original audio stop delay (2026-11-11).** The user's
+  hangs (performance mode with the Cache options; every time in a car crash at the first
+  corner of Spa; 1–3 s stalls on the title; the original v1.01 slave too; never with
+  NoCache) reproduce as stalls on `a1200-060` with the user's `CUSTOM2=1 Cache` at the Spa
+  race start: the CPU sits in the game's audio stop-path loop, one interrupt every 70 µs,
+  for 0.3–2.5 s (slave.md "Audio stop delay"). The user is all but certain this is the
+  hang. The slave replaces the loop on a 68020 or faster with a 5-line beam wait; no stall
+  remains in the emulator, and the frame rate is unchanged. Next: the user's test on the
+  A1200/040.
   **The glitches are the original game's (2026-11-08).** `tools/wall_contact.py` holds
   throttle and full right steering into the wall on 020+Fast with the FR10 slave. With
   `CUSTOM2=0` (the original loop) the car is kicked from speed 94 to 263, thrown about 400
@@ -47,8 +34,8 @@
   throws: in the demo crash (`tools/demo_trace.py`) the impulse runs once and the car
   moves about 35 lateral units per 20 ms step (about 175 a tick). So the undivided-impulse
   suspicion is not borne out, and the view swings, bouncing, white strip and red wedge
-  of the recording are the original's crash response and drawing. Still open: the hangs
-  on the real machine (the card; `CUSTOM2=0` there). The lap (020+Fast) and controls
+  of the user's emulator recording (2026-11-07) are the original's crash response and
+  drawing. The lap (020+Fast) and controls
   (A500+Fast) checks fail because the FR10 layout's demo start reaches such a crash, a
   fixture problem: they need a start that avoids it.
 - **Fast RAM rendering (docs/FASTRAM_PLAN.md)** is in the release slave since FR10:
@@ -69,9 +56,9 @@ The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory
 The current build is the FR10 production slave (`376d1164…`, `tools/fr10_build.py`, with
 `-off` arms and scene fixtures). Next, in order:
 
-1. The real-hardware hangs (Where it stands): the user's test without the card and with
-   `CUSTOM2=0`. Then the lap and controls fixtures' demo crash, reload, and the season
-   runner's missing exit.
+1. The real-hardware hangs (Where it stands): the user's test of the audio stop fix on the
+   A1200/040. Then the lap and controls fixtures' demo crash (it also ends the 020+Fast
+   `fps` window on the current build), reload, and the season runner's missing exit.
 2. FR11 (optional, FASTRAM_PLAN).
 
 Done: FR10, checkpoint and release (2026-11-08; FASTRAM_PLAN "FR10").
