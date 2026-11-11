@@ -144,6 +144,34 @@ original game. Checks (`a1200-fast`, CUSTOM2=1, ignored `tmp/shopbug/`):
   are unchanged: `a1200-fast` 12.5 / 18.6 and 040 25 MHz 22.7 / 49.6 fps (CUSTOM2 off / on),
   for both slaves.
 
+### Lane markings on 040/060 (after 3.0b of 10.11.2026)
+
+With Enhanced framerate, Chip RAM is data-cached write-through (`RoadRashHD.s`,
+`resload_SetCPU`). After the background and road (`e_background_road`), native main hunk
+`$316d6` ANDs the lane-marking cutouts into plane 2 with `and.w`/`and.l d0,(a3)`, over the
+rows the blitter queue has just refilled (151 rows ending at plane-2 row 135). On a 040 or 060,
+the reads could hit lines still cached from the last time that buffer was drawn, so the old
+cutouts came back. The dashes then showed short yellow horizontal bars on one buffer, every
+other frame. A player reported it on a 68060 (11.11.2026, "some horizontal yellow lines" on
+the lane markings).
+
+`e_plane2_flush` pushes those rows' data-cache lines (`CPUSHL DC`, 398 lines) after the queue
+drains and after the native fallback pair, on 040/060 only (`AFF_68040`). The 030's 256-byte
+data cache showed no streaks with the old slave and is left alone. The routine is placed at
+the end of the slave: inserting it after `e_draw_road` shifted the following code and cost
+the cycle-exact 030 0.3 fps by layout alone (60 bytes of padding gave 39.7). Checks (ignored
+`tmp/lanes/`, 600 race fields each, CUSTOM2=1, shared FS-UAE):
+
+- `a1200-060`: the 10.11.2026 slave's frames differ from a Chip-uncached build
+  (`WCPUF_Base_NC`) in 532 of 600, all at the dashes; the fixed slave's match it in all 600.
+- `a1200-040`: the old slave's frames differ from the fixed slave's in 45 of 600.
+  `a1200-030`: the fixed slave's frames are identical to the old slave's.
+- Disabling the CPU bob path (`e_cpu_try`) left the streaks unchanged.
+- Race rates (`tools/check_a.py --normal`, one run each; repeat runs were identical), old /
+  new, CUSTOM2 off and on: `a1200-fast` 12.5 / 18.6 both; 030 50 MHz 13.2 / 40.1 both;
+  040 25 MHz 22.7 / 49.6 and 22.6 / 49.6; 060 50 MHz 23.3 / 49.6 and 23.3 / 50.0.
+  Native mode (CUSTOM2=0) doesn't run the routine.
+
 ## Final emulator validation
 
 Normal-build sampled race rates (PAL, Enhanced framerate enabled):

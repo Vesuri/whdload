@@ -837,6 +837,30 @@ enhanced_selected:
  include public_boot_tables.s
  include public_intro_index.s
 
+; Called at the end of e_background_road (blitter_queue.s), and kept after the
+; hot code: inserting it there shifted the 68030 layout. Native $316d6 then ANDs
+; the lane-marking cutouts into plane 2 rows the blitter has just refilled. Chip
+; RAM is data-cached (write-through) here, so lines still cached from this
+; buffer's previous frame would bring back its old cutouts on the 040/060. The
+; 030's 256-byte data cache showed none. The pass's 151 rows end at plane-2 row
+; 135 and start 15 rows above.
+e_plane2_flush:
+ btst #3,cpu_attention+3(pc) ; AFF_68040, also set for the 060
+ beq .none
+ movem.l d0-d1/a0,-(a7)
+ move.l $408.w,d0
+ addi.l #$41a0-15*42,d0
+ andi.w #$fff0,d0
+ move.l d0,a0
+ move.w #(151*42+15)/16,d1 ; one extra line for the alignment
+.push:
+ dc.w $f468 ; cpushl dc,(a0)
+ lea 16(a0),a0
+ dbf d1,.push
+ movem.l (a7)+,d0-d1/a0
+.none:
+ rts
+
 ; Amiga Version and release tooling use the same fixed version/date as WHDLoad.
  dc.b "$VER: RoadRash "
  DECL_VERSION

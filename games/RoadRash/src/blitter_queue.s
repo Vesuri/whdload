@@ -141,13 +141,15 @@ e_background_road:
 .restored:
  move.w (a7)+,sr
  movem.l (a7)+,d0-d2/a0-a1
- rts
+ bra e_plane2_flush
 .native:
  bsr e_dirty_reset
  movem.l (a7)+,d0-d7/a0-a6
  move.l e_main(pc),a0
  adda.l #$31744,a0
  jsr (a0)
+ bsr e_draw_road
+ bra e_plane2_flush
 e_draw_road:
  move.l e_main(pc),a0
  adda.l #$310d0,a0

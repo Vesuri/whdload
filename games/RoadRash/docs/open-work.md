@@ -8,7 +8,8 @@ releases of 22.10.2026, built from the tree submitted and merged upstream ("Road
 optional enhanced framerate"), and of 09.11.2026. Those added the waits after unwaited blits
 (`visual-fixes.md`) and a shorter ReadMe changelog; 10.11.2026 fixes the bike shop's bikes with
 Enhanced framerate (`blitter-performance.md`, "Menu and shop bobs"). `release/slaves.sha256`
-pins its slave.
+pins its slave. Not released yet: the fix for yellow streaks on the lane markings on 040/060
+(`blitter-performance.md`, "Lane markings on 040/060").
 
 The submitted tree is the development branch reduced to its release configuration (no VERIFY
 instrumentation, development notes or packager), so its slave differs from the development
@@ -50,5 +51,8 @@ password entry); the `PL_IFC2` move is a behaviour change to decide on, not a fi
   they may happen every frame. No glitch has been reported there. A wait in the
   race path costs time, so any fix needs the rate checks.
 - D1d: real 68040/68060 cache and coherency testing (emulator only so far).
+- Other CPU reads of blitter-written Chip RAM with the data cache on (040/060): the CPU bob
+  path (`e_cpu_try`) reads its destination after the blitter has drawn there. No glitch has
+  been seen; disabling it didn't change the lane-marking frames.
 - F6a–F6d: relocating the fixed-address CPU globals, future work by agreement.
 - Testing on real hardware in general; the release's limitations are in `release.md`.
