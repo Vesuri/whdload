@@ -9,6 +9,10 @@ The current state is in [slave.md](slave.md). These items are open, most importa
    interpolate. The frame-by-frame checks pass (slave.md "Verification"); the feel needs the
    user's judgement.
 
+2. **Music and effects with the new audio DMA wait** (slave.md "Audio DMA wait"). FS-UAE
+   reports no failed restarts and the recordings match the A500's. Listen to the intro music on
+   the 68040/40 with the MMU and `DCache`, and to the effects in a race.
+
 ## Accept the current build
 
 - Pixel twins: 1,000 frames per demo fixture for the line drawer and the background planes 0/1.
@@ -32,7 +36,7 @@ The current state is in [slave.md](slave.md). These items are open, most importa
   installer sets `CUSTOM1=1` in the game icon (profiling.md "Release"). The changed installer
   branch has not been executed in the Amiga Installer yet; run an installation from the
   original disk and read back the game icon's tooltypes. To decide: what happens to the pull
-  request. The release here is 4.0b (10.10.2026).
+  request. The release here is 4.0b (11.11.2026).
 
 ## Not pursued
 

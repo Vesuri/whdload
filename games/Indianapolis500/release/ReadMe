@@ -1,5 +1,5 @@
 
- Indianapolis 500 Enhanced 4.0b (10.10.2026)
+ Indianapolis 500 Enhanced 4.0b (11.11.2026)
 
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
@@ -67,11 +67,13 @@
 
  History:
  --------
- version 4.0b (10/10/2026), high frame rate support by Vesuri:
+ version 4.0b (11/11/2026), high frame rate support by Vesuri:
  - high frame rate support (CUSTOM1=1), enabled in the installed icon
  - 68020+ and Fast RAM required; original behavior on other machines
  - smooth driving motion and CPU drawing optimizations
  - smooth instant replay motion with the original transition-wipe pace
+ - audio DMA wait fixed: the music no longer loses notes on fast CPUs
+   (68040/060)
 
  version 3.0 (30/04/2022) done by StingRay:
  - patch redone

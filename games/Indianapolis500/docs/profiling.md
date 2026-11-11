@@ -98,6 +98,14 @@ the installed one).
     A4000 ROM.
 - **Caches:** add `DCACHE` (or `CACHE`) to `WHD_ARGS`. Without it a 68020/68030 runs with every
   cache off.
+- **Audio:** FS-UAE works around too-short audio DMA waits by itself on a 68020 or faster: when
+  DMA comes back on while a channel is still playing, it restarts the channel and logs
+  "Audio N DMA wait hack ENABLED" (UAE `audio.cpp`, `audio_state_channel2`). Real hardware does
+  not. Add `--uae_chipset_hacks=8` to `EXTRA_ARGS` to switch it off (it also switches off
+  FS-UAE's two other Paula workarounds); the log then says "... DMA wait hack DISABLED" for each
+  restart that fails, which counts them. Record the audio with
+  `SDL_AUDIODRIVER=disk SDL_DISKAUDIOFILE=<absolute path>` and `--audio_driver=sdl` (44.1 kHz,
+  16-bit stereo).
 - **Max speed** (`cpu_speed=max`, `cycle_exact=false`, `cpu_compatible=false`) is not a real
   machine: chip accesses are nearly free.
 

@@ -21,12 +21,15 @@
 *** History			***
 ***********************************
 
-; 10-Oct-2026	- optional high frame rate support by Vesuri (CUSTOM1, off
+; 11-Nov-2026	- optional high frame rate support by Vesuri (CUSTOM1, off
 ;		  by default): the 15 fps limit is removed, the cars and
 ;		  the camera move smoothly between the game's ticks and
 ;		  parts of the 3D view are drawn with the CPU where that is
 ;		  faster than the blitter, it needs a 68020+ with the game
 ;		  in fast memory, other machines run the original game
+;		- audio DMA wait loops in the music player and the sound
+;		  effects replaced by a raster line wait, the music no
+;		  longer loses notes on fast CPUs (68040/060)
 
 ; 30-Apr-2022	- byte sized flag was passed as word sized flag when starting
 ;		  game, this caused the replay to work as intended
@@ -115,8 +118,8 @@ HEADER	SLAVE_HEADER			; ws_security + ws_ID
 	IFD	DEBUG
 	dc.b	"DEBUG (do NOT release!) "
 	ENDC
-	dc.b	"Version 4.0b (10.10.2026)",0
-	dc.b	"$VER: Indianapolis500.Slave 4.0b (10.10.2026)",0
+	dc.b	"Version 4.0b (11.11.2026)",0
+	dc.b	"$VER: Indianapolis500.Slave 4.0b (11.11.2026)",0
 
 	CNOP	0,4
 
@@ -178,6 +181,7 @@ PL_INTRO
 	PL_PSS	$be2,Acknowledge_Level2_Interrupt,2
 	PL_PSS	$bf6,Acknowledge_Level2_Interrupt,2
 	PL_PSS	$c6a,Acknowledge_Level2_Interrupt,2
+	PL_PSS	$629e,Audio_DMA_Wait,8	; music player's DMA wait (intro:102de)
 	PL_END
 
 .Check_Quit_Key
@@ -263,6 +267,7 @@ PL_GAME	PL_START
 	PL_PSS	$9c48,Acknowledge_Level2_Interrupt,2
 
 	PL_PS	$9b7e,.Check_Quit_Key
+	PL_P	$a384,Audio_DMA_Wait	; sound effects' DMA wait
 	PL_END
 
 .load	movem.l	d0-a6,-(a7)
@@ -350,6 +355,26 @@ PL_GAME	PL_START
 Acknowledge_Level2_Interrupt
 	move.w	#1<<3,$dff09c
 	move.w	#1<<3,$dff09c
+	rts
+
+; The music player and the sound effects turn audio DMA off, set up the
+; channels, then waited with 401 reads of address 0 before turning DMA back
+; on: about 16 raster lines on a 68000, less than one on a 68040, too short
+; for Paula to restart the channels. With DMA off, a channel finishes the
+; sample period it is in and plays one more (the low byte, with the new
+; period) before it is idle: up to 2 x 794 colour clocks here (7 lines, the
+; effect at game:a1ac). Wait for 9 line changes, at least 8 whole lines
+; (0.5 ms), only when notes or effects start. Leaves d1.w = -1 and a0 = 0 as
+; the loop did.
+Audio_DMA_Wait
+	move.l	d0,-(a7)
+	move.w	#9-1,d1
+.line	move.b	$dff006,d0
+.wait	cmp.b	$dff006,d0
+	beq.b	.wait
+	dbf	d1,.line
+	move.l	(a7)+,d0
+	sub.l	a0,a0
 	rts
 
 Acknowledge_Level3_Interrupt

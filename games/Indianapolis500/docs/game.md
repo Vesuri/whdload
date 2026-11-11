@@ -117,6 +117,19 @@ every 150 ticks (counter `game:268d0`) and resets at tick 900 (`game:27bec`). Th
 windows are the opening and director ticks 50/200/350/500/650/800. 200 and 800 are the
 heaviest views.
 
+## Sound
+
+- The intro (loaded at 0, still resident in the game) holds the music player. `$fe00` is a hook
+  vector called on every CIA tick by the intro's handler (`intro:ac4e`) and the game's
+  (`game:09be4` → `game:a018`). `$fe04` is the music tick (`$fe30`), `$fe08` starts a song and
+  `$fe0c` stops it. In a race the game points the hook at its engine sound (`game:a020`); when
+  it stops the music it patches `$fe04`/`$fe08` to `rts` (`game:9fe2`).
+- New notes and effects turn audio DMA off, set the channels and wait with 401 reads of
+  address 0 (`intro:102de`, `game:a384`) before turning DMA on. The slave replaces both waits
+  (slave.md "Audio DMA wait").
+- Periods: music notes from the table at `intro:179da` (135–254), with octaves from shorter
+  waveforms; noise drums on channel 3 at 190–672; effects up to 794 (`game:a1ac`).
+
 ## Other facts
 
 - Mode `game:268da` (1 = demo). `game:09b2e`: bit 0 pause, bit 1 replay. Race event

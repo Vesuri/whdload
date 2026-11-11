@@ -1,8 +1,8 @@
 # The enhanced slave
 
-`src/Indianapolis500_WHD.s` is StingRay's v3.0 slave plus optional patches in
-`src/Indianapolis500_*.s`. With the option off, the game is byte-for-byte the original
-(`tools/check_disabled.py`). How the original works:
+`src/Indianapolis500_WHD.s` is StingRay's v3.0 slave plus one fix that is always on (the audio
+DMA wait, below) and optional patches in `src/Indianapolis500_*.s`. With the option off, every
+optional range holds the original bytes (`tools/check_disabled.py`). How the original works:
 [game.md](game.md). How to build, run and measure: [profiling.md](profiling.md).
 
 ## Options
@@ -27,6 +27,30 @@ and the slave runs under 19.2 and 20.0. No WHDLoad 17 or 18 binary has been trie
 after the game is loaded.
 
 ## Features
+
+**Audio DMA wait (always on, `Audio_DMA_Wait`).** The music player (`intro:102de`, reached
+through the `$fe00` hook in the intro and the game's menus) and the sound effects (`game:a384`)
+turn audio DMA off, set up the channels, then wait with 401 reads of address 0 before turning
+DMA back on. That is about 16 raster lines on a 68000, but 0.9 lines measured on the 68040
+(FS-UAE `a1200-040`, MMU on, `DCACHE`). The channels are still playing when DMA comes back on,
+so the new notes do not restart and the intro music sounds unsteady. `PL_PSS $629e` (intro)
+and `PL_P $a384` (game) wait for nine raster-line changes instead: at least 8 whole lines, about
+0.5 ms. With DMA off, a channel finishes the period it is in and then plays the low byte for
+one more period, using the period just written, before it goes idle. The longest period the
+game uses is 794 colour clocks (the effect at `game:a1ac`; music notes reach about 260, the
+noise drums 672), so the worst case is 1,588 colour clocks, 7 lines. Five line changes
+(one period) still left 8 failed drum restarts. In a race the wait runs about three times a
+second (31 and 33 calls in two 500-field windows, 68040 race build), about 0.15% of the time.
+Afterwards d1.w = −1 and a0 = 0, as with the loop.
+
+Verified in FS-UAE with its own workaround off (`--uae_chipset_hacks=8`; profiling.md). The
+emulator logs every DMA-on that finds the channel still playing. Over about 40 s of intro on
+the `a1200-040` with `CUSTOM1=1 DCACHE`: 68 with the original slave (channels 0 and 3, all at
+`intro:102f6`), 8 with a five-line wait, 0 with nine lines; 0 for the original slave on the
+A500. Audio recordings aligned with an A500 recording by onset cross-correlation: the
+nine-line build matches it as closely as a second A500 run does (21 of 87 onsets unmatched
+against 21 of 89, no drift between 3-second windows); the original slave on the 68040 leaves
+56 of 100 unmatched and drifts by up to 0.12 s.
 
 **Motion (`PL_MOTION`, `Indianapolis500_Motion.s`).**
 - `PL_PSS $152` (`motion_wait`) removes the main loop's wait for a simulation tick, except during
@@ -109,7 +133,7 @@ Evidence so far:
 - With the option off, all 17 optional ranges hold the original bytes (`check_disabled.py`).
 - Option off against v3.0, 1,010 demo SOFT snapshots on the 68040/25 (`CACHE DCACHE`): hunk 0 and
   BSS hunk 5 are identical tick for tick to the shipped v3.0 slave padded to the same size
-  (an ad hoc comparison of `fixed_window.sh` state captures). Only the six jumps into the slave differ, plus renderer workspace
+  (an ad hoc comparison of `fixed_window.sh` state captures). Only the six jumps into the slave differ (the audio DMA wait, added later, makes a seventh at `game:a384`), plus renderer workspace
   (hunk 1, one hunk-0 snapshot at `game:0e81d…`) and one stack byte, all mid-frame timing.
   The bigger slave makes WHDLoad load the game `$2000` lower, and the demo's course depends on
   the load address: the shipped and the padded v3.0 diverge at tick 816 exactly as ours does.
