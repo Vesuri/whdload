@@ -115,7 +115,7 @@ slv_info	dc.b	"installed by StingRay/[S]carab^Scoopex",10
 		IFD	DEBUG
 		dc.b	"DEBUG!!! "
 		ENDC
-		dc.b	"Version 2.0b (06.11.2026)",0
+		dc.b	"Version 2.0b (11.11.2026)",0
 		CNOP	0,4
 
 slv_config	dc.b	"C2:B:Enhanced framerate"

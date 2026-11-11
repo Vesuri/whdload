@@ -1,4 +1,4 @@
-# Ferrari Formula One 2.0b (06.11.2026)
+# Ferrari Formula One 2.0b (11.11.2026)
 
 Player-facing changes and activation: [ReadMe](../release/ReadMe).
 

@@ -1,5 +1,5 @@
 
- Ferrari Formula One Enhanced 2.0b (06.11.2026)
+ Ferrari Formula One Enhanced 2.0b (11.11.2026)
 
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
@@ -92,7 +92,7 @@
  History:
  --------
 
- version 2.0b (06.11.2026) done by Vesuri:
+ version 2.0b (11.11.2026) done by Vesuri:
  - added the Enhanced framerate option (CUSTOM2=1)
  - faster rendering on A500 and accelerated Amigas
  - consistent game speed regardless of rendering speed

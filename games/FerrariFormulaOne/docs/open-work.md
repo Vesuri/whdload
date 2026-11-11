@@ -2,7 +2,7 @@
 
 ## Where it stands (2026-11-08)
 
-- **Release 2.0b (06.11.2026), unreleased.** The release slave (`376d1164…`, FR10) is the
+- **Release 2.0b (11.11.2026), unreleased.** The release slave (`376d1164…`, FR10) is the
   default-off combined performance slave (`CUSTOM2=1`, PAL, SPS 0481) with Fast RAM
   rendering on the 030/040/060 (FASTRAM_PLAN "FR10"). It reserves 1 MiB ExpMem (768 KiB
   pool), so the A500 without Fast memory and the chip-only A1200 no longer start (the
@@ -12,7 +12,7 @@
   on the pre-FR10 slave too; and season, whose runner hangs after a correct F10 exit
   (`run_release_season.py` waits for the emulator to exit, with no timeout).
 - **Before a release here:** `tools/build.py` appends `$VER: FerrariFormulaOne.slave 2.0b
-  (06.11.2026)` after the payloads, from `slv_info`'s version and date, so no host or payload
+  (11.11.2026)` after the payloads, from `slv_info`'s version and date, so no host or payload
   byte moves. Enhanced framerate (`CUSTOM2=1`) is on in the shipped launch icons
   (`release.json` `tooltypes`, 2026-11-11) and `release/Install` writes it into the
   installed icon too (the user's decision, 2026-11-06; not yet run under Installer).
