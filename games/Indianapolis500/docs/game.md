@@ -103,6 +103,23 @@ Everything is copied once per frame with SOFT disabled:
   `game:0b830`).
 - **Transform:** `game:0a908` (vertex transform and perspective, 9 `muls` and 2 `divs`), cached
   per vertex and per component. The largest CPU item (24.8% inclusive on the A500).
+- **Cars** (`game:208ec` walks the car array, `game:20ad6` per car) are not 3D models. Each one
+  is a pre-made 2D image chosen by distance band (table `game:24c40`, under 4000 units) and by
+  heading relative to the camera (32 steps over 180°, table `game:24c58`; the other side is
+  drawn mirrored). `game:c3d6` draws it as rows of horizontal colour spans (one-row blits,
+  BLTCON0 `$05AC`). The span coordinates go through a scale table picked by the exact distance
+  (`game:233fc`), and colours 12 and 9 become the car's own two colours (record `+26`). All
+  cars take this path, the nearest ones too. The 11 bands × 32 headings (352 images, 27,644
+  bytes) are in data hunk 6, indexed by little-endian offsets from its start.
+- The wheels are black spans in these images. Only a few near images give a wheel a cap: one
+  colour-15 span (band 10, headings 19 and 20). Rows are never repeated, so a car is at most its
+  image's height (about 24 rows in band 10); nearer than 415 units the band clamps
+  (`game:20b26`) and the car stays at one largest size.
+- The objects in the lists at `game:207f2` use the same scheme with 16 headings
+  (`game:20912`); near ones are drawn into the mirror buffers by `game:c712`.
+- `game:1239a` draws a filled, dithered circle (midpoint algorithm into the edge tables at
+  `game:e958`, then `game:0bd76`). Its object opcode (`game:147ee`, `$982` from the object base
+  `game:13e6c`) occurs only at `game:1660c`, inside a data table, so probably by coincidence.
 - Bitmap pointer at `game:e80c`. Blitter waits: `btst #6,$dff002` (78 sites) and `btst d4,(a6)`.
 
 Original profile, demo's first 100 fields: the A500 is CPU-bound at 5.1 fps (`game:0a908` 24.8%,
