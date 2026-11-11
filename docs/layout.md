@@ -65,5 +65,5 @@ The caller's environment (make command-line variables included) beats every valu
 | `game_setup` | run | editing `FSUAE_SETUP_ARGS` after the named machine is applied |
 | `GAME_FSUAE_ARGS=(...)` | run | extra FS-UAE arguments |
 | `game_unpack` | unpack | installing from disk images or an installer archive |
-| `game_dist DIST` | dist | packaging release.json cannot describe (changed icons, a new installer) |
+| `game_dist DIST` | dist | packaging release.json cannot describe (changed icon images, a new installer) |
 | `game_check` | check | the game's own checks, such as its `tools/` tests |

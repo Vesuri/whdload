@@ -29,6 +29,9 @@ Driven by the game's release/release.json:
 - replace / add: archive member -> "build:<Variant>" (that variant's release slave) or a
   path relative to the game directory. A replaced member must exist in the original and an
   added one must not. remove: members to drop.
+- tooltypes (optional): icon member -> tooltypes added in front of the icon's own, so before
+  any NewIcon image lines; images, the default tool and trailing ColorIcon or GlowIcon data
+  stay as shipped. The icon must have tooltypes and none with the same name.
 - source (optional): the archive's slave source drawer. Its files are replaced by exactly
   the game's src/ files the listed variants' release builds were assembled from (the .deps
   lists), keeping src/-relative paths in the files' own spelling (an include may name a
@@ -48,6 +51,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -82,6 +86,52 @@ def date_of(slave):
         sys.exit(f'{slave}: no "$VER: <name> <version> (dd.mm.yyyy)" date')
     day, month, year = (int(x) for x in m.groups())
     return f'{year:04d}{month:02d}{day:02d}'
+
+
+def with_tooltypes(icon, entries, name):
+    """icon (a .info DiskObject) with entries added in front of its tooltypes. Everything
+    else stays byte for byte."""
+    def fail(why):
+        sys.exit(f'{name}: {why}')
+    u16 = lambda at: struct.unpack_from('>H', icon, at)[0]
+    u32 = lambda at: struct.unpack_from('>I', icon, at)[0]
+    if len(icon) < 78 or icon[:2] != b'\xe3\x10':
+        fail('not an icon')
+    # DiskObject: the gadget's two image pointers at 22 and 26, then the default tool,
+    # tooltypes and drawer data pointers at 50, 54 and 66. Then drawer data (56 bytes), the
+    # images (20 bytes each and their planes), the default tool and the tooltype array.
+    render, select = u32(22), u32(26)
+    default_tool, tooltypes, drawer = u32(50), u32(54), u32(66)
+    at = 78 + (56 if drawer else 0)
+    for image in (render, select):
+        if image:
+            width, height, depth, data = u16(at + 4), u16(at + 6), u16(at + 8), u32(at + 10)
+            at += 20 + ((width + 15) // 16 * 2 * height * depth if data else 0)
+    if default_tool:
+        at += 4 + u32(at)
+    if not tooltypes:
+        fail('has no tooltypes to add to')
+    size, cursor, keys = u32(at), at + 4, []
+    if size < 4 or size % 4:
+        fail(f'tooltype array size {size}')
+    for _ in range(size // 4 - 1):
+        length = u32(cursor)
+        value = icon[cursor + 4:cursor + 4 + length]
+        if not length or len(value) != length or not value.endswith(b'\0'):
+            fail('its tooltypes do not parse')
+        keys.append(value.rstrip(b'\0').lstrip(b'(').split(b'=')[0].strip().upper())
+        cursor += 4 + length
+    insert = b''
+    for entry in entries:
+        key = entry.split('=')[0].strip()
+        if key.upper().encode('latin-1') in keys:
+            fail(f'already has a {key} tooltype')
+        value = entry.encode('latin-1') + b'\0'
+        insert += struct.pack('>I', len(value)) + value
+    out = icon[:at] + struct.pack('>I', size + 4 * len(entries)) + insert + icon[at + 4:]
+    if icon[:at] + struct.pack('>I', size) + out[at + 4 + len(insert):] != icon:
+        fail('the insertion does not reverse')
+    return out
 
 
 def true_case(root, rel):
@@ -152,6 +202,12 @@ def main():
                     sys.exit(f'{entry["input"]}: no member {member} to remove')
                 (stage / member).unlink()
                 removed.add(member)
+            tooltypes = entry.get('tooltypes', {})
+            for member, entries in tooltypes.items():
+                if member not in before or member in replace or member in removed:
+                    sys.exit(f'{entry["input"]}: {member} is not a shipped, kept and unreplaced icon')
+                icon = stage / member
+                icon.write_bytes(with_tooltypes(icon.read_bytes(), entries, member))
 
             source = entry.get('source')
             if source:
@@ -214,7 +270,7 @@ def main():
             for member in sorted(got):
                 if not filecmp.cmp(check / member, stage / member, shallow=False):
                     sys.exit(f'{member} differs from the staged file')
-            changed = set(replace) | added | {m for m in got if source and m.startswith(source['dir'].rstrip('/') + '/')
+            changed = set(replace) | set(tooltypes) | added | {m for m in got if source and m.startswith(source['dir'].rstrip('/') + '/')
                                                and m[len(source['dir'].rstrip('/')) + 1:] not in source.get('keep', [])}
             for member in sorted(got - changed):
                 if not filecmp.cmp(check / member, orig_dir / member, shallow=False):

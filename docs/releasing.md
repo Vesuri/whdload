@@ -9,7 +9,7 @@ make prune-dist       # at the root: delete all but the latest archive of each g
 `make dist` builds the release slaves and repacks the game's original installer archive,
 named in `release/release.json`, into `dist/` at the root, next to a `.sha256`.
 `common/tools/package_release.py` documents the format: members to replace (`build:<Variant>` or a file in the game), to add and to
-remove, and optionally the archive's source drawer.
+remove, tooltypes to add to shipped icons, and optionally the archive's source drawer.
 
 ## Names
 
@@ -49,7 +49,7 @@ Before packaging:
   history stay.
 - Test the release slave on the machines in `SETUPS`; the packager checks the archive, not
   gameplay.
-- A game whose release needs more (icon tooltypes, a rewritten installer) defines
+- A game whose release needs more (changed icon images, a rewritten installer) defines
   `game_dist DIST` in `game.sh`; it must make the same checks.
 
 ## Publishing
