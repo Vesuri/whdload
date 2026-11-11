@@ -90,7 +90,8 @@ SETUP=a1200-030 PROG_BASE=auto EXTRA_ARGS=--uae_mmu_model=0 WHD_ARGS="CUSTOM2=1"
   `CUSTOM2=5` (`SLAVE=original`). Compare only `$9860`–`$9D69`; the rest is code with
   relocated addresses. A recording that runs past the race's end waits for ever.
 - `BUILD=verify` checks every frame drawn between ticks; `tools/verify.py` on its server
-  prints what changed (nothing, when it works).
+  prints what changed (nothing, when it works), and the road and the clear drawn the 2.0b
+  way against the original's.
 
 ## Traps
 

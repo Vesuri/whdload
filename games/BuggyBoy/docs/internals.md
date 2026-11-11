@@ -205,7 +205,7 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
 
 - **The gate** is `WHDLTAG_ATTNFLAGS_GET`: a 68020 or better takes the enhanced path, a
   68000 or 68010 runs 1.3's code. The disk versions never reach it.
-- **ExpMem** is optional, `$45000` bytes (`$60000` in the VERIFY build). It counts as fast memory unless it is below
+- **ExpMem** is optional, `$46000` bytes (`$65000` in the VERIFY build; WHDLoad wants a multiple of `$1000`). It counts as fast memory unless it is below
   `$200000` (chip) or in `$C00000`–`$DFFFFF` (slow memory on the chip bus). Fast ExpMem
   holds:
 
@@ -232,7 +232,7 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
   since those CPUs slow down on cacheable chip accesses. The 68060 also gets the branch
   cache and superscalar dispatch.
 - **Program base.** The level-3 vector `$6C` holds the base + `$4DAC`. On the a1200-030
-  setup the base is `$9D0000` (`$9B0000` in the VERIFY build).
+  setup the base is `$9B0000` (`$9A0000` in the VERIFY build).
 
 ### The fixed tick
 
@@ -241,7 +241,7 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
 | Offset | Original | 2.0b |
 |---|---|---|
 | `$138` | `lea $DFF000,a0` (race setup, on every way into the loop) | `_RaceInit`: the first pass runs the logic, and a tick is due at once |
-| `$158` | `bsr $153E` (logic), `bsr $6716` (road) | `_PreDraw`, then the road |
+| `$158` | `bsr $153E` (logic), `bsr $6716` (road), `bsr $1E2` (clear) | `_PreDraw`, then the road and the clear |
 | `$16C` | `bsr $2672` (swap), `tst.w $9874` | `_PostDraw` |
 | `$2682` | (1.3's lock) | `_SetCop`: no wait in the race loop's swap; 1.3's lock everywhere else |
 
@@ -282,3 +282,15 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
   back buffer as aligned longwords. The road writes every word of those rows and reads
   only what it wrote in the same row; the VERIFY build draws it both ways each frame and
   compares (`tools/verify.py`: no difference in 801 frames).
+- **The clear queued to the blitter** (with fast ExpMem; `_PL_Queue`). Before the road,
+  `_QClear` records the clear's blits instead of running them: the sky (rows 0 to 83) as
+  4 blits, where 1.3 blits planes 0 and 2 and the CPU clears 1 and 3, then the clear's own
+  code from `$27E` (the horizon step, `$98D2` and `$98DE`, which only the logic reads,
+  and the backdrop, rows 84 to 103, up to 16 blits). `$2D4` gives that code a register
+  block in the work area instead of `$DFF000`, and its 16 waits (`$318`–`$5B6`) queue the
+  blit set up so far. The blitter interrupt (`$4DB6`, in the level-3 handler, which
+  otherwise counts every level-3 interrupt as a field) starts each next blit while the CPU
+  draws the road in fast memory; `_QSync` waits for the last after the road's copy, before
+  the objects, the next to use the blitter. All the later blit code sets every register it
+  uses. The VERIFY build runs 1.3's clear after the queued one from the same horizon and
+  compares rows 0 to 103 (`tools/verify.py`: no difference in 1240 frames).

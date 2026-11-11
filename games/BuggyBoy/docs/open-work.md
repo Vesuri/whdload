@@ -132,22 +132,24 @@ checked.
    | the road in fast memory, copied with misaligned longwords | | 1.273 |
    | the copy aligned | | 1.169 |
    | alloc 1 2 bytes later: the screens longword-aligned | 1.865 | 1.085 |
+   | the clear's blits queued to the blitter interrupt, run during the road | 1.864 | 0.993 |
 
-   On the 030 that is 26.5 fps, 13 of 106 frames in one field. A CPU access to chip costs
+   On the 030 that is 34.5 fps, 75 of 137 frames in one field (the a500 is unchanged at
+   5.092). The tick states still match 1.3's for 600 ticks. A CPU access to chip costs
    about 60 cycles of the 030 (1.2 µs, several bus slots), so the bus has room the CPU
    cannot use: what is left is to make fewer CPU accesses (now per frame about 9,600 by
-   the objects, 6,700 by `$448A`, 3,400 by the clear, 3,900 by the road copy) or to give
+   the objects, 6,700 by `$448A`, 3,900 by the road copy) or to give
    work to the blitter, which uses free slots at full speed. Candidates:
    - the object plotter (`$3D94`, `$418C`: CPU-masked `and`/`or` on the screen) by the
      blitter, from the graphics already in chip;
    - tried: the clear's two CPU planes by the blitter, each plane's fill overlapped with a
      plane of the road copy. Worse (1.115 against 1.085 on the 030): the copy waited for
      the fills, which share the bus with it;
-   - the CPU's waits for the blitter, about 0.17 fields a frame on the 030: the blit code at
-     `$2D60` (reached from `$41E2` and `$424E`, which the profile charges for it) waits
-     before each of its 6 blits (`$2D72`–`$2E7E`), the clear's backdrop blits at
-     `$354`–`$390`. A queue the blitter interrupt works through would let the CPU go on
-     until it next draws on the screen;
+   - the objects' waits for the blitter, about 0.10 fields a frame on the 030: the blit code
+     at `$2D60` (reached from `$41E2` and `$424E`, which the profile charges for it) waits
+     before each of its 6 blits (`$2D72`–`$2E7E`). The clear's queue (`_PL_Queue`) could
+     take them, but the CPU plotter draws on the same screen in between, so each CPU plot
+     would wait for the queue;
    - not the HUD alone: `$448A` draws the HUD text (`$4A70`) and also the player's buggy
      (masked, from alloc 2), and the clear wipes the sky behind the HUD every frame.
 

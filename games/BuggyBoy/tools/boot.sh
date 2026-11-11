@@ -5,7 +5,7 @@
 # stopped. Run options (SETUP, SLAVE, BUILD, SOURCE, WHD_ARGS, EXTRA_ARGS, INSTANCE, ...)
 # pass through.
 #   PROG_BASE   the entry: default $400 (1.3, and 2.0 without fast memory); `auto` finds it
-#               first with a calibration boot (2.0 with the program in fast memory: the
+#               first with a calibration boot (300 fields at a time until it is in place) (2.0 with the program in fast memory: the
 #               level-3 vector $6C holds the base + $4DAC). The same setup and build give
 #               the same address every time.
 #   tools/boot.sh                      default SETUP=a500
@@ -38,13 +38,18 @@ serve() {   # BOOT_BREAK or none; waits until serving
 base=${PROG_BASE:-0x400}
 if [ "$base" = auto ]; then
     serve ""
-    python3 tools/buggyboy.py gdb 'monitor fields 600' >/dev/null
-    v=$(python3 tools/buggyboy.py gdb 'x/wx 0x6c' | sed -n 's/.*:[[:space:]]*0x\([0-9a-fA-F]*\).*/\1/p')
+    base=
+    for _ in 1 2 3 4 5 6 7 8 9 10; do   # until the game's handler is in: base $400 or 64 KB-aligned
+        python3 tools/buggyboy.py gdb 'monitor fields 300' >/dev/null
+        v=$(python3 tools/buggyboy.py gdb 'x/wx 0x6c' | sed -n 's/.*:[[:space:]]*0x\([0-9a-fA-F]*\).*/\1/p')
+        [ -n "$v" ] || continue
+        b=$((0x$v - 0x4DAC))
+        if [ $b -eq 1024 ] || [ $((b & 0xffff)) -eq 0 ]; then base=$(printf '0x%x' $b); break; fi
+    done
     python3 tools/buggyboy.py quit >/dev/null 2>&1 || true
-    [ -n "$v" ] || { echo "boot.sh: no level-3 vector" >&2; exit 1; }
-    base=$(printf '0x%x' $((0x$v - 0x4DAC)))
+    wait $pid 2>/dev/null || true   # the calibration server gone before the next starts
+    [ -n "$base" ] || { echo "boot.sh: no level-3 vector of the game" >&2; exit 1; }
     echo "program base $base"
-    sleep 1
 fi
 serve "$base"
 echo "serving ($log), program base $base"
