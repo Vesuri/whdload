@@ -68,12 +68,11 @@
  History:
  --------
  version 4.0b (11/11/2026), high frame rate support by Vesuri:
- - high frame rate support (CUSTOM1=1), enabled in the installed icon
- - 68020+ and Fast RAM required; original behavior on other machines
- - smooth driving motion and CPU drawing optimizations
- - smooth instant replay motion with the original transition-wipe pace
- - audio DMA wait fixed: the music no longer loses notes on fast CPUs
-   (68040/060)
+ - new "High frame rate support" option (CUSTOM1=1, set by the installer):
+   on a 68020 or better with the game in Fast RAM the frame rate is no
+   longer limited, driving, the demo and instant replays move smoothly and
+   drawing is faster. Other machines run the original game
+ - fixed: the music and sound effects lost notes on fast CPUs (68040/060)
 
  version 3.0 (30/04/2022) done by StingRay:
  - patch redone
