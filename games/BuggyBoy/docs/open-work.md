@@ -140,8 +140,16 @@ checked.
    work to the blitter, which uses free slots at full speed. Candidates:
    - the object plotter (`$3D94`, `$418C`: CPU-masked `and`/`or` on the screen) by the
      blitter, from the graphics already in chip;
-   - the clear's two CPU planes by the blitter, overlapped with the road copy;
-   - the HUD drawn only where it changes.
+   - tried: the clear's two CPU planes by the blitter, each plane's fill overlapped with a
+     plane of the road copy. Worse (1.115 against 1.085 on the 030): the copy waited for
+     the fills, which share the bus with it;
+   - the CPU's waits for the blitter, about 0.17 fields a frame on the 030: the blit code at
+     `$2D60` (reached from `$41E2` and `$424E`, which the profile charges for it) waits
+     before each of its 6 blits (`$2D72`–`$2E7E`), the clear's backdrop blits at
+     `$354`–`$390`. A queue the blitter interrupt works through would let the CPU go on
+     until it next draws on the screen;
+   - not the HUD alone: `$448A` draws the HUD text (`$4A70`) and also the player's buggy
+     (masked, from alloc 2), and the clear wipes the sky behind the HUD every frame.
 
    Earlier candidates, each to be A/B measured:
    - 32-bit long-aligned road writes (about 8,200 word writes a frame now);
