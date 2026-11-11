@@ -697,7 +697,7 @@ FRKFill:
  bsr.w FRKFillInit
 .ready:
  bsr.w FRKSetup
- lea FRKFillTab(pc),a5
+ move.l FRKFillTab(pc),a5
  move.w d6,d0
  andi.w #$18,d0
  cmpi.w #$08,d0                 ; IFE alone; IFE with EFE acts as EFE
@@ -764,7 +764,7 @@ FRKFillD:
 ; bit rule of FRBFill.
 FRKFillInit:
  movem.l d0-d7/a1,-(sp)
- lea FRKFillTab(pc),a1
+ move.l FRKFillTab(pc),a1
  moveq #0,d7                    ; 0 exclusive, 1 inclusive
 .mode:
  moveq #0,d6                    ; carry in
@@ -810,7 +810,8 @@ FRKFillInit:
  rts
 
  even
-FRKFillTab: ds.w 1024
+; In the Fast block (FF1FastRenderAllocate): FRK_FILL_BYTES.
+FRKFillTab: dc.l 0
 FRKFillReady: dc.b 0
  even
  ifd FRK_COUNT

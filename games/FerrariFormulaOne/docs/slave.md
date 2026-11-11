@@ -72,6 +72,19 @@ selects the accepted R3g arithmetic branches explicitly and verifies all binding
 operands after its final assembly pass. Original diagnostic builders remain in
 the ignored local development harness.
 
+Each payload's binding table (`tools/bindings.py`, applied by `FF1ApplyBindings`) is
+packed. It has one entry per used hunk, holding that hunk's previous base and its new
+base. Then comes one 6-byte record per bound operand: the offset from the previous record,
+the hunk, the kind (a long, or its high or low word) and the addend. An operand's expected
+value is its hunk's previous base plus the addend, so no expected words are stored. The
+tables are 12.1 / 3.7 / 18.2 KB for the 68000 / chip-only 68020 / Fast payloads (formerly
+58.2 / 17.0 / 89.8 KB in 16-byte half-operand records). Work buffers of 1 KB and up are
+allocated, not carried in the slave:
+- the 68000 path's 2.5 KB boundary coefficients, from the public pool on the first race and
+  kept (the native coefficients stay selected if that fails);
+- Fast RAM rendering's row states, block states and fill tables (4.3 KB), placed after the
+  view mirrors in its Fast block.
+
 Integration acceptance passed on 2026-10-14 for SPS 0481 PAL on the four documented emulator
 profiles. Controlled exact-state comparisons, 30 exact frames per engine,
 CUSTOM2=0 legacy comparisons, 60-second clocks, enabled CUSTOM1 options,

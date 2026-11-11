@@ -59,7 +59,8 @@ try:
    raw=dump('stats7',probe+sy['FF1FastRenderCopyStats'],probe+sy['FF1FastRenderCopyStats']+20)
    a['fr7']=dict(zip(['tag','rows','written','flushes','view_seeds'],struct.unpack('>5I',raw)))
   if 'FF1FastRenderBlocks' in sy:
-   raw=dump('blocks',probe+sy['FF1FastRenderBlocks'],probe+sy['FF1FastRenderBlocks']+1000)
+   at=struct.unpack('>I',dump('blockptr',probe+sy['FF1FastRenderBlocks'],probe+sy['FF1FastRenderBlocks']+4))[0]
+   raw=dump('blocks',at,at+1000) if at else bytes(1000)
    segs=[(0xcd30,0xd3e0),(0xd3e0,0x18f48),(0x18f48+30960,0x528d8)];out=[];o=0
    for lo,hi in segs:
     n=(hi-lo+255)>>8

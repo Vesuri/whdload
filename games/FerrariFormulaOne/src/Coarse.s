@@ -15,7 +15,6 @@ public_bindings:
 
  IFD FF1_COARSE_200_COMPLETE
  include "FerrariFormulaOne_Coarse200RootTable.s"
- include "FerrariFormulaOne_Coarse200BoundaryTable.s"
  include "FerrariFormulaOne_Coarse200DivideTable.s"
 
  ENDC

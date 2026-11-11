@@ -116,5 +116,22 @@ if kind=='000':
 data_candidates=[]
 (b/'bindings-data-review.json').write_text(json.dumps(data_candidates,indent=2)+'\n')
 (b/'bindings.json').write_text(json.dumps([dict(offset=k,hunk=v[0]//4,shift=v[1],addend=v[2],expected=v[3],reason=why[k]) for k,v in sorted(records.items())],indent=2)+'\n')
-(b/'bindings.bin').write_bytes(b''.join(struct.pack('>IHHIHH',k,*v,0) for k,v in sorted(records.items()))+struct.pack('>I',0xffffffff))
-print(len(records),'word bindings;',len(data_candidates),'explicit data candidates require review')
+# Packed table (FerrariFormulaOne_Bindings.s). Header: hunk count.w, then per used hunk
+# slot byte offset.w, previous base.l (the canonical base) and new base.l (runtime work).
+# Records: delta.w from the previous record's offset (0 ends), hunk index.b, kind.b
+# (0 long, 1 high word, 2 low word), hunk-relative addend.w. A word's expected value is
+# derived from the hunk's previous base, so no expected words are stored.
+for k,(slot,shift,addend,expected) in records.items():
+ assert expected==((hunks[slot//4]['base']+addend)>>shift)&0xffff,(hex(k),slot,shift,addend,expected)
+used=sorted({v[0] for v in records.values()});index={s:i for i,s in enumerate(used)}
+assert len(used)<256
+packed=[];prev=0;items=sorted(records.items());i=0
+while i<len(items):
+ off,(slot,shift,addend,_)=items[i]
+ if shift==16 and i+1<len(items) and items[i+1][0]==off+2 and items[i+1][1][:3]==(slot,0,addend):kind=0;i+=2
+ else:kind=1 if shift==16 else 2;i+=1
+ delta=off-prev;assert 0<delta<32768 and 0<=addend<65536,(hex(off),delta,addend)
+ packed.append(struct.pack('>HBBH',delta,index[slot],kind,addend));prev=off
+table=struct.pack('>H',len(used))+b''.join(struct.pack('>HII',s,hunks[s//4]['base'],0) for s in used)+b''.join(packed)+struct.pack('>H',0)
+(b/'bindings.bin').write_bytes(table)
+print(len(records),'word bindings in',len(packed),'records,',len(table),'bytes;',len(data_candidates),'explicit data candidates require review')

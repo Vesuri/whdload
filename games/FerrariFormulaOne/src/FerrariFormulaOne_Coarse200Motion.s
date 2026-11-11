@@ -2369,8 +2369,7 @@ C4SaveMask042 equ *
  tst.w (sp)+
  bne.b .p5_native_coefficients
  lea C4BoundaryControl(pc),a1
- dc.w $d3fc
- dc.l C4BoundaryCoefficients-C4BoundaryControl
+ move.l 2(a1),a1
  move.w (a1,d4.l),d0
  ext.l d0
  adda.w #512,a1

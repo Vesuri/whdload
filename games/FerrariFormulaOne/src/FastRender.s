@@ -108,6 +108,11 @@ FR_M2_BLOCKS equ (FR_M2_HI-FR_M2_LO+255)>>FR_BLOCK_SHIFT
 FR_M3_BLOCKS equ (FR_M3_HI-FR_M3_LO+255)>>FR_BLOCK_SHIFT
 FR_M4_BLOCKS equ (FR_M4_HI-FR_M4_LO+255)>>FR_BLOCK_SHIFT
 FR_BLOCKS equ FR_M2_BLOCKS+FR_M3_BLOCKS+FR_M4_BLOCKS
+; Work buffers after the view mirrors in the Fast block, each a multiple of 4.
+FR_ROWS_BYTES equ (2*FR_ROWS_PAD+3)&-4
+FR_BLOCKS_BYTES equ (FR_BLOCKS+1+3)&-4
+FRK_FILL_BYTES equ 2*1024        ; FRKFillTab: exclusive, then inclusive words
+FR_WORK_BYTES equ FR_ROWS_BYTES+FR_BLOCKS_BYTES+FRK_FILL_BYTES
 
 FF1FastRenderInstall:
  movem.l d0-d1/a0-a1/a3,-(sp)
@@ -172,7 +177,7 @@ FF1FastRenderAllocate:
  add.l d1,d2
  bra.b .size
 .sized:
- addi.l #2*FR_VIEW_BYTES,d2 ; FR7 view mirrors, after the mirrors
+ addi.l #2*FR_VIEW_BYTES+FR_WORK_BYTES,d2 ; FR7 view mirrors, then the work buffers
  move.l d2,FRS_BLOCK_BYTES(a3)
  move.l $4.w,a6
  moveq #4,d1                ; MEMF_FAST
@@ -222,6 +227,24 @@ FF1FastRenderAllocate:
 .placed:
  lea FF1FastRenderView(pc),a0
  move.l d3,(a0)
+ ; Work buffers after the views: row and block states start untrusted (0);
+ ; the fill tables are built at their first use.
+ addi.l #2*FR_VIEW_BYTES,d3
+ lea FF1FastRenderRows(pc),a0
+ move.l d3,(a0)
+ move.l d3,a0
+ addi.l #FR_ROWS_BYTES,d3
+ lea FF1FastRenderBlocks(pc),a1
+ move.l d3,(a1)
+ addi.l #FR_BLOCKS_BYTES,d3
+ lea FRKFillTab(pc),a1
+ move.l d3,(a1)
+ lea FRKFillReady(pc),a1
+ clr.b (a1)
+ move.w #(FR_ROWS_BYTES+FR_BLOCKS_BYTES)/4-1,d1
+.clear:
+ clr.l (a0)+
+ dbf d1,.clear
  ; Seed every mirror from Chip once the blitter is idle.
  tst.b $dff002
 .blit:
@@ -308,12 +331,12 @@ FF1FastRenderPrefix:
  ; FRMarkSpan), so the row states persist; the other arms start untrusted.
  cmpi.w #FR_SCRATCH_STAGES,FF1FastRenderStages(pc)
  bhs.b .cleared
- lea FF1FastRenderRows(pc),a0
+ move.l FF1FastRenderRows(pc),a0
  move.w #(2*FR_ROWS_PAD)/2-1,d0
 .clear:
  clr.w (a0)+
  dbf d0,.clear
- lea FF1FastRenderBlocks(pc),a0
+ move.l FF1FastRenderBlocks(pc),a0
  move.w #(FR_BLOCKS+1)/2-1,d0
 .blocks:
  clr.w (a0)+
@@ -2102,7 +2125,7 @@ FRTrackBlocks:
  lea FF1FastRenderDelta(pc),a0
  move.l (a0,d2.w*4),d7      ; Fast - Chip
  lea FRBlockOffsets(pc),a0
- lea FF1FastRenderBlocks(pc),a2
+ move.l FF1FastRenderBlocks(pc),a2
  adda.w -4(a0,d2.w*2),a2
  cmp.l d0,d1
  bls.w .fault
@@ -2163,7 +2186,7 @@ FRPublishBlocks:
  lea FF1FastRenderDelta(pc),a0
  move.l (a0,d2.w*4),d7
  lea FRBlockOffsets(pc),a0
- lea FF1FastRenderBlocks(pc),a2
+ move.l FF1FastRenderBlocks(pc),a2
  adda.w -4(a0,d2.w*2),a2
  move.l d6,d1
  sub.l d4,d1
@@ -2213,7 +2236,7 @@ FRTrackSpan:
  move.l (a0,d2.w*8),d4      ; Chip bank
  lea FF1FastRenderDelta(pc),a0
  move.l (a0,d2.w*4),d7      ; Fast - Chip
- lea FF1FastRenderRows(pc),a2
+ move.l FF1FastRenderRows(pc),a2
  mulu.w #FR_ROWS_PAD,d2
  adda.l d2,a2
  sub.l d4,d0
@@ -2292,7 +2315,7 @@ FRMarkSpan:
  mulu.w #43691,d1
  swap d1
  lsr.w #5,d1                ; last row
- lea FF1FastRenderRows(pc),a0
+ move.l FF1FastRenderRows(pc),a0
  tst.w d2
  beq.b .bank
  lea FR_ROWS_PAD(a0),a0
@@ -2347,7 +2370,7 @@ FRPublishRows:
  move.l (a0,d3.w*8),a0      ; Chip bank
  lea FF1FastRenderDelta(pc),a1
  move.l (a1,d3.w*4),d1      ; Fast - Chip
- lea FF1FastRenderRows(pc),a2
+ move.l FF1FastRenderRows(pc),a2
  move.w d3,d0
  mulu.w #FR_ROWS_PAD,d0
  adda.l d0,a2
@@ -2637,7 +2660,7 @@ FRPublishWhole:
  move.l (a0,d3.w*8),a0      ; Chip bank
  lea FF1FastRenderDelta(pc),a1
  move.l (a1,d3.w*4),d1
- lea FF1FastRenderRows(pc),a2
+ move.l FF1FastRenderRows(pc),a2
  move.w d3,d0
  mulu.w #FR_ROWS_PAD,d0
  adda.l d0,a2
@@ -3154,9 +3177,9 @@ FRCarDeferred: dc.w 0                ; FR12: the car's mask blit is deferred to 
 ; 1 until B8Draw's next request consumes it.
 FF1FastRenderShowView: dc.l 0,0
  dc.w 0,0
-FF1FastRenderRows: ds.b 2*FR_ROWS_PAD
- even
-FF1FastRenderBlocks: ds.b FR_BLOCKS+1
- even
+; Work buffers in the Fast block (FF1FastRenderAllocate): bank row states,
+; block states.
+FF1FastRenderRows: dc.l 0
+FF1FastRenderBlocks: dc.l 0
 FF1FastRenderRoadRegs: ds.l 14       ; D0-D7/A0-A5 after the prefix road
 FF1FastRenderImage: ds.b $3c         ; FRB_IMAGE: registers $040-$075 and B state
