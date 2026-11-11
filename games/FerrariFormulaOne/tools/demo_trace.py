@@ -5,7 +5,8 @@ live demo; FASTRAM_PLAN FR4 "Live race").
 
   demo_trace.py PROFILE      env FF1_BUILD (dir), C1_VARIANT (tag), RELEASE_WHD_ARGS,
                              DEMO_SAMPLES (default 120), DEMO_STEP (fields, default 25),
-                             DEMO_SKIP (fields before the first sample)
+                             DEMO_SKIP (fields before the first sample),
+                             RELEASE_PROFILE_OVERRIDES (JSON, as ff1check.py's MMU cases)
 Output tmp/step5/demo-trace-PROFILE-TAG/result.json.
 """
 from pathlib import Path
@@ -18,6 +19,7 @@ profile = sys.argv[1]; tag = os.environ.get('C1_VARIANT', 'candidate')
 out = r / 'tmp/step5' / f'demo-trace-{profile}-{tag}'; out.mkdir(parents=True, exist_ok=True)
 b = Path(os.environ.get('FF1_BUILD', str(r / 'tmp/build/fr10-production'))) / 'FerrariFormulaOne.slave'
 profiles = json.loads((r / 'tmp/manifest/step3-profiles.json').read_text()); os.environ.update(profiles[profile])
+os.environ.update(json.loads(os.environ.get('RELEASE_PROFILE_OVERRIDES', '{}')))   # e.g. ff1check.py MMU
 os.environ.update(SLAVE=str(b), WARP='1', WINDOW='none', JOY0='mouse', DETERMINISTIC='1',
                   WHD_ARGS=os.environ.get('RELEASE_WHD_ARGS', 'CUSTOM1=1 CUSTOM2=1 ConfigDelay=0'),
                   FSUAE=os.environ.get('RELEASE_FSUAE', str(r / 'tmp/step5-frame-observer-build/fs-uae')),
