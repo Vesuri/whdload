@@ -64,8 +64,6 @@ CHECKS = {
                      doc='20 production updates, no engine error'),
     'fps':      dict(script='test_h5_fps.py', kind='h5-fps', profiles=FAST, covers=ANY, core=True, whd=PERF,
                      doc='300-presentation FPS and live CACR in performance mode'),
-    'gates':    dict(script='ff1_gates.py', kind=None, profiles=['040-40-bce'], covers=ANY, core=True,
-                     doc='exact states, 30 stable frames (normal/grid) and elapsed clock vs B8-PAL'),
     'memory':   dict(script='test_release_smoke.py', kind='release-smoke', profiles=None, core=False,
                      covers=['FerrariFormulaOne_WHD.s', 'FerrariFormulaOne_PublicMemory.s',
                              'FerrariFormulaOne_PublicLoader.s', 'FerrariFormulaOne/layout.json',
@@ -163,7 +161,7 @@ def run_one(check, prof, tag, ov, expect, build, a):
     if over:
         env['RELEASE_PROFILE_OVERRIDES'] = json.dumps(over)
     argv = [sys.executable, str(R / 'tools' / c['script'])]
-    argv += ['--build', str(build), '--tag', tag] if check == 'gates' else [prof]
+    argv += [prof]
     log = R / 'tmp/ff1check' / f'{check}-{prof}-{tag}.log'
     log.parent.mkdir(parents=True, exist_ok=True)
     t = time.time()

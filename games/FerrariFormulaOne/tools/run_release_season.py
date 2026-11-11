@@ -10,7 +10,9 @@ try:
    (r/'tmp/step5/release-route-replay.log').write_text(replay.stdout)
    if replay.returncode: raise RuntimeError(replay.stdout[-4000:])
    subprocess.run([sys.executable,str(r/'tools/control_step5_c4_q03.py'),str(r/'tools/release-season-replay.json')],check=True)
-   print('Season saved; F10 return awaiting visual verification',flush=True)
+   print('Season saved; F10 exit verified (TDREASON_OK)',flush=True)
+   # Close the live session (ff1check waits for exit).
+   subprocess.run([sys.executable,str(r/'tools/control_step5_c4_q03.py'),'[{"op":"quit"}]'])
  assert p.wait()==0
 finally:
  if p.poll() is None:p.terminate();p.wait()

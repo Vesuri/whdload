@@ -26,18 +26,21 @@ The A500 without Fast memory and the chip-only 020 left the core profiles at FR1
 check below).
 
 Core checks run on every source change: a 20-update smoke on every core
-profile, performance-mode FPS (with the share of one-field intervals) and CACR on
-the three 020-or-faster profiles, and the exact-state, stable-frame and elapsed-clock
-gates on 040. The exact-state gate allows only Fast pointers to differ from the B8-PAL
-reference, as the 1 MiB layout moves the guest's Fast allocations.
+profile, and performance-mode FPS (with the share of one-field intervals) and CACR on
+the three 020-or-faster profiles. The exact-state, stable-frame and elapsed-clock gates
+on 040 (`tools/attic/ff1_gates.py`) were retired on 2026-11-11: their B8-PAL references
+and fixture sources were local, are gone, and their builder needs its own output.
 
 Feature checks run when a source file they cover changes, and all of them run
 for a release:
 
 - memory layouts, the only check that uses several A500 or chip-only setups
 - 030 with WHDLoad's MMU option and data cache, and 040 with the MMU
-- native lap completion and driving controls
-- season save, the race-control route and repair/transport clocks
+- native lap completion and driving controls (on the A500 the demo takeover's grid slot
+  meets a start-line contact; the controls check brakes the car to rest first and
+  records `start_contact`)
+- season save, the race-control route and repair/transport clocks (the season runner
+  passes once the F10 exit is verified and closes the session)
 - CUSTOM2=0 native overlay reloads
 - Fast RAM rendering on 030 and 040: the path is active, 50 draws without a fault, and
   both Chip banks equal their Fast shadows
@@ -272,20 +275,13 @@ AmigaXDev `docs/reference/headless-fsuae.md`.
 
 ## Disabled native overlay reloads
 
-Both CUSTOM1 values pass on A500, A500+Fast, chip-only 020 and 020+Fast with
-CUSTOM2=0. Actual device input leaves driving, returns through the native pit
-and race-control screens, selects qualifying, and loads driving again. All
-1,005 words in the combined performance patch inventory exactly match the
-first load and the original native reference after reload.
-
-For CUSTOM1=0, the original timing callback remains installed; its host address
-is checked separately before normalizing that linkage operand. For CUSTOM1=1,
-the native six bytes at `$6a304` remain `e34048c02840`. This direct native-code
-check complements the earlier RNG-controlled state fixture, whose startup
-control deliberately installed a timing callback for both options. An initial
-harness assertion incorrectly required that callback for CUSTOM1=1; correcting
-it to the original option contract preserves the complete patch-word gate.
-Evidence: `tmp/manifest/release-disabled-reloads.json` (eight passing cases).
+With CUSTOM2=0 on A500+Fast and 020+Fast, actual device input leaves driving,
+returns through the native pit and race-control screens, selects qualifying, and
+loads driving again. All 1,005 words in the combined performance patch inventory
+(`tmp/manifest/release-perf-ranges.json`) exactly match the first load after the
+reload, and `$6a304` calls the host's `fixtiming` (StingRay's timing fix, always
+installed since CUSTOM1 was removed). The earlier comparison with a capture of the
+original slave went with that capture, which was local and is gone (2026-11-11).
 
 ## Monaco standing start and tow
 

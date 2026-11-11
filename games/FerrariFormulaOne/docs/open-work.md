@@ -89,8 +89,6 @@ python3 tools/fr8_report.py tmp/step5/c4-q03-h5-fps-030-50-bce-fr8-pace-normal
                                      # phases, histograms, tearing, tick-to-screen delay
 H5_BUILD=$PWD/tmp/build/fr8-TAG C1_VARIANT=fr8-TAG python3 tools/test_h5_fps.py 030-50-bce
                                      # 300 intervals, warp off; grep "'fps':"
-FF1_FINE_DEFINES=FF1_FAST_RENDER=1 python3 tools/ff1_gates.py --build tmp/build/fr8-TAG \
-  --tag TAG frames/normal frames/grid timing/elapsed
 FR4_BUILD=tmp/build/fr8-TAG FR4_TAG=-fr8-TAG \
   RELEASE_WHD_ARGS='CUSTOM2=1 ConfigDelay=0 NoWriteCache' \
   python3 tools/fr4_probe.py 030-50-bce 300
@@ -110,10 +108,6 @@ python3 tools/fr6_sites.py tmp/step5/hi25-profile-030-50-bce-prof-fr8-TAG DRAWS
 
 Pitfalls:
 
-- `ff1_gates.py` builds its frame fixtures from the working tree with the environment;
-  without `FF1_FINE_DEFINES=FF1_FAST_RENDER=1` it silently tests the non-FR path (FR5a/b
-  were invalid this way). Check with `grep FF1FastRenderPrefix:` in
-  `tmp/build/render-TAG-matched-stable-frames/fine/fine.list`.
 - Give `ff1check.py` explicit `--profiles` on FR builds: the defaults include the A500 and
   chip-only A1200, which fail (smoke: `assert len(hits)==1, []`, no `FF1B7PUBLICROOT`).
 - The first `mmu` run of a sequence sometimes fails after 3 s with `FileNotFoundError` on
@@ -130,8 +124,6 @@ Pitfalls:
   the banks while driving (FR1) and the full arm publishes every dirty row each draw;
   partial arms keep the FR5 tracking. A new writer outside the redirection breaks this
   silently. The probe's `rows_refreshed=0` is expected.
-- The frame gate's capture is timed from `B8Draw`, so `ff1_gates.py` patches its FR frame
-  fixtures to `FF1FastRenderEarly` 0 (the early request would show a newer frame).
 - The pacing log (`FF1_FAST_RENDER_PACING`) moves the layout and shifts FPS by up to 1 %;
   compare arms built together. Native absolute addresses are bound only in code before
   `public_bind`: `FastRenderPacing.s` (at the end of `Fine.s`) gets them passed from
@@ -142,9 +134,7 @@ Pitfalls:
 - The live runners (route, modal, reload, season) default to the emulator
   `tmp/step3/fs-uae-q03-final`, which needs `data`, `share` and `fsemu` beside it (links to
   `tmp/step5-frame-observer-build`); without them FS-UAE exits at once and the runner
-  reports `could not connect: Connection refused`. The frame gate needs the fixture sources
-  `tmp/build/step5-b8-v3*` and the B8-PAL references `tmp/step5/c4-q03-*-b8pal-*`. All are
-  local and ignored.
+  reports `could not connect: Connection refused`. They are local and ignored.
 
 The evidence (measurement and validation JSON, `tmp/manifest/`, with `project.json` as the
 index) and the captures (`tmp/step5/`, ...) are local and ignored. `tmp/step5-frame-observer-build/`

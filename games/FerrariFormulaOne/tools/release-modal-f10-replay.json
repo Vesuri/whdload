@@ -356,7 +356,7 @@
   },
   {
     "op": "exec",
-    "code": "import re\nlisting=(r/'tmp/build/production/host.list').read_text(errors='replace')\nm=re.search(r'^00:([0-9A-F]{8}) [0-9A-F]+\\s+\\d+:\\s+\\.exit\\s+pea\\s+TDREASON_OK$',listing,re.M);assert m\nquit_pc=host+int(m[1],16)\ncmd('delete');cmd(f'break *{quit_pc}');cmd('monitor input KEY_F10 1');assert 'Breakpoint' in cmd('continue');assert val('$pc')==quit_pc\ncmd('monitor input KEY_F10 0');abort=val(f'*(unsigned int*){host+hs[\"_resload\"]}')+4\ncmd('delete');cmd(f'break *{abort}');assert 'Breakpoint' in cmd('continue');assert val('*(unsigned int*)$sp')==0xffffffff\nreport['actual_f10_exit']=True;report['f10_abort_reason']='TDREASON_OK';report['f10_registers']=cmd('info registers');save()\ncmd('delete');g.cont();time.sleep(10);g.stop();report['after_f10_registers']=cmd('info registers');s.handle(g,'shot '+str(out/'after-f10.png'));save()\n"
+    "code": "import re\nlisting=(b.parent/'host.list').read_text(errors='replace')\nm=re.search(r'^00:([0-9A-F]{8}) [0-9A-F]+\\s+\\d+:\\s+\\.exit\\s+pea\\s+TDREASON_OK$',listing,re.M);assert m\nquit_pc=host+int(m[1],16)\ncmd('delete');cmd(f'break *{quit_pc}');cmd('monitor input KEY_F10 1');assert 'Breakpoint' in cmd('continue');assert val('$pc')==quit_pc\ncmd('monitor input KEY_F10 0');abort=val(f'*(unsigned int*){host+hs[\"_resload\"]}')+4\ncmd('delete');cmd(f'break *{abort}');assert 'Breakpoint' in cmd('continue');assert val('*(unsigned int*)$sp')==0xffffffff\nreport['actual_f10_exit']=True;report['f10_abort_reason']='TDREASON_OK';report['f10_registers']=cmd('info registers');save()\ncmd('delete');g.cont();time.sleep(10);g.stop();report['after_f10_registers']=cmd('info registers');s.handle(g,'shot '+str(out/'after-f10.png'));save()\n"
   },
   {
     "op": "quit"

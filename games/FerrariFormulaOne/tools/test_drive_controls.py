@@ -136,7 +136,17 @@ try:
  clutch=os.environ.get('DRIVE_CLUTCH')=='1'
  if clutch:cmd('monitor input JOY1_FIRE_BUTTON 1');cmd('monitor input JOY1_2ND_BUTTON 1')
  advance_fields(150,False);start=row('ready')
- assert start['countdown']==0 and start['speed']==0
+ assert start['countdown']==0,start
+ # A start-line contact can move the car before the test drives it (the A500's demo grid
+ # slot meets the original's collision response): brake it to rest, then drive as usual.
+ if start['speed'] and not clutch:
+  cmd('monitor input JOY1_FIRE_BUTTON 1')
+  for i in range(10):
+   advance_fields(30,False);start=row('settling-'+str(i))
+   if start['speed']==0:break
+  cmd('monitor input JOY1_FIRE_BUTTON 0');advance_fields(20,False);start=row('ready-after-contact')
+  report['start_contact']=True
+ assert start['speed']==0,start
  if clutch:assert start['rpm']>4000
  cmd('monitor input JOY1_FIRE_BUTTON 0');cmd('monitor input JOY1_2ND_BUTTON 1')
  advance_fields(60,False);accel=row('accelerated');assert accel['speed']>20,accel
