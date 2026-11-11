@@ -35,14 +35,23 @@ W_BLT		= $17000			;the clear's blitter registers, recorded (_QClear)
 W_QUEUE		= $17080			;the recorded blits, Q_ENTRY bytes each
 W_GFX		= $17800			;fast memory: copy of alloc 2 (the graphics)
 W_END		= W_GFX+GFX_SIZE
+FINE		= 64				;presentation positions per segment (_FineInit)
+OBJ_SET		= 442				;one phase's object table ($76b0)
+W_FOBJ		= W_END				;FINE object tables, $76b0's layout
+W_FSTRIPE	= W_FOBJ+FINE*OBJ_SET		;FINE stripe tables ($685a's) per parity
+W_FMAP		= W_FSTRIPE+2*FINE*192		;FINE row-to-slice maps: count.w, 98 bytes
+W_FT		= W_FMAP+FINE*100		;slice boundaries: 5 phases, and one fine
+W_FX		= W_FT+6*30			;the rows' x of the second projection
+W_TSAVE		= W_FX+106*2			;a tick frame's position variables (_TickPose)
+W_FEND		= W_TSAVE+$240
 	IFD VERIFY
-W_VERIFY	= $52800			;copy of the program
+W_VERIFY	= (W_FEND+$fff)&-$1000		;copy of the program
 W_LOG		= W_VERIFY+$b000		;the log (tools/verify.py)
 W_VCOURSES	= W_LOG+$400			;copy of COURSES.DAT
 W_VCLEAR	= W_VCOURSES+$10000		;the queued clear's rows 0 to 103, against 1.3's
 W_SIZE		= (W_VCLEAR+$4800+$fff)&-$1000
 	ELSE
-W_SIZE		= (W_END+$fff)&-$1000
+W_SIZE		= (W_FEND+$fff)&-$1000
 	ENDC
 EXPSIZE		= $10000+EXP_WORK+W_SIZE+EXP_STACK	;ws_ExpMem (optional)
 	IFNE EXPSIZE&$fff
@@ -50,6 +59,8 @@ EXPSIZE		= $10000+EXP_WORK+W_SIZE+EXP_STACK	;ws_ExpMem (optional)
 	ENDC
 
 TICK		= 4				;fields per logic tick (12.5 Hz, 1.3's default lock)
+LMAX		= 24				;the smoothed position's most lag (1/FINE segment)
+CATCH		= 16				;its catch-up per field into a crossed segment
 LAT_MAX		= 128				;a larger lateral change per tick is a jump (steering
 						;moves it up to 60 a tick, $810c, plus the drift)
 
@@ -84,6 +95,15 @@ Q_MAX		= 40				;the clear records at most 20
 	ENDC
 P_BLOCK		= $9860				;the logic's state block; V_* are offsets in it
 V_PARITY	= $987a-P_BLOCK			;segment parity, 0 or 8
+P_STRIPES	= $685a				;the road's stripes: 96 words per parity + phase
+P_OBJTAB	= $76b0				;object rows: OBJ_SET bytes per phase
+P_SLICEH	= $7daa				;slice heights - 1: 16 bytes per phase
+P_ROWS		= $9b22				;the projection's per-row longs (106)
+P_ROWHI		= $9b4a				;the road's row 0 among them
+P_SLICES	= $9980				;the slices' rows, 32 bytes each
+P_CROP		= $7e4a				;tall objects: 4 longs per size, one per phase
+P_STEPS		= $804c				;phase steps / 2: 8 words per speed band
+V_SPEED		= $98b2-P_BLOCK			;speed; the band is speed & $70
 V_PHASE		= $987c-P_BLOCK			;phase in the segment, 0 2 4 6 (of 8)
 V_PHASE221	= $987e-P_BLOCK			;phase * 221 (the object tables)
 V_ROADPH	= $9880-P_BLOCK			;(parity + phase) * 96 (the road)
@@ -284,6 +304,10 @@ _TickPatch	movem.l	d0-d1/a0-a2,-(sp)
 		lea	_PL_Plot(pc),a0
 		move.l	a5,a1
 		jsr	resload_Patch(a2)
+		lea	_PL_Fine(pc),a0
+		move.l	a5,a1
+		jsr	resload_Patch(a2)
+		bsr	_FineInit
 		TSTPC	_FastExp
 		beq.b	.no
 		move.l	_Work(pc),d0
@@ -920,6 +944,361 @@ _PlotText	move.l	d6,-(sp)
 		movem.l	(sp)+,d6		;flags: the last write's, as the original's or.w
 		rts
 
+; The drawing's readers of the phase that take a fine position between
+; ticks (_Pose; docs/internals.md, "Fine positions"). The others read the
+; phase, which the pose sets to the even phase below the position.
+_PL_Fine	PL_START
+		PL_PS	$3536,_ObjRows		;adda.w $987e,a5
+		PL_PSS	$35d4,_Grow,2		;mulu.w $987c,d7; lsr.w #4,d7
+		PL_PS	$39f4,_Phase0		;move.w $987e,d7
+		PL_PS	$3a22,_Phase0		;move.w $987e,d7
+		PL_PS	$9d8a,_Stripes		;adda.w $9880,a6
+		PL_PSS	$3d3c,_PoleLen,6	;move.w $987c,d7; lsr.w #1,d7; move.b 4(a2,d7.w),d4
+		PL_P	$3d0c,_Crop		;the tall objects' place and crop (type 54)
+		PL_END
+
+; a5 = $76b0 + a row's offset: its table for the phase.
+_ObjRows	TSTPC	_Fine
+		beq.b	.orig
+		suba.l	_ProgBase(pc),a5
+		suba.l	#P_OBJTAB,a5
+		adda.l	_FineObj(pc),a5
+		rts
+.orig		move.l	a0,-(sp)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_BLOCK,a0
+		adda.w	V_PHASE221(a0),a5
+		move.l	(sp)+,a0
+		rts
+
+; d7 = a size step's height difference: the sprite's lift, difference *
+; phase / 16 (fine: * position / 128, the same at the even phases). It
+; keeps the sprite centred on its slice's true size, also through the
+; size change at the crossing (the lift reaches half the step there).
+_Grow		TSTPC	_Fine
+		beq.b	.orig
+		mulu	_FineF(pc),d7
+		lsr.w	#7,d7
+		rts
+.orig		move.l	a0,-(sp)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_BLOCK,a0
+		mulu	V_PHASE(a0),d7
+		lsr.w	#4,d7
+		move.l	(sp)+,a0
+		rts
+
+; d7.w = the distance from the row's table to phase 0's.
+_Phase0		TSTPC	_Fine
+		beq.b	.orig
+		move.w	_FineF(pc),d7
+		mulu	#OBJ_SET,d7
+		rts
+.orig		move.l	a0,-(sp)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_BLOCK,a0
+		move.w	V_PHASE221(a0),d7
+		move.l	(sp)+,a0
+		rts
+
+; a6 = $685a: the stripes for the parity and phase.
+_Stripes	TSTPC	_Fine
+		beq.b	.orig
+		move.l	_FineStripe(pc),a6
+		rts
+.orig		move.l	a0,-(sp)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_BLOCK,a0
+		adda.w	V_ROADPH(a0),a6
+		move.l	(sp)+,a0
+		rts
+
+; d4.b = a pole's length (the sprite entry's 4 bytes per phase, a2 = the
+; entry + 8; d6 = the row's entry offset, 0 for the nearest). Fine: between
+; the phase's byte and the next, after the last the next size's first (the
+; nearest size continues its last step). d7 = the phase / 2, as the original.
+_PoleLen	TSTPC	_Fine
+		beq.b	.orig
+		move.w	_FineF(pc),d7
+		lsr.w	#4,d7
+		movem.l	d0-d1,-(sp)
+		moveq	#0,d0
+		move.b	4(a2,d7.w),d0
+		moveq	#0,d1
+		cmp.w	#3,d7
+		beq.b	.last
+		move.b	5(a2,d7.w),d1
+		bra.b	.lerp
+.last		tst.w	d6
+		beq.b	.nearest
+		move.b	-12(a2),d1		;the next size's (16 bytes before)
+		bra.b	.lerp
+.nearest	move.b	6(a2),d1
+		neg.w	d1
+		add.w	d0,d1
+		add.w	d0,d1
+.lerp		sub.w	d0,d1
+		move.w	_FineF(pc),d4
+		and.w	#15,d4
+		muls	d4,d1
+		asr.l	#4,d1
+		add.w	d0,d1
+		move.b	d1,d4
+		movem.l	(sp)+,d0-d1
+		rts
+.orig		move.l	a0,-(sp)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_BLOCK,a0
+		move.w	V_PHASE(a0),d7
+		move.l	(sp)+,a0
+		lsr.w	#1,d7
+		move.b	4(a2,d7.w),d4
+		rts
+
+; $3d0c: a tall object drawn from row y up, its top held at phase 6's place
+; through the segment: P_CROP + the entry's offset (16 per row) + phase * 4
+; gives the graphics' offset down (a1, c rows), y * 40, and c (taken off
+; d4). c = y(phase 6) - y. Fine: y the row's fine y, up to phase 6, then
+; phase 6's (moving on down would need rows below the graphics' bottom).
+_Crop		movea.l	a6,a0
+		move.l	_ProgBase(pc),a3
+		add.l	#P_CROP,a3
+		adda.w	-(a2),a3
+		TSTPC	_Fine
+		beq.b	.orig
+		move.w	(a2),d3
+		cmp.w	#11*16,d3
+		bhi.b	.orig
+		and.w	#15,d3
+		bne.b	.orig
+		move.w	_FineF(pc),d3
+		cmp.w	#48,d3
+		bhi.b	.p6
+		movem.l	d0-d1/a4,-(sp)
+		move.w	(a2),d0
+		lsr.w	#4,d0			;the row
+		mulu	#34,d0
+		move.l	_FineObj(pc),a4
+		move.w	(a4,d0.w),d0		;y * 40
+		moveq	#-32,d1
+		and.w	12+2(a3),d1
+		asr.w	#2,d1			;y(phase 6) * 40
+		sub.w	d0,d1			;c * 40
+		adda.w	d0,a0
+		suba.w	d1,a1
+		ext.l	d1
+		divu	#40,d1
+		sub.w	d1,d4
+		move.w	d1,d3
+		move.w	_FineF(pc),d0		;a3 as the original leaves it
+		lsr.w	#4,d0
+		lsl.w	#2,d0			;phase * 2 (4 per even phase)
+		lea	2(a3,d0.w),a3
+		movem.l	(sp)+,d0-d1/a4
+		rts
+.p6		moveq	#6,d3
+		bra.b	.ph
+.orig		move.l	a0,-(sp)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_BLOCK,a0
+		move.w	V_PHASE(a0),d3
+		move.l	(sp)+,a0
+.ph		add.w	d3,d3
+		adda.w	d3,a3
+		suba.w	(a3)+,a1
+		moveq	#-32,d3
+		and.w	(a3),d3
+		asr.w	#2,d3
+		adda.w	d3,a0
+		moveq	#31,d3
+		and.w	(a3),d3
+		sub.w	d3,d4
+		rts
+
+; The FINE positions' tables, from the program's 4 phases. Position F is
+; 16a + g: phase 2a and g/16 of the way to phase 2a + 2, where phase 8 is
+; phase 0 one slice nearer. The slices' boundaries (cumulative rows) are
+; interpolated; the row-to-slice maps and the stripes follow from them. The
+; object rows' screen rows and lanes' x are interpolated (the nearest row at
+; phase 8 is at the screen's bottom, row 200, its x extrapolated along the
+; lane). Rounding down keeps every row above 200. At F = 16a every table
+; equals the program's.
+_FineInit	movem.l	d0-d7/a0-a6,-(sp)
+		move.l	_ProgBase(pc),a5
+		move.l	_Work(pc),a6
+		move.l	a6,a0
+		add.l	#W_FT,a0
+		move.l	a5,a1
+		add.l	#P_SLICEH,a1
+		moveq	#4-1,d7
+.tp		moveq	#0,d0
+		move.w	d0,(a0)+
+		moveq	#14-1,d6
+.ti		moveq	#0,d1
+		move.b	(a1)+,d1
+		addq.w	#1,d1
+		add.w	d1,d0
+		move.w	d0,(a0)+
+		dbf	d6,.ti
+		addq.l	#2,a1
+		dbf	d7,.tp
+		lea	-4*30+2(a0),a1		;phase 8: phase 0's from the second
+		moveq	#14-1,d6
+.t8		move.w	(a1)+,(a0)+
+		dbf	d6,.t8
+		move.w	-2(a0),d0
+		addq.w	#1,d0
+		move.w	d0,(a0)+
+		moveq	#0,d7			;F
+.f		move.w	d7,d6
+		lsr.w	#4,d6			;a
+		moveq	#15,d5
+		and.w	d7,d5			;g
+		move.l	a6,a0			;the boundaries
+		add.l	#W_FT,a0
+		move.w	d6,d0
+		mulu	#30,d0
+		add.w	d0,a0
+		lea	30(a0),a1
+		move.l	a6,a2
+		add.l	#W_FT+5*30,a2
+		moveq	#15-1,d4
+.tf		move.w	(a1)+,d0
+		move.w	(a0)+,d1
+		sub.w	d1,d0
+		muls	d5,d0
+		asr.l	#4,d0
+		add.w	d1,d0
+		move.w	d0,(a2)+
+		dbf	d4,.tf
+		lea	-30(a2),a2
+		move.l	a6,a3			;the map
+		add.l	#W_FMAP,a3
+		move.w	d7,d0
+		mulu	#100,d0
+		add.l	d0,a3
+		move.l	a3,a4
+		move.w	28(a2),d0
+		cmp.w	#98,d0
+		bls.b	.cnt
+		moveq	#98,d0
+.cnt		move.w	d0,(a3)+
+		moveq	#0,d1			;row
+		moveq	#0,d2			;slice
+.mr		cmp.w	d0,d1
+		bhs.b	.mdone
+.ms		move.w	d2,d3
+		add.w	d3,d3
+		cmp.w	2(a2,d3.w),d1
+		blo.b	.mput
+		addq.w	#1,d2
+		bra.b	.ms
+.mput		move.b	d2,(a3)+
+		addq.w	#1,d1
+		bra.b	.mr
+.mdone		lea	2(a4),a3		;the stripes: even slices coloured at parity 0
+		move.l	a6,a4
+		add.l	#W_FSTRIPE,a4
+		move.w	d7,d0
+		mulu	#192,d0
+		add.l	d0,a4
+		moveq	#96-1,d4
+.st		moveq	#1,d0
+		and.b	(a3)+,d0
+		beq.b	.even
+		clr.w	(a4)
+		move.w	#10240,FINE*192(a4)
+		bra.b	.snext
+.even		move.w	#10240,(a4)
+		clr.w	FINE*192(a4)
+.snext		addq.l	#2,a4
+		dbf	d4,.st
+		move.l	a6,a4			;the object rows
+		add.l	#W_FOBJ,a4
+		move.w	d7,d0
+		mulu	#OBJ_SET,d0
+		add.l	d0,a4
+		move.l	a5,a0
+		add.l	#P_OBJTAB,a0
+		move.w	d6,d0
+		mulu	#OBJ_SET,d0
+		add.w	d0,a0			;phase 2a
+		lea	OBJ_SET(a0),a1		;phase 2a + 2
+		cmp.w	#3,d6
+		bne.b	.b
+		move.l	a5,a1
+		add.l	#P_OBJTAB+34,a1		;phase 8: phase 0 one row on
+.b		moveq	#0,d4			;row
+.row		moveq	#0,d0
+		move.w	(a0),d0
+		divu	#40,d0			;yA
+		cmp.w	#3,d6
+		bne.b	.yb
+		cmp.w	#11,d4
+		bne.b	.yb
+		move.w	#200,d2
+		bra.b	.yl
+.yb		moveq	#0,d2
+		move.w	(a1),d2
+		divu	#40,d2			;yB
+.yl		move.w	d2,d3
+		sub.w	d0,d3
+		muls	d5,d3
+		asr.l	#4,d3
+		add.w	d0,d3			;y
+		move.w	d3,d1
+		mulu	#40,d1
+		move.w	d1,(a4)+
+		move.w	d3,d1
+		sub.w	#104,d1
+		add.w	d1,d1
+		add.w	d1,d1
+		move.w	d1,(a4)+		;the row's place in the projection's rows
+		lea	4(a0),a2
+		lea	4(a1),a3
+		moveq	#15-1,d1
+.lane		move.w	(a2)+,d2		;xA
+		cmp.w	#3,d6
+		bne.b	.lb
+		cmp.w	#11,d4
+		bne.b	.lb
+		move.l	d1,-(sp)		;xB = xA + (xA - x0) * (200 - yA) / (yA - y0)
+		move.w	d2,d3
+		sub.w	-34(a3),d3
+		move.w	#200,d1
+		sub.w	d0,d1
+		muls	d1,d3
+		moveq	#0,d1
+		move.w	-34(a1),d1
+		divu	#40,d1
+		neg.w	d1
+		add.w	d0,d1
+		divs	d1,d3
+		add.w	d2,d3
+		move.l	(sp)+,d1
+		bra.b	.lx
+.lb		move.w	(a3),d3			;xB
+.lx		addq.l	#2,a3
+		sub.w	d2,d3
+		muls	d5,d3
+		asr.l	#4,d3
+		add.w	d2,d3
+		move.w	d3,(a4)+
+		dbf	d1,.lane
+		lea	34(a0),a0
+		lea	34(a1),a1
+		addq.w	#1,d4
+		cmp.w	#12,d4
+		blo	.row
+		moveq	#17-1,d1		;row 12 as the phase's
+.r12		move.w	(a0)+,(a4)+
+		dbf	d1,.r12
+		addq.w	#1,d7
+		cmp.w	#FINE,d7
+		blo	.f
+		movem.l	(sp)+,d0-d7/a0-a6
+		rts
+
 ; Before the race loop: the first pass runs the logic and draws its result.
 _RaceInit	move.l	a0,-(sp)
 		lea	_Pending(pc),a0
@@ -928,6 +1307,21 @@ _RaceInit	move.l	a0,-(sp)
 		move.w	P_FIELDS(a0),-(sp)
 		lea	_NextTick(pc),a0
 		move.w	(sp)+,(a0)
+		movem.l	d0/a1,-(sp)
+		move.l	_ProgBase(pc),a0
+		move.w	P_FIELDS(a0),d0
+		lea	_LastF(pc),a1
+		move.w	d0,(a1)
+		add.l	#P_BLOCK,a0
+		moveq	#0,d0
+		move.w	V_PHASE(a0),d0		;the positions from the race's start
+		lsl.w	#3,d0
+		lea	_XLive(pc),a1
+		move.l	d0,(a1)+		;_XLive
+		move.l	d0,(a1)+		;_XPrev
+		lsl.l	#4,d0
+		move.l	d0,(a1)			;_XS
+		movem.l	(sp)+,d0/a1
 		TSTPC	_FastExp
 		beq.b	.nogfx
 		movem.l	d0/a1,-(sp)
@@ -987,6 +1381,7 @@ _PreDraw	movem.l	d0-d7/a0-a6,-(sp)
 		bsr	_ToBuf			;the state shown at the last tick
 		move.l	_AddrLogic(pc),a0
 		jsr	(a0)
+		bsr	_Advance
 .due		move.l	_ProgBase(pc),a5
 		lea	_NextTick(pc),a4
 		move.w	P_FIELDS(a5),d0
@@ -1000,10 +1395,18 @@ _PreDraw	movem.l	d0-d7/a0-a6,-(sp)
 		move.w	d1,(a4)
 .ontime		lea	_Pending(pc),a0
 		st	(a0)			;the next logic step after this frame
+	IFND NOSMOOTH
+		move.l	_Custom2(pc),d1
+		beq.b	.road
+		moveq	#0,d0
+		bsr	_Smooth
+		bsr	_TickPose
+	ENDC
 		bra.b	.road
 .between	lea	_Staged(pc),a0
 		st	(a0)
 		bsr	_SaveState
+		bsr	_Smooth
 		bsr	_Pose
 .road		movem.l	(sp)+,d0-d7/a0-a6
 		TSTPC	_FastExp
@@ -1058,6 +1461,8 @@ _Pose		move.w	d0,d7
 		add.l	#P_BLOCK,a4		;S_next (live)
 		move.l	_Work(pc),a3
 		lea	W_PREV(a3),a3		;S_prev
+		lea	_PoseNext(pc),a0
+		sf	(a0)
 		move.w	V_PHASE(a3),d1		;ph0
 		move.w	V_PHASE(a4),d2		;ph1
 		move.w	V_PARITY(a4),d3
@@ -1073,12 +1478,20 @@ _Pose		move.w	d0,d7
 .have		cmp.w	#8,d3
 		bhi	.hold
 		mulu	d7,d3			;d * n
-		move.w	d1,d4
-		mulu	#TICK,d4
-		add.w	d3,d4			;the position * TICK
-		add.w	#TICK,d4
-		divu	#2*TICK,d4
-		add.w	d4,d4			;q: rounded to an even phase, 0 to 8
+		lsl.w	#3,d3
+		divu	#TICK,d3
+		lsl.w	#3,d1
+		add.w	d1,d3			;u: S_prev's segment start + 0 to 128, in 1/FINE
+		move.w	d3,d4
+	IFND NOSMOOTH
+		move.l	_XS(pc),d0		;smoothed: u = X - S_prev's segment start
+		lsr.l	#4,d0
+		sub.l	_XPrev(pc),d0
+		add.w	d1,d0
+		bpl.b	.u
+		moveq	#0,d0
+.u		move.w	d0,d4
+	ENDC
 		moveq	#0,d5			;no lateral
 		move.w	V_LAT(a3),d0		;lat0
 		move.w	V_LAT(a4),d6
@@ -1092,29 +1505,48 @@ _Pose		move.w	d0,d7
 		divs	#TICK,d6
 		add.w	d0,d6			;lat
 		moveq	#-1,d5
-.block		cmp.w	#8,d4
+.block		lea	_PoseLat(pc),a0
+		move.w	d6,(a0)+		;_PoseLat
+		move.w	d5,(a0)			;_PoseLatOn
+		move.w	d4,d3
+		cmp.w	#FINE,d3
 		blo.b	.prev
-		subq.w	#8,d4			;past the crossing: S_next's segment
-		bra.b	.set
-.prev		move.l	a3,a1
-		bsr	_FromBuf		;S_prev's segment
-.set		move.w	d4,V_PHASE(a4)
-		move.w	d4,d0
-		mulu	#221,d0
-		move.w	d0,V_PHASE221(a4)
-		moveq	#8,d0
-		and.w	V_PARITY(a4),d0
-		add.w	d4,d0
-		mulu	#96,d0
-		move.w	d0,V_ROADPH(a4)
-		tst.w	d5
-		beq.b	.project
-		move.w	d6,V_LAT(a4)
-.project	movem.l	d7/a4,-(sp)
-		move.l	a5,a0
-		add.l	#P_PROJECT,a0
-		jsr	(a0)
-		movem.l	(sp)+,d7/a4
+		sub.w	#FINE,d3		;past the crossing: S_next's segment
+		lea	_PoseNext(pc),a0
+		st	(a0)
+.prev
+	IFD COARSE
+		and.w	#-16,d3			;A/B: only the program's 4 phases
+	ENDC
+		lea	_FineF(pc),a0
+		move.w	d3,(a0)
+		moveq	#15,d4
+		and.w	d3,d4			;g: sixteenths from P0 to P0 + 2
+		lsr.w	#4,d3
+		add.w	d3,d3			;P0
+		tst.w	d4
+		beq.b	.final
+		cmp.w	#6,d3
+		bne.b	.sameb
+		TSTPC	_PoseNext
+		bne.b	.sameb
+		moveq	#0,d0			;P0 + 2 = 8: S_next (live) at 0
+		bsr	_ProjAt
+		bsr	_SaveRows
+		bra.b	.final
+.sameb		bsr	_PoseState
+		move.w	d3,d0
+		addq.w	#2,d0
+		bsr	_ProjAt
+		bsr	_SaveRows
+.final		bsr	_PoseState
+		move.w	d3,d0
+		bsr	_ProjAt
+		tst.w	d4
+		beq.b	.tables
+		bsr	_LerpRows
+		bsr	_FineMap
+.tables		bsr	_FineTables
 		move.w	V_CURVE0(a4),d0		;the clear's step
 		muls	V_HSPEED(a4),d0
 		move.w	d7,d1
@@ -1132,12 +1564,335 @@ _Pose		move.w	d0,d7
 .hok		move.w	d0,V_HORIZON(a4)
 .hold		rts
 
+; The fine tables' pointers for _FineF and the live state's parity; the
+; drawing's readers use them from now (_Fine).
+_FineTables	movem.l	d0-d1/a0-a1,-(sp)
+		move.w	_FineF(pc),d0
+		move.l	_Work(pc),a0
+		add.l	#W_FOBJ,a0
+		move.w	d0,d1
+		mulu	#OBJ_SET,d1
+		add.l	d1,a0
+		lea	_FineObj(pc),a1
+		move.l	a0,(a1)+		;_FineObj
+		move.l	_Work(pc),a0
+		add.l	#W_FSTRIPE,a0
+		moveq	#8,d1
+		and.w	V_PARITY(a4),d1
+		lsl.w	#3,d1			;parity * FINE
+		add.w	d0,d1
+		mulu	#192,d1
+		add.l	d1,a0
+		move.l	a0,(a1)			;_FineStripe
+		lea	_Fine(pc),a0
+		st	(a0)
+
+		movem.l	(sp)+,d0-d1/a0-a1
+		rts
+
+; At a logic step: the committed position, counted on in 1/FINE segment
+; (_XLive, and _XPrev before the step). A step backwards or of more than
+; a segment (a new race, a reset) starts the count again.
+_Advance	movem.l	d0-d3/a0-a2,-(sp)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_BLOCK,a0
+		move.l	_Work(pc),a1
+		lea	W_PREV(a1),a1
+		move.w	V_PHASE(a1),d1		;ph0
+		move.w	V_PHASE(a0),d2		;ph1
+		move.w	V_PARITY(a0),d3
+		cmp.w	V_PARITY(a1),d3
+		beq.b	.same
+		moveq	#8,d0
+		sub.w	d1,d0
+		add.w	d2,d0
+		bra.b	.have
+.same		move.w	d2,d0
+		sub.w	d1,d0
+		bmi.b	.reset
+.have		cmp.w	#8,d0
+		bhi.b	.reset
+		lsl.w	#3,d0
+		ext.l	d0
+		lea	_XLive(pc),a2
+		move.l	(a2),d1
+		move.l	d1,4(a2)		;_XPrev
+		add.l	d0,d1
+		move.l	d1,(a2)
+		bra.b	.done
+.reset		lea	_XLive(pc),a2
+		moveq	#0,d0
+		move.w	d2,d0
+		lsl.w	#3,d0
+		move.l	d0,(a2)+		;_XLive: ph1 in segment 0
+		lsl.w	#3,d1
+		move.l	d1,(a2)+		;_XPrev: ph0 in segment 0
+		lsl.l	#4,d0
+		move.l	d0,(a2)			;_XS
+.done		movem.l	(sp)+,d0-d3/a0-a2
+		rts
+
+; The smoothed position _XS (1/16 of 1/FINE segment): on by the speed band's
+; mean phase step (the 8 steps of P_STEPS) per field since the last frame,
+; then held between the committed position less LMAX and the committed
+; position, and in a state the frame can draw: a tick frame (d0.w >= 0) in
+; the committed segment, a frame between ticks (n = TICK + d0) in S_prev's
+; or S_next's, and reaching S_next's by the tick frame (CATCH per field).
+_Smooth		movem.l	d0-d6/a0-a2,-(sp)
+		move.l	_ProgBase(pc),a0
+		move.w	P_FIELDS(a0),d1
+		lea	_LastF(pc),a1
+		move.w	d1,d2
+		sub.w	(a1),d2			;fields since the last frame
+		move.w	d1,(a1)
+		cmp.w	#8,d2
+		bls.b	.dt
+		moveq	#8,d2
+.dt		add.l	#P_BLOCK,a0
+		moveq	#$70,d3
+		and.w	V_SPEED(a0),d3
+		move.l	_ProgBase(pc),a2
+		add.l	#P_STEPS,a2
+		adda.w	d3,a2
+		moveq	#0,d4
+		moveq	#8-1,d5
+.sum		add.w	(a2)+,d4
+		dbf	d5,.sum
+		lsl.w	#3,d4			;sum * 2 phase units * 8 / 8 ticks / TICK * 16
+		mulu	d2,d4
+		move.l	_XS(pc),d5
+		add.l	d4,d5
+		move.l	_XLive(pc),d3		;hi
+		move.w	V_PHASE(a0),d4
+		lsl.w	#3,d4
+		ext.l	d4
+		move.l	d3,d6
+		sub.l	d4,d6			;S_next's segment start
+		move.l	d3,d1
+		sub.l	#LMAX,d1		;lo
+		tst.w	d0
+		bmi.b	.between
+		cmp.l	d6,d1
+		bge.b	.clamp
+		move.l	d6,d1
+		bra.b	.clamp
+.between	move.l	_Work(pc),a2
+		lea	W_PREV(a2),a2
+		move.w	V_PHASE(a2),d4
+		lsl.w	#3,d4
+		ext.l	d4
+		move.l	_XPrev(pc),d2
+		sub.l	d4,d2			;S_prev's segment start
+		cmp.l	d2,d1
+		bge.b	.ramp
+		move.l	d2,d1
+.ramp		move.w	d0,d4			;n - TICK
+		muls	#CATCH,d4
+		add.l	d6,d4
+		cmp.l	d4,d1
+		bge.b	.clamp
+		move.l	d4,d1
+.clamp		lsl.l	#4,d1
+		lsl.l	#4,d3
+		cmp.l	d1,d5
+		bge.b	.lo
+		move.l	d1,d5
+.lo		cmp.l	d3,d5
+		ble.b	.hi
+		move.l	d3,d5
+.hi		lea	_XS(pc),a1
+		move.l	d5,(a1)
+		movem.l	(sp)+,d0-d6/a0-a2
+		rts
+
+; A tick frame at the smoothed position: in the committed state, only the
+; position's variables changed (the phase's three, the projection's
+; output), and _PostDraw puts them back, so the drawing's own writes stay.
+_TickPose	movem.l	d0-d7/a0-a6,-(sp)
+		move.l	_ProgBase(pc),a5
+		move.l	a5,a4
+		add.l	#P_BLOCK,a4
+		move.l	_XS(pc),d3
+		lsr.l	#4,d3
+		move.w	V_PHASE(a4),d1
+		lsl.w	#3,d1
+		ext.l	d1
+		move.l	_XLive(pc),d2
+		sub.l	d1,d2
+		sub.l	d2,d3			;F in the committed segment
+		bmi	.no
+	IFD COARSE
+		and.w	#-16,d3
+	ENDC
+		cmp.w	d1,d3
+		bhs	.no			;at the committed position
+		bsr	_TSave
+		lea	_PoseNext(pc),a0
+		st	(a0)
+		lea	_PoseLatOn(pc),a0
+		clr.w	(a0)
+		lea	_FineF(pc),a0
+		move.w	d3,(a0)
+		moveq	#15,d4
+		and.w	d3,d4
+		lsr.w	#4,d3
+		add.w	d3,d3			;P0
+		tst.w	d4
+		beq.b	.final
+		move.w	d3,d0
+		addq.w	#2,d0
+		bsr	_ProjAt
+		bsr	_SaveRows
+.final		move.w	d3,d0
+		bsr	_ProjAt
+		tst.w	d4
+		beq.b	.tables
+		bsr	_LerpRows
+		bsr	_FineMap
+.tables		bsr	_FineTables
+		lea	_TickPosed(pc),a0
+		st	(a0)
+.no		movem.l	(sp)+,d0-d7/a0-a6
+		rts
+
+; The position's variables of a tick frame, to W_TSAVE (_TSave) and back.
+_TRegions	dc.l	$987c,6/2		;words: the phase, * 221, the road's
+		dc.l	$9892,4/2		;the projection's
+		dc.l	$98dc,2/2
+		dc.l	$9b22,($9d3c-$9b22)/2	;rows and curves
+		dc.l	0
+
+_TSave		movem.l	d0/a0-a2,-(sp)
+		move.l	_Work(pc),a1
+		add.l	#W_TSAVE,a1
+		lea	_TRegions(pc),a2
+.next		move.l	(a2)+,a0
+		add.l	_ProgBase(pc),a0
+		move.l	(a2)+,d0
+		subq.w	#1,d0
+.copy		move.w	(a0)+,(a1)+
+		dbf	d0,.copy
+		tst.l	(a2)
+		bne.b	.next
+		movem.l	(sp)+,d0/a0-a2
+		rts
+
+_TRestore	movem.l	d0/a0-a2,-(sp)
+		move.l	_Work(pc),a1
+		add.l	#W_TSAVE,a1
+		lea	_TRegions(pc),a2
+.next		move.l	(a2)+,a0
+		add.l	_ProgBase(pc),a0
+		move.l	(a2)+,d0
+		subq.w	#1,d0
+.copy		move.w	(a1)+,(a0)+
+		dbf	d0,.copy
+		tst.l	(a2)
+		bne.b	.next
+		movem.l	(sp)+,d0/a0-a2
+		rts
+
+; The pose's state in the live block: S_prev unless the pose is past the
+; crossing (S_next, live already). Loaded once.
+_PoseState	TSTPC	_PoseNext
+		bne.b	.done
+		move.l	a1,-(sp)
+		lea	_PoseNext(pc),a1
+		st	(a1)			;loaded: S_prev is now live
+		move.l	a3,a1
+		bsr	_FromBuf
+		move.l	(sp)+,a1
+.done		rts
+
+; The projection for phase d0.w (even, 0 to 6) in the live state, with the
+; pose's lateral position.
+_ProjAt		movem.l	d0-d7/a0-a6,-(sp)
+		move.w	d0,V_PHASE(a4)
+		move.w	d0,d1
+		mulu	#221,d1
+		move.w	d1,V_PHASE221(a4)
+		moveq	#8,d1
+		and.w	V_PARITY(a4),d1
+		add.w	d0,d1
+		mulu	#96,d1
+		move.w	d1,V_ROADPH(a4)
+		TSTPC	_PoseLatOn
+		beq.b	.go
+		move.w	_PoseLat(pc),V_LAT(a4)
+.go		move.l	a5,a0
+		add.l	#P_PROJECT,a0
+		jsr	(a0)
+		movem.l	(sp)+,d0-d7/a0-a6
+		rts
+
+; The rows' x (the low words of the projection's per-row longs) to W_FX.
+_SaveRows	movem.l	d0/a0-a1,-(sp)
+		move.l	a5,a0
+		add.l	#P_ROWS+2,a0
+		move.l	_Work(pc),a1
+		add.l	#W_FX,a1
+		moveq	#106-1,d0
+.copy		move.w	(a0),(a1)+
+		addq.l	#4,a0
+		dbf	d0,.copy
+		movem.l	(sp)+,d0/a0-a1
+		rts
+
+; Rows' x: this projection's, d4/16 of the way to W_FX's.
+_LerpRows	movem.l	d0-d2/a0-a1,-(sp)
+		move.l	a5,a0
+		add.l	#P_ROWS+2,a0
+		move.l	_Work(pc),a1
+		add.l	#W_FX,a1
+		moveq	#106-1,d2
+.row		move.w	(a1)+,d0
+		move.w	(a0),d1
+		sub.w	d1,d0
+		muls	d4,d0
+		asr.l	#4,d0
+		add.w	d1,d0
+		move.w	d0,(a0)
+		addq.l	#4,a0
+		dbf	d2,.row
+		movem.l	(sp)+,d0-d2/a0-a1
+		rts
+
+; The rows' slices (the projection's last part, $2446) from the fine map.
+_FineMap	movem.l	d0-d2/a0-a2,-(sp)
+		move.l	a5,a0
+		add.l	#P_ROWHI,a0
+		move.l	a5,a1
+		add.l	#P_SLICES,a1
+		move.l	_Work(pc),a2
+		add.l	#W_FMAP,a2
+		move.w	_FineF(pc),d0
+		mulu	#100,d0
+		add.l	d0,a2
+		move.w	(a2)+,d2
+		subq.w	#1,d2
+.row		moveq	#0,d0
+		move.b	(a2)+,d0
+		lsl.w	#5,d0
+		move.w	(a1,d0.w),(a0)
+		addq.l	#4,a0
+		dbf	d2,.row
+		movem.l	(sp)+,d0-d2/a0-a2
+		rts
+
 ; Replaces the loop's swap and the test after it. A frame between ticks
 ; restores the state and goes straight back to the loop: the checks after
 ; the swap (race end, right button, left button delay) see only tick frames.
 _PostDraw	movem.l	d0-d1/a0-a1,-(sp)
 		lea	_GfxDelta(pc),a0
 		clr.l	(a0)
+		lea	_Fine(pc),a0
+		sf	(a0)
+		TSTPC	_TickPosed
+		beq.b	.posed
+		lea	_TickPosed(pc),a0
+		sf	(a0)
+		bsr	_TRestore
+.posed
 	IFD VERIFY
 		bsr	_CompareGfx
 	ENDC
@@ -1342,6 +2097,15 @@ _GfxHi		dc.l	0
 _GfxRace	dc.l	0			;W_GFX - alloc 2, from the race's start
 _GfxDelta	dc.l	0			;_GfxRace while the loop draws, else 0
 _NextTick	dc.w	0			;P_FIELDS value the next tick is due at
+_FineF		dc.w	0			;the pose's position in its segment, 0 to FINE-1
+_PoseLat	dc.w	0			;the pose's lateral position; these two in this order
+_PoseLatOn	dc.w	0			;-1: set it
+_XLive		dc.l	0			;the committed position (1/FINE segment); these three in this order
+_XPrev		dc.l	0			;before the last logic step
+_XS		dc.l	0			;the smoothed position, * 16
+_LastF		dc.w	0			;P_FIELDS at the last frame
+_FineObj	dc.l	0			;W_FOBJ's table for _FineF; these two in this order
+_FineStripe	dc.l	0			;W_FSTRIPE's table for _FineF and the parity
 	IFD VERIFY
 _VHorizon	dc.w	0			;V_HORIZON before the queued clear
 _VGfxCount	dc.w	0			;_CompareGfx runs every 16th frame
@@ -1354,6 +2118,10 @@ _InLoop		dc.b	0			;-1: the race loop's swap
 _RoadFast	dc.b	0			;-1: the race loop's road, to fast memory
 _QRec		dc.b	0			;-1: the clear records its blits
 _QBusy		dc.b	0			;-1: the queue is running
+_Fine		dc.b	0			;-1: the drawing uses the fine tables (_Pose)
+		EVEN
+_PoseNext	dc.b	0			;-1: the live state is the pose's (S_next, or S_prev loaded)
+_TickPosed	dc.b	0			;-1: this tick frame is drawn at a smoothed position
 		EVEN
 _FakeSel	dc.w	0			;for _RoadScreen
 		dc.l	0			;_Work + W_SCREEN

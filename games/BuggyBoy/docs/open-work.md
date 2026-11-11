@@ -121,27 +121,26 @@ checked.
      | a1200-030 | 25.00 | 40 | 1.287 |
 
      The pose costs about 0.11 fields on the 030 (1.178 without it).
-   - **4b, finer than 4 phases.** Next. Phase tables in between the 4 for the slice
-     heights (`$7DAA`), the object positions (`$76B0` + phase × 221 bytes) and the curve
-     shift in `$2352`; objects between their slices. Every reader of the phase (`$987C`)
-     in the drawing, from the disassembly:
+   - **4b, finer than 4 phases.** Done ([internals.md](internals.md), "Fine positions",
+     "The smoothed position"): 64 positions per segment for the road's slices and stripes,
+     the curve, the object rows and lanes, the sprites' lift, poles and tall objects; and
+     the shown position moved on at the speed band's mean step, tick frames included. Per
+     field from the race's start, joystick up held, a1200-030 (64 fields; the nearest pole
+     tracked):
 
-     | Offset | Use |
-     |---|---|
-     | `$2362` | the curve shift, (6 − phase) / 2 |
-     | `$244E` | table `$81AA` + (phase & 6) × 8 |
-     | `$3502`, `$39A4`, `$39B4` | `and #4`: the segment's second half (odd phases fit as they are) |
-     | `$35D4` | `mulu`: linear in the phase (odd phases fit) |
-     | `$3AB4` | table `$81EA` + phase (words) |
-     | `$3D16` | table `$824A` + phase × 2 |
-     | `$3D3C` | phase / 2, a byte index (`$3D42`) |
-     | `$1392`, `$13EC`, `$3536`, `$39F4` | phase × 221 (`$987E`): the object tables |
-     | `$9D8A` | the road's stripes, (parity + phase) × 96 (`$9880`) |
+     | Build | Fields with the road unchanged | The pole |
+     |---|---:|---|
+     | `COARSE` (the program's 4 positions) | 43 of 63 | 4 to 6 pixels every 4 fields |
+     | fine, `NOSMOOTH` | 18 of 63 | every field at speed; stops for ticks in the low bands |
+     | fine and smoothed | 10 of 63 (the buggy still standing) | 1 pixel every 1 or 2 fields from the start |
 
-     Some tables hold screen offsets (row × 40 + column), which do not interpolate as
-     numbers; each needs its in-between entries derived from what it encodes. Contact sheets per field around
-     segment crossings and in the top speed band, where a tick moves a whole segment and
-     only 2 or 3 of the 4 phases can show between ticks.
+     At a size change the pole's base stays on the kerb line (one field 1 row above it) and
+     its top moves on smoothly. VERIFY: nothing changed after 102 frames between ticks.
+     The tick states match 1.3's for 599 ticks outside `$98F8`–`$9915`, the road feature's
+     drawing scratch (development.md, "Benchmark"). 200-field window: a1200-030 50.00 fps
+     (median 0.853); a1200 23.75 (median 1.853, was 1.770: the second projection and the
+     posed tick frames). Still coarse, as in the program: objects placed at an absolute row
+     per size (`$399E`, `$39F0`) move only at crossings, and sprites change size there.
    - The menus and the start sequence use 1.3's default lock (12.5 Hz), as the race tick.
 5. **Drawing cost** to under one field on the 030. In progress; 200-field window, default
    options, work per frame median (fields):

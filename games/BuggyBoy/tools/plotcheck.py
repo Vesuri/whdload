@@ -54,7 +54,7 @@ def assemble():
     """The plotters and their variables from Enhanced.s, as a raw binary at CODE_NEW."""
     src = (ROOT / 'src/Enhanced.s').read_text()
     start = re.search(r'^_PlotColumn\t', src, re.M).start()
-    end = src.index('; Before the race loop')
+    end = src.index("; The drawing's readers of the phase that take a fine position")
     body = src[start:end]
     consts = '\n'.join(re.findall(r'^(?:GFX_BUGGY|BUGGY_BYTES)\t.*$', src, re.M))
     # a branch table at 0, 4, 8 and the variables at 12 (in _GfxLo's order)

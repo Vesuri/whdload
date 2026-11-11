@@ -208,7 +208,7 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
 
 - **The gate** is `WHDLTAG_ATTNFLAGS_GET`: a 68020 or better takes the enhanced path, a
   68000 or 68010 runs 1.3's code. The disk versions never reach it.
-- **ExpMem** is optional, `$81000` bytes (`$A1000` in the VERIFY build; WHDLoad wants a multiple of `$1000`). It counts as fast memory unless it is below
+- **ExpMem** is optional, `$8F000` bytes (`$AF000` in the VERIFY build; WHDLoad wants a multiple of `$1000`). It counts as fast memory unless it is below
   `$200000` (chip) or in `$C00000`–`$DFFFFF` (slow memory on the chip bus). Fast ExpMem
   holds:
 
@@ -216,7 +216,7 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
   |---|---|
   | base | the program (to `$B4D0` with its relocation table; the hunk header in the 32 bytes before). The base is the first 64 KB boundary at least `$20` bytes into the ExpMem, so the program does not cross one, as at `$400` in chip (word-sized address arithmetic would break there) |
   | base + `$C000` | the game's public allocations: COURSES.DAT (63072 bytes) |
-  | base + `$1C000` | the slave's buffers: saved state, the road's screen and source, the blit queue, and from + `$17800` a copy of alloc 2 (240000 bytes, the graphics; only with fast ExpMem) |
+  | base + `$1C000` | the slave's buffers: saved state, the road's screen and source, the blit queue, from + `$17800` a copy of alloc 2 (240000 bytes, the graphics; only with fast ExpMem), then the fine tables (`_FineInit`, 59 KB) |
   | the top `$2000` bytes | the stack (SSP set to the top before `jsr` to the program) |
 
   Without fast memory the base is the ExpMem's start and only the buffers are there.
@@ -243,7 +243,7 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
   is a tick frame: 12.5 fps, the same logic and drawing sequence. A 10 Hz tick (5 fields)
   was tried first; the race timer counted down too slowly at it.
 - **Program base.** The level-3 vector `$6C` holds the base + `$4DAC`. On the a1200-030
-  setup the base is `$980000` (`$960000` in the VERIFY build).
+  setup the base is `$970000` (`$950000` in the VERIFY build).
 
 ### The fixed tick
 
@@ -275,19 +275,67 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
 - **The pose** (`_Pose`). The logic step after a tick frame saves the state first (S_prev,
   the state that frame showed); the live state is then S_next. A frame n fields (1 to 3)
   after the tick frame's due field shows n/4 of the way from S_prev to S_next:
-  - forward: the position is phase plus segment. A tick moves it at most one segment,
-    since a crossing clears the phase. The position is rounded to the renderers' even
-    phases. Before the crossing the frame uses S_prev's state with that phase, after it
-    S_next's. `$987E` and `$9880` are derived again from it.
+  - forward: the smoothed position (below) in 1/64 segment. Before the crossing the
+    frame uses S_prev's state, after it S_next's, and draws with the fine tables (below).
+    The phase `$987C` and `$987E`, `$9880` are set to the even phase below the position,
+    for the readers that keep the program's 4 phases.
   - lateral `$9890`: interpolated, unless it changed by more than 128 in the tick (a jump).
     Steering moves it by up to ±60 a tick at speed (the step table at `$810C`: steering
     state × 8 + speed / 16), plus the curve's drift.
-  - the projection `$2352` is run again, for the row tables.
+  - the projection `$2352` is run at the two even phases around the position (the second
+    in S_next at phase 0 when the position is past phase 6) and the rows' x interpolated
+    between them; the rows' slices (its last part, `$2446`) come from the fine map.
   - horizon `$98DE`: set so that the clear's step (`$98DC` × `$98DA`) lands n/4 of the
     way, wrapped to 0–639.
 
-  A backward phase in the same segment (a new race) shows S_next unchanged. Objects, the
-  HUD and the player's sprite are the chosen tick's.
+  A backward phase in the same segment (a new race) shows S_next unchanged. Which objects
+  show, the HUD and the player's sprite are the chosen tick's.
+- **Fine positions** (`_FineInit`, `_PL_Fine`). The program has 4 positions per segment
+  (phases 0, 2, 4, 6 of 8); the frames between ticks draw at 64. `_FineInit` generates, at
+  the start, 64 sets of each table from the program's 4: position 16a + g is phase 2a and
+  g/16 of the way to phase 2a + 2, where phase 8 is phase 0 one slice nearer (every slice
+  boundary at phase 8 is phase 0's next one).
+  - The slices' boundaries (cumulative rows of `$7DAA`'s heights) are interpolated; the
+    row-to-slice maps and the stripes (`$685A`: even slices coloured at parity 0) follow.
+  - The object rows (`$76B0`: per row the screen row, its place in the projection's rows,
+    and 15 lanes' x) are interpolated; the nearest row at phase 8 is at row 200, its x
+    extrapolated along the lane. Rounding down keeps every row above 200.
+  - At the even phases every set equals the program's table (checked against a model of
+    the generator), so a tick frame and a frame between ticks agree.
+
+  The readers given the fine position, while the pose has set `_Fine`:
+
+  | Offset | Original | Fine |
+  |---|---|---|
+  | `$3536` | `adda.w $987E,a5`: the object rows for the phase | the set for the position |
+  | `$39F4`, `$3A22` | `move.w $987E,d7`: back to phase 0's row (x fixed over the segment) | the distance to set 0 |
+  | `$35D4` | lift = (next size's height − height) × phase / 16 | × position / 128 |
+  | `$3D3C` | a pole's length: the sprite entry's byte for the phase | between the phase's and the next (after the last, the next size's first) |
+  | `$3D0C` | a tall object's row and bottom crop for the phase (top held at phase 6's) | the row's fine row, the crop from it; past phase 6 phase 6's |
+  | `$9D8A` | `adda.w $9880,a6`: the stripes | the set for the position and parity |
+
+  The lift at `$35D4` keeps a sprite, drawn at its slice's pre-scaled size, centred on the
+  slice's true size: the size grows by a step at the crossing, and the lift (half the step
+  at phase 8) makes that step grow the sprite equally up and down about a centre that
+  moves on smoothly. Other readers keep the even phase: the `and #4` tests (`$3502`,
+  `$39A4`, `$39B4`: the second half of the segment, which the even phase below the position
+  gives), and `$3AB4` (an offset of ±1 row per phase). Objects placed at an absolute row
+  per size (the plotters at `$399E` and `$39F0`) do not move within a segment in the
+  program either.
+- **The smoothed position** (`_Smooth`). The logic's steps per tick follow an 8-step cycle
+  per speed band (`$804C`: band 1 moves 2 phase units in one tick of 4, band 2 in every
+  other tick), so even exact interpolation stops and goes. The committed position is
+  counted on at each logic step (`_Advance`, 1/64 segment); the shown one moves on every
+  field by the band's mean step (speed `$98B2` & `$70`), held between the committed
+  position less 24 and the committed position, inside a segment the frame has a state
+  for, and ramped (16 per field) into a segment the logic has crossed by the tick frame.
+  Tick frames show it too (`_TickPose`): in the committed state, with only the position's
+  variables (the phase words, `$9892`, `$98DC`, the rows and curves `$9B22`–`$9D3B`)
+  changed and put back after the frame, so the drawing's own writes (animation counters,
+  the course words, the lateral check at `$41E2`, which reads the logic's `$98D0`) are
+  the committed frame's. No drawing write the logic reads depends on where objects are
+  drawn; the road feature routine `$93E` (bridges and the like, called from the object
+  routine) keeps its geometry in `$98F8`–`$9915`, which only its own module reads.
 - **The road in fast memory** (with fast ExpMem; `_PL_Road`). The race loop's road draws
   into a screen in the work area, reading a copy of alloc 4 made at each race start
   (`$9D6A` gives it that screen, `$9D78` the copy; the road's other callers, `$2CC0` and

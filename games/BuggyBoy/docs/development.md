@@ -93,6 +93,12 @@ SETUP=a1200-030 PROG_BASE=auto EXTRA_ARGS=--uae_mmu_model=0 WHD_ARGS="CUSTOM2=1"
   relocated addresses. A recording that runs past the race's end waits for ever. The
   first logic step recorded depends on where the route's 100 fields end against the tick:
   compare at offsets of a tick or two (at 50 fps 2.0b's tick *i* is 1.3's *i* + 1).
+  With Enhanced framerate on, also leave out `$98F8`–`$9915`: the road feature's drawing
+  scratch (`$93E`, called from the object routine, and read only by its own module), which a
+  tick frame drawn at the smoothed position fills from that position.
+- Assembler defines for A/B runs (export `VASM_EXTRA`, since `serve` rebuilds the slave):
+  `COARSE` draws at the program's 4 positions per segment instead of the 64 fine ones,
+  `NOSMOOTH` interpolates between ticks without the smoothed position.
 - `tools/plotcheck.py [DUMP] [N]` checks the merged plotters against the original loops in
   Unicorn (needs a chip dump with the program at `$400`, such as `tmp/dumps/attract.bin`).
 - `BUILD=verify` checks every frame drawn between ticks; `tools/verify.py` on its server
