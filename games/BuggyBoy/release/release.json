@@ -1,0 +1,24 @@
+{
+  "archives": [
+    {
+      "input": "BuggyBoy.lha",
+      "output": "BuggyBoyEnhanced-{version}-{date}.lha",
+      "replace": {
+        "BuggyBoyInstall/BuggyBoy.slave": "build:BuggyBoy",
+        "BuggyBoyInstall/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {
+        "dir": "BuggyBoyInstall/source",
+        "variants": [
+          "BuggyBoy"
+        ],
+        "keep": [
+          "BuggyBoy.islave.s",
+          "Makefile_windows.mak"
+        ]
+      }
+    }
+  ]
+}
