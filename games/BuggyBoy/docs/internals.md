@@ -205,7 +205,7 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
 
 - **The gate** is `WHDLTAG_ATTNFLAGS_GET`: a 68020 or better takes the enhanced path, a
   68000 or 68010 runs 1.3's code. The disk versions never reach it.
-- **ExpMem** is optional, `$2F000` bytes (`$4A000` in the VERIFY build). It counts as fast memory unless it is below
+- **ExpMem** is optional, `$45000` bytes (`$60000` in the VERIFY build). It counts as fast memory unless it is below
   `$200000` (chip) or in `$C00000`–`$DFFFFF` (slow memory on the chip bus). Fast ExpMem
   holds:
 
@@ -217,6 +217,10 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
   | the top `$2000` bytes | the stack (SSP set to the top before `jsr` to the program) |
 
   Without fast memory the base is the ExpMem's start and only the buffers are there.
+- **Alloc 1 starts 2 bytes later** (on any 68020 or better). It holds the screens at
+  + `$C1E` and + `$891E`, which were 2 bytes off a longword, so every longword access
+  to them (the clear's `clr.l`, the HUD's and the objects' `and.l`/`or.l`) took two chip
+  accesses. Its DMA (copper list, bitplanes, blitter) needs only word alignment.
 
   Chip allocations stay with 1.3's bump allocator from `$10000`. The program's only
   absolute references outside its hunk (`$2A5E`–`$2A88`: `$D32C`, `$D46C`, `$D5AC`,
@@ -271,3 +275,10 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
 
   A backward phase in the same segment (a new race) shows S_next unchanged. Objects, the
   HUD and the player's sprite are the chosen tick's.
+- **The road in fast memory** (with fast ExpMem; `_PL_Road`). The race loop's road draws
+  into a screen in the work area, reading a copy of alloc 4 made at each race start
+  (`$9D6A` gives it that screen, `$9D78` the copy; the road's other callers, `$2CC0` and
+  `$32F4`, draw as before). `_CopyRoad` then writes rows 104 to 199 of the 4 planes to the
+  back buffer as aligned longwords. The road writes every word of those rows and reads
+  only what it wrote in the same row; the VERIFY build draws it both ways each frame and
+  compares (`tools/verify.py`: no difference in 801 frames).

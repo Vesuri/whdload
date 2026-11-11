@@ -24,13 +24,15 @@ EXP_STACK	= $2000				;the stack
 
 W_SAVE		= 0				;the state saved around a frame between ticks
 W_PREV		= $600				;the state of the tick before the last
+W_SCREEN	= $1000				;fast memory: the road's screen (as a chip one)
+W_ROADGFX	= $9000				;fast memory: copy of alloc 4 (the road's source)
 	IFD VERIFY
-W_VERIFY	= $1000				;copy of the program
-W_LOG		= $c000				;the log (tools/verify.py)
-W_VCOURSES	= $c400				;copy of COURSES.DAT
-W_SIZE		= $1c000
+W_VERIFY	= $17000			;copy of the program
+W_LOG		= $22000			;the log (tools/verify.py)
+W_VCOURSES	= $22400			;copy of COURSES.DAT
+W_SIZE		= $32000
 	ELSE
-W_SIZE		= $1000
+W_SIZE		= $17000
 	ENDC
 EXPSIZE		= $10000+EXP_WORK+W_SIZE+EXP_STACK	;ws_ExpMem (optional)
 
@@ -49,6 +51,12 @@ P_COURSES	= $9822				;pointer to COURSES.DAT (alloc 3)
 P_COURSE	= $9826				;the course's data in it
 REGIONS_SIZE	= ($9d6c-$9860)+$10+$20		;_StateRegions
 P_PROJECT	= $2352				;the road projection (part of the logic)
+P_SCREENSEL	= $9818				;word: 0 or 4, then the two screens' pointers
+P_ROADGFX	= $982a				;pointer to alloc 4
+ROADGFX_SIZE	= 57088
+SCREEN_SIZE	= 32000				;4 planes of 8000 bytes
+ROAD_TOP	= 104*40			;the road: rows 104 to 199 of every plane
+ROAD_BYTES	= 96*40
 P_BLOCK		= $9860				;the logic's state block; V_* are offsets in it
 V_PARITY	= $987a-P_BLOCK			;segment parity, 0 or 8
 V_PHASE		= $987c-P_BLOCK			;phase in the segment, 0 2 4 6 (of 8)
@@ -59,6 +67,7 @@ V_HSPEED	= $98da-P_BLOCK			;horizon step = V_HSPEED * V_CURVE0
 V_CURVE0	= $98dc-P_BLOCK			;the nearest curve value ($2352)
 V_HORIZON	= $98de-P_BLOCK			;horizon scroll, 0 to 639 (the clear adds the step)
 COURSES_SIZE	= 63072
+ALLOC1_SIZE	= 67102				;the screens and the copper list
 
 	IFD VERIFY
 	IFGT W_VCOURSES+COURSES_SIZE-W_SIZE
@@ -125,7 +134,7 @@ _EnhDest	lea	DOSGAMEADDRESS-$20,a1
 ;======================================================================
 
 _AllocMem	btst	#MEM_CHIP,d1
-		bne	_AllocChip
+		bne.b	.chip
 		TSTPC	_FastExp
 		beq	_AllocChip
 		movem.l	d1-d2/a1,-(sp)
@@ -154,6 +163,19 @@ _AllocMem	btst	#MEM_CHIP,d1
 .full		sub.l	#$10,d0			;undo the rounding's safety
 		movem.l	(sp)+,d1-d2/a1
 		bra	_AllocChip
+
+; Alloc 1 holds the two screens at + $C1E and + $891E, 2 bytes off a
+; longword: 2 bytes later the game's longword accesses to them are aligned,
+; one chip access each instead of two. Its DMA needs only word alignment.
+.chip		TSTPC	_Enh
+		beq	_AllocChip
+		cmp.l	#ALLOC1_SIZE,d0
+		bne	_AllocChip
+		addq.l	#4,d0
+		bsr	_AllocChip
+		addq.l	#2,d0
+		addq.l	#2,a0
+		rts
 
 ;======================================================================
 ; Start the DOS version: a5 = program.
@@ -202,7 +224,7 @@ _EnhCache	movem.l	d0-d1/a0-a2,-(sp)
 
 _TickPatch	movem.l	d0-d1/a0-a2,-(sp)
 		move.l	_ExpBase(pc),d0
-		beq.b	.no
+		beq	.no
 		add.l	#EXP_WORK,d0
 		lea	_Work(pc),a0
 		move.l	d0,(a0)
@@ -223,13 +245,22 @@ _TickPatch	movem.l	d0-d1/a0-a2,-(sp)
 		move.l	_Work(pc),a0
 		add.l	#W_LOG,a0
 		move.l	a0,$3c0			;for the tools
-		move.w	#(8+200*4)/4-1,d0
+		move.w	#$348/4-1,d0
 .clr		clr.l	(a0)+
 		dbf	d0,.clr
 	ENDC
 		lea	_PL_Tick(pc),a0
 		move.l	a5,a1
 		move.l	_resload(pc),a2
+		jsr	resload_Patch(a2)
+		TSTPC	_FastExp
+		beq.b	.no
+		move.l	_Work(pc),d0
+		add.l	#W_SCREEN,d0
+		lea	_FakeSel+2(pc),a0
+		move.l	d0,(a0)
+		lea	_PL_Road(pc),a0
+		move.l	a5,a1
 		jsr	resload_Patch(a2)
 .no		movem.l	(sp)+,d0-d1/a0-a2
 		rts
@@ -241,6 +272,108 @@ _PL_Tick	PL_START
 		PL_PSS	$2682,_SetCop,2		;move.l (a1,d0.w),$dff080
 		PL_END
 
+; With fast ExpMem the race loop's road draws into a screen in fast memory
+; from a fast copy of its source, and _CopyRoad moves its rows to chip. The
+; road writes every word of rows 104 to 199 in every plane, reading only what
+; it wrote, so the result is the same. Its other callers draw as before.
+_PL_Road	PL_START
+		PL_PS	$9d6a,_RoadScreen	;lea $9818,a0
+		PL_PS	$9d78,_RoadSource	;movea.l $982a,a3
+		PL_END
+
+_RoadScreen	TSTPC	_RoadFast
+		bne.b	.fast
+		move.l	_ProgBase(pc),a0
+		add.l	#P_SCREENSEL,a0
+		rts
+.fast		lea	_FakeSel(pc),a0		;the road's adda.w (a0)+,a0; movea.l (a0),a2
+		rts
+
+_RoadSource	move.l	_ProgBase(pc),a3
+		add.l	#P_ROADGFX,a3
+		move.l	(a3),a3
+		TSTPC	_RoadFast
+		beq.b	.chip
+		move.l	_Work(pc),a3
+		add.l	#W_ROADGFX,a3
+.chip		rts
+
+; The road's rows from the fast screen to the back buffer.
+_CopyRoad	movem.l	d0-d1/a0-a1,-(sp)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_SCREENSEL,a0
+		adda.w	(a0)+,a0
+		move.l	(a0),a1
+		add.l	#ROAD_TOP,a1
+		move.l	_Work(pc),a0
+		add.l	#W_SCREEN+ROAD_TOP,a0
+		moveq	#4-1,d1
+		move.l	a1,d0
+		btst	#1,d0
+		bne.b	.odd
+.plane		move.w	#ROAD_BYTES/32-1,d0
+.copy		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		dbf	d0,.copy
+		add.l	#8000-ROAD_BYTES,a0
+		add.l	#8000-ROAD_BYTES,a1
+		dbf	d1,.plane
+		bra.b	.done
+; The screens are 2 bytes off a longword (alloc 1 + $C1E and + $891E): a
+; word first, so the longword writes are aligned, one chip access each.
+.odd		move.w	(a0)+,(a1)+
+		move.w	#ROAD_BYTES/32-1,d0
+		bra.b	.oddin
+.oddcopy	move.l	(a0)+,(a1)+
+.oddin		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		dbf	d0,.oddcopy
+		move.w	(a0)+,(a1)+
+		add.l	#8000-ROAD_BYTES,a0
+		add.l	#8000-ROAD_BYTES,a1
+		dbf	d1,.odd
+.done
+		movem.l	(sp)+,d0-d1/a0-a1
+		rts
+
+	IFD VERIFY
+; The road drawn in fast memory against the original's in the back buffer:
+; log + $340 counts the frames, + $344 the longwords that differ.
+_CompareRoad	movem.l	d0-d1/a0-a2,-(sp)
+		move.l	_Work(pc),a2
+		add.l	#W_LOG+$340,a2
+		addq.l	#1,(a2)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_SCREENSEL,a0
+		adda.w	(a0)+,a0
+		move.l	(a0),a1
+		add.l	#ROAD_TOP,a1
+		move.l	_Work(pc),a0
+		add.l	#W_SCREEN+ROAD_TOP,a0
+		moveq	#4-1,d1
+.plane		move.w	#ROAD_BYTES/4-1,d0
+.cmp		cmpm.l	(a0)+,(a1)+
+		beq.b	.same
+		addq.l	#1,4(a2)
+.same		dbf	d0,.cmp
+		add.l	#8000-ROAD_BYTES,a0
+		add.l	#8000-ROAD_BYTES,a1
+		dbf	d1,.plane
+		movem.l	(sp)+,d0-d1/a0-a2
+		rts
+	ENDC
+
 ; Before the race loop: the first pass runs the logic and draws its result.
 _RaceInit	move.l	a0,-(sp)
 		lea	_Pending(pc),a0
@@ -249,7 +382,19 @@ _RaceInit	move.l	a0,-(sp)
 		move.w	P_FIELDS(a0),-(sp)
 		lea	_NextTick(pc),a0
 		move.w	(sp)+,(a0)
-		move.l	(sp)+,a0
+		TSTPC	_FastExp
+		beq.b	.nogfx
+		movem.l	d0/a1,-(sp)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_ROADGFX,a0
+		move.l	(a0),a0
+		move.l	_Work(pc),a1
+		add.l	#W_ROADGFX,a1
+		move.w	#ROADGFX_SIZE/4-1,d0
+.gfx		move.l	(a0)+,(a1)+
+		dbf	d0,.gfx
+		movem.l	(sp)+,d0/a1
+.nogfx		move.l	(sp)+,a0
 		lea	$dff000,a0		;stolen
 		rts
 
@@ -283,8 +428,23 @@ _PreDraw	movem.l	d0-d7/a0-a6,-(sp)
 		bsr	_SaveState
 		bsr	_Pose
 .road		movem.l	(sp)+,d0-d7/a0-a6
+		TSTPC	_FastExp
+		bne.b	.fast
 		move.l	_AddrRoad(pc),-(sp)
 		rts
+.fast		lea	_RoadFast(pc),a0	;the road sets a0 first
+		st	(a0)
+		move.l	_AddrRoad(pc),a0
+		jsr	(a0)
+		lea	_RoadFast(pc),a0	;the clear sets a0 first
+		sf	(a0)
+	IFD VERIFY
+		move.l	_AddrRoad(pc),a0	;and in chip, as the original
+		jsr	(a0)
+		bra	_CompareRoad
+	ELSE
+		bra	_CopyRoad
+	ENDC
 
 ; The pose of a frame between ticks, in the live state (S_next, the last
 ; tick's result; W_PREV holds S_prev, the tick before, in the same layout).
@@ -586,4 +746,8 @@ _FastExp	dc.b	0			;-1: the ExpMem is fast memory
 _Pending	dc.b	0			;-1: run the logic before the next frame
 _Staged		dc.b	0			;-1: this frame is between ticks
 _InLoop		dc.b	0			;-1: the race loop's swap
+_RoadFast	dc.b	0			;-1: the race loop's road, to fast memory
+		EVEN
+_FakeSel	dc.w	0			;for _RoadScreen
+		dc.l	0			;_Work + W_SCREEN
 		EVEN

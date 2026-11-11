@@ -5,7 +5,9 @@
 
 Each frame between ticks saves the state, draws and restores it; the VERIFY build then
 compares the whole program and COURSES.DAT with copies from before the frame, but for what the level-3
-handler writes. Prints the frames checked and every program offset that differed.
+handler writes. Prints the frames checked and every program offset that differed; then the frames whose
+road, drawn in fast memory, was compared with the original's drawn in chip, and the
+longwords that differed.
 """
 import sys
 from pathlib import Path
@@ -24,12 +26,13 @@ def read():
         if not w:
             break
         entries.append((w >> 16, w & 0xFFFF))
-    return frames, diffs, entries
+    return frames, diffs, entries, route.peek(log + 0x340), route.peek(log + 0x344)
 
 
 if __name__ == '__main__':
-    frames, diffs, entries = read()
+    frames, diffs, entries, roads, road_diffs = read()
     print(f'frames between ticks checked {frames}, differing longwords {diffs}')
+    print(f'roads drawn in fast memory checked {roads}, differing longwords {road_diffs}')
     for off, n in entries:
         if off & 0x8000:
             print(f'  COURSES.DAT +{(off & 0x7fff) * 2:05x}  x{n}')

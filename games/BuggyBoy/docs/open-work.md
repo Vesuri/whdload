@@ -123,7 +123,27 @@ checked.
      only 2 or 3 of the 4 phases can show between ticks.
    - Open: the menus and the start sequence still use 1.3's lock (12.5 Hz on a fast
      Amiga); measure the A500's rate on them.
-5. **Drawing cost** to under one field on the 030. Candidates, each A/B measured:
+5. **Drawing cost** to under one field on the 030. In progress; 200-field window, default
+   options, work per frame median (fields):
+
+   | Change | a1200 | a1200-030 |
+   |---|---:|---:|
+   | after step 4a | 1.908 | 1.287 |
+   | the road in fast memory, copied with misaligned longwords | | 1.273 |
+   | the copy aligned | | 1.169 |
+   | alloc 1 2 bytes later: the screens longword-aligned | 1.865 | 1.085 |
+
+   On the 030 that is 26.5 fps, 13 of 106 frames in one field. A CPU access to chip costs
+   about 60 cycles of the 030 (1.2 µs, several bus slots), so the bus has room the CPU
+   cannot use: what is left is to make fewer CPU accesses (now per frame about 9,600 by
+   the objects, 6,700 by `$448A`, 3,400 by the clear, 3,900 by the road copy) or to give
+   work to the blitter, which uses free slots at full speed. Candidates:
+   - the object plotter (`$3D94`, `$418C`: CPU-masked `and`/`or` on the screen) by the
+     blitter, from the graphics already in chip;
+   - the clear's two CPU planes by the blitter, overlapped with the road copy;
+   - the HUD drawn only where it changes.
+
+   Earlier candidates, each to be A/B measured:
    - 32-bit long-aligned road writes (about 8,200 word writes a frame now);
    - the HUD digits drawn only when they change, into both buffers;
    - the screen clear by the blitter in parallel with CPU work, or only where the road does
