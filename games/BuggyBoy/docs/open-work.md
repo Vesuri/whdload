@@ -1,13 +1,12 @@
 # Open work
 
-No slave changes yet. `src/` is Codetapper's 1.3 source as upstream has it. It builds
-byte-identical to the shipped slave given its date string ([development.md](development.md))
-and boots to the attract sequence on the a500 and the a1200. The 50 fps investigation below
-is measured; its plan is not started.
+`src/` is Codetapper's 1.3 with the start of 2.0b (`$VER: slave 2.0b (11.11.2026)`): on a
+68020 or better the slave enables the caches and, when the ExpMem is fast memory, runs the
+program, COURSES.DAT and the stack from it (`src/Enhanced.s`; [internals.md](internals.md),
+"2.0b"). A 68000 or 68010 and the disk versions run 1.3 unchanged. The 50 fps plan below
+is at step 2.
 
-Nothing is released from here. A release needs a new slave version with a
-`$VER: <name> <version> (dd.mm.yyyy)` string (the packager reads the version and date from
-it; 1.3's has neither a name nor, in our build, a date) and a ReadMe entry above
+Nothing is released from here. A release needs the plan finished and a ReadMe entry above
 Codetapper's history.
 
 ## 50 fps at the original game speed
@@ -47,23 +46,19 @@ Every other machine must run at least as well as before.
     plane, the objects are CPU-masked sprites, and the whole screen is cleared each frame.
   - The blitter is busy in 5% of the slots.
 
-### Decisions needed
+### Decisions (11.11.2026)
 
-1. **Which speed is "original".** The A500 does 9.0 fps in the benchmark window (5 or 6
-   fields a frame), and less in busier scenes. 1.3's default gives 12.5 fps on a fast
-   Amiga, not the labelled 10. Candidates:
-   - 10 Hz, a tick every 5 fields, which is the A500's best case and 1.3's `CUSTOM2=5`;
-   - the A500's measured average over a whole lap (not yet measured);
-   - 1.3's 12.5 Hz.
-2. **Latency.** Interpolation shows each tick one tick (100 ms at 10 Hz) late. The forward
-   motion can be predicted instead: its next step comes from the speed table and the cycle,
-   so it is exact until the speed band changes. Lateral motion depends on input.
-3. **Cache policy.** Enable the caches in the slave (instruction cache for chip code; both
-   for an ExpMem program), or leave them to WHDLoad's `Cache`/`DCache` options.
+1. **The game runs at 10 Hz**: one logic tick every 5 fields. That is the A500's best case
+   in the benchmark window and 1.3's `CUSTOM2=5`. 1.3's default (12.5 Hz on a fast Amiga)
+   and the A500's whole-lap average were the other candidates.
+2. **Interpolation**, not prediction: each drawn frame shows a pose between the last two
+   ticks, so the picture is one tick (100 ms) behind the logic.
+3. **The slave enables the caches** where they apply, instead of leaving them to WHDLoad's
+   `Cache`/`DCache` options.
 
 ### Design
 
-1. **Fixed tick.** Run the race loop's logic (`$153E`) once per tick of N fields (decision 1).
+1. **Fixed tick.** Run the race loop's logic (`$153E`) once per tick of 5 fields.
    The drawing runs every field, or every second field where one field is not enough. A
    frame longer than a tick delays the tick, as the original does; catch-up is not needed
    for the 030.
@@ -71,17 +66,16 @@ Every other machine must run at least as well as before.
    (`$41E2` and the others in [internals.md](internals.md), "The road and the objects")
    run once per tick. The routines are then pure drawing and can run any number of times.
 3. **Presentation pose.** Each drawn frame gets the forward position (phase, sub-phase,
-   parity, slice offset) and the lateral position between the last two ticks (or predicted,
-   decision 2). Derived from it:
+   parity, slice offset) and the lateral position between the last two ticks. Derived from
+   it:
    - the road's row table (`$2352` with finer phase tables: `$7DAA` has 4 phases of 14
      slice heights; finer ones can be generated from the same perspective);
    - the object positions between their slices, at the size of the nearer slice;
    - the lateral skew.
-4. **Memory.** The program and the stack go to an optional ExpMem when it is fast memory,
-   and COURSES.DAT (allocated as public) too. Copies of the CPU-read graphics (alloc 2 and
-   4) can follow. DMA buffers stay in chip. Without fast memory the slave keeps 1.3's
-   layout.
-5. **The 68000 and chip-only machines** keep 1.3's path, byte for byte where possible.
+4. **Memory** (done in step 1). The program, the stack and COURSES.DAT (allocated as
+   public) are in the ExpMem when it is fast memory. Copies of the CPU-read graphics
+   (alloc 2 and 4) can follow. DMA buffers stay in chip.
+5. **The 68000 and 68010** keep 1.3's path.
 
 ### Steps
 
@@ -89,13 +83,20 @@ Each ends measured with `tools/bench.py` on the a500, a1200 and a1200-030, with 
 checked.
 
 0. **Harness.** Record the race state per tick with `tools/states.py`. Add a VERIFY switch
-   that logs each tick, and a check that two runs give the same tick sequence. Measure the
-   A500 over a whole lap (decision 1). Check DMA on the other screens (title, course select,
-   name entry, game over) before moving the program out of chip.
-1. **Slave skeleton.** A `$VER` with a date, the optional ExpMem, the program in it, the
-   cache policy (decision 3), and the gate: a 68020 or better, with the ExpMem in fast
-   memory. Done when the gate-off path gives 1.3's benchmark, and the program in fast
-   memory reproduces the experiment's 1.34 fields per frame.
+   that logs each tick, and a check that two runs give the same tick sequence. Still open:
+   check DMA on the other screens (title, course select, name entry, game over) with the
+   program in fast memory; the title, the course select and the race draw correctly.
+1. **Slave skeleton.** Done. Measured in the 200-field window with `CUSTOM2=1`:
+
+   | Machine | fps | Work per frame, median (fields) | Before |
+   |---|---:|---:|---|
+   | a500 | 9.00 | 5.092 | 5.092, 1.3 |
+   | a1200 | 24.00 | 1.742 | 1.744, 1.3 with `CACHE` |
+   | a1200-030 | 25.00 | 1.178 | 1.344, the fast-memory experiment |
+
+   The gate is the CPU alone: the stock A1200 gets the instruction cache, and the tick and
+   the interpolation once they exist (it draws in 1.74 fields, so about 25 fps). The
+   program moves only when the ExpMem is fast memory.
 2. **Fixed tick, unchanged drawing.** Run the logic every N fields and redraw the
    committed state in between. Done when the ticks match 1.3 at the same tick rate, and the
    draw cost per frame is reported.

@@ -1,7 +1,8 @@
 # Internals
 
 What is known from Codetapper's 1.3 slave (`src/BuggyBoyHD.s`), the installed files and the
-race benchmark ([development.md](development.md), "Benchmark"). All game addresses are
+race benchmark ([development.md](development.md), "Benchmark"). Sections about 1.3 describe
+the slave as it was imported; what 2.0b changes is in "2.0b" at the end. All game addresses are
 program offsets: the code hunk of the decrypted `bug.p`, which the shipped slave runs at
 `$400` (runtime address = offset + `$400`).
 
@@ -195,3 +196,33 @@ same). Work per frame excludes the waits.
 - **Word-wide drawing.** The road writes `move.w` (about 8,200 a frame); the object
   plotter does `and.l`/`or.l` at word-aligned addresses, two bus accesses each on a
   32-bit chip bus. Long-aligned 32-bit writes would halve the road's accesses.
+
+## 2.0b
+
+`src/Enhanced.s`, included by `BuggyBoyHD.s`; the hooks in `BuggyBoyHD.s` are
+`_EnhInit` after `resload_Control`, `_EnhDest` for the load address, `_EnhGo` for the
+start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
+
+- **The gate** is `WHDLTAG_ATTNFLAGS_GET`: a 68020 or better takes the enhanced path, a
+  68000 or 68010 runs 1.3's code. The disk versions never reach it.
+- **ExpMem** is optional, `$30000` bytes. It counts as fast memory unless it is below
+  `$200000` (chip) or in `$C00000`–`$DFFFFF` (slow memory on the chip bus). Fast ExpMem
+  holds:
+
+  | Offset | What |
+  |---|---|
+  | `$0` | `bug.p`'s hunk header; the program at `$20` (to `$B4F0` with its relocation table) |
+  | `$C000` | the game's public allocations: COURSES.DAT (63072 bytes) |
+  | `$2E000`–`$2FFFF` | the stack (SSP set to the top before `jsr` to the program) |
+
+  Chip allocations stay with 1.3's bump allocator from `$10000`. The program's only
+  absolute references outside its hunk (`$2A5E`–`$2A88`: `$D32C`, `$D46C`, `$D5AC`,
+  `$D5AE`) are not relocated, so they stay in chip wherever the program runs.
+- **Caches** (`_EnhCache`, `resload_SetCPU`): instruction and data caches, ExpMem and
+  slave copyback. BaseMem is write-through, because without the MMU a non-cacheable region
+  turns every cache off (WHDLoad's cache.html). The 68030 does not data-cache chip memory
+  anyway. On a 68040 or 68060 with the program in fast memory BaseMem is non-cacheable,
+  since those CPUs slow down on cacheable chip accesses. The 68060 also gets the branch
+  cache and superscalar dispatch.
+- **Program base.** With fast ExpMem the program runs at ExpMem + `$20` (on the a1200-030
+  setup, `$9C6020`); the level-3 vector `$6C` holds the base + `$4DAC`.

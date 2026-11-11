@@ -21,6 +21,9 @@
 ;		         - Added 2 Exotic icons (taken from http://exotica.fix.no)
 ;		05.11.11 - v1.3         
 ;		         - Supports another Tenstar pack version (thanks to Paul Vernon)
+;		11.11.26 - v2.0b (Buggy Boy Enhanced)
+;		         - 68020+: caches enabled; the program, COURSES.DAT and the
+;		           stack in fast memory when the ExpMem is (Enhanced.s)
 ; Requires:	WHDLoad 17+
 ; Copyright:	Public Domain
 ; Language:	68000 Assembler
@@ -59,7 +62,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$59			;ws_keyexit = F10
-_expmem		dc.l	0			;ws_ExpMem
+_expmem		dc.l	-EXPSIZE		;ws_ExpMem (optional, Enhanced.s)
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -70,24 +73,8 @@ _expmem		dc.l	0			;ws_ExpMem
 
 ;============================================================================
 
-	IFD BARFLY
-		IFND	.passchk
-		DOSCMD	"WDate  >T:date"
-.passchk
-		ENDC
-	ENDC
-
-
 DECL_VERSION:MACRO
-	dc.b	"1.3"
-	IFD BARFLY
-		dc.b	" "
-		INCBIN	"T:date"
-	ENDC
-	IFD	DATETIME
-		dc.b	" "
-		incbin	datetime
-	ENDC
+	dc.b	"2.0b (11.11.2026)"
 	ENDM
 	dc.b	"$","VER: slave "
 	DECL_VERSION
@@ -126,6 +113,7 @@ _restart
 		lea	_Tags(pc),a0
 		move.l	_resload(pc),a2
 		jsr	resload_Control(a2)
+		bsr	_EnhInit
 
 		lea	_BugPFile(pc),a0	;Check for protected version
 		bsr	_GetFileSize
@@ -135,7 +123,7 @@ _restart
 		bsr	_GetFileSize
 		beq	_DiskVersions
 
-_DOSVersion	lea	DOSGAMEADDRESS-$20,a1	;a1 = Destination (hunk header at $3e0, real code at $400)
+_DOSVersion	bsr	_EnhDest		;a1 = Destination (hunk header at $3e0, real code at $400)
 		move.l	a1,a5
 		move.l	_resload(pc),a2
 		jsr	resload_LoadFileDecrunch(a2)
@@ -186,9 +174,7 @@ _DOSVersion	lea	DOSGAMEADDRESS-$20,a1	;a1 = Destination (hunk header at $3e0, re
 		move.l	#$3cc,$dff080
 		move.l	#0,$dff180
 
-		move.w	#$83d0,$dff096		;Enable DMA
-		jsr	(a5)
-		bra	_exit
+		bra	_EnhGo			;Enable DMA, jsr (a5)
 
 _PL_BugOP	PL_START
 		PL_PSS	$8,_AllocMem,4		;Allocate 67102 bytes
@@ -563,9 +549,15 @@ _SetCheat	lea	_CheatFlag(pc),a0
 
 ;======================================================================
 
-_LoadHighs	jsr	$5d4+DOSGAMEADDRESS	;Clear out highest scores
+_LoadHighs	move.l	a0,-(sp)
+		move.l	_ProgBase(pc),a0
+		jsr	$5d4(a0)		;Clear out highest scores
 		bsr	_LoadHighScores
-		jmp	$106+DOSGAMEADDRESS	;Stolen code
+		move.l	_ProgBase(pc),a0
+		pea	$106(a0)		;Stolen code: jmp $106
+		move.l	4(sp),a0
+		move.l	(sp)+,(sp)
+		rts
 
 _LoadHighsTens	jsr	$70538			;Clear out highest scores
 		bsr	_LoadHighScores		;Tenstar version
@@ -636,7 +628,7 @@ _EmptyDBF	movem.l	d0-d1,-(sp)
 
 ;======================================================================
 
-_AllocMem	movem.l	d1-d2/a1,-(sp)
+_AllocChip	movem.l	d1-d2/a1,-(sp)
 		lea	_FreeMem(pc),a1		;Current free memory
 		move.l	(a1),d1
 		move.l	d1,d2			;Give this to the program
@@ -760,6 +752,7 @@ _CD32_Controls	move.l	#JPB_BTN_FORWARD,d2
 ;======================================================================
 
 		INCLUDE	"whdload/keyboard.s"
+		INCLUDE	"Enhanced.s"
 
 ;======================================================================
 _resload	dc.l	0			;Resident loader
@@ -780,6 +773,8 @@ _Custom2	dc.l	0
 _Custom3	dc.l	0
 		dc.l	WHDLTAG_BUTTONWAIT_GET
 _ButtonWait	dc.l	0
+		dc.l	WHDLTAG_ATTNFLAGS_GET
+_AttnFlags	dc.l	0
 		dc.l	TAG_DONE
 ;======================================================================
 
