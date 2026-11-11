@@ -9,8 +9,9 @@ are the option "Enhanced framerate" (`CUSTOM2`); without it the game draws at 12
 and every screen outside the race is locked at 12.5 fps either way (1.3's default). A 68000 or 68010 and
 the disk versions run 1.3 unchanged. The 50 fps plan below is at step 4b.
 
-Nothing is released from here. The ReadMe has the 2.0b entry; a release needs the plan
-finished.
+Released as Buggy Boy Enhanced 2.0b (11.11.2026), with steps 5 and 6 still open below: the
+slave pinned in `release/slaves.sha256`, the archive from `make dist` with `CUSTOM2=1` added
+to every shipped icon (`release/release.json`). Further work is a later version.
 
 ## 50 fps at the original game speed
 
@@ -191,7 +192,8 @@ checked.
    - the CPU sprite plotter long-aligned, or by the blitter;
    - fast-memory copies of the graphics the CPU reads.
 6. **Matrix and release.** a500 and a1200 without fast memory: 1.3's behaviour. a1200-fast,
-   a1200-030, 040 and 060: functional and measured. A ReadMe entry, then package.
+   a1200-030, 040 and 060: functional and measured. The ReadMe entry and the package are
+   done (2.0b).
    - **The option** is done: `C2:B:Enhanced framerate` replaced 1.3's frame rate list
      ([internals.md](internals.md), "2.0b"). 200-field window, 12.5 Hz tick: a1200-030 50.00
      fps with it (median 0.855 fields a frame), 12.50 without (4 fields a frame); a1200

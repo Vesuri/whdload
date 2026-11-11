@@ -1,7 +1,7 @@
 # Buggy Boy
 
 Elite's Buggy Boy (1988) as Codetapper's WHDLoad slave
-1.3, being improved as Buggy Boy Enhanced 2.0b (not released yet). The slave is by
+1.3, improved as Buggy Boy Enhanced, released as 2.0b (11.11.2026). The slave is by
 Codetapper/Action (1.0 to 1.2, 2001; 1.3, 13.04.2022, added the frame rate control and the
 trainer), credited in the ReadMe and the source header. Its source is kept in JOTD's
 whdload_slaves (`B/BuggyBoy/usr` at eb73c315), so game.conf `AUTHOR` is JOTD and `UPSTREAM`

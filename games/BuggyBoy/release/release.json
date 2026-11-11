@@ -9,6 +9,23 @@
       },
       "add": {},
       "remove": [],
+      "tooltypes": {
+        "BuggyBoyInstall/BuggyBoy.inf": [
+          "CUSTOM2=1"
+        ],
+        "BuggyBoyInstall/BuggyBoy.newicon": [
+          "CUSTOM2=1"
+        ],
+        "BuggyBoyInstall/BuggyBoy.glowicon": [
+          "CUSTOM2=1"
+        ],
+        "BuggyBoyInstall/BuggyBoy.enewicon": [
+          "CUSTOM2=1"
+        ],
+        "BuggyBoyInstall/BuggyBoy.exoticon": [
+          "CUSTOM2=1"
+        ]
+      },
       "source": {
         "dir": "BuggyBoyInstall/source",
         "variants": [
