@@ -205,15 +205,18 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
 
 - **The gate** is `WHDLTAG_ATTNFLAGS_GET`: a 68020 or better takes the enhanced path, a
   68000 or 68010 runs 1.3's code. The disk versions never reach it.
-- **ExpMem** is optional, `$30000` bytes. It counts as fast memory unless it is below
+- **ExpMem** is optional, `$2F000` bytes (`$4A000` in the VERIFY build). It counts as fast memory unless it is below
   `$200000` (chip) or in `$C00000`–`$DFFFFF` (slow memory on the chip bus). Fast ExpMem
   holds:
 
-  | Offset | What |
+  | Where | What |
   |---|---|
-  | `$0` | `bug.p`'s hunk header; the program at `$20` (to `$B4F0` with its relocation table) |
-  | `$C000` | the game's public allocations: COURSES.DAT (63072 bytes) |
-  | `$2E000`–`$2FFFF` | the stack (SSP set to the top before `jsr` to the program) |
+  | base | the program (to `$B4D0` with its relocation table; the hunk header in the 32 bytes before). The base is the first 64 KB boundary at least `$20` bytes into the ExpMem, so the program does not cross one, as at `$400` in chip (word-sized address arithmetic would break there) |
+  | base + `$C000` | the game's public allocations: COURSES.DAT (63072 bytes) |
+  | base + `$1C000` | the slave's buffers (below) |
+  | the top `$2000` bytes | the stack (SSP set to the top before `jsr` to the program) |
+
+  Without fast memory the base is the ExpMem's start and only the buffers are there.
 
   Chip allocations stay with 1.3's bump allocator from `$10000`. The program's only
   absolute references outside its hunk (`$2A5E`–`$2A88`: `$D32C`, `$D46C`, `$D5AC`,
@@ -224,5 +227,47 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
   anyway. On a 68040 or 68060 with the program in fast memory BaseMem is non-cacheable,
   since those CPUs slow down on cacheable chip accesses. The 68060 also gets the branch
   cache and superscalar dispatch.
-- **Program base.** With fast ExpMem the program runs at ExpMem + `$20` (on the a1200-030
-  setup, `$9C6020`); the level-3 vector `$6C` holds the base + `$4DAC`.
+- **Program base.** The level-3 vector `$6C` holds the base + `$4DAC`. On the a1200-030
+  setup the base is `$9D0000` (`$9B0000` in the VERIFY build).
+
+### The fixed tick
+
+With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the race loop:
+
+| Offset | Original | 2.0b |
+|---|---|---|
+| `$138` | `lea $DFF000,a0` (race setup, on every way into the loop) | `_RaceInit`: the first pass runs the logic, and a tick is due at once |
+| `$158` | `bsr $153E` (logic), `bsr $6716` (road) | `_PreDraw`, then the road |
+| `$16C` | `bsr $2672` (swap), `tst.w $9874` | `_PostDraw` |
+| `$2682` | (1.3's lock) | `_SetCop`: no wait in the race loop's swap; 1.3's lock everywhere else |
+
+- **The tick** is due every 5 fields of the game's field counter `$66D8`. A frame that
+  starts when a tick is due is a *tick frame*: it draws the committed state, writes and all,
+  as the original drew after each logic step, and the logic runs at the start of the next
+  frame. A tick frame more than a tick late starts the count again. So the logic and the
+  drawing's writes to game state happen in exactly the original order, once per tick; the
+  state at each logic step is byte-identical to 1.3's at `CUSTOM2=5` (10 Hz) over 600
+  ticks of the benchmark route.
+- **A frame between ticks** saves the state, sets a pose, draws, and restores the state
+  before the swap; then it goes straight back to the loop's start, so the checks after the
+  swap (race end `$9874`, the right button, the left button's delay) run on tick frames
+  only. Saved: `$9860`–`$9D6B` (the logic's block), `$8B40`–`$8B4F` and `$8E70`–`$8E8F`
+  (the drawing's own counters and HUD state), and the two COURSES.DAT words the object
+  routine animates each frame (`$3418`: `($9826)` + `$D70` and + `$1250`). The VERIFY
+  build compares the whole program and COURSES.DAT after each such frame
+  (`tools/verify.py`); nothing else changes but what the level-3 handler writes (`$66D8`,
+  the sound channels `$4EDC`–`$4F13`).
+- **The pose** (`_Pose`). The logic step after a tick frame saves the state first (S_prev,
+  the state that frame showed); the live state is then S_next. A frame n fields (1 to 4)
+  after the tick frame's due field shows n/5 of the way from S_prev to S_next:
+  - forward: the position is phase plus segment. A tick moves it at most one segment,
+    since a crossing clears the phase. The position is rounded to the renderers' even
+    phases. Before the crossing the frame uses S_prev's state with that phase, after it
+    S_next's. `$987E` and `$9880` are derived again from it.
+  - lateral `$9890`: interpolated, unless it changed by more than 16 in the tick.
+  - the projection `$2352` is run again, for the row tables.
+  - horizon `$98DE`: set so that the clear's step (`$98DC` × `$98DA`) lands n/5 of the
+    way, wrapped to 0–639.
+
+  A backward phase in the same segment (a new race) shows S_next unchanged. Objects, the
+  HUD and the player's sprite are the chosen tick's.

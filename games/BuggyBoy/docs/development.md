@@ -85,7 +85,12 @@ SETUP=a1200-030 PROG_BASE=auto EXTRA_ARGS=--uae_mmu_model=0 WHD_ARGS="CUSTOM2=1"
   takes a different time on each machine. The game state at the window's end differs
   between machines anyway: the game runs faster on a faster one.
 - `tools/states.py N OUT.npy`, on a server stopped in a race, records the state block
-  (`$9860`–`$9D6F`) at the swap for N frames, with the fields between them.
+  (`$9860`–`$9D6F`) at the swap for N frames, with the fields between them. `AT=153E`
+  records at the logic instead: once per tick in 2.0b, comparable with 1.3 at
+  `CUSTOM2=5` (`SLAVE=original`). Compare only `$9860`–`$9D69`; the rest is code with
+  relocated addresses. A recording that runs past the race's end waits for ever.
+- `BUILD=verify` checks every frame drawn between ticks; `tools/verify.py` on its server
+  prints what changed (nothing, when it works).
 
 ## Traps
 

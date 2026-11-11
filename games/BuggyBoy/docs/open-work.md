@@ -2,9 +2,10 @@
 
 `src/` is Codetapper's 1.3 with the start of 2.0b (`$VER: slave 2.0b (11.11.2026)`): on a
 68020 or better the slave enables the caches and, when the ExpMem is fast memory, runs the
-program, COURSES.DAT and the stack from it (`src/Enhanced.s`; [internals.md](internals.md),
-"2.0b"). A 68000 or 68010 and the disk versions run 1.3 unchanged. The 50 fps plan below
-is at step 2.
+program, COURSES.DAT and the stack from it. The race runs its logic on a fixed 10 Hz tick
+and draws as often as the machine manages, with each frame interpolated between the last
+two ticks (`src/Enhanced.s`; [internals.md](internals.md), "2.0b"). A 68000 or 68010 and
+the disk versions run 1.3 unchanged. The 50 fps plan below is at step 4b.
 
 Nothing is released from here. A release needs the plan finished and a ReadMe entry above
 Codetapper's history.
@@ -62,9 +63,9 @@ Every other machine must run at least as well as before.
    The drawing runs every field, or every second field where one field is not enough. A
    frame longer than a tick delays the tick, as the original does; catch-up is not needed
    for the 030.
-2. **Split the draw path.** The writes to game state in the object and HUD routines
-   (`$41E2` and the others in [internals.md](internals.md), "The road and the objects")
-   run once per tick. The routines are then pure drawing and can run any number of times.
+2. **Draw-path side effects** (done): instead of splitting the routines, a tick frame
+   draws the committed state with all its writes, and a frame between ticks saves and
+   restores the state around its drawing ([internals.md](internals.md), "The fixed tick").
 3. **Presentation pose.** Each drawn frame gets the forward position (phase, sub-phase,
    parity, slice offset) and the lateral position between the last two ticks. Derived from
    it:
@@ -97,13 +98,31 @@ checked.
    The gate is the CPU alone: the stock A1200 gets the instruction cache, and the tick and
    the interpolation once they exist (it draws in 1.74 fields, so about 25 fps). The
    program moves only when the ExpMem is fast memory.
-2. **Fixed tick, unchanged drawing.** Run the logic every N fields and redraw the
-   committed state in between. Done when the ticks match 1.3 at the same tick rate, and the
-   draw cost per frame is reported.
-3. **Draw-path split** (design 2). Done when drawing twice per tick leaves the state block
-   identical.
-4. **Presentation pose** (design 3): road first, then objects, then lateral. Contact sheets
-   per field around segment crossings and in the top speed band.
+2. **Fixed tick.** Done. The state at each logic step is byte-identical to 1.3's at
+   `CUSTOM2=5` for 600 ticks of the route (`AT=153E tools/states.py`); the race timer
+   counts at 1.3's 10 Hz rate.
+3. **Save and restore around frames between ticks.** Done. The VERIFY build finds nothing
+   changed after 962 such frames (`tools/verify.py`).
+4. **Presentation pose** (design 3).
+   - **4a, within the renderers' 4 phases.** Done: forward position (with the segment
+     crossing), lateral and horizon interpolated, the projection re-run. On the 030 the
+     drawn phase steps every second frame where 1.3 at 10 Hz jumps every frame, and the
+     lateral position moves every frame. Measured, 200-field window, default options:
+
+     | Machine | fps | Logic steps | Work per frame, median (fields) |
+     |---|---:|---:|---:|
+     | a500 | 9.00 | 35 | 5.092 (1.3: 5.092) |
+     | a1200 | 22.25 | 40 | 1.908 |
+     | a1200-030 | 25.00 | 40 | 1.287 |
+
+     The pose costs about 0.11 fields on the 030 (1.178 without it).
+   - **4b, finer than 4 phases.** Next. Phase tables in between the 4 for the slice
+     heights (`$7DAA`), the object positions (`$76B0` + phase × 221 bytes) and the curve
+     shift in `$2352`; objects between their slices. Contact sheets per field around
+     segment crossings and in the top speed band, where a tick moves a whole segment and
+     only 2 or 3 of the 4 phases can show between ticks.
+   - Open: the menus and the start sequence still use 1.3's lock (12.5 Hz on a fast
+     Amiga); measure the A500's rate on them.
 5. **Drawing cost** to under one field on the 030. Candidates, each A/B measured:
    - 32-bit long-aligned road writes (about 8,200 word writes a frame now);
    - the HUD digits drawn only when they change, into both buffers;

@@ -3,7 +3,8 @@
 
     python3 tools/states.py N OUT.npy [LO HI]
 
-Breaks at the swap (program offset $2672, once per frame), N times, and dumps the program's
+Breaks at the swap (program offset $2672, once per frame; AT=OFFSET in the environment
+for another, such as AT=153E, the logic, once per tick in 2.0b), N times, and dumps the program's
 runtime range LO..HI (default the state block $9C60-$A170 at base $400, given as program
 offsets $9860-$9D70) at each stop; saves an (N, HI-LO) uint8 array and prints the field
 counter ($6AD8) per frame.
@@ -27,7 +28,8 @@ def main(argv):
     n, out = int(argv[0]), ROOT / argv[1]
     lo, hi = (int(argv[2], 16), int(argv[3], 16)) if len(argv) > 3 else (0x9860, 0x9D70)
     prog = route.prog_base()
-    route.req('gdb', f'break *{prog + SWAP_ENTRY:#x}')
+    at = int(os.environ.get('AT', f'{SWAP_ENTRY:x}'), 16)
+    route.req('gdb', f'break *{prog + at:#x}')
     rows, fields = [], []
     tmp = Path(tempfile.mkdtemp(dir=ROOT / 'tmp'))
     try:
