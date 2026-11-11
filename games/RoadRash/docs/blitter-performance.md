@@ -144,7 +144,7 @@ original game. Checks (`a1200-fast`, CUSTOM2=1, ignored `tmp/shopbug/`):
   are unchanged: `a1200-fast` 12.5 / 18.6 and 040 25 MHz 22.7 / 49.6 fps (CUSTOM2 off / on),
   for both slaves.
 
-### Lane markings on 040/060 (after 3.0b of 10.11.2026)
+### Lane markings on 040/060 (3.0b of 11.11.2026)
 
 With Enhanced framerate, Chip RAM is data-cached write-through (`RoadRashHD.s`,
 `resload_SetCPU`). After the background and road (`e_background_road`), native main hunk

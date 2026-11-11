@@ -1,9 +1,10 @@
-# Road Rash 3.0b (10.11.2026)
+# Road Rash 3.0b (11.11.2026)
 
 3.0b was first released on 22.10.2026. The 09.11.2026 release replaced it, with the same
 version, the blitter waits in `visual-fixes.md` ("Unwaited blits") and a shorter ReadMe
-changelog; the 10.11.2026 release replaces that, adding the bike-shop fix in
-`blitter-performance.md` ("Menu and shop bobs"). The checks of both are at the end of this
+changelog; the 10.11.2026 release replaced that, adding the bike-shop fix in
+`blitter-performance.md` ("Menu and shop bobs"), and the 11.11.2026 release replaces that,
+adding the lane-marking fix ("Lane markings on 040/060"). Their checks are at the end of this
 document; the rest describes the 22.10.2026 release's validation, which those changes leave
 unchanged.
 
@@ -164,3 +165,12 @@ bobs") only in the date strings, which keep their length. The same race-entry ch
 09.11.2026's passed on every machine in `SETUPS` with CUSTOM2 off and on (030, 040 and 060
 on the shared `fs-uae`). The archive extracts with the pinned slave, the dated ReadMe and
 the `src/` files the slave was built from.
+
+## 11.11.2026 release checks
+
+The release slave differs from the one checked in `blitter-performance.md` ("Lane markings
+on 040/060") only in the date strings, which keep their length. The same race-entry check
+passed on every machine in `SETUPS` with CUSTOM2 off and on (030, 040 and 060 on the shared
+`fs-uae`; the `a1200-fast` Enhanced run needed 64 fire presses instead of 60 to get past the
+course screen). The archive extracts with the pinned slave, the dated ReadMe and the `src/`
+files the slave was built from.

@@ -2,14 +2,14 @@
 
 ## Where it stands
 
-3.0b (10.11.2026) is complete under the agreed emulator scope: plan items A–C and G
-complete, D, E and F1–F5 complete, H1/H2 investigated (`performance-plan.md`). It replaces the
-releases of 22.10.2026, built from the tree submitted and merged upstream ("Road Rash 3.0b:
-optional enhanced framerate"), and of 09.11.2026. Those added the waits after unwaited blits
-(`visual-fixes.md`) and a shorter ReadMe changelog; 10.11.2026 fixes the bike shop's bikes with
-Enhanced framerate (`blitter-performance.md`, "Menu and shop bobs"). `release/slaves.sha256`
-pins its slave. Not released yet: the fix for yellow streaks on the lane markings on 040/060
-(`blitter-performance.md`, "Lane markings on 040/060").
+3.0b (11.11.2026) is complete under the agreed emulator scope: plan items A–C and G
+complete, D, E and F1–F5 complete, H1/H2 investigated (`performance-plan.md`). It replaces
+three releases of the same version. 22.10.2026 was built from the tree submitted and merged
+upstream ("Road Rash 3.0b: optional enhanced framerate"). 09.11.2026 added the waits after
+unwaited blits (`visual-fixes.md`) and a shorter ReadMe changelog, and 10.11.2026 fixed the
+bike shop's bikes with Enhanced framerate (`blitter-performance.md`, "Menu and shop bobs").
+11.11.2026 fixes the yellow streaks on the lane markings on 040/060 (`blitter-performance.md`,
+"Lane markings on 040/060"). `release/slaves.sha256` pins its slave.
 
 The submitted tree is the development branch reduced to its release configuration (no VERIFY
 instrumentation, development notes or packager), so its slave differs from the development
