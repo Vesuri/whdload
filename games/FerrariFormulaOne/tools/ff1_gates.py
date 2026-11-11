@@ -21,7 +21,7 @@ ap.add_argument('--skip-prepare', action='store_true'); ap.add_argument('cases',
 a = ap.parse_args()
 tag = a.tag.replace('/', '-')
 PROFILE = '040-40-bce'
-PERF = 'CUSTOM1=0 CUSTOM2=1 ConfigDelay=0 NoWriteCache'
+PERF = 'CUSTOM2=1 ConfigDelay=0 NoWriteCache'
 
 
 def prepare():

@@ -21,11 +21,20 @@ game_build() {
   (cd "$GAME_ROOT" && find src -type f | LC_ALL=C sort) > "$out/$VARIANT.deps"
 }
 
+# make run on the release slave: Enhanced framerate on (CUSTOM2=1), as the shipped icons set
+# it, unless WHD_ARGS names CUSTOM2. SLAVE=original and the harness (which names its slave)
+# are left alone.
 # FF1_LAUNCH selects one of the harness's launch modes:
 #   stdio       WHDLoad's output to DH1:startup-output.log, its result to DH0:whdload-exit.txt
 #   diagnostic  without NOREQ, so WHDLoad's requesters stay up
 #   session     RELEASE_SEASON_SOURCE (a season save) installed as DH1:data/qual.ses
 game_prepare() {
+  if [ -z "${SLAVE:-}" ] && [ "${BUILD:-release}" = release ]; then
+    case " ${WHD_ARGS:-} " in
+      *" CUSTOM2="*) ;;
+      *) WHD_ARGS="${WHD_ARGS:+$WHD_ARGS }CUSTOM2=1" ;;
+    esac
+  fi
   case "${FF1_LAUNCH:-}" in
     '') ;;
     stdio) WHD_ARGS="${WHD_ARGS:-} >DH1:startup-output.log"; VERIFY_EXIT=1 ;;

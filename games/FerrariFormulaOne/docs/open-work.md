@@ -13,8 +13,9 @@
   (`run_release_season.py` waits for the emulator to exit, with no timeout).
 - **Before a release here:** `tools/build.py` appends `$VER: FerrariFormulaOne.slave 2.0b
   (06.11.2026)` after the payloads, from `slv_info`'s version and date, so no host or payload
-  byte moves. The installed icon enables performance mode: `release/Install` writes
-  `CUSTOM2=1` into it (the user's decision, 2026-11-06; not yet run under Installer).
+  byte moves. Enhanced framerate (`CUSTOM2=1`) is on in the shipped launch icons
+  (`release.json` `tooltypes`, 2026-11-11) and `release/Install` writes it into the
+  installed icon too (the user's decision, 2026-11-06; not yet run under Installer).
 - **The real A1200/040 hangs: the original audio stop delay (2026-11-11).** The user's
   hangs (performance mode with the Cache options; every time in a car crash at the first
   corner of Spa; 1–3 s stalls on the title; the original v1.01 slave too; never with
@@ -91,7 +92,7 @@ H5_BUILD=$PWD/tmp/build/fr8-TAG C1_VARIANT=fr8-TAG python3 tools/test_h5_fps.py 
 FF1_FINE_DEFINES=FF1_FAST_RENDER=1 python3 tools/ff1_gates.py --build tmp/build/fr8-TAG \
   --tag TAG frames/normal frames/grid timing/elapsed
 FR4_BUILD=tmp/build/fr8-TAG FR4_TAG=-fr8-TAG \
-  RELEASE_WHD_ARGS='CUSTOM1=0 CUSTOM2=1 ConfigDelay=0 NoWriteCache' \
+  RELEASE_WHD_ARGS='CUSTOM2=1 ConfigDelay=0 NoWriteCache' \
   python3 tools/fr4_probe.py 030-50-bce 300
                                      # tmp/step5/fr4-probe-030-50-bce-fr8-TAG/result.json
                                      # stats_after: fr4.faults, fr4.hard, fr5, fr7;

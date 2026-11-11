@@ -10,6 +10,15 @@
       },
       "add": {},
       "remove": [],
+      "tooltypes": {
+        "FerrariFormulaOne_Install/FerrariFormulaOne.boxirek": ["CUSTOM2=1"],
+        "FerrariFormulaOne_Install/FerrariFormulaOne.colirek": ["CUSTOM2=1"],
+        "FerrariFormulaOne_Install/FerrariFormulaOne.colirek2": ["CUSTOM2=1"],
+        "FerrariFormulaOne_Install/FerrariFormulaOne.newicon": ["CUSTOM2=1"],
+        "FerrariFormulaOne_Install/FerrariFormulaOne.newirek": ["CUSTOM2=1"],
+        "FerrariFormulaOne_Install/FerrariFormulaOne.newirek2": ["CUSTOM2=1"],
+        "FerrariFormulaOne_Install/FerrariFormulaOne.romirek": ["CUSTOM2=1"]
+      },
       "source": {"dir": "FerrariFormulaOne_Install/Source", "variants": ["FerrariFormulaOne"]}
     }
   ]

@@ -18,7 +18,7 @@
  To install from a different drive than DF0: select installation mode Expert.
 
  The installed game requires 0.5 MB ChipMem and 1 MB OtherMem (Kickstart ROM
- and performance mode), plus memory for preload. An A500 without Fast memory
+ and Enhanced framerate), plus memory for preload. An A500 without Fast memory
  and an A1200 without Fast memory do not have enough.
  It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
 
@@ -43,14 +43,14 @@
  - Wrong blit fixed
  - CPU dependent delay fixed
  - Sound stop delay fixed (stalls and freezes on a 68040/060 with caches)
- - Timing fixed (can be disabled with CUSTOM1)
+ - Timing fixed
  - Manual included 
  - lots of nice icons (one created by me, all others by Irek)
  - Source code included as usual
  - Quit option that works on 68000 machines (default key is 'F10')
- - Performance mode (CUSTOM2=1, PAL, SPS 0481 version)
+ - Enhanced framerate (CUSTOM2=1) for the PAL SPS 0481 version
 
- The performance mode keeps the game speed constant whatever the rendering
+ Enhanced framerate keeps the game speed constant whatever the rendering
  speed and renders faster. On a 68020 or faster with Fast memory the player's
  car moves more smoothly. On a 68030 or faster with Fast memory the picture
  is drawn in Fast memory. It uses Fast memory and the safe CPU caches when
@@ -71,8 +71,7 @@
 
  As the game was made for the A500 the coder didn't wait for the raster beam
  which means the game runs much too fast on anything else than a plain 68000
- machine. I have fixed the timing of course, if you want to disable the timing
- fix use CUSTOM1=1.
+ machine. I have fixed the timing of course.
 
  Enjoy the game from HD.
  Sting, 01-Aug-2016
@@ -94,7 +93,7 @@
  --------
 
  version 2.0b (06.11.2026) done by Vesuri:
- - added performance mode (CUSTOM2=1)
+ - added the Enhanced framerate option (CUSTOM2=1)
  - faster rendering on A500 and accelerated Amigas
  - consistent game speed regardless of rendering speed
  - smoother car movement on 68020 and faster Amigas with Fast memory
@@ -103,6 +102,8 @@
  - uses all safe CPU caches on 68020 and faster
  - fixed the sound stop delay that stalled or froze 68040/060 machines with
    caches
+ - removed the CUSTOM1 option; the timing fix always applies without
+   Enhanced framerate
 
  version 1.01 (07.08.2016)
  - support for another version added, thanks to Irek Kloska for

@@ -33,7 +33,7 @@ GAME = R / 'tmp/game/FerrariFormulaOne/data/racemenu'
 # chip-only A1200 (MEMORY below).
 CORE = ['a500-fast', 'a1200-fast', '030-50-bce', '040-40-bce']
 FAST = ['a1200-fast', '030-50-bce', '040-40-bce']
-PERF = 'CUSTOM1=0 CUSTOM2=1 ConfigDelay=0 NoWriteCache'
+PERF = 'CUSTOM2=1 ConfigDelay=0 NoWriteCache'
 ANY = ['FerrariFormulaOne_*.s', 'FerrariFormulaOne/*.s', 'FerrariFormulaOne/*.py',
        'FerrariFormulaOne/layout.json']
 
@@ -60,7 +60,7 @@ MMU = [
 # name: script, result kind, default profiles, covered Games/ globs, core?
 CHECKS = {
     'smoke':    dict(script='test_release_smoke.py', kind='release-smoke', profiles=CORE, covers=ANY, core=True,
-                     whd='CUSTOM1=1 CUSTOM2=1 ConfigDelay=0',   # as the icons launch; chip-only 020 needs it
+                     whd='CUSTOM2=1 ConfigDelay=0',   # as the icons launch; chip-only 020 needs it
                      doc='20 production updates, no engine error'),
     'fps':      dict(script='test_h5_fps.py', kind='h5-fps', profiles=FAST, covers=ANY, core=True, whd=PERF,
                      doc='300-presentation FPS and live CACR in performance mode'),
@@ -70,7 +70,7 @@ CHECKS = {
                      covers=['FerrariFormulaOne_WHD.s', 'FerrariFormulaOne_PublicMemory.s',
                              'FerrariFormulaOne_PublicLoader.s', 'FerrariFormulaOne/layout.json',
                              'FerrariFormulaOne/build.py'],
-                     whd='CUSTOM1=1 CUSTOM2=1 ConfigDelay=0',   # chip-only 020 needs ConfigDelay=0 on 20.1
+                     whd='CUSTOM2=1 ConfigDelay=0',   # chip-only 020 needs ConfigDelay=0 on 20.1
                      doc='A500/chip-only memory layouts start (or fail) as documented'),
     'mmu':      dict(script='test_release_smoke.py', kind='release-smoke', profiles=None, core=False,
                      covers=['FerrariFormulaOne_Cache.s', 'FerrariFormulaOne_PublicMemory.s', 'FerrariFormulaOne_WHD.s'],
@@ -88,7 +88,7 @@ CHECKS = {
     'season':   dict(script='run_release_season.py', kind='release-live', profiles=['a500-fast'], core=False,
                      covers=['FerrariFormulaOne_Coarse200Save.s', 'FerrariFormulaOne_PublicLoader.s',
                      'FerrariFormulaOne_PublicLifecycle.s', 'FerrariFormulaOne/ProductionHost.s'],
-                     whd='CUSTOM1=1 CUSTOM2=1 NoWriteCache', doc='native season save'),
+                     whd='CUSTOM2=1 NoWriteCache', doc='native season save'),
     'route':    dict(script='run_release_route.py', kind='release-live', profiles=['a1200-fast'], core=False,
                      covers=['FerrariFormulaOne_PublicLifecycle.s', 'FerrariFormulaOne_Opponents.s',
                      'FerrariFormulaOne_Time.s', 'FerrariFormulaOne/FinePause.s', 'FerrariFormulaOne/ProductionHost.s'],

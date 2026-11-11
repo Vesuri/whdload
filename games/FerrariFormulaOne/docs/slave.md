@@ -30,11 +30,14 @@ behave like the 040 and is not measured, and real hardware is untested.
 `build.py` accepts further `FF1_FAST_RENDER*` defines in `FF1_FINE_DEFINES` for
 development builds (`FF1_FAST_RENDER_PACING`); without them the build is the release.
 
-`CUSTOM2=0` (the slave's default) selects the original loop. The release installer
-writes `CUSTOM2=1` into the installed icon, so installed games start in performance mode. `CUSTOM1` retains its
-original meaning there: disable the original slave's timing repair.
-`CUSTOM2=1` enables elapsed-time scheduling for SPS 0481 in PAL mode; it supersedes that
-repair, so both CUSTOM1 settings select the same performance behavior:
+`CUSTOM2=0` (the slave's default) selects the original loop. `CUSTOM2=1` is the splash
+window's "Enhanced framerate", the only option: the shipped launch icons carry it
+(`release/release.json`, `tooltypes`), the installer writes it into the installed icon
+again, and `make run` passes it unless `WHD_ARGS` names `CUSTOM2` (`game.sh`). The
+original slave's `CUSTOM1` (disable its timing repair, two WaitTOF calls per race loop) is
+gone (the user's decision, 2026-11-11): the repair always applies with `CUSTOM2=0` and on
+Irek's version. `CUSTOM2=1` enables elapsed-time scheduling for SPS 0481 in PAL mode, which
+never installs that repair:
 
 | Machine | Simulation interval |
 | --- | --- |

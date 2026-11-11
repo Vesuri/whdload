@@ -40,7 +40,7 @@ FF1PreparePublicResident:
  rts
 
 ; A0 = native BPTR hunk table; A1 = original screen-pointer repair callback;
-; A2 = original timing callback; D0 = Disable Timing Fix (CUSTOM1).
+; A2 = original timing callback; D0 nonzero leaves it out (Enhanced framerate paces the race).
 ; Caller has established race HEADER file:$22f30 / entry hunk 160.
 ; Return D0=0 on success, -1 on unexpected code. D1-D7/A0-A6 preserved.
 ; All three signatures checked before the first write. Re-entry is harmless.

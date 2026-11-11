@@ -1,6 +1,7 @@
 # Ferrari Formula One
 
-A performance mode (`CUSTOM2=1`, default off) for the SPS 0481 PAL Ferrari Formula One:
+A performance mode (`CUSTOM2=1`, "Enhanced framerate" to the player; off in the slave, on in
+the shipped icons and `make run`) for the SPS 0481 PAL Ferrari Formula One:
 elapsed-time scheduling with a converted 200 ms simulation on the 68000, the native 100 ms
 on a 68020 without Fast memory and a 20 ms player simulation on a 68020+ with Fast memory,
 faster rendering, Fast-memory allocation and CPU caches; `CUSTOM2=0` is the original game.

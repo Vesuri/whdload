@@ -118,13 +118,11 @@ slv_info	dc.b	"installed by StingRay/[S]carab^Scoopex",10
 		dc.b	"Version 2.0b (06.11.2026)",0
 		CNOP	0,4
 
-slv_config	dc.b	"C1:B:Disable Timing Fix;C2:B:Elapsed-time performance mode (SPS 0481)"
+slv_config	dc.b	"C2:B:Enhanced framerate"
 		dc.b	0
 		CNOP	0,4
 
-TAGLIST		dc.l	WHDLTAG_CUSTOM1_GET
-NOTIMINGFIX	dc.l	0
-		dc.l	WHDLTAG_CUSTOM2_GET
+TAGLIST		dc.l	WHDLTAG_CUSTOM2_GET
 FF1PublicEnabled	dc.l 0
 	dc.l	WHDLTAG_ATTNFLAGS_GET
 FF1AttnFlags	dc.l	0
@@ -286,15 +284,9 @@ PLGAME_IREK
 
 
 ; fix timing
-	move.l	NOTIMINGFIX(pc),-(a7)		; CUSTOM1=1?
-	tst.l	(a7)
-	addq.w	#4,a7
-	bne.b	.nofix				; -> no timing fix!
-
 	move.w	#$4eb9,$6a304-$64a68(a1)
 	pea	fixtiming(pc)
 	move.l	(a7)+,$6a304-$64a68+2(a1)
-.nofix
 
 .no	rts
 
@@ -369,15 +361,9 @@ PLGAME	PL_START
 
 
 ; fix timing
-	move.l	NOTIMINGFIX(pc),-(a7)		; CUSTOM1=1?
-	tst.l	(a7)
-	addq.w	#4,a7
-	bne.b	.nofix				; -> no timing fix!
-
 	move.w	#$4eb9,$6a304-$64a68(a1)
 	pea	fixtiming(pc)
 	move.l	(a7)+,$6a304-$64a68+2(a1)
-.nofix
 
 	IFD	DEBUG
 .RMB	move.w	#$f00,$dff180
