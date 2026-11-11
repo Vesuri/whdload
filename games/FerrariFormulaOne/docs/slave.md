@@ -111,7 +111,7 @@ is 260,276 bytes, SHA256
 `e57c42ec5160f1771146045f81a31c59ff7942f30678e801fb5c00178dd2910d`;
 an independent rebuild of the corrected source reproduces it exactly.
 
-This is an unreleased, opt-in emulator-qualified candidate. The accelerated,
+Release 2.0b is emulator-qualified, not tested on real hardware. The accelerated,
 cache/MMU, original-option/reload, track, save/load and
 clock checks are complete in [RELEASE_QUALIFICATION.md](RELEASE_QUALIFICATION.md).
 Its first section defines the current, reduced test matrix and which checks

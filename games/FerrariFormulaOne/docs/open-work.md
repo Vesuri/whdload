@@ -1,21 +1,21 @@
 # Ferrari Formula One current work
 
-## Where it stands (2026-11-08)
+## Where it stands (2026-11-11)
 
-- **Release 2.0b (11.11.2026), unreleased.** The release slave (`376d1164…`, FR10) is the
-  default-off combined performance slave (`CUSTOM2=1`, PAL, SPS 0481) with Fast RAM
-  rendering on the 030/040/060 (FASTRAM_PLAN "FR10"). It reserves 1 MiB ExpMem (768 KiB
-  pool), so the A500 without Fast memory and the chip-only A1200 no longer start (the
-  user's decision, "add enough memory", 2026-11-06). `ff1check.py release` on it
-  (2026-11-08): everything passes except lap (020+Fast) and controls (A500+Fast), which
-  meet the collision problem below in the demo; reload (A500+Fast, 020+Fast), which fails
-  on the pre-FR10 slave too; and season, whose runner hangs after a correct F10 exit
-  (`run_release_season.py` waits for the emulator to exit, with no timeout).
+- **Release 2.0b (11.11.2026).** The release slave (`0a29050a…`, `release/slaves.sha256`)
+  is the FR10 slave with packed binding tables, the audio stop fix and the one
+  "Enhanced framerate" option (`CUSTOM2=1`, PAL, SPS 0481), with Fast RAM rendering on
+  the 030/040/060 (FASTRAM_PLAN "FR10"). It reserves 1 MiB ExpMem (768 KiB pool), so
+  the A500 without Fast memory and the chip-only A1200 do not start (the user's
+  decision, "add enough memory", 2026-11-06). `ff1check.py` on it (2026-11-11): every
+  check passes (gates is retired, RELEASE_QUALIFICATION.md); the installer test passes.
+  Released without the user's test on the real A1200/040 (the user's decision).
 - **Before a release here:** `tools/build.py` appends `$VER: FerrariFormulaOne.slave 2.0b
   (11.11.2026)` after the payloads, from `slv_info`'s version and date, so no host or payload
   byte moves. Enhanced framerate (`CUSTOM2=1`) is on in the shipped launch icons
   (`release.json` `tooltypes`, 2026-11-11) and `release/Install` writes it into the
-  installed icon too (the user's decision, 2026-11-06; not yet run under Installer).
+  installed icon too (the user's decision, 2026-11-06; `tools/install_check.py`).
+  `release/slaves.sha256` pins the release slave (`make record`).
 - **The real A1200/040 hangs: the original audio stop delay (2026-11-11).** The user's
   hangs (performance mode with the Cache options; every time in a car crash at the first
   corner of Spa; 1–3 s stalls on the title; the original v1.01 slave too; never with
@@ -23,7 +23,7 @@
   race start: the CPU sits in the game's audio stop-path loop, one interrupt every 70 µs,
   for 0.3–2.5 s (slave.md "Audio stop delay"). The user is all but certain this is the
   hang. The slave replaces the loop on a 68020 or faster with a 5-line beam wait; no stall
-  remains in the emulator, and the frame rate is unchanged. Next: the user's test on the
+  remains in the emulator, and the frame rate is unchanged. Not yet tested on the real
   A1200/040.
   **The glitches are the original game's (2026-11-08).** `tools/wall_contact.py` holds
   throttle and full right steering into the wall on 020+Fast with the FR10 slave. With
@@ -36,9 +36,8 @@
   moves about 35 lateral units per 20 ms step (about 175 a tick). So the undivided-impulse
   suspicion is not borne out, and the view swings, bouncing, white strip and red wedge
   of the user's emulator recording (2026-11-07) are the original's crash response and
-  drawing. The lap (020+Fast) and controls
-  (A500+Fast) checks fail because the FR10 layout's demo start reaches such a crash, a
-  fixture problem: they need a start that avoids it.
+  drawing. On the A500 the controls check's demo takeover meets such a contact at the
+  start; the check brakes the car to rest before driving.
 - **Fast RAM rendering (docs/FASTRAM_PLAN.md)** is in the release slave since FR10:
   030-50 BCE 48.9–49.9 FPS against 12.5–25.0 on the Chip path, 040-40 BCE 22.5–31.5.
 - Human playtesting (full races) and real Amiga hardware remain deferred.
@@ -49,17 +48,15 @@ The user's decisions (2026-11-05): concentrate on the 68030 and leave the 68040 
 30–38 FPS on the 030 is a good result. The 040 is slower than the 030 on this path (FR5
 already showed it: 161 against 94 ms per draw, road 67 against 24 ms), the cause is not
 known and it has not been profiled since FR5, so no 040 figure follows from an 030 one.
-Commit each FR step when its gates pass; push only when asked. Production is the FR10
-slave `376d1164…` (1 MiB ExpMem). The hunks already load
+Commit each FR step when its checks pass; push only when asked. Production is the 2.0b
+release slave `0a29050a…` (1 MiB ExpMem). The hunks already load
 into Fast memory (FASTRAM_PLAN "Code and data placement check"); that needs no new look.
 The test matrix has no 060 and no WHDLoad 17.0, and one A500 setup except memory checks.
 
-The current build is the FR10 production slave (`376d1164…`, `tools/fr10_build.py`, with
-`-off` arms and scene fixtures). Next, in order:
+The current build is the 2.0b release slave (`0a29050a…`; `tools/fr10_build.py` makes
+the `-off` arms and scene fixtures). Next, in order:
 
-1. The real-hardware hangs (Where it stands): the user's test of the audio stop fix on the
-   A1200/040. Then the lap and controls fixtures' demo crash (it also ends the 020+Fast
-   `fps` window on the current build), reload, and the season runner's missing exit.
+1. The user's test of the audio stop fix on the real A1200/040 (Where it stands).
 2. FR11 (optional, FASTRAM_PLAN).
 
 Done: FR10, checkpoint and release (2026-11-08; FASTRAM_PLAN "FR10").
