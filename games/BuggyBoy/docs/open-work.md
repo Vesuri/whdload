@@ -133,9 +133,15 @@ checked.
    | the copy aligned | | 1.169 |
    | alloc 1 2 bytes later: the screens longword-aligned | 1.865 | 1.085 |
    | the clear's blits queued to the blitter interrupt, run during the road | 1.864 | 0.993 |
+   | the sky's blits queued at the frame's start, before the logic and the pose | | 0.988 |
+   | of the sky only planes 0 and 2 by the blitter, 1 and 3 by the CPU after the copy (1.3's split) | 1.865 | 0.967 |
 
-   On the 030 that is 34.5 fps, 75 of 137 frames in one field (the a500 is unchanged at
-   5.092). The tick states still match 1.3's for 600 ticks. A CPU access to chip costs
+   On the 030 that is 40.25 fps, 121 of 160 frames in one field (p90 1.038, max 1.113;
+   the a500 is unchanged at 5.092). The tick states still match 1.3's for 600 ticks. All
+   four sky planes by the CPU measured 0.977, the CPU's two before the copy 0.966. The
+   road's copy is slowed while the queue runs: 0.22 fields a frame with all four sky planes
+   queued, against 0.11 alone (the blitter fills a word in 2 cycles, the CPU a longword in
+   one access). A CPU access to chip costs
    about 60 cycles of the 030 (1.2 µs, several bus slots), so the bus has room the CPU
    cannot use: what is left is to make fewer CPU accesses (now per frame about 9,600 by
    the objects, 6,700 by `$448A`, 3,900 by the road copy) or to give

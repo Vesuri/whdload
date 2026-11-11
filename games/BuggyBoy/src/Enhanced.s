@@ -424,18 +424,11 @@ _PL_Queue	PL_START
 		PL_PSS	$4db6,_Level3,2		;move.w $1e(a0),d0; and.w $1c(a0),d0
 		PL_END
 
-_QClear		movem.l	d0-d7/a0-a6,-(sp)
-		move.l	_ProgBase(pc),a5
-	IFD VERIFY
-		lea	_VHorizon(pc),a0
-		move.l	a5,a1
-		add.l	#P_BLOCK+V_HORIZON,a1
-		move.w	(a1),(a0)
-	ENDC
-		move.l	a5,a0
-		add.l	#P_SCREENSEL,a0
-		adda.w	(a0)+,a0
-		move.l	(a0),a6			;the back buffer, as the clear's
+; At the frame's start (the back buffer is free once the swap's field wait
+; is over): the sky's planes 0 and 2, as 1.3's blits, which depend on
+; nothing the frame computes. Planes 1 and 3 are _CpuSky's, as 1.3's.
+_QSky		movem.l	d0/a0-a2/a5-a6,-(sp)
+		bsr.b	.screen
 		move.l	_Work(pc),a2
 		move.l	a2,a1
 		add.l	#W_QUEUE,a1
@@ -449,16 +442,33 @@ _QClear		movem.l	d0-d7/a0-a6,-(sp)
 		moveq	#-1,d0
 		move.l	d0,$44(a2)
 		clr.w	$66(a2)
-		clr.w	$74(a2)			;planes 1 and 3: 0
-		lea	8000(a6),a0
-		bsr.b	.sky
-		lea	24000(a6),a0
-		bsr.b	.sky
-		move.w	d0,$74(a2)		;planes 0 and 2: -1, as 1.3 leaves it
+		move.w	d0,$74(a2)		;planes 0 and 2: -1
 		move.l	a6,a0
 		bsr.b	.sky
 		lea	16000(a6),a0
 		bsr.b	.sky
+		bsr	_QStart
+		movem.l	(sp)+,d0/a0-a2/a5-a6
+		rts
+.sky		move.l	a0,$54(a2)
+		move.w	#SKY_SIZE,$58(a2)
+		bra	_Snap
+.screen		move.l	_ProgBase(pc),a5
+		move.l	a5,a0
+		add.l	#P_SCREENSEL,a0
+		adda.w	(a0)+,a0
+		move.l	(a0),a6			;the back buffer, as the clear's
+		rts
+
+; After the pose: the rest of the clear, its blits added to the queue.
+_QClear		movem.l	d0-d7/a0-a6,-(sp)
+		bsr.b	_QSky\.screen
+	IFD VERIFY
+		lea	_VHorizon(pc),a0
+		move.l	a5,a1
+		add.l	#P_BLOCK+V_HORIZON,a1
+		move.w	(a1),(a0)
+	ENDC
 		lea	_QRec(pc),a0
 		st	(a0)
 		move.l	a5,a0
@@ -469,12 +479,14 @@ _QClear		movem.l	d0-d7/a0-a6,-(sp)
 		bsr.b	_Snap			;the last
 		lea	_QRec(pc),a0
 		sf	(a0)
-		bsr	_QStart
+		lea	$dff000,a0
+		move.w	#$4000,$9a(a0)		;the queue's end against the additions
+		TSTPC	_QBusy
+		bne.b	.running
+		bsr	_QStart			;it had run dry: from the first added
+.running	move.w	#$c000,$9a(a0)
 		movem.l	(sp)+,d0-d7/a0-a6
 		rts
-.sky		move.l	a0,$54(a2)
-		move.w	#SKY_SIZE,$58(a2)
-		bra.b	_Snap
 
 ; The clear's lea $dff000,a2 before the backdrop.
 _BltBase	lea	$dff000,a2
@@ -571,6 +583,33 @@ _Level3		move.w	$1e(a0),d0
 		add.l	#P_L3END,(sp)
 .rts		rts
 
+; The sky's planes 1 and 3 (rows 0 to 83) cleared by the CPU, after the road's
+; copy: measured on the a1200-030, the blitter filling them as well is slower
+; (0.988 fields a frame against 0.967), and the CPU all four too (0.977).
+_CpuSky		movem.l	d0-d1/a0-a1,-(sp)
+		move.l	_ProgBase(pc),a0
+		add.l	#P_SCREENSEL,a0
+		adda.w	(a0)+,a0
+		move.l	(a0),a1
+		lea	8000(a1),a0
+		bsr.b	.plane
+		lea	24000(a1),a0
+		bsr.b	.plane
+		movem.l	(sp)+,d0-d1/a0-a1
+		rts
+.plane		move.w	#84*40/32-1,d0
+		moveq	#0,d1
+.clr		move.l	d1,(a0)+
+		move.l	d1,(a0)+
+		move.l	d1,(a0)+
+		move.l	d1,(a0)+
+		move.l	d1,(a0)+
+		move.l	d1,(a0)+
+		move.l	d1,(a0)+
+		move.l	d1,(a0)+
+		dbf	d0,.clr
+		rts
+
 _QSync		TSTPC	_QBusy
 		bne.b	_QSync
 		rts
@@ -652,6 +691,10 @@ _RaceInit	move.l	a0,-(sp)
 
 ; Replaces the loop's calls of the logic, the road and the clear.
 _PreDraw	movem.l	d0-d7/a0-a6,-(sp)
+		TSTPC	_FastExp
+		beq.b	.nosky
+		bsr	_QSky
+.nosky
 		TSTPC	_Pending
 		beq.b	.due
 		lea	_Pending(pc),a0
@@ -698,10 +741,12 @@ _PreDraw	movem.l	d0-d7/a0-a6,-(sp)
 		move.l	_AddrRoad(pc),a0	;and in chip, as the original
 		jsr	(a0)
 		bsr	_CompareRoad
+		bsr	_CpuSky
 		bsr	_QSync
 		bra	_CompareClear
 	ELSE
 		bsr	_CopyRoad
+		bsr	_CpuSky
 		bra	_QSync
 	ENDC
 

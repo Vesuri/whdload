@@ -282,15 +282,17 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
   back buffer as aligned longwords. The road writes every word of those rows and reads
   only what it wrote in the same row; the VERIFY build draws it both ways each frame and
   compares (`tools/verify.py`: no difference in 801 frames).
-- **The clear queued to the blitter** (with fast ExpMem; `_PL_Queue`). Before the road,
-  `_QClear` records the clear's blits instead of running them: the sky (rows 0 to 83) as
-  4 blits, where 1.3 blits planes 0 and 2 and the CPU clears 1 and 3, then the clear's own
-  code from `$27E` (the horizon step, `$98D2` and `$98DE`, which only the logic reads,
-  and the backdrop, rows 84 to 103, up to 16 blits). `$2D4` gives that code a register
+- **The clear queued to the blitter** (with fast ExpMem; `_PL_Queue`). The clear's blits
+  are recorded instead of run: at the frame's start (the back buffer is free once the
+  swap's field wait is over) `_QSky` queues the sky's planes 0 and 2 (rows 0 to 83, 1.3's
+  two blits); after the pose `_QClear` runs the clear's own code from `$27E` (the horizon
+  step, `$98D2` and `$98DE`, which only the logic reads, and the backdrop, rows 84 to 103,
+  up to 16 blits) and adds its blits, restarting the queue if it ran dry. The CPU clears
+  the sky's planes 1 and 3 after the road's copy, as 1.3 does (`_CpuSky`). `$2D4` gives that code a register
   block in the work area instead of `$DFF000`, and its 16 waits (`$318`–`$5B6`) queue the
   blit set up so far. The blitter interrupt (`$4DB6`, in the level-3 handler, which
   otherwise counts every level-3 interrupt as a field) starts each next blit while the CPU
-  draws the road in fast memory; `_QSync` waits for the last after the road's copy, before
+  runs the logic, the pose and the road in fast memory; `_QSync` waits for the last before
   the objects, the next to use the blitter. All the later blit code sets every register it
   uses. The VERIFY build runs 1.3's clear after the queued one from the same horizon and
-  compares rows 0 to 103 (`tools/verify.py`: no difference in 1240 frames).
+  compares rows 0 to 103 (`tools/verify.py`: no difference in 1317 frames).
