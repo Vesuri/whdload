@@ -9,8 +9,8 @@ are the option "Enhanced framerate" (`CUSTOM2`); without it the game draws at 12
 and every screen outside the race is locked at 12.5 fps either way (1.3's default). A 68000 or 68010 and
 the disk versions run 1.3 unchanged. The 50 fps plan below is at step 4b.
 
-Nothing is released from here. A release needs the plan finished and a ReadMe entry above
-Codetapper's history.
+Nothing is released from here. The ReadMe has the 2.0b entry; a release needs the plan
+finished.
 
 ## 50 fps at the original game speed
 
