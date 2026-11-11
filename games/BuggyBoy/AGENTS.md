@@ -19,5 +19,6 @@ Read `docs/open-work.md` first.
 
 The slave source is `src/` (`BuggyBoyHD.s` with `ReadJoypad.s`; `BuggyBoy.islave.s` is the
 RawDIC imager slave for the disk versions, not assembled here). `game.sh` generates the
-`keyboard.s` the build uses ([development.md](docs/development.md)). There is no `tools/`
-yet: `make serve` and `make server` drive the game.
+`keyboard.s` the build uses ([development.md](docs/development.md)). `tools/` is the
+harness: `buggyboy.py` (the gdb-stub server), `boot.sh`, `route.py`, `bench.py` (the race
+benchmark), `chipprofile.py` and `states.py`.

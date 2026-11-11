@@ -1,7 +1,9 @@
 # Internals
 
-What is known from reading Codetapper's 1.3 slave (`src/BuggyBoyHD.s`) and the installed
-files; nothing here has been traced or measured yet.
+What is known from Codetapper's 1.3 slave (`src/BuggyBoyHD.s`), the installed files and the
+race benchmark ([development.md](development.md), "Benchmark"). All game addresses are
+program offsets: the code hunk of the decrypted `bug.p`, which the shipped slave runs at
+`$400` (runtime address = offset + `$400`).
 
 ## Slave header
 
@@ -45,7 +47,8 @@ Anything else is `TDREASON_WRONGVER`. The installed archive also has a 3392-byte
    0 black, DMACON `$83D0`, then `jsr $400`.
 
 The game's `AllocMem` calls get a bump allocator from `$10000`, cleared, 16-byte aligned.
-Running past `$80000` writes `MEM ERR ` at address 0 and quits.
+Running past `$80000` writes `MEM ERR ` at address 0 and quits. ExpMem is 0 and the stack is
+at the top of BaseMem, so everything, code included, is in the 512 KB of chip memory.
 
 ## Patches (DOS version)
 
@@ -53,7 +56,7 @@ Program offsets (from `$400`).
 
 | Offset | Original | Patch |
 |---|---|---|
-| `$8`, `$24`, `$40`, `$5C` | `AllocMem` calls (67102, 240000, 63702, 57088 bytes) | `jsr _AllocMem` |
+| `$8`, `$24`, `$40`, `$5C` | `AllocMem` calls (67102, 240000, 63072, 57088 bytes; the source comment says 63702) | `jsr _AllocMem` |
 | `$D4` | | `_LoadHighs`: clear the table (`$5D4`), load `BuggyBoy.highs` (640 bytes, XORed with a falling counter) to `$8EA4` |
 | `$5E0` | | `'IAN'` fills the default high-score names |
 | `$1C86`, `$1C8A` | `lea $FFFF824C,a2` (Atari ST palette) | `$DFF18C`, `nop nop` |
@@ -76,14 +79,119 @@ trainer list (commented out in the source).
 
 ## Frame rate control (1.3)
 
-`_CountFrames` counts the routine at `$4DB0`, presumably once per field (unverified).
-`_LockFrameRate`, before the game writes COP1LC, waits until the count reaches N and
-resets it, which caps the game at one frame per N+1 counts:
+`_CountFrames` runs in the level-3 handler, once per field (only VERTB is enabled).
+`_LockFrameRate`, before the game writes COP1LC, waits until the count since the last swap
+reaches N and resets it. The game's own wait for the next field follows the swap, so a frame
+takes at least N fields: the cap is 50/N fps, not the 50/(N+1) the labels assume.
 
-| `CUSTOM2` | N | Label |
+| `CUSTOM2` | N | Label | Cap (measured on the a1200-030) |
+|---|---|---|---|
+| 0 ("Default speed") or above 7 | 4 | 10 fps | 12.5 fps |
+| 1 | 1 | 25 fps | none: the game's own rate (the 1.2 behaviour) |
+| 2 to 7 | `CUSTOM2` | 17, 13, 10, 8, 7, 6 fps | 50/N: 25, 16.7, 12.5, 10, 8.3, 7.1 |
+
+The A500 never reaches the default cap (it draws a race frame in 4.3 to 5.7 fields), so the
+lock changes nothing there. On a fast Amiga the default runs the game at 12.5 frames a
+second, about 39% faster than the A500's 9 in the benchmark window. `CUSTOM2=5` ("8fps") is
+the one that gives 10. The wait is a busy loop on the counter.
+
+## Frames and time
+
+The race loop is `$158`–`$1AC`, once per frame, with no other clock:
+
+| Step | Offset | What |
 |---|---|---|
-| 0 ("Default speed") or above 7 | 4 | 10 fps |
-| 1 to 7 | `CUSTOM2` | 25, 17, 13, 10, 8, 7, 6 fps |
+| 1 | `$153E` | the game logic: input, speed, the road phase, objects, timers, and the road projection `$2352` (below) |
+| 2 | `$6716` | the road: `bra` to `$9D6A`, a CPU renderer |
+| 3 | `$1E2` | clears the back buffer (blitter, then CPU) |
+| 4 | `$33BE` | the objects (CPU-masked sprites, `$3D94`) and blits |
+| 5 | `$448A` | starts with the HUD digits (score, time, speed); more drawing after |
+| 6 | `$2672` | the swap: toggles `$9818` bit 2 (which of the two copper lists in `$670E` shows), the 1.3 lock, COP1LC, then `$4B7C` |
+| 7 | | pause and quit checks, back to step 1 |
 
-So "Default speed" is the same cap as `CUSTOM2=4`; the labels assume 50 counts a second.
-The wait is a busy loop on the counter.
+`$4B7C` waits for the field counter `$66D8` to change. That counter is the only time source
+the game has: the level-3 handler (`$4DAC`) increments it once per field and runs the
+4-channel sound sequencer, and nothing but `$4B7C` reads it. There are no CIA timers or beam
+reads. So every quantity advances once per frame, and game speed is the frame rate:
+
+- The time display `$9922` counts down once every 12 frames (`$9924`).
+- The road phase `$987C` (below) moves per frame by a step from a table.
+- Objects move one depth slice per segment crossed.
+
+The logic is cheap: `$153E` is 2.4% of the A500's time, about 0.13 fields per frame, and
+0.014 fields on the 68030. The drawing is everything else.
+
+### The road and the objects
+
+- **Phase and segments.** Forward motion is a phase `$987C` in units of 1/8 segment, used as
+  0, 2, 4, 6. Each frame (`$185E`) it gains `2 × table[$804C + (speed & $70) + cycle]`, the
+  cycle `$98B4` stepping through 8 entries. At 8 or more it is cleared, not reduced, so the
+  overshoot is lost, and the segment parity `$987A` toggles (the stripe colours) and
+  `$98C0` flags a new slice. `$987E` (phase × 221) and `$9880` (phase and parity × 96) are
+  derived for the renderers.
+- **Speed bands.** The step table gives per-frame steps of 0, 0–2, 0–2, 2, 2–4, 4, 4–8 and 8
+  phase units for the 8 bands: in the top bands the world moves a whole segment every
+  frame, the phase stays 0, and motion is shown only by the objects stepping a slice and the
+  stripes swapping.
+- **Road slices.** The road is 14 perspective slices; `$7DAA` holds their row counts for each
+  of the 4 phases (16 bytes a phase; the last slices grow from 7 to 25 rows). `$2352`
+  builds the per-row table at `$9B22`–`$9CC9` from them, the per-segment curves at
+  `$9942` and the lateral position `$9890` (which steps by 2 or 4 per frame). The road
+  renderer draws 96 + 5 rows from that table, every row, every plane, with `move.w`.
+- **Objects** are codes in 32-byte slice rows from about `$9980`, one row per depth slice;
+  they shift a row when a new slice starts. The object routine draws each at the position
+  and pre-scaled size of its slice.
+- **State block.** The logic writes `$9860`–`$9D6F` (1.3 KB; also `$8E70`) and the drawing
+  reads it. The drawing writes some too: the object routine `$8B40`–`$8B4F`,
+  `$8E70`–`$8E8F`, `$9880`–`$989F`, `$98D0`–`$98EF` and `$9930`; `$448A` `$8E70`–`$8E8F` and
+  `$9920`–`$992F`; the clear `$98D0`–`$98DF`. Some of it is game logic: `$41E2`, inside the
+  object routine, sets `$9930` to 30 or 60 when the lateral position passes ±280 and clears
+  `$98EE`.
+
+## Memory and DMA
+
+From the benchmark's chip-bus records:
+
+| Memory | Pointer | Requested | DMA | CPU per field (030) |
+|---|---|---|---|---|
+| program `$0`–`$AFFF` | | (no type in the hunk) | none | code and state |
+| alloc 1, 67102 bytes | `$265A` | chip | copper list, both screens (4 planes of 8000 bytes), blitter C and D | 3,700 reads, 9,400 writes |
+| alloc 2, 240000 bytes (`graphics`) | `$982E` | chip | blitter A, B, C sources | 840 reads |
+| alloc 3, 63072 bytes (COURSES.DAT) | `$9822` | public | none | 70 reads |
+| alloc 4, 57088 bytes | `$982A` | chip | audio | 1,100 reads (the road's source) |
+| stack, top of BaseMem | | | none | 190 reads, 190 writes |
+
+The game asks for chip only where DMA needs it; only the slave's single BaseMem puts the
+program, COURSES.DAT and the stack in chip as well. No DMA in the benchmark window reads
+the program, so the program can run from fast memory (the experiment in
+[development.md](development.md)); other screens (title, menus, name entry) are not yet
+checked.
+
+## Performance
+
+The race benchmark's 200-field window (Offroad, joystick up), cycle-exact traces; the 68030
+without its MMU (WHDLoad does not use it without its `MMU` option, so the cache state is the
+same). Work per frame excludes the waits.
+
+| Machine | Slave, options | fps | Fields per frame | Work per frame, fields: median (min–max) |
+|---|---|---:|---|---|
+| a500 | 1.3, default | 9.00 | 5 ×14, 6 ×21 | 5.09 (4.34–5.69) |
+| a1200 | 1.3, `CUSTOM2=1` | 12.50 | 4 | 3.57 (3.18–4.01) |
+| a1200 | 1.3, `CUSTOM2=1`, `CACHE` | 24.00 | 2 ×86, 3 ×9 | 1.74 (1.46–2.12) |
+| a1200-030 | 1.3, default | 12.50 | 4 | 3.12 (2.74–3.44) |
+| a1200-030 | 1.3, default, `CACHE` | 12.50 | 4 | 1.75 (1.52–1.94) |
+| a1200-030 | 1.3, `CUSTOM2=1` | 13.25 | 3 ×12, 4 ×40 | 3.12 (2.74–3.44) |
+| a1200-030 | 1.3, `CUSTOM2=1`, `CACHE` | 25.00 | 2 | 1.60 (1.36–1.94) |
+| a1200-030 | program in fast, I and D caches, `CUSTOM2=1` | 25.00 | 2 | 1.34 (1.15–1.72) |
+
+- **Caches are off** on the 68020 and 68030: the slave sets no cache policy and WHDLoad
+  without the MMU then disables both. The instruction cache alone (`CACHE`) halves the
+  work on both CPUs; no glitch was seen.
+- **The chip bus decides.** The 68020/14 and the 68030/50 are within 10% of each other.
+  With the program in fast memory, the work splits per frame: road 0.41 fields, objects
+  0.40, `$448A` 0.31, clear 0.23, logic 0.01. What remains is the CPU's chip accesses to the
+  screens (about 26,000 a frame: 18,800 writes, 7,400 reads, at about 30 cycles each) and
+  reads of the graphics in alloc 2 and 4 (about 4,000).
+- **Word-wide drawing.** The road writes `move.w` (about 8,200 a frame); the object
+  plotter does `and.l`/`or.l` at word-aligned addresses, two bus accesses each on a
+  32-bit chip bus. Long-aligned 32-bit writes would halve the road's accesses.
