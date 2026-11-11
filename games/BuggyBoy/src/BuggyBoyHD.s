@@ -394,12 +394,12 @@ _CountFrames	lea	_FrameCounter(pc),a0
 		lea	$dff000,a0		;Stolen code
 		rts
 
-; 10 fps: at least 5 fields from swap to swap (the game's own wait for the
-; next field follows). 1.3 took N from CUSTOM2 (default 4, 12.5 fps); in 2.0b
-; CUSTOM2 is the Enhanced framerate switch (Enhanced.s), and the game's logic
-; runs at 10 Hz everywhere.
+; 12.5 fps: at least 4 fields from swap to swap (the game's own wait for the
+; next field follows), 1.3's default. 1.3 took N from CUSTOM2; in 2.0b CUSTOM2
+; is the Enhanced framerate switch (Enhanced.s), and the game's logic runs at
+; 12.5 Hz everywhere.
 _LockFrameRate	movem.l	d0-d1/a0,-(sp)
-		moveq	#5,d1
+		moveq	#4,d1
 		lea	_FrameCounter(pc),a0
 .DelayLoop	move.w	(a0),d0			;Check we've reached the
 		cmp.w	d1,d0			;correct frame number

@@ -235,13 +235,13 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
   since those CPUs slow down on cacheable chip accesses. The 68060 also gets the branch
   cache and superscalar dispatch.
 - **The frame rate option** (`C2:B:Enhanced framerate`, `CUSTOM2`) replaces 1.3's list.
-  The game's logic runs at 10 Hz on every machine and with either setting:
-  `_LockFrameRate` waits for 5 fields from swap to swap (1.3's N fixed at 5) on every
+  The game's logic runs at 12.5 Hz on every machine and with either setting:
+  `_LockFrameRate` waits for 4 fields from swap to swap (1.3's default N, now fixed) on every
   screen outside the race, and in the race on the 68000 and 68010 and without an ExpMem.
   In the fixed tick, `CUSTOM2` non-zero draws the frames between ticks (as many as the
   machine manages); zero makes `_PreDraw` wait until the next tick is due, so every frame
-  is a tick frame: 10 fps, the same logic and drawing sequence. 1.3's default (N = 4) ran a
-  fast Amiga's game at 12.5 Hz.
+  is a tick frame: 12.5 fps, the same logic and drawing sequence. A 10 Hz tick (5 fields)
+  was tried first; the race timer counted down too slowly at it.
 - **Program base.** The level-3 vector `$6C` holds the base + `$4DAC`. On the a1200-030
   setup the base is `$980000` (`$960000` in the VERIFY build).
 
@@ -254,15 +254,15 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
 | `$138` | `lea $DFF000,a0` (race setup, on every way into the loop) | `_RaceInit`: the first pass runs the logic, and a tick is due at once |
 | `$158` | `bsr $153E` (logic), `bsr $6716` (road), `bsr $1E2` (clear) | `_PreDraw`, then the road and the clear |
 | `$16C` | `bsr $2672` (swap), `tst.w $9874` | `_PostDraw` |
-| `$2682` | (1.3's lock) | `_SetCop`: no wait in the race loop's swap; the 10 fps lock everywhere else |
+| `$2682` | (1.3's lock) | `_SetCop`: no wait in the race loop's swap; the 12.5 fps lock everywhere else |
 
-- **The tick** is due every 5 fields of the game's field counter `$66D8`. A frame that
+- **The tick** is due every 4 fields of the game's field counter `$66D8`. A frame that
   starts when a tick is due is a *tick frame*: it draws the committed state, writes and all,
   as the original drew after each logic step, and the logic runs at the start of the next
   frame. A tick frame more than a tick late starts the count again. So the logic and the
   drawing's writes to game state happen in exactly the original order, once per tick; the
-  state at each logic step is byte-identical to 1.3's at `CUSTOM2=5` (10 Hz) over 600
-  ticks of the benchmark route.
+  state at each logic step is byte-identical to 1.3's at its default lock over 599 ticks
+  of the benchmark route on the a1200-030 (and with the first, 10 Hz tick against `CUSTOM2=5`).
 - **A frame between ticks** saves the state, sets a pose, draws, and restores the state
   before the swap; then it goes straight back to the loop's start, so the checks after the
   swap (race end `$9874`, the right button, the left button's delay) run on tick frames
@@ -273,8 +273,8 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
   (`tools/verify.py`); nothing else changes but what the level-3 handler writes (`$66D8`,
   the sound channels `$4EDC`–`$4F13`).
 - **The pose** (`_Pose`). The logic step after a tick frame saves the state first (S_prev,
-  the state that frame showed); the live state is then S_next. A frame n fields (1 to 4)
-  after the tick frame's due field shows n/5 of the way from S_prev to S_next:
+  the state that frame showed); the live state is then S_next. A frame n fields (1 to 3)
+  after the tick frame's due field shows n/4 of the way from S_prev to S_next:
   - forward: the position is phase plus segment. A tick moves it at most one segment,
     since a crossing clears the phase. The position is rounded to the renderers' even
     phases. Before the crossing the frame uses S_prev's state with that phase, after it
@@ -283,7 +283,7 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
     Steering moves it by up to ±60 a tick at speed (the step table at `$810C`: steering
     state × 8 + speed / 16), plus the curve's drift.
   - the projection `$2352` is run again, for the row tables.
-  - horizon `$98DE`: set so that the clear's step (`$98DC` × `$98DA`) lands n/5 of the
+  - horizon `$98DE`: set so that the clear's step (`$98DC` × `$98DA`) lands n/4 of the
     way, wrapped to 0–639.
 
   A backward phase in the same segment (a new race) shows S_next unchanged. Objects, the

@@ -11,7 +11,7 @@
 ;   step; a frame between ticks saves the state, draws, and restores it, so
 ;   the game state sees exactly the original sequence of logic and drawing.
 ;   The frames between ticks need the Enhanced framerate option (CUSTOM2);
-;   without it each frame waits for its tick: 10 fps.
+;   without it each frame waits for its tick: 12.5 fps.
 ;
 ; Offsets P_* are program offsets (docs/internals.md).
 ;---------------------------------------------------------------------------*
@@ -49,7 +49,7 @@ EXPSIZE		= $10000+EXP_WORK+W_SIZE+EXP_STACK	;ws_ExpMem (optional)
 		FAIL	"ws_ExpMem must be a multiple of $1000 (WHDLoad: slave is illegal)"
 	ENDC
 
-TICK		= 5				;fields per logic tick (10 Hz)
+TICK		= 4				;fields per logic tick (12.5 Hz, 1.3's default lock)
 LAT_MAX		= 128				;a larger lateral change per tick is a jump (steering
 						;moves it up to 60 a tick, $810c, plus the drift)
 
@@ -969,7 +969,7 @@ _RaceInit	move.l	a0,-(sp)
 _PreDraw	movem.l	d0-d7/a0-a6,-(sp)
 		move.l	_Custom2(pc),d0		;Enhanced framerate
 		bne.b	.free
-		move.l	_ProgBase(pc),a0	;off: every frame a tick frame (10 fps)
+		move.l	_ProgBase(pc),a0	;off: every frame a tick frame (12.5 fps)
 .cap		move.w	P_FIELDS(a0),d0
 		sub.w	_NextTick(pc),d0
 		bmi.b	.cap

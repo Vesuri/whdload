@@ -2,11 +2,11 @@
 
 `src/` is Codetapper's 1.3 with the start of 2.0b (`$VER: slave 2.0b (11.11.2026)`): on a
 68020 or better the slave enables the caches and, when the ExpMem is fast memory, runs the
-program, COURSES.DAT and the stack from it. The race runs its logic on a fixed 10 Hz tick
+program, COURSES.DAT and the stack from it. The race runs its logic on a fixed 12.5 Hz tick
 and draws as often as the machine manages, with each frame interpolated between the last
 two ticks (`src/Enhanced.s`; [internals.md](internals.md), "2.0b"). The frames between ticks
-are the option "Enhanced framerate" (`CUSTOM2`); without it the game draws at 10 fps,
-and every screen outside the race is locked at 10 fps either way. A 68000 or 68010 and
+are the option "Enhanced framerate" (`CUSTOM2`); without it the game draws at 12.5 fps,
+and every screen outside the race is locked at 12.5 fps either way (1.3's default). A 68000 or 68010 and
 the disk versions run 1.3 unchanged. The 50 fps plan below is at step 4b.
 
 Nothing is released from here. A release needs the plan finished and a ReadMe entry above
@@ -51,17 +51,17 @@ Every other machine must run at least as well as before.
 
 ### Decisions (11.11.2026)
 
-1. **The game runs at 10 Hz**: one logic tick every 5 fields. That is the A500's best case
-   in the benchmark window and 1.3's `CUSTOM2=5`. 1.3's default (12.5 Hz on a fast Amiga)
-   and the A500's whole-lap average were the other candidates.
+1. **The game runs at 12.5 Hz**: one logic tick every 4 fields, 1.3's default lock on a fast
+   Amiga. 10 Hz (1.3's `CUSTOM2=5`, the A500's best case in the benchmark window) was the
+   first choice, but the race timer counted down too slowly at it (changed 11.11.2026).
 2. **Interpolation**, not prediction: each drawn frame shows a pose between the last two
-   ticks, so the picture is one tick (100 ms) behind the logic.
+   ticks, so the picture is one tick (80 ms) behind the logic.
 3. **The slave enables the caches** where they apply, instead of leaving them to WHDLoad's
    `Cache`/`DCache` options.
 
 ### Design
 
-1. **Fixed tick.** Run the race loop's logic (`$153E`) once per tick of 5 fields.
+1. **Fixed tick.** Run the race loop's logic (`$153E`) once per tick of 4 fields.
    The drawing runs every field, or every second field where one field is not enough. A
    frame longer than a tick delays the tick, as the original does; catch-up is not needed
    for the 030.
@@ -104,14 +104,14 @@ checked.
    the interpolation once they exist (it draws in 1.74 fields, so about 25 fps). The
    program moves only when the ExpMem is fast memory.
 2. **Fixed tick.** Done. The state at each logic step is byte-identical to 1.3's at
-   `CUSTOM2=5` for 600 ticks of the route (`AT=153E tools/states.py`); the race timer
-   counts at 1.3's 10 Hz rate.
+   its default lock for 599 ticks of the route on the a1200-030 (`AT=153E tools/states.py`,
+   one tick later in the recording); the first, 10 Hz tick matched `CUSTOM2=5` the same way.
 3. **Save and restore around frames between ticks.** Done. The VERIFY build finds nothing
    changed after 962 such frames (`tools/verify.py`).
 4. **Presentation pose** (design 3).
    - **4a, within the renderers' 4 phases.** Done: forward position (with the segment
      crossing), lateral and horizon interpolated, the projection re-run. On the 030 the
-     drawn phase steps every second frame where 1.3 at 10 Hz jumps every frame, and the
+     drawn phase steps every second frame where 1.3 at 10 Hz jumps every frame (measured with the 10 Hz tick), and the
      lateral position moves every frame. Measured, 200-field window, default options:
 
      | Machine | fps | Logic steps | Work per frame, median (fields) |
@@ -142,8 +142,7 @@ checked.
      numbers; each needs its in-between entries derived from what it encodes. Contact sheets per field around
      segment crossings and in the top speed band, where a tick moves a whole segment and
      only 2 or 3 of the 4 phases can show between ticks.
-   - Open: the menus and the start sequence still use 1.3's lock (12.5 Hz on a fast
-     Amiga); measure the A500's rate on them.
+   - The menus and the start sequence use 1.3's default lock (12.5 Hz), as the race tick.
 5. **Drawing cost** to under one field on the 030. In progress; 200-field window, default
    options, work per frame median (fields):
 
@@ -195,12 +194,13 @@ checked.
 6. **Matrix and release.** a500 and a1200 without fast memory: 1.3's behaviour. a1200-fast,
    a1200-030, 040 and 060: functional and measured. A ReadMe entry, then package.
    - **The option** is done: `C2:B:Enhanced framerate` replaced 1.3's frame rate list
-     ([internals.md](internals.md), "2.0b"). 200-field window: a1200-030 50.00 fps with it,
-     10.00 without (5 fields a frame); a500 9.00 (1.3: 9.00).
+     ([internals.md](internals.md), "2.0b"). 200-field window, 12.5 Hz tick: a1200-030 50.00
+     fps with it (median 0.855 fields a frame), 12.50 without (4 fields a frame); a1200
+     24.75 with it; a500 9.00 (1.3: 9.00).
    - **Steering** is interpolated: the pose took a lateral change over 16 a tick for a jump,
      but steering moves it up to 60, so it moved once a tick. With 128 the road's edge moves
      every field while steering (per-field sheets, `+JOY2_LEFT` in the race).
-   - **Matrix** (200-field window, `CUSTOM2=1`, before the option existed: the same path).
+   - **Matrix** (200-field window, with the 10 Hz tick, before the option existed: the same path as it on).
      All draw the race correctly, with the same game state at field 3000:
 
      | Setup | fps | Work per frame, median (fields) |

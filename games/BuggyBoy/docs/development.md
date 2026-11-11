@@ -57,7 +57,7 @@ Under `WARP=1` both machines are in the attract sequence by 10 to 18 s: the cour
 (T1 Offroad to T5 South) and the high-score table. `SLAVE=original` boots the shipped 1.3.
 `WHD_ARGS=BUTTONWAIT` holds the title picture; `CUSTOM1` (trainer), `CUSTOM2` (frame rate)
 and `CUSTOM3` (CD32 pad) are the slave's options ([internals.md](internals.md)). In 2.0b
-`CUSTOM2=1` is Enhanced framerate: without it the race draws at 10 fps, so benchmark 2.0b's
+`CUSTOM2=1` is Enhanced framerate: without it the race draws at 12.5 fps, so benchmark 2.0b's
 frame rate with `WHD_ARGS=CUSTOM2=1`. For 1.3 (`SLAVE=original`) `CUSTOM2` is still the list.
 
 ## Benchmark
@@ -89,7 +89,7 @@ SETUP=a1200-030 PROG_BASE=auto EXTRA_ARGS=--uae_mmu_model=0 WHD_ARGS="CUSTOM2=1"
 - `tools/states.py N OUT.npy`, on a server stopped in a race, records the state block
   (`$9860`–`$9D6F`) at the swap for N frames, with the fields between them. `AT=153E`
   records at the logic instead: once per tick in 2.0b, comparable with 1.3 at
-  `CUSTOM2=5` (`SLAVE=original`). Compare only `$9860`–`$9D69`; the rest is code with
+  1.3's default lock (`SLAVE=original`, no `CUSTOM2`). Compare only `$9860`–`$9D69`; the rest is code with
   relocated addresses. A recording that runs past the race's end waits for ever. The
   first logic step recorded depends on where the route's 100 fields end against the tick:
   compare at offsets of a tick or two (at 50 fps 2.0b's tick *i* is 1.3's *i* + 1).
