@@ -32,7 +32,13 @@ on 040 (`tools/attic/ff1_gates.py`) were retired on 2026-11-11: their B8-PAL ref
 and fixture sources were local, are gone, and their builder needs its own output.
 
 Feature checks run when a source file they cover changes, and all of them run
-for a release:
+for a release.
+The release installer is checked by hand: `tools/install_check.py serve` boots
+`tools/install_run.sh` (Workbench 2.04's system files, WHDLoad's tools and Installer
+43.3; the newest `dist/` archive unpacked on DH1:, an empty DH2:, and in DF0 a disk named
+ff1 with the game's files), then `pointer`, `click X Y` and `shot` walk the dialogs; the
+installed drawer is `tmp/run/install/.run/dh2/` on the host.
+The feature checks:
 
 - memory layouts, the only check that uses several A500 or chip-only setups
 - 030 with WHDLoad's MMU option and data cache, and 040 with the MMU
