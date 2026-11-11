@@ -29,7 +29,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Powerdrome Enhanced | Galahad/Fairlight | [2.0b (10.11.2026)](https://github.com/Vesuri/whdload/releases/tag/PowerdromeEnhanced-2.0b-20261110) |
 | Prince of Persia Enhanced | JOTD | released upstream as JOTD's 5.2 (24.10.2026) |
 | Red Baron Enhanced | JOTD | [3.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/RedBaronEnhanced-3.0b-20261013) |
-| Road Rash Enhanced | JOTD | [3.0b (10.11.2026)](https://github.com/Vesuri/whdload/releases/tag/RoadRashEnhanced-3.0b-20261110) |
+| Road Rash Enhanced | JOTD | [3.0b (11.11.2026)](https://github.com/Vesuri/whdload/releases/tag/RoadRashEnhanced-3.0b-20261111) |
 | Robinson's Requiem Enhanced | CFou! | not yet released |
 | Star Wars Enhanced | StingRay | not yet released |
 | Stellar 7 Enhanced | Psygore | [2.0b (07.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Stellar7Enhanced-2.0b-20261107) |
