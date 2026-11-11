@@ -18,7 +18,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Battlehawks 1942 Enhanced | Galahad/Fairlight | [2.0b (09.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Battlehawks1942Enhanced-2.0b-20261109) |
 | Encounter Enhanced | JOTD | not yet released |
 | Ferrari Formula One Enhanced | StingRay | not yet released |
-| Formula One Grand Prix Enhanced | Codetapper | [2.0b (02.11.2026)](https://github.com/Vesuri/whdload/releases/tag/FormulaOneGrandPrixEnhanced-2.0b-20261102) |
+| Formula One Grand Prix Enhanced | Codetapper | [2.0b (11.11.2026)](https://github.com/Vesuri/whdload/releases/tag/FormulaOneGrandPrixEnhanced-2.0b-20261111) |
 | Grand Prix Circuit Enhanced | JOTD | [2.0b (14.10.2026)](https://github.com/Vesuri/whdload/releases/tag/GrandPrixCircuitEnhanced-2.0b-20261014) |
 | Gunship Enhanced | JOTD | not yet released |
 | Hard Drivin' Enhanced | JOTD | [4.0b (06.11.2026)](https://github.com/Vesuri/whdload/releases/tag/HardDrivinEnhanced-4.0b-20261106) |
