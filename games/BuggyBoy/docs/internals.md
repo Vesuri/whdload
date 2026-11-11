@@ -10,7 +10,8 @@ program offsets: the code hunk of the decrypted `bug.p`, which the shipped slave
 
 `ws_Version` 17, flags `WHDLF_NoError|WHDLF_EmulTrap`, `ws_BaseMemSize` `$80000` (512 KB,
 the whole game in chip memory), no ExpMem, no Kickstart: a direct slave. Quit key `$59`
-(F10). `ws_config`: `C1` trainer ("Infinite Time"), `C2` frame rate (below), `C3` CD32
+(F10). `ws_config`: `C1` trainer ("Infinite Time"), `C2` frame rate (below; in 2.0b the
+Enhanced framerate switch, "2.0b"), `C3` CD32
 joypad, `BW` button wait. `resload_Control` reads `CUSTOM1`–`CUSTOM3` and `BUTTONWAIT`,
 but nothing tests `CUSTOM1`, and `_SetCheat`, which would stop the high-score save, is never
 called.
@@ -80,6 +81,8 @@ trainer list (commented out in the source).
 
 ## Frame rate control (1.3)
 
+1.3's option, as imported; 2.0b replaced it ("2.0b", "The frame rate option").
+
 `_CountFrames` runs in the level-3 handler, once per field (only VERTB is enabled).
 `_LockFrameRate`, before the game writes COP1LC, waits until the count since the last swap
 reaches N and resets it. The game's own wait for the next field follows the swap, so a frame
@@ -137,7 +140,7 @@ The logic is cheap: `$153E` is 2.4% of the A500's time, about 0.13 fields per fr
 - **Road slices.** The road is 14 perspective slices; `$7DAA` holds their row counts for each
   of the 4 phases (16 bytes a phase; the last slices grow from 7 to 25 rows). `$2352`
   builds the per-row table at `$9B22`–`$9CC9` from them, the per-segment curves at
-  `$9942` and the lateral position `$9890` (which steps by 2 or 4 per frame). The road
+  `$9942` and the lateral position `$9890` (which steps by up to ±60 per frame when steering). The road
   renderer draws 96 + 5 rows from that table, every row, every plane, with `move.w`.
 - **Objects** are codes in 32-byte slice rows from about `$9980`, one row per depth slice;
   they shift a row when a new slice starts. The object routine draws each at the position
@@ -231,6 +234,14 @@ start, `_AllocMem`, and `_LoadHighs` made relative to the program base.
   anyway. On a 68040 or 68060 with the program in fast memory BaseMem is non-cacheable,
   since those CPUs slow down on cacheable chip accesses. The 68060 also gets the branch
   cache and superscalar dispatch.
+- **The frame rate option** (`C2:B:Enhanced framerate`, `CUSTOM2`) replaces 1.3's list.
+  The game's logic runs at 10 Hz on every machine and with either setting:
+  `_LockFrameRate` waits for 5 fields from swap to swap (1.3's N fixed at 5) on every
+  screen outside the race, and in the race on the 68000 and 68010 and without an ExpMem.
+  In the fixed tick, `CUSTOM2` non-zero draws the frames between ticks (as many as the
+  machine manages); zero makes `_PreDraw` wait until the next tick is due, so every frame
+  is a tick frame: 10 fps, the same logic and drawing sequence. 1.3's default (N = 4) ran a
+  fast Amiga's game at 12.5 Hz.
 - **Program base.** The level-3 vector `$6C` holds the base + `$4DAC`. On the a1200-030
   setup the base is `$980000` (`$960000` in the VERIFY build).
 
@@ -243,7 +254,7 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
 | `$138` | `lea $DFF000,a0` (race setup, on every way into the loop) | `_RaceInit`: the first pass runs the logic, and a tick is due at once |
 | `$158` | `bsr $153E` (logic), `bsr $6716` (road), `bsr $1E2` (clear) | `_PreDraw`, then the road and the clear |
 | `$16C` | `bsr $2672` (swap), `tst.w $9874` | `_PostDraw` |
-| `$2682` | (1.3's lock) | `_SetCop`: no wait in the race loop's swap; 1.3's lock everywhere else |
+| `$2682` | (1.3's lock) | `_SetCop`: no wait in the race loop's swap; the 10 fps lock everywhere else |
 
 - **The tick** is due every 5 fields of the game's field counter `$66D8`. A frame that
   starts when a tick is due is a *tick frame*: it draws the committed state, writes and all,
@@ -268,7 +279,9 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
     since a crossing clears the phase. The position is rounded to the renderers' even
     phases. Before the crossing the frame uses S_prev's state with that phase, after it
     S_next's. `$987E` and `$9880` are derived again from it.
-  - lateral `$9890`: interpolated, unless it changed by more than 16 in the tick.
+  - lateral `$9890`: interpolated, unless it changed by more than 128 in the tick (a jump).
+    Steering moves it by up to ±60 a tick at speed (the step table at `$810C`: steering
+    state × 8 + speed / 16), plus the curve's drift.
   - the projection `$2352` is run again, for the row tables.
   - horizon `$98DE`: set so that the clear's step (`$98DC` × `$98DA`) lands n/5 of the
     way, wrapped to 0–639.

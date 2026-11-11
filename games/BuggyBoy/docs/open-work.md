@@ -4,7 +4,9 @@
 68020 or better the slave enables the caches and, when the ExpMem is fast memory, runs the
 program, COURSES.DAT and the stack from it. The race runs its logic on a fixed 10 Hz tick
 and draws as often as the machine manages, with each frame interpolated between the last
-two ticks (`src/Enhanced.s`; [internals.md](internals.md), "2.0b"). A 68000 or 68010 and
+two ticks (`src/Enhanced.s`; [internals.md](internals.md), "2.0b"). The frames between ticks
+are the option "Enhanced framerate" (`CUSTOM2`); without it the game draws at 10 fps,
+and every screen outside the race is locked at 10 fps either way. A 68000 or 68010 and
 the disk versions run 1.3 unchanged. The 50 fps plan below is at step 4b.
 
 Nothing is released from here. A release needs the plan finished and a ReadMe entry above
@@ -86,7 +88,10 @@ checked.
 0. **Harness.** Record the race state per tick with `tools/states.py`. Add a VERIFY switch
    that logs each tick, and a check that two runs give the same tick sequence. Still open:
    check DMA on the other screens (title, course select, name entry, game over) with the
-   program in fast memory; the title, the course select and the race draw correctly.
+   program in fast memory; the title, the course select and the race draw correctly. The route
+   plays Offroad only: on the course select, joystick directions held 10 to 40 fields
+   through the harness did not move the selection (fire works; the game reads port 1,
+   `$DFF00C`, edge-detected at `$2502`), so the other four courses are not measured.
 1. **Slave skeleton.** Done. Measured in the 200-field window with `CUSTOM2=1`:
 
    | Machine | fps | Work per frame, median (fields) | Before |
@@ -118,7 +123,23 @@ checked.
      The pose costs about 0.11 fields on the 030 (1.178 without it).
    - **4b, finer than 4 phases.** Next. Phase tables in between the 4 for the slice
      heights (`$7DAA`), the object positions (`$76B0` + phase × 221 bytes) and the curve
-     shift in `$2352`; objects between their slices. Contact sheets per field around
+     shift in `$2352`; objects between their slices. Every reader of the phase (`$987C`)
+     in the drawing, from the disassembly:
+
+     | Offset | Use |
+     |---|---|
+     | `$2362` | the curve shift, (6 − phase) / 2 |
+     | `$244E` | table `$81AA` + (phase & 6) × 8 |
+     | `$3502`, `$39A4`, `$39B4` | `and #4`: the segment's second half (odd phases fit as they are) |
+     | `$35D4` | `mulu`: linear in the phase (odd phases fit) |
+     | `$3AB4` | table `$81EA` + phase (words) |
+     | `$3D16` | table `$824A` + phase × 2 |
+     | `$3D3C` | phase / 2, a byte index (`$3D42`) |
+     | `$1392`, `$13EC`, `$3536`, `$39F4` | phase × 221 (`$987E`): the object tables |
+     | `$9D8A` | the road's stripes, (parity + phase) × 96 (`$9880`) |
+
+     Some tables hold screen offsets (row × 40 + column), which do not interpolate as
+     numbers; each needs its in-between entries derived from what it encodes. Contact sheets per field around
      segment crossings and in the top speed band, where a tick moves a whole segment and
      only 2 or 3 of the 4 phases can show between ticks.
    - Open: the menus and the start sequence still use 1.3's lock (12.5 Hz on a fast
@@ -172,8 +193,25 @@ checked.
    - the CPU sprite plotter long-aligned, or by the blitter;
    - fast-memory copies of the graphics the CPU reads.
 6. **Matrix and release.** a500 and a1200 without fast memory: 1.3's behaviour. a1200-fast,
-   a1200-030, 040 and 060: functional and measured. A ReadMe entry and the option, then
-   package.
+   a1200-030, 040 and 060: functional and measured. A ReadMe entry, then package.
+   - **The option** is done: `C2:B:Enhanced framerate` replaced 1.3's frame rate list
+     ([internals.md](internals.md), "2.0b"). 200-field window: a1200-030 50.00 fps with it,
+     10.00 without (5 fields a frame); a500 9.00 (1.3: 9.00).
+   - **Steering** is interpolated: the pose took a lateral change over 16 a tick for a jump,
+     but steering moves it up to 60, so it moved once a tick. With 128 the road's edge moves
+     every field while steering (per-field sheets, `+JOY2_LEFT` in the race).
+   - **Matrix** (200-field window, `CUSTOM2=1`, before the option existed: the same path).
+     All draw the race correctly, with the same game state at field 3000:
+
+     | Setup | fps | Work per frame, median (fields) |
+     |---|---:|---:|
+     | a3000 | 38.50 | 0.971 (44 of 153 frames over 1) |
+     | a1200-fast | 25.00 | 1.302 |
+     | a500-020 | 25.00 | 1.566 |
+     | a1200-040, a1200-060 | not measured | |
+
+     Open: 1.3 on the a3000, a1200-fast and a500-020 for comparison; the 040 and 060 need a
+     frame count without the cycle tracer, which records nothing on them.
 
 ## Other candidates
 

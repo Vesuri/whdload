@@ -10,6 +10,8 @@
 ;   frame draws the committed state, as the original did after each logic
 ;   step; a frame between ticks saves the state, draws, and restores it, so
 ;   the game state sees exactly the original sequence of logic and drawing.
+;   The frames between ticks need the Enhanced framerate option (CUSTOM2);
+;   without it each frame waits for its tick: 10 fps.
 ;
 ; Offsets P_* are program offsets (docs/internals.md).
 ;---------------------------------------------------------------------------*
@@ -48,7 +50,8 @@ EXPSIZE		= $10000+EXP_WORK+W_SIZE+EXP_STACK	;ws_ExpMem (optional)
 	ENDC
 
 TICK		= 5				;fields per logic tick (10 Hz)
-LAT_MAX		= 16				;a larger lateral change per tick is a jump
+LAT_MAX		= 128				;a larger lateral change per tick is a jump (steering
+						;moves it up to 60 a tick, $810c, plus the drift)
 
 P_SETUP		= $138				;race setup: lea $dff000,a0 (every way in)
 P_LOOP		= $158				;the race loop
@@ -964,6 +967,13 @@ _RaceInit	move.l	a0,-(sp)
 
 ; Replaces the loop's calls of the logic, the road and the clear.
 _PreDraw	movem.l	d0-d7/a0-a6,-(sp)
+		move.l	_Custom2(pc),d0		;Enhanced framerate
+		bne.b	.free
+		move.l	_ProgBase(pc),a0	;off: every frame a tick frame (10 fps)
+.cap		move.w	P_FIELDS(a0),d0
+		sub.w	_NextTick(pc),d0
+		bmi.b	.cap
+.free
 		TSTPC	_FastExp
 		beq.b	.nosky
 		bsr	_QSky

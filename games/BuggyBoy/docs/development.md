@@ -56,7 +56,9 @@ make server CMD='wait 18'; make server CMD='shot tmp/shots/x.png'; make server C
 Under `WARP=1` both machines are in the attract sequence by 10 to 18 s: the course select
 (T1 Offroad to T5 South) and the high-score table. `SLAVE=original` boots the shipped 1.3.
 `WHD_ARGS=BUTTONWAIT` holds the title picture; `CUSTOM1` (trainer), `CUSTOM2` (frame rate)
-and `CUSTOM3` (CD32 pad) are the slave's options ([internals.md](internals.md)).
+and `CUSTOM3` (CD32 pad) are the slave's options ([internals.md](internals.md)). In 2.0b
+`CUSTOM2=1` is Enhanced framerate: without it the race draws at 10 fps, so benchmark 2.0b's
+frame rate with `WHD_ARGS=CUSTOM2=1`. For 1.3 (`SLAVE=original`) `CUSTOM2` is still the list.
 
 ## Benchmark
 
