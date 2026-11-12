@@ -44,7 +44,8 @@ def _opkind(t, pc, cache):
 
 
 class ChipReduction:
-    def __init__(self):
+    def __init__(self, map_pc=None):
+        self.map_pc = map_pc                 # copy PC -> chip PC for the Enhanced copy (not saved)
         self.ctx = {}                        # (top, func) -> id
         self.cycles = collections.Counter()  # id -> CPU cycles
         self.acc = collections.Counter()     # (id, kind) -> chip accesses; kind code/read/write
@@ -68,6 +69,7 @@ class ChipReduction:
     def feed(self, trace):
         t = barto.load(str(trace)) if not isinstance(trace, barto.Trace) else trace
         d, u, cache = t.data, struct.unpack_from, {}
+        mp = getattr(self, 'map_pc', None) or (lambda pc: pc)
         stack, sps, pend = self._stack, self._sps, self._pend
         for f in t.fields:
             dt2 = np.dtype({'names': ['reg', 'size', 'addr', 'type', 'extra'],
@@ -102,11 +104,11 @@ class ChipReduction:
                 while sps and sp > sps[-1]:
                     stack, sps = stack[:-1], sps[:-1]
                 if pend == 1:
-                    stack, sps = stack + (pc,), sps + (sp,)
+                    stack, sps = stack + (mp(pc),), sps + (sp,)
                 ipl = (u('<I', d, off - 4)[0] >> 8) & 7
                 if ipl > IPL_MAIN:
                     if not in_irq:
-                        in_irq, irq_entry = True, pc
+                        in_irq, irq_entry = True, mp(pc)
                     top, func = 'irq', irq_entry
                 elif stack:
                     top, func = stack[0], stack[-1]
@@ -175,7 +177,7 @@ class ChipReduction:
 
     def save(self, path):
         with gzip.open(path, 'wb') as f:
-            pickle.dump(self.__dict__, f)
+            pickle.dump({k: v for k, v in self.__dict__.items() if k != 'map_pc'}, f)
 
     @classmethod
     def load(cls, path):
