@@ -386,11 +386,11 @@ Each step ends measured: the benchmark (fps, work per frame), the outcome (score
 8. **Matrix and acceptance.** Done. The benchmark (`tools/bench.py`) on the release build,
    against 1.2 (`tmp/ref`):
 
-   | Setup | 1.2 | 2.0b, Enhanced off | 2.0b, `CUSTOM1=1` | world steps per second, Enhanced |
+   | Setup | 1.2 | Enhanced off | `CUSTOM1=1` | world steps per second, Enhanced |
    |---|---:|---:|---:|---|
    | a1200-030 | 25.00 | 25.00 | 49.90 | 25.00, every step 2 fields apart |
    | a1200-fast (020/14) | 24.70 | | 44.50 | 25.00, every step 2 fields apart |
-   | a500-020 (ECS, fast memory) | 23.10 | | 34.10 | 25.00; 1: 15, 2: 219, 3: 14, 4: 1 fields apart |
+   | a500-020 (ECS, fast memory) | 23.10 | | 34.90 | 25.00; 1: 14, 2: 221, 3: 14 fields apart |
    | a1200 (no fast memory: ExpMem in chip, refused) | 24.70 | | 24.70 | as 1.2 |
    | a500 (a 68000, refused) | 15.70 | 15.70 | 15.70 | as 1.2 |
 
@@ -398,7 +398,8 @@ Each step ends measured: the benchmark (fps, work per frame), the outcome (score
      DOS error 103 loading its "Resload" overlay. Base memory is all the chip, so the system's
      chip contents go to the slow memory, and the optional ExpMem (then 144 KB) took what the
      overlay needed. 124 KB booted, 136 KB did not. Dropping the table window's copy (72 KB,
-     step 6) brought the ExpMem to 72 KB. Without it the a500-020 went from 35.20 to 34.10;
+     step 6) brought the ExpMem to 72 KB. Without it the a500-020 went from 35.20 to 34.10
+     (34.90 in the release build, whose code no longer holds the FMODE routine);
      the AGA cells, then with FMODE 3, measured the same (50.00, 47.50). Without FMODE they
      measure 49.90 and 44.50 (the window copy: 50.00 and 46.40).
    - Equivalence on the a1200-030, as in step 7: the benchmark identical to 1.2 (250 hashes,
@@ -417,7 +418,7 @@ Each step ends measured: the benchmark (fps, work per frame), the outcome (score
      fields).
 9. **Release.** Done: the ReadMe entry above JOTD's history (the option, its requirements,
    the credit to JOTD and Harry), `CUSTOM1=1` in the icon (`release/release.json`), the
-   version 2.0b (12.11.2026).
+   version 2.0b (12.11.2026); its first build had FMODE 3 and was replaced ("Other candidates").
 
 ## Other candidates
 
