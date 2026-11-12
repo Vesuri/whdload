@@ -71,12 +71,6 @@ CROWS		= 136
 VIEWEND		= 44+CROWS
 FIELDLAST	= 308
 KROWS		= 8			;rows per chunk of the clear
-	IFND DDFA
-DDFA		= $30			;FMODE 3's fetch window (AGA): the same pixels as
-	ENDC
-	IFND DDFB
-DDFB		= $A8			;the game's $34/$CA at FMODE 0
-	ENDC
 	IFNE	CROWS-CROWS/KROWS*KROWS
 	FAIL	"CROWS is not whole chunks"
 	ENDC
@@ -400,7 +394,6 @@ _enhance
 	add.l	#PG_STACKTOP,d0
 	lea	STACK_OPERAND,a0
 	move.l	d0,(a0,d7.l)
-	bsr	_fmode
 	bsr	_hzinstall
 	lea	$E50E,a0		;the transform's first store to a slot's arrays
 	add.l	d7,a0
@@ -1319,25 +1312,6 @@ _objrestore
 	bra.b	.r
 .d	rts
 _eloopend
-
-; AGA: the bitplanes fetched 64 bits wide (FMODE 3), a quarter of the chip slots. The
-; screens ($68000, $78000, planes $1F40 apart, 40-byte rows) are 8-byte aligned. The two
-; copper lists are the only ones the game loads and nothing rewrites their fetch window.
-; AGA is told by Lisa's id in DENISEID ($F8), not by the ChipRevBits, which come from the
-; Kickstart's graphics.library and lack the AGA bits under a Kickstart for an ECS machine.
-_fmode	moveq	#0,d0
-	IFND NOFMODE
-	move.w	$DFF07C,d1
-	cmp.b	#$F8,d1
-	bne.b	.w
-	move.w	#DDFA,$1233E
-	move.w	#DDFB,$12342
-	move.w	#DDFA,$12382
-	move.w	#DDFB,$12386
-	moveq	#3,d0
-	ENDC
-.w	move.w	d0,$DFF1FC
-	rts
 
 ; What the transform ($E32A), the sort ($E724) and the draw write, and the camera: chip
 ; address, longs - 1. The interrupt writes none of it (tools/dataflow.py).

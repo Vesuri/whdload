@@ -106,9 +106,8 @@ static code map:
 - The window `$54000`–`$65FFF` above the program (the log, exp and angle tables the
   transform and the collision tests index with signed words from `$59FFE`, `$5DFFE` and
   `$5D400`, and the star tables) stays in chip. A copy in the ExpMem (72 KB) cut its chip
-  reads from 417 a field to 3 on the 030, but with the 64-bit fetch (below) it gains nothing:
-  50.00 fps on the a1200-030 and 47.50 on the a1200-fast with and without it. Without it the
-  ExpMem is 72 KB instead of 144 KB. That matters on a 1 MB A500 (512 KB chip, 512 KB slow):
+  reads from 417 a field to 3 on the 030 and was worth 50.00 against 49.90 fps on the
+  a1200-030 and 46.40 against 44.50 on the a1200-fast. Without it the ExpMem is 72 KB instead of 144 KB. That matters on a 1 MB A500 (512 KB chip, 512 KB slow):
   base memory is all the chip, WHDLoad keeps the system's chip contents in the slow memory,
   and with the optional ExpMem allocated WHDLoad could not load its own overlay ("not
   enough memory", DOS error 103) at 136 KB or more; 124 KB booted.
@@ -133,15 +132,12 @@ top of the ExpMem's page (`EXP_PAGE` + `$1000`); the game sets SP nowhere else. 
 `_ack3`, which writes INTREQ twice: from fast memory the `rte` came before the clear reached
 Paula and the handler ran twice a field.
 
-**Fetch mode.** On AGA (DENISEID `$F8`; the ChipRevBits come from the Kickstart's
-graphics.library and lack the AGA bits under the A600 Kickstart the test setups boot)
-`_fmode` writes FMODE 3, 64-bit bitplane fetches, and sets the fetch window of both play
-copper lists (`$1233E`/`$12342`, `$12382`/`$12386`) from `$34`/`$CA` to `$30`/`$A8`; otherwise
-it writes FMODE 0. The two lists are the only ones the game loads (the title, play and
-GAME OVER screens), nothing rewrites those words, and the screens' planes and 40-byte rows
-are 8-byte aligned. Screenshots of the title and of play match FMODE 0's pixel for pixel.
-The display then takes 5.6% of the chip slots instead of 22.5%, which the blits get: on
-the a1200-fast the object draw falls from 78 to 72 lines and `$10B48` from 36 to 28.
+**Fetch mode.** The slave leaves FMODE alone (0, as the game expects). FMODE 3 with the
+play lists' fetch window at `$30`/`$A8` gave the a1200-fast 47.50 fps instead of 46.40, but in
+play on the a1200-030 it showed black one-line strips, 16 pixels wide, in the screen columns
+48–63 and 112–127, over the HUD, the view and the panel (seen in interactive runs, not in
+the gdb-stub runs). Written at the entry it also garbled the loader's last field (its list
+at `$528` fetches `$38`/`$D0`). open-work.md, "Other candidates".
 
 **Horizon plotter.** `$CA52` writes six instruction slots (`$CB0A`–`$CB1C`, `$CB80`–`$CB84`)
 from the table at `$12A40` per colour (the index goes past 16 entries, so a fixed variant
@@ -431,7 +427,7 @@ add more):
   positions are in between: an object's animation, colour and lifetime are the
   committed ones. New objects stand still for their first two fields, and an object
   that ends in a world step is gone from the staged frame already.
-- A 68020/14 with fast memory misses frames when many objects are in view: 47.5 fps on the
+- A 68020/14 with fast memory misses frames when many objects are in view: 44.5 fps on the
   benchmark, the misses in the explosion, where the committed frame's transform and sort take
   about 100 lines and the object draw over 100. The draw is blitter-bound (one short
   blit per plane per column, each set up and waited for by the CPU) and the transform reads

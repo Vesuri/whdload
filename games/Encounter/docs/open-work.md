@@ -4,8 +4,8 @@
 step 6's read-only part: the harness; the gate, caches and optional ExpMem; the stack and
 the code in fast memory; the 50 Hz presentation with the world at 1.2's 25 Hz; the objects
 between their positions; the read-only tables in the copy; the clear ahead, a cheaper staged
-frame and the 64-bit fetch on AGA. The a1200-030 shows 50.00 fps on the benchmark, the
-020/14 with fast memory 47.50. Also the GAME OVER pause as a field wait (internals.md,
+frame. The a1200-030 shows 49.90 fps on the benchmark, the 020/14 with fast memory
+44.50. Also the GAME OVER pause as a field wait (internals.md,
 "Patches"). Open: the 020/14 in the explosion (step 7), the written data (step 6, which
 needs a complete code map first). 1.2's source is kept unchanged in `src/original/` as the
 reference build ([development.md](development.md)).
@@ -267,8 +267,9 @@ Each step ends measured: the benchmark (fps, work per frame), the outcome (score
        `$D1B0`, `$E408`, the horizon's patterns `$11EEA`–`$122FF`, `$12700`–`$12FFF`;
      - until step 8, the window `$54000`–`$65FFF` (the math tables at `$59FFE`, `$5DFFE`,
        `$5D400`, and the star tables), copied after the entry generates the star tables.
-       Step 8 dropped the copy: with the 64-bit fetch it gained nothing on the AGA cells,
-       and its 72 KB kept the game from starting on a 1 MB A500 (step 8).
+       Step 8 dropped the copy: its 72 KB kept the game from starting on a 1 MB A500
+       (step 8). It was worth 46.40 against 44.50 fps on the a1200-fast and 50.00 against
+       49.90 on the a1200-030 (without FMODE).
 
      A missed reader still reads chip, where the bytes are the same.
    - Not movable as planned:
@@ -306,7 +307,7 @@ Each step ends measured: the benchmark (fps, work per frame), the outcome (score
      - VERIFY clean, stack 112 bytes;
      - Enhanced off identical to 1.2.
    - The chip tables and their copies are equal at every logic step of both routes.
-7. **Drawing work.** Done ([internals.md](internals.md), "Main loop", "Fetch mode"); the
+7. **Drawing work.** Done ([internals.md](internals.md), "Main loop"); the
    020/14 still misses frames in the explosion. Each change A/B measured on the a1200-030 benchmark
    (`CUSTOM1=1`):
 
@@ -337,7 +338,7 @@ Each step ends measured: the benchmark (fps, work per frame), the outcome (score
        slots its view checks drop).
    - Not done: overlapping the blits with CPU work (`$BB22`'s strips, the skyline `$BFB8`
      and the mountains `$D374` wait for each blit, and the game sets BLTPRI, so the CPU
-     stalls; about 14% of the traced cycles), `FMODE`, and a faster `$E32A` (40 lines in
+     stalls; about 14% of the traced cycles) and a faster `$E32A` (40 lines in
      the explosion, with 105 slots in use).
 
    Measured (benchmark, `tools/bench.py`, `CUSTOM1=1`):
@@ -364,7 +365,7 @@ Each step ends measured: the benchmark (fps, work per frame), the outcome (score
    | Change | fps |
    |---|---:|
    | the above | 46.40 |
-   | FMODE 3 on AGA, the fetch window `$30`/`$A8` (the display 22.5% → 5.6% of the chip slots; the object draw 78 → 72 lines, `$10B48` 36 → 28) | 47.50 |
+   | FMODE 3 on AGA, the fetch window `$30`/`$A8` (the display 22.5% → 5.6% of the chip slots; the object draw 78 → 72 lines, `$10B48` 36 → 28); not kept, "Other candidates" | 47.50 |
 
    - Not kept on the 020/14:
      - the estimate's margin at 1/32, or `STAGEEND` 304: 47.50 and 47.40, each with a
@@ -381,14 +382,14 @@ Each step ends measured: the benchmark (fps, work per frame), the outcome (score
      or transform, not a tuning step.
 
    Target: the 030 holds 50 fps through the benchmark (met); the 020/14 + fast holds 50 fps
-   through the explosion (not met: 47.50, the 25 misses in the explosion).
+   through the explosion (not met: 44.50 in the release, without FMODE and the window copy).
 8. **Matrix and acceptance.** Done. The benchmark (`tools/bench.py`) on the release build,
    against 1.2 (`tmp/ref`):
 
    | Setup | 1.2 | 2.0b, Enhanced off | 2.0b, `CUSTOM1=1` | world steps per second, Enhanced |
    |---|---:|---:|---:|---|
-   | a1200-030 | 25.00 | 25.00 | 50.00 | 25.00, every step 2 fields apart |
-   | a1200-fast (020/14) | 24.70 | | 47.50 | 25.00, every step 2 fields apart |
+   | a1200-030 | 25.00 | 25.00 | 49.90 | 25.00, every step 2 fields apart |
+   | a1200-fast (020/14) | 24.70 | | 44.50 | 25.00, every step 2 fields apart |
    | a500-020 (ECS, fast memory) | 23.10 | | 34.10 | 25.00; 1: 15, 2: 219, 3: 14, 4: 1 fields apart |
    | a1200 (no fast memory: ExpMem in chip, refused) | 24.70 | | 24.70 | as 1.2 |
    | a500 (a 68000, refused) | 15.70 | 15.70 | 15.70 | as 1.2 |
@@ -397,8 +398,9 @@ Each step ends measured: the benchmark (fps, work per frame), the outcome (score
      DOS error 103 loading its "Resload" overlay. Base memory is all the chip, so the system's
      chip contents go to the slow memory, and the optional ExpMem (then 144 KB) took what the
      overlay needed. 124 KB booted, 136 KB did not. Dropping the table window's copy (72 KB,
-     step 6) brought the ExpMem to 72 KB with no change on the AGA cells (50.00, 47.50); the
-     a500-020, without the 64-bit fetch, went from 35.20 to 34.10.
+     step 6) brought the ExpMem to 72 KB. Without it the a500-020 went from 35.20 to 34.10;
+     the AGA cells, then with FMODE 3, measured the same (50.00, 47.50). Without FMODE they
+     measure 49.90 and 44.50 (the window copy: 50.00 and 46.40).
    - Equivalence on the a1200-030, as in step 7: the benchmark identical to 1.2 (250 hashes,
      screens and step fields), with Enhanced off too; the demo's 150 screens equal and 135
      hashes, the rest differing in the audio sequencer's bytes `$8277` and `$827B` after the
@@ -427,3 +429,13 @@ Not started and not measured; each needs its own investigation before it is plan
    horizon plotter under the instruction cache (step 3) is one unverified suspect.
 2. The keyboard handshake wait the slave inserts (`DBFD1`, three raster-line changes)
    and the game's own timing on fast CPUs have not been examined.
+3. FMODE 3 on AGA (measured: the a1200-fast 46.40 → 47.50 fps with the window copy). Tried
+   with the play lists' fetch window at `$30`/`$A8` (the game's DIW `$2C71`/`$F4D1` and
+   modulos 0 unchanged; planes and rows 8-byte aligned) and removed: in interactive play on
+   the a1200-030 it showed black one-line strips 16 pixels wide in the screen columns 48–63
+   and 112–127, the HUD, view and panel alike, different every frame; the same build without
+   FMODE showed none. The gdb-stub runs never showed them. The game shows sprites 0 and 1
+   (the frame's edges, lines `$2C`–`$CB`) and points 2–7 at an empty sprite (`$5410`); the
+   fetch starting at `$30` instead of `$34` may take sprite DMA slots. The loader's list
+   (`$528`) is still shown at the entry, so FMODE must be set by the game's lists, not by
+   the CPU there.
