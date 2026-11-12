@@ -1,7 +1,8 @@
 # Internals
 
-What is known from reading JOTD's 1.2 slave (`src/EncounterHD.s`) and the installed
-`disk.1`, and from the level-1 benchmark traces ("Frames and time", "Performance").
+What is known from reading JOTD's 1.2 slave (`src/original/EncounterHD.s`; `src/EncounterHD.s`
+is 2.0b, 1.2 plus the game-over pause (`$DC54`, "Patches") and "Enhanced framerate" below) and the installed `disk.1`, and from the
+level-1 benchmark traces ("Frames and time", "Performance").
 
 ## The installed game
 
@@ -13,10 +14,16 @@ offsets, with the address the slave loads them to.
 
 ## Slave header
 
-`ws_Version` 10, flags `WHDLF_Disk|WHDLF_NoError|WHDLF_EmulTrap|WHDLF_EmulDivZero`,
+1.2: `ws_Version` 10, flags `WHDLF_Disk|WHDLF_NoError|WHDLF_EmulTrap|WHDLF_EmulDivZero`,
 `ws_BaseMemSize` `$80000` (512 KB, the whole game in chip memory), no ExpMem
 (`USE_FASTMEM` is never defined), no Kickstart: a direct slave. Quit key `$5D`
 (numeric `*`). `resload_Control` reads `CUSTOM1` (unused) and `BUTTONWAIT`.
+
+2.0b: `ws_Version` 17 with `ws_config` `C1:B:Enhanced framerate`, an optional ExpMem of
+`$12000` bytes (`ws_ExpMem` negative: WHDLoad runs the game without it when it cannot be
+had): the code copy, a page for the stack, the staged frame's save area and the object
+snapshot; and `$VER` with the date. It also reads `WHDLTAG_ATTNFLAGS_GET`; the VERIFY build adds
+`WHDLF_EmulIllegal` and reads `CUSTOM2` ([development.md](development.md)).
 
 ## How it loads
 
@@ -46,6 +53,7 @@ All are written to memory after the decryption; addresses with their `disk.1` of
 | `$6C` | | (unset) | level 3 vector to `INT3`, which clears INTREQ `$0380` and returns, until the game installs its own (`$804E`, at `$E1A0`, file `$156D0`) |
 | `$94C6` | `$109F6` | `clr.b $939B` (6 bytes) | `jsr SAVEHIGH`: the same `clr.b`, then `resload_SaveFile` of `$91E2`, `$90` bytes, to `ENHIGH` |
 | `$C4D2` | `$13A02` | `moveq #75,d1; dbf d1,*` (6 bytes): the keyboard handshake delay, a CPU-speed loop | `jsr keyhp` (below) |
+| `$DC54` | `$15184` | `move.l d0,-(a7); move.l #$8A354,d0; subi.l #1,d0; bne.w *-4; move.l (a7)+,d0` (20 bytes): the GAME OVER screen's pause, a CPU-speed loop; 108 fields on the a500 with 1.2, 1 on the a1200-030 | `jsr _gowait; bra.b $DC68`: waits 108 changes of the field counter `$11DEC` (measured from `$DC54` to `$DC6E`: 109 fields with the `$E28C` wait after it, on the a1200-030 with Enhanced framerate) |
 
 Inside `keyhp` (the raw key, already decoded, is in `d0`):
 
@@ -63,6 +71,168 @@ The game's own exception vectors make the header flags work: the boot block runs
 vector `$14` at an `rte` (`$E288`, file `$157B8`, set at `$E1BE`, file `$156EE`). With the VBR moved by WHDLoad, `EmulTrap` and
 `EmulDivZero` forward those exceptions to these vectors; this is the ReadMe's "no more need
 for NOVBRMOVE (division by zero avoided)" in 1.2.
+
+## Enhanced framerate
+
+The option moves the code and the stack to fast memory and replaces the main loop: the
+world steps as 1.2 steps it at 25 fps, and a frame is shown every field when there is time.
+Plan and measurements: [open-work.md](open-work.md).
+
+**Gate** (`_gate`, right after the decryption, before any patch). The option is on only when
+`CUSTOM1` is set, `WHDLTAG_ATTNFLAGS_GET` reports a 68020 or better, the ExpMem was
+allocated at `$200000`–`$9FFFFF` or from `$1000000` up (not chip, not `$C00000`), and the
+decrypted program `$5000`–`$12FFF` has the CRC-16 `relocs.i` was generated for
+(`COPY_CRC`). Otherwise nothing below is done and the game runs as 1.2, from the same
+memory.
+
+**Copy** (`_enhance`, after the patches above, so the copy has keyhp, SAVEHIGH and `_gowait`). `$5000`–
+`$12FFF` is copied to the ExpMem at 0 (delta = ExpMem − `$5000`), and delta is added to the
+32-bit fields `src/relocs.i` lists, which `tools/relocs.py` computes from `tools/codemap.py`'s
+static code map:
+
+- `_rel_code`: every absolute operand that is a code address: `jsr`/`jmp` into the program,
+  code addresses stored to the vectors and the audio continuations (`$6C`, `$14`, `$8266`,
+  `$826A`, `$826E`), and the entries of the jump table `$C5D6` (read PC-relative, so the
+  copy reads the copy's table). Data operands are not changed: data stays in chip.
+- `_rel_moved`: the absolute references to the two variables that are read PC-relative and
+  written, the key byte `$C526` and the plotter's colour cache `$CA4E`; those now live in
+  the copy, where the PC-relative reads find them.
+- `_rel_smc`: the horizon plotter's self-modifying stores (`$CA86`–`$CAA4`), so they patch
+  the copy.
+- `_rel_tab`: the base operands (`lea abs.l,An`, `movea.l #imm,An`, absolute reads) of the
+  read-only tables inside the copy, so their readers read the copy: the model pointers
+  `$D1B0`–`$D29B` (not the models they point to), the bit masks `$E408`, the horizon's
+  plane patterns `$11EEA`–`$122FF` and the tables `$12700`–`$12FFF`.
+- The window `$54000`–`$65FFF` above the program (the log, exp and angle tables the
+  transform and the collision tests index with signed words from `$59FFE`, `$5DFFE` and
+  `$5D400`, and the star tables) stays in chip. A copy in the ExpMem (72 KB) cut its chip
+  reads from 417 a field to 3 on the 030, but with the 64-bit fetch (below) it gains nothing:
+  50.00 fps on the a1200-030 and 47.50 on the a1200-fast with and without it. Without it the
+  ExpMem is 72 KB instead of 144 KB. That matters on a 1 MB A500 (512 KB chip, 512 KB slow):
+  base memory is all the chip, WHDLoad keeps the system's chip contents in the slow memory,
+  and with the optional ExpMem allocated WHDLoad could not load its own overlay ("not
+  enough memory", DOS error 103) at 136 KB or more; 124 KB booted.
+
+For `_rel_tab`, a reader the analysis misses still reads chip, where the bytes are the same; no
+code writes these tables (the data-flow scans; no absolute write in the code), and at every
+logic step of the benchmark and the demo the chip tables and their copies are equal. The
+models (`$17000`–`$5A000`, through `$D1B0`) stay in chip: the blitter reads parts of them
+(`$20300`–`$205FF`, `$3F100`–`$41FFF`) from pointers made from the same model addresses.
+
+The chip program stays complete: audio plays from `$7000`–`$80FF` and `$8200`–`$82FF`, and
+anything the code map does not reach still runs there. `jmp copy` trampolines go over the 21
+chip routines whose addresses are held in data (`_tramp`) and the entry `$D7E2`, each only
+where all 6 bytes are instruction bytes with no branch target inside (not `$8272`, which
+data follows). Through them a missed reference returns to the copy.
+
+**Stack.** The entry's `movea.l #$7FFFE,a7` (operand `$D7E4`, in the copy) is set to the
+top of the ExpMem's page (`EXP_PAGE` + `$1000`); the game sets SP nowhere else. It uses
+112 bytes on the benchmark, 88 in the demo (VERIFY's guard fill).
+
+**Level-3 acknowledge.** The handler's exit at `$81A8` (`move.w #$20,$DFF09C; rte`) jumps to
+`_ack3`, which writes INTREQ twice: from fast memory the `rte` came before the clear reached
+Paula and the handler ran twice a field.
+
+**Fetch mode.** On AGA (DENISEID `$F8`; the ChipRevBits come from the Kickstart's
+graphics.library and lack the AGA bits under the A600 Kickstart the test setups boot)
+`_fmode` writes FMODE 3, 64-bit bitplane fetches, and sets the fetch window of both play
+copper lists (`$1233E`/`$12342`, `$12382`/`$12386`) from `$34`/`$CA` to `$30`/`$A8`; otherwise
+it writes FMODE 0. The two lists are the only ones the game loads (the title, play and
+GAME OVER screens), nothing rewrites those words, and the screens' planes and 40-byte rows
+are 8-byte aligned. Screenshots of the title and of play match FMODE 0's pixel for pixel.
+The display then takes 5.6% of the chip slots instead of 22.5%, which the blits get: on
+the a1200-fast the object draw falls from 78 to 72 lines and `$10B48` from 36 to 28.
+
+**Horizon plotter.** `$CA52` writes six instruction slots (`$CB0A`–`$CB1C`, `$CB80`–`$CB84`)
+from the table at `$12A40` per colour (the index goes past 16 entries, so a fixed variant
+per colour does not work). The copy keeps it, but `$CA86` becomes `jsr _hzset; bra.b $CAAA`:
+`_hzset` does the same stores into the copy, then pushes them out of the caches
+(`_hzflush30`: CACR clear-instruction-cache on the 68020/030; `_hzflush40`: `cpushl bc` on
+the three lines on the 68040/060).
+
+**Main loop** (`_eloop`, in the slave; the copy's `$DA30` jumps to it, so every entry and
+re-entry of 1.2's loop arrives there). Per logic frame, two fields apart:
+
+1. The logic frame, once it is due: the counters 1.2's frame end keeps per frame (`$11E36`
+   on every second, by a logical swap parity kept apart from `$11E67`; the countdown
+   `$11E0C`; the elapsed count `$11ECE` = 2), then the logic head (a call to an `rts` at
+   the page's `PG_HASH`), where the state is 1.2's at `$DA56` (its world step's start,
+   after its draw and frame end). Then 1.2's `$DA56`–`$DB0A`, with its exits to `$DB12` and
+   `$DBC2` (after `$11E67` is set back to the logical parity), and the keys `$C536`, which
+   share no address with the transform and the sort. Before the world step `_objsnap`
+   copies the objects' positions and lifetimes to the ExpMem when the staged frame may run:
+   the line the last logic frame ended at plus the staged frame's estimate is by `STAGEEND`.
+2. A staged frame, if the logic frame ended in its field and the estimate (`_est`) says it
+   will end by line `STAGEEND` (300). The estimate is the last committed draw + this logic
+   frame's transform and sort + the last staged frame's save, staging and restore (or the
+   last staged frame, if longer), + the rows of the clear still to do, + 1/16, all timed
+   with the beam. The staged frame:
+   - saves `_stab` to the ExpMem (1.1 KB: the horizon's tables `$1000`–`$11FF`, the visible
+     and sorted lists `$3A5C`–`$3C5F`, `$9FFC`–`$A003`, `$CCF6`, `$11E18`,
+     `$11EA0`–`$11ECB`, the camera), and the background objects' animation: the counter
+     (+2) and the frame (+14) of every animated entry in the level's list at (`$10BAA`),
+     the only bytes `$10B48` writes there;
+   - sets the camera to its snapshot after the logic frame's first player step: position
+     `$2790`, `$2B98`, ground scroll `$11EAE`, `$CCF8`, the horizon's turn `$11EB2`, the
+     heading `$11EB4`;
+   - sets every object halfway between its positions before and after the world step
+     (`_objstage`, below);
+   - transforms, sorts and draws as 1.2 does, with the slot arrays saved as the transform
+     writes them (`_tcow`, below), restores all of it and the moved objects, and swaps.
+3. The committed frame: the transform, the sort and 1.2's draw of the same state, then the
+   swap. Its effects on the state (1.2's draw also steps animations) are 1.2's, so it always
+   runs.
+
+**The transform's slot arrays.** `$E32A` writes a slot's results to the arrays at `$400`,
+`$600`, `$800`, `$A00`, `$C00` and `$E00` (+ the slot's offset), and only for a slot its
+view checks pass, so a slot the committed transform drops keeps what the staged transform
+wrote: the arrays cannot be left to the committed transform to overwrite. Every store to
+them comes after the first, `move.w d3,$E02(a0)` at `$E50E`. In the copy, `$E50E`–`$E517`
+is `jsr _tcow` and two `nop`s: during a staged transform `_tcow` saves the slot's six longs
+before it does the two instructions it replaces. The arrays are 3 KB; on the benchmark a staged
+frame saves 37 slots on average (28 bytes each with the offset), with 64–105 in use.
+
+**Clear ahead.** `$DF94` clears rows 0–135 of the back buffer, about 50 lines on the 030.
+After a swap the next back buffer is the screen this field shows. Once the beam is past its
+view (line `VIEWEND`, 44 + 136) the frame end clears it until line `FIELDLAST` (308), and so
+does a field the loop only waits through (`_idle`). The whole clear is `$DF94` (`_kall`) when
+it can end before that line (by the last clear's length, `_kdur`); otherwise `_kclr` clears 8
+rows of the four planes at a time, checking the beam between, and the draw's `$DF94` becomes
+`_clear`, which clears the rows left. `_kclr` takes about 60 lines for a whole clear, so it is
+only for clears that may stop. Something that may write the screens outside the draw (the
+hit effect `$A006`, the loop's exits) drops the clear ahead (`_noclr`).
+
+**Sort.** `_sort` does `$E724`'s selection sort (the visible list at `$3A5C`, `$11EA0` + 1
+longs, descending, unsigned) on a copy in the ExpMem's page (`PG_SORT`) and copies it back.
+The keys are depth:slot offset, so no two are equal and the order is 1.2's.
+
+**Objects between their positions.** An object is slot n (0–127, `$11EA2` = 4 × the last)
+of the arrays x `$2794`, y `$2998`, z `$2B9C` (longs at + 4n; − 4 is the camera) and the
+lifetime `$1CD2` (a word: 0 a free slot, `$FFFF` and `$8000` do not count down). Only the
+transform (`$E32A`) reads the positions (`tools/dataflow.py`). `_objstage` moves a slot to
+the midpoint of its positions before and after the world step, taken modulo 2^28 (the
+transform uses the high word's low 12 bits), unless the slot:
+- was free before (a new object);
+- has a higher lifetime than before (the slot was used again: a new shot takes the oldest
+  shot's slot, which jumps by about 2^19);
+- moved `OBJSNAP` (`$10000`) or more on an axis.
+
+Those are drawn where they are now. On the benchmark and in the demo every other moving
+object moves under `$4000` a step, and the distance rule never fires. The positions it
+changes are listed in the ExpMem and put back after the draw. A staged frame without a
+snapshot (its logic frame ended earlier than the one before) shows the objects where they are.
+
+The first frame after an entry is 1.2's, with 1.2's frame end, so the elapsed count from the
+last exit is 1.2's. Logic frames more than a frame behind restart the schedule (the game
+slows, as 1.2 does). A frame's end (`_fend`) is 1.2's without the counters, waiting for the
+next field. The screens are drawn alternately, so the committed frames all go to one buffer
+and the staged frames to the other; the radar dot (`$9D10`), which erases its position of
+two draws before (`$A000`), gets the position per buffer (`_dots`).
+
+**Caches.** `resload_SetCPU`: BaseMem write-through (non-cacheable on a 68040/060, whose
+copyback the blitter-written screens cannot have), ExpMem and the slave copyback,
+instruction and data cache. 1.2's `SetCACR(EnableI)` stays for the off path. `NoCache`
+overrides it.
 
 The source's `ifeq 1` block (clearing `$69666`–`$6B000`, patching `$69A8A` and
 `$69A9C`) and the commented-out quit patch at `$D7F6` are not assembled.
@@ -151,8 +321,10 @@ address + `$7530` (encrypted bytes between `$6000` and `$13000`).
 - **Objects**: `$DDC0` walks the sorted list. The primitive `$BB22`, about 72 calls a frame,
   draws with blitter strips (`$B2C4`, `$B6BC`, `$C56C`) and busy-waits on the blitter
   (`btst #6,$DFF002`) between them. The blitter is busy in only 5% of the chip slots.
-- **Clear**: `$DF94` clears the back buffer with the CPU (`movem`, through `$DFE6` and
-  `$DFCC`): about 32 KB a frame.
+- **Clear**: `$DF94` clears the view, rows 0–135 of the back buffer's four planes, with the
+  CPU (`movem`, through `$DFE6` and `$DFCC`, 5440 bytes a plane): planes 0–2 to 0, plane 3
+  to `$FF`. Colour 8 is the sky's and the ground's colour, set per line by the copper. The
+  objects are clipped at row 135; the panel below is drawn once and never cleared.
 - **Horizon**: `$CD14` with the plotter `$CA52`–`$CB8C`, CPU only. The plotter modifies its
   own code:
   - per call it writes plane operations into the slots `$CB0A`–`$CB1C` and `$CB80`–`$CB84`
@@ -251,7 +423,18 @@ add more):
 
 ## Limitations
 
-- No caches beyond the instruction cache (`resload_SetCACR` enables only `CACRF_EnableI`).
-- 512 KB chip only; nothing is relocated to fast memory, so a frame costs nearly the same on
-  a 68020/14 and a 68030/50 ("Performance").
+- Off the Enhanced path, no caches beyond the instruction cache (`resload_SetCACR` enables
+  only `CACRF_EnableI`) and nothing in fast memory, so a frame costs nearly the same on a
+  68020/14 and a 68030/50 ("Performance").
+- On it, the screens and the written game data stay in chip; of the CPU-only data only the
+  read-only tables above are in fast memory (open-work.md step 6). In a staged frame only the
+  positions are in between: an object's animation, colour and lifetime are the
+  committed ones. New objects stand still for their first two fields, and an object
+  that ends in a world step is gone from the staged frame already.
+- A 68020/14 with fast memory misses frames when many objects are in view: 47.5 fps on the
+  benchmark, the misses in the explosion, where the committed frame's transform and sort take
+  about 100 lines and the object draw over 100. The draw is blitter-bound (one short
+  blit per plane per column, each set up and waited for by the CPU) and the transform reads
+  the slot arrays from chip (open-work.md step 7).
+- The copy is tied to the one known program (`COPY_CRC`); another version runs as 1.2.
 - The white-colours bug is unexplained (ReadMe).

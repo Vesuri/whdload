@@ -1,14 +1,14 @@
 # Open work
 
-No slave changes yet; the performance investigation below is measured, and the plan after it
-is not started. `src/EncounterHD.s` is JOTD's 1.2 source as upstream has it; the game
-directory only sets it up on the repository layout: it unpacks, builds (to the same code as
-the shipped slave, not the same bytes: [development.md](development.md)), and boots to the
-title screen and the attract-mode demo on the default a500.
-
-Nothing is released from here. A release would need a new slave version with a
-`$VER: <name> <version> (dd.mm.yyyy)` string (the packager reads the version and date from
-it; 1.2 has no date) and a ReadMe entry above JOTD's history.
+2.0b (12.11.2026): JOTD's 1.2 with Enhanced framerate, steps 0–5 and 7–9 below done and
+step 6's read-only part: the harness; the gate, caches and optional ExpMem; the stack and
+the code in fast memory; the 50 Hz presentation with the world at 1.2's 25 Hz; the objects
+between their positions; the read-only tables in the copy; the clear ahead, a cheaper staged
+frame and the 64-bit fetch on AGA. The a1200-030 shows 50.00 fps on the benchmark, the
+020/14 with fast memory 47.50. Also the GAME OVER pause as a field wait (internals.md,
+"Patches"). Open: the 020/14 in the explosion (step 7), the written data (step 6, which
+needs a complete code map first). 1.2's source is kept unchanged in `src/original/` as the
+reference build ([development.md](development.md)).
 
 ## Enhanced framerate: 50 fps at the original game speed
 
@@ -129,123 +129,293 @@ The world block, per frame, in the main loop's order. Row order is execution ord
 Each step ends measured: the benchmark (fps, work per frame), the outcome (score 15, targets
 16, shield 4 in `end.png`), and from step 3 on, the equivalence check.
 
-0. **Harness.** The benchmark run is the test route, plus the attract demo, which plays by
-   itself after boot and goes through the same main loop.
-   - Make the byte-level data-flow scan (scratch `exact.py` today) a tool next to
-     `tools/chipprofile.py`.
-   - Add a state hash of world memory per logic step. Screens, copper lists, presentation
-     lists and code are excluded; step 3 fixes the exact set.
-   - Add a VERIFY build switch that exposes the hash and logs every logic step.
-   - Add a `demo` route to `tools/route.py`: boot with no input until the demo runs, then
-     a few seconds of it, with a contact sheet.
+0. **Harness.** Done. `tools/dataflow.py` (the data-flow scan, saved by every benchmark),
+   `tools/codemap.py` (the static code map), `tools/statehash.py` and the `hash N NAME`
+   and `demo` steps of `tools/route.py` ([development.md](development.md), "Equivalence
+   checks").
+   - The hash is taken by the harness through a breakpoint at the world step's start
+     (`$DA56`, after the draw and the frame end; the main-loop head `$DA30` until step 7)
+     rather than by the VERIFY slave: no slave code, and emulated time is not disturbed.
+     The VERIFY build instead traps chip code execution and guards the stack.
+   - The hashed set: base memory `$0`–`$12FFF` without code bytes, `$10`, the field counter
+     `$11DEA`, the last pacing exit `$11ECC` and the copper lists; screens are compared
+     separately.
 
-   Done when two benchmark runs give the same hash sequence, and two demo runs do too.
-1. **Slave skeleton.**
-   - Add the `$VER` with a date, `ws_Version` 17 with `ws_config`, the optional ExpMem and
-     the gate.
-   - Cache policy through `resload_SetCPU`, honouring `NoCache`: instruction cache as now.
-     Enable the data cache only where WHDLoad can make BaseMem non-cacheable, because the
-     blitter writes screens the CPU also reads.
+   Measured: two benchmark runs give the same 250 hashes (all distinct), two demo runs the
+   same 150.
+1. **Slave skeleton.** Done: `$VER` 2.0b, `ws_Version` 17 with `ws_config`, the optional
+   ExpMem and the gate (also a CRC of the decrypted program), caches through
+   `resload_SetCPU` on the Enhanced path only (BaseMem write-through, non-cacheable on a
+   68040/060).
+   - With Enhanced off (a1200-030), and on where the gate refuses it (a1200: ExpMem in chip;
+     a500: a 68000), frame count and the fields between swaps equal 1.2's. The reports are
+     not byte-identical: the pacing wait differs by a few thousand cycles in the traced
+     total (under 0.001%), as the longer slave start shifts the phase.
+   - Fault injection (VERIFY, `CUSTOM2`): no ExpMem, ExpMem in chip, a 68000 and another
+     program each leave `$D7E2` unpatched and run exactly as 1.2 (fields 135–633).
+2. **Stack in fast.** Done: `$D7E2`'s `movea.l #$7FFFE,a7` is the only SP load in the code
+   map; its operand in the copy points at the top of the ExpMem page. VERIFY's guard fill
+   shows 112 bytes used on the benchmark, 88 in the demo.
+3. **Code copy in fast.** Done, as [internals.md](internals.md) "Enhanced framerate"
+   describes. Changes from the plan:
+   - The copy is `$5000`–`$12FFF` (the sprite routine `$5296` included), relocated from
+     `tools/codemap.py`'s static map rather than Ghidra; the map reaches every PC traced on
+     the a500, a1200 and a1200-030. Chip routines whose addresses are held in data get a
+     `jmp` into the copy.
+   - The PC-relative written variables (`$C526`, `$CA4E`) move into the copy instead of
+     their readers becoming absolute.
+   - The horizon plotter keeps its self-modification, writing the copy and then flushing the
+     caches: the colour index goes past 16 table entries, so per-colour variants were wrong.
+     Under `NOCACHE` and with the flush the plotter matches 1.2; the stale-cache risk in 1.2
+     was not seen.
+   - From fast memory the level-3 handler re-triggered (its `rte` overtook the INTREQ
+     clear); the copy acknowledges twice.
 
-   Done when the a500, a1200 and a1200-030 with Enhanced off give the 1.2 benchmark reports
-   byte for byte. Fault-inject: no ExpMem, ExpMem in chip, a 68000. Each falls back to the
-   1.2 path.
-2. **Stack in fast.**
-   - Move the supervisor stack, `$7FFFE` at the entry, to a guarded area at the top of the
-     ExpMem.
-   - Find every place the game reloads SP (entry, restarts, game over) and redirect it.
+   Measured (benchmark, `CUSTOM1=1` against 1.2, `tools/bench.py`):
 
-   Done when the run is equivalent, the trace has no stack accesses at `$7FD00`–`$7FFFF`,
-   and the gain is measured.
-3. **Code copy in fast.** Copy `$8000`–`$12FFF` and the sprite routine at `$5296` to the
-   ExpMem after decryption and the slave patches, then relocate the copy:
-   - the absolute `jsr`/`jmp` into the program (17 in the window's code);
-   - code addresses in immediates: the level-3 vector `$6C` (`$804E`, set at `$E1A0`) and
-     any other vector the game sets, the audio sequencer continuations
-     (`move.l #$8C2E,$8266` and the like);
-   - jump tables (`$C5D6`, read PC-relative, so the copy's entries change).
+   | Setup | fps | work per frame, fields: median / max | chip code fetches per field |
+   |---|---|---|---|
+   | a1200-030, 1.2 | 25.00 | 1.064 / 1.824 | 8373 |
+   | a1200-030, Enhanced | 25.00 | 0.654 / 1.042 | 0 (3 trampolines, under 1 a field) |
+   | a1200-fast (020/14), 1.2 | 24.70 | 1.188 / 2.107 | 7718 |
+   | a1200-fast, Enhanced | 25.00 | 0.878 / 1.448 | 0 |
 
-   Data stays at its chip addresses and is reached by its absolute operands (640 `abs.l` in
-   the window's code). The rest needs care:
-   - The PC-relative reads of written data become absolute: `$C536` and `$C558` (the key
-     byte `$C526`, written by the level-3 handler at `$C4E4`), and `$CA6C` (`$CA4E`).
-   - The horizon plotter `$CA52`–`$CB8C` writes its own instructions (slots
-     `$CB0A`–`$CB1C` and `$CB80`–`$CB84`, from the table at `$12A40`). Replace it with a
-     version that does not modify itself, for example a loop per slot combination. That
-     also removes a stale-cache risk the original has on 68020+ (unverified).
-   - Re-apply keyhp (`$C4D2`) and SAVEHIGH (`$94C6`) to the copy.
-   - Build the reference list from Ghidra seeded with all traced PCs, because the window
-     executes only part of the program. Code the benchmark does not reach stays safe if a
-     reference is missed: it runs the chip original, which keeps the slave's patches, and is
-     only slower.
+   Equivalence: the benchmark's 250 hashes and screens equal 1.2's; in the demo all 150
+   screens are equal and 134 hashes, the rest differing only in the elapsed count `$11ECE`
+   and the audio sequencer's timing bytes (1.2 takes 3 fields for some demo frames). The
+   VERIFY build traps no chip code execution on either route; it does when a trampoline
+   is removed.
+4. **Native logic, 50 Hz presentation.** Done: the slave's main loop `_eloop`
+   ([internals.md](internals.md), "Main loop"). Changes from the design:
+   - The staged frame saves and restores everything the transform, the sort and the draw
+     write (`_stab`, 5.5 KB), so it leaves no trace in the state; the committed frame is
+     1.2's draw, and always runs, because 1.2's draw also steps state (the background
+     objects' animation `$10D08` up, the horizon's turn `$11EB2`, the radar dot).
+   - Logic frames never run back to back: the committed draw belongs to its logic frame.
+     Only the staged frame is dropped, when the beam-timed estimate (the last staged frame,
+     or the last committed draw + 64 lines, + 1/8) says it would not end by line 300.
+     Lower margins let staged frames overrun and delay logic frames by a field (5 of 250
+     with + 24 lines).
+   - `$11E67` toggles per presented frame; a logical parity drives `$11E36` and is put back
+     into `$11E67` when the loop is left. The radar dot's erase position is kept per screen
+     buffer, because the committed frames all go to one buffer.
 
-   Done when:
-   - the benchmark's trace shows no code fetches from chip while Enhanced is on;
-   - a VERIFY build traps any execution in the chip program's code bytes (the audio ranges
-     are left alone);
-   - per-step hashes match 1.2's;
-   - the gain on the 030 and the 020 is measured against the model above.
-4. **Native logic, 50 Hz presentation.**
-   - Restructure the copy's main loop as in design point 3: pacing to one field, `$11E67`
-     per presented frame, and `$11E36` and `$11E0C` per logic frame.
-   - First version: the staged pose is the snapshotted camera with the committed objects.
+   Measured (benchmark, `tools/bench.py`, `CUSTOM1=1`):
 
-   Done when:
-   - world steps per second are 25.0 on the 030 and the 020;
-   - the sequence of per-step hashes equals 1.2's on the a1200-030 under the same per-field
-     input. 1.2 there does every frame's work in under 2 fields (worst 1.82), so its world
-     steps are exactly 2 fields apart and the two line up;
-   - presentation frames write nothing in the hashed set and never call the RNG (`$7000`
-     moves only in logic frames);
-   - the demo's per-step hashes equal 1.2's, and its contact sheet shows the same scenes;
-   - fps is reported over the benchmark.
-5. **Interpolated objects.**
-   - Snapshot object positions before each world step.
-   - Stage the midpoints in the logic frame's pose. Snap objects that appear, disappear or
-     move further than a threshold.
-   - Find the exact inputs of `$E32A` and the drawing with the data-flow scan.
+   | Setup | fps | world steps per second | work per presented frame, fields: median / max |
+   |---|---|---|---|
+   | a1200-030 | 39.50 | 25.00 (every logic frame 2 fields apart) | 0.677 / 1.046 |
+   | a1200-fast (020/14) | 25.00 (no staged frame fits) | 25.00 | 0.879 / 1.452 |
 
-   Done when contact sheets show objects moving every field without jumps at spawn, death or
-   the explosion, and the hashes are unchanged.
-6. **CPU-only data in fast.**
-   - Read-only tables first: `$12000`–`$122FF` and `$12700`–`$12FFF`, `$17000`, `$20000`,
-     `$28000`–`$29FFF` and `$59000`–`$5FFFF` read 690 times per field and are never written
-     in the window. Copy them rather than move them, so DMA elsewhere in the game still
-     finds them in chip. Redirect readers hottest first; partial redirection is safe while
-     the data does not change. Static analysis must show that nothing writes a table after
-     the copy (a level start that rebuilds one would leave the copy stale).
-   - Then the written regions. These are moved, so the benchmark cannot vouch for the rest
-     of the game. Each is moved all or nothing, with every reference relocated, and only
-     when static analysis shows that no DMA pointer the game loads points into it:
-     - the object arrays `$1000`–`$3FFF` (870 reads and 130 writes per field), reached
-       through base registers set by immediates;
-     - the variables in `$11000`–`$11FFF` and in the program range;
-     - the low page.
+   Equivalence on the a1200-030:
+   - Benchmark: all 250 logic-head hashes and shown screens equal 1.2's, at the same fields.
+   - Demo: all 150 shown screens are equal; hashes equal at steps 1–134. Step 0 differs in
+     the elapsed count, which the demo does not use. Steps 135–149 differ in the audio
+     sequencer's bytes only, after a transition that takes 9 fields instead of 1.2's 44,
+     as with the 25 fps copy (step 3).
+   - Presentation frames call no RNG: `$7000` is in the hashed set.
+   - The VERIFY build traps no chip code on either route; the stack peaks at 112 bytes.
+   - With Enhanced off the benchmark is identical to 1.2.
 
-   Done as step 3: equivalence, no chip CPU-data accesses outside the DMA map, gain measured.
-7. **Drawing work, as the measurements then require.** Candidates:
-   - Clear the back buffer with the blitter while the CPU runs logic and transform from fast
-     memory. The blitter is busy in 5% of slots; the CPU clear `$DF94` is 9% of the CPU.
-   - Overlap the blitter strips in `$BB22` with CPU work instead of busy-waiting.
-   - AGA only: 64-bit bitplane fetch (`FMODE`). Bitplane DMA takes 22.5% of the chip slots;
-     Mercenary 3 measured a gain from it.
-   - Replace the O(n²) sort `$E724`, and speed up `$E32A`.
+   A contact sheet of 8 consecutive demo fields shows a new image every field, turning
+   evenly.
+5. **Interpolated objects.** Done ([internals.md](internals.md), "Objects between their
+   positions"):
+   - The data-flow scan: only `$E32A` reads the positions (x `$2794`, y `$2998`, z
+     `$2B9C`, 128 slots); the depth sort reads only the visible list. The drawing's other
+     object inputs (animation, colours) stay committed.
+   - `_objsnap` copies the positions and lifetimes before the world step. The staged frame
+     sets the midpoints and puts the positions back after its draw. It snaps slots that
+     are new, were used again (their lifetime rose) or moved `$10000` or more.
+   - Changes from the plan:
+     - The positions are saved per moved slot into the ExpMem, not as part of `_stab`.
+       Saving all three arrays (1.5 KB more chip traffic each way) let staged frames
+       overrun: with `STAGEPAD` 64, 8 of 250 logic frames ran at other fields than 1.2's. At 96 they were
+       on time, but only 2 staged frames in 500 fields ran (25.2 fps).
+     - The snapshot runs only when the staged frame can fit (the line the last logic frame
+       ended at plus the estimate). Without that the 020/14, where no staged frame fits,
+       showed 9 committed frames a field late instead of 1.
 
-   Target: the 020/14 + fast holds 50 fps through the explosion. Each item is A/B measured,
-   kept only if it gains, and shown to leave the hashes unchanged.
-8. **Matrix and acceptance.**
-   - a1200-030: 50 fps through the benchmark; the demo as in step 4.
-   - a1200-fast and a500-020: measured.
-   - a1200-040 and a1200-060: functional, with MMU and caches, as Road Rash's checks.
-   - a500 and a1200 without fast memory: 1.2 behaviour byte for byte.
-   - A DMA capture showing nothing reads or writes the ExpMem.
-   - The fault injection from step 1.
-   - World steps per second at 25 on every Enhanced cell.
-9. **Release.**
-   - Write a ReadMe entry describing the option, the requirements and the credit to Harry
-     and JOTD.
-   - Add the icon tooltype `CUSTOM1=1`.
-   - Bump the version, then package.
+   Measured (benchmark, `tools/bench.py`, `CUSTOM1=1`):
+
+   | Setup | fps | world steps per second | work per presented frame, fields: median / max |
+   |---|---|---|---|
+   | a1200-030 | 38.40 (step 4: 39.50) | 25.00 (every logic frame 2 fields apart) | 0.672 / 1.046 |
+   | a1200-fast (020/14) | 25.00 | 25.00 | 0.880 / 1.452 |
+
+   - Of the 135 staged frames in the a1200-030's window, 132 had a snapshot.
+   - Slots per step on the benchmark, from 1.2's dumps:
+     - 2585 slots interpolated, at most 40 in one step;
+     - 46 snapped as new and 41 as used again;
+     - 16110 not moving;
+     - none over the distance threshold.
+
+     In the demo: 57 interpolated and 6 new.
+   - Equivalence on the a1200-030, as in step 4:
+     - the benchmark is identical to 1.2 (all 250 hashes, screens and step fields);
+     - in the demo all 150 screens are equal, and the hashes differ from 1.2's only in the
+       elapsed count at step 0 and the audio sequencer's bytes after the transition;
+     - the VERIFY build traps nothing, and the stack peaks at 112 bytes;
+     - with Enhanced off the benchmark is identical to 1.2.
+   - The presented frames, dumped at every swap: shots shrink every field as they fly off.
+     A new shot keeps its first position for two fields. The explosion's debris falls
+     every field in which a staged frame runs.
+6. **CPU-only data in fast.** The read-only tables are done
+   ([internals.md](internals.md), `_rel_tab`); the written data is not.
+   - Read-only, in fast memory:
+     - the tables inside the copy, by relocating their base operands: the model pointers
+       `$D1B0`, `$E408`, the horizon's patterns `$11EEA`–`$122FF`, `$12700`–`$12FFF`;
+     - until step 8, the window `$54000`–`$65FFF` (the math tables at `$59FFE`, `$5DFFE`,
+       `$5D400`, and the star tables), copied after the entry generates the star tables.
+       Step 8 dropped the copy: with the 64-bit fetch it gained nothing on the AGA cells,
+       and its 72 KB kept the game from starting on a 1 MB A500 (step 8).
+
+     A missed reader still reads chip, where the bytes are the same.
+   - Not movable as planned:
+     - The models `$17000`–`$5A000` (about 370 chip reads a field, through `$D1B0`): the
+       blitter reads parts of them through pointers made from the same model addresses.
+     - The object arrays `$1000`–`$3FFF` and the transform's arrays in the low page (about
+       2000 chip accesses a field). The code addresses them as `$2794(a0)` with a0 the
+       slot's offset, so the displacement is the chip address, and a 16-bit displacement
+       cannot reach fast memory. Moving them means reassembling the routines that use
+       them.
+     - The written variables (`$11DEA`–`$11EE9`: about 370 reads and 80 writes a field,
+       and those in `$C000`–`$10FFF`). Their addresses are also operands of code that
+       `tools/codemap.py` does not reach. That code runs from chip and would keep using the
+       chip copy. Examples:
+       - `$D29C` (`addq.w #1,$11E40`, the level advance);
+       - `$100AA`–`$10322` and `$1098C`–`$10B48`, held in the handler tables;
+       - `$ACFC`, a branch table.
+
+       The hottest variables (`$11E60`, `$11E66`, `$11EB4`, `$11EB6`) are among those
+       operands. Seeding the tables' longs as code brings in data (the `$11346` table holds
+       audio sequences), so each table's layout must be worked out first. A complete code
+       map would also put that code in fast memory.
+
+   Measured (benchmark, `tools/bench.py`, `CUSTOM1=1`):
+
+   | Setup | fps | world steps per second | work per presented frame, fields: median / max |
+   |---|---|---|---|
+   | a1200-030 | 42.00 (step 5: 38.40) | 25.00 | 0.653 / 0.976 |
+   | a1200-fast (020/14) | 25.00 | 25.00 | 0.859 / 1.410 (step 5: 0.880 / 1.452) |
+
+   - Chip reads per field on the a1200-030: the window 417 → 3; the program's tables 295 → 0.
+   - Equivalence as in step 5:
+     - benchmark identical to 1.2;
+     - demo identical to step 5's;
+     - VERIFY clean, stack 112 bytes;
+     - Enhanced off identical to 1.2.
+   - The chip tables and their copies are equal at every logic step of both routes.
+7. **Drawing work.** Done ([internals.md](internals.md), "Main loop", "Fetch mode"); the
+   020/14 still misses frames in the explosion. Each change A/B measured on the a1200-030 benchmark
+   (`CUSTOM1=1`):
+
+   | Change | fps |
+   |---|---:|
+   | step 6 | 42.00 |
+   | the clear ahead: `$DF94` in the time after a swap once the beam is past the view | 48.7 |
+   | the staged frame's estimate from its measured parts instead of `STAGEPAD` (no logic frame late) | 48.2 |
+   | `_sort`: `$E724`'s sort on a copy in fast memory | 48.7 |
+   | the committed transform and sort in the committed frame's field, not the logic field (the logic field's median 259 → 190 lines) | 49.70 |
+   | the estimate's margin 1/16 instead of 1/8 | 49.90 |
+   | the staged frame saves only what it writes: the slots the transform writes (`_tcow`) and the animation words, 5.5 KB → about 2.2 KB | 50.00 |
+
+   - With the last change the margin was tried at 1/8 again: 49.90, so 1/16 stays.
+   - The staged frame's own work (save, staging, restore) fell from 37 lines to 16. Before,
+     `_save` and `_restore` took 18 and 12 lines, 43 and 28 clocks a long, about the cost
+     of a chip access each.
+   - The clear covers rows 0–135 (`CROWS`), as `$DF94` does: the view ends at line 180,
+     not 205. The clear's first chunked version cleared rows 0–159 and wiped the panel's top
+     rows, which are drawn once; the screen check caught it.
+   - Not kept:
+     - The blitter for the clear, alone or beside the CPU: no gain. The clear is bound by the
+       chip bus, which the blitter shares.
+     - `_kclr` (chunks with beam checks) for whole clears: 60–64 lines against `$DF94`'s
+       50, with fixed-offset `movem`, 14 registers, plane order or no beam checks. It only
+       does clears that may stop.
+     - Leaving the slot arrays to the committed transform: the screens differ (it skips
+       slots its view checks drop).
+   - Not done: overlapping the blits with CPU work (`$BB22`'s strips, the skyline `$BFB8`
+     and the mountains `$D374` wait for each blit, and the game sets BLTPRI, so the CPU
+     stalls; about 14% of the traced cycles), `FMODE`, and a faster `$E32A` (40 lines in
+     the explosion, with 105 slots in use).
+
+   Measured (benchmark, `tools/bench.py`, `CUSTOM1=1`):
+
+   | Setup | fps | world steps per second | fields between swaps |
+   |---|---|---|---|
+   | a1200-030 | 50.00 (step 6: 42.00) | 25.00 (every logic frame 2 fields apart) | 1: 500 |
+   | a1200-fast (020/14) | 46.40 (step 6: 25.00) | 25.00 | 1: 431, 2: 28, 3: 4 |
+
+   - The 030's frames in lines (313 a field), median / max: world + staged 221 / 311,
+     committed 174 / 306.
+   - The 020/14 misses 32 frames: 22 in the explosion (fields 147–196) and 10 over fields
+     346–456. In 36 of its 250 logic frames no staged frame fits.
+   - Equivalence on the a1200-030:
+     - the benchmark is identical to 1.2 (all 250 hashes, screens and step fields);
+     - in the demo all 150 screens are equal; hashes equal at 135 of 150, the rest
+       differing only in the audio sequencer's byte `$827B` after the transition;
+     - the VERIFY build traps nothing, and the stack peaks at 112 bytes, guard intact;
+     - with Enhanced off the benchmark is identical to 1.2;
+     - `end.png`: score 15, targets 16, shield 4.
+
+   Then on the a1200-fast (020/14), A/B on the same source:
+
+   | Change | fps |
+   |---|---:|
+   | the above | 46.40 |
+   | FMODE 3 on AGA, the fetch window `$30`/`$A8` (the display 22.5% → 5.6% of the chip slots; the object draw 78 → 72 lines, `$10B48` 36 → 28) | 47.50 |
+
+   - Not kept on the 020/14:
+     - the estimate's margin at 1/32, or `STAGEEND` 304: 47.50 and 47.40, each with a
+       logic frame late;
+     - a merge sort for `_sort` (any sort gives `$E724`'s bytes, the keys being unique):
+       47.40, slower on the usual short lists; below 32 entries the selection sort and a
+       merge sort above: 47.50, no frame gained. In the explosion it saved about 11 lines.
+   - Where the 020/14's explosion goes: the committed frame's transform and sort take about
+     100 lines (line 32 to about 140; `$E32A` about 90 of them), the object draw over 100.
+     `$E32A`'s cycles are spread over the routine: the slot reads from chip, the octant
+     logic, and 18% in the log normalisation's rotate loops, which `bfffo` could shorten by
+     perhaps 5–10 lines. The draw is blitter-bound: one short 4-channel blit per plane per
+     column, each set up and waited for by the CPU. 50 fps there needs a new object drawer
+     or transform, not a tuning step.
+
+   Target: the 030 holds 50 fps through the benchmark (met); the 020/14 + fast holds 50 fps
+   through the explosion (not met: 47.50, the 25 misses in the explosion).
+8. **Matrix and acceptance.** Done. The benchmark (`tools/bench.py`) on the release build,
+   against 1.2 (`tmp/ref`):
+
+   | Setup | 1.2 | 2.0b, Enhanced off | 2.0b, `CUSTOM1=1` | world steps per second, Enhanced |
+   |---|---:|---:|---:|---|
+   | a1200-030 | 25.00 | 25.00 | 50.00 | 25.00, every step 2 fields apart |
+   | a1200-fast (020/14) | 24.70 | | 47.50 | 25.00, every step 2 fields apart |
+   | a500-020 (ECS, fast memory) | 23.10 | | 34.10 | 25.00; 1: 15, 2: 219, 3: 14, 4: 1 fields apart |
+   | a1200 (no fast memory: ExpMem in chip, refused) | 24.70 | | 24.70 | as 1.2 |
+   | a500 (a 68000, refused) | 15.70 | 15.70 | 15.70 | as 1.2 |
+
+   - The 1 MB A500 (512 KB chip, 512 KB slow) did not start with 2.0b: WHDLoad stopped with
+     DOS error 103 loading its "Resload" overlay. Base memory is all the chip, so the system's
+     chip contents go to the slow memory, and the optional ExpMem (then 144 KB) took what the
+     overlay needed. 124 KB booted, 136 KB did not. Dropping the table window's copy (72 KB,
+     step 6) brought the ExpMem to 72 KB with no change on the AGA cells (50.00, 47.50); the
+     a500-020, without the 64-bit fetch, went from 35.20 to 34.10.
+   - Equivalence on the a1200-030, as in step 7: the benchmark identical to 1.2 (250 hashes,
+     screens and step fields), with Enhanced off too; the demo's 150 screens equal and 135
+     hashes, the rest differing in the audio sequencer's bytes `$8277` and `$827B` after the
+     transition, which takes fewer fields; VERIFY traps nothing, stack 112 bytes on the
+     benchmark and 88 in the demo, guard intact.
+   - a1200-040 and a1200-060 (functional, MMU and caches): Enhanced on (the entry jumps to
+     the copy), the benchmark ends at score 15, targets 16, shield 4 on both.
+   - The GAME OVER pause: 108 fields on the a500 with 1.2, 1 on the a1200-030; 2.0b waits 108
+     fields everywhere (the a1200-030 with Enhanced and the VERIFY build measured).
+   - DMA: every page the bitplane, copper, blitter, audio and sprite channels touch on the
+     benchmark is in chip below `$80000` (`chip.txt`), none in the ExpMem.
+   - The fault injection (VERIFY, `CUSTOM2` 1, 2, 4, 8 with `CUSTOM1=1`, a1200-030): each
+     leaves `$D7E2` unpatched and runs the benchmark exactly as 1.2 (250 hashes and step
+     fields).
+9. **Release.** Done: the ReadMe entry above JOTD's history (the option, its requirements,
+   the credit to JOTD and Harry), `CUSTOM1=1` in the icon (`release/release.json`), the
+   version 2.0b (12.11.2026).
 
 ## Other candidates
 
