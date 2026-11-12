@@ -9,6 +9,11 @@
       },
       "add": {},
       "remove": [],
+      "tooltypes": {
+        "EncounterHD/Encounter.inf": [
+          "CUSTOM1=1"
+        ]
+      },
       "source": {
         "dir": "EncounterHD/source",
         "variants": [

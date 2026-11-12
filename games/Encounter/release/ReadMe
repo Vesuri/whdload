@@ -11,6 +11,21 @@ Note:   The program has still a bug, but i cant find the source since
 
  History
  
+ Version 2.0b (12.11.2026) done by Vesuri
+ - Enhanced framerate option (CUSTOM1=1, set in the supplied icon) on a 68020
+   or faster with Fast memory: the game keeps its normal speed and shows up to
+   50 frames a second, objects moving smoothly in between; measured 50 fps on
+   a 68030/50 and 47 fps on an A1200 with Fast memory
+ - Enhanced framerate runs the game's code and stack from Fast memory, uses
+   the CPU caches and, on AGA, fetches the screen 64 bits at a time
+ - Without the option, on a 68000 or without Fast memory the game runs as
+   with 1.2, apart from the GAME OVER screen below
+ - The GAME OVER screen stays up about two seconds on every Amiga (it was a
+   CPU delay loop, gone in a moment on a fast CPU)
+ - Builds on JOTD's 1.2 and Harry's 1.0 and 1.1
+ - Requires WHDLoad 17 or newer; Enhanced framerate uses 72 KB of other
+   memory when available
+
  Version 1.2 (10.01.08) done by JOTD
  - No more need for NOVBRMOVE (division by zero avoided)
  - BUTTONWAIT allows to see intro screen (was not disableable)
