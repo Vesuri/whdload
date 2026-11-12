@@ -394,6 +394,7 @@ _enhance
 	add.l	#PG_STACKTOP,d0
 	lea	STACK_OPERAND,a0
 	move.l	d0,(a0,d7.l)
+	bsr	_fmode
 	bsr	_hzinstall
 	lea	$E50E,a0		;the transform's first store to a slot's arrays
 	add.l	d7,a0
@@ -1312,6 +1313,38 @@ _objrestore
 	bra.b	.r
 .d	rts
 _eloopend
+
+; AGA: the bitplanes fetched 64 bits wide (FMODE 3). The screens ($68000, $78000, planes
+; $1F40 apart, 40-byte rows, modulo 0) are 8-byte aligned. A lowres FMODE 3 fetch unit is
+; 32 cycles, 64 pixels, and the fetch must start on its grid: from $38 the five units of a
+; 320-pixel row end with the one at $B8 (the game: $34/$CA at FMODE 0). Started off the
+; grid ($30, $34) the fetch showed black one-line strips at the end of the first two units
+; in play. The picture keeps its place, but the line's first bitplane data reaches Denise
+; later, and sprites stay hidden until it does: the first pixels of sprite 0, the frame's
+; left edge. BRDSPRT (BPLCON3 bit 1, with ECSENA, BPLCON0 bit 0) shows them: BPLCON0
+; $4200 becomes $4201 in both lists, and list 1's move #0,BPLCON1 ($1232C) becomes
+; move #2,BPLCON3. BPLCON1 stays 0 (the loader's list writes it 0, nothing else writes it);
+; the game otherwise runs with BPLCON3 0, which the ] key also writes. FMODE is set by the
+; lists (move #0,BPL2MOD at $12348 and $1238C becomes move #3,FMODE; BPL2MOD is written 0
+; by every list and by nothing else), not by the CPU: the loader's list ($528, fetch
+; $38/$D0) is still shown at the entry. AGA is told by Lisa's id in DENISEID ($F8, 16 reads
+; in a row: ECS Denise reads $FC, OCS Denise leaves the bus undriven); the ChipRevBits lack
+; the AGA bits under a Kickstart for an ECS machine.
+_fmode	moveq	#16-1,d0
+.id	move.w	$DFF07C,d1
+	cmp.b	#$F8,d1
+	bne.b	.w
+	dbf	d0,.id
+	move.l	#$01FC0003,$12348
+	move.l	#$01FC0003,$1238C
+	move.w	#$0038,$1233E
+	move.w	#$00B8,$12342
+	move.w	#$0038,$12382
+	move.w	#$00B8,$12386
+	move.w	#$4201,$1232A
+	move.w	#$4201,$12376
+	move.l	#$01060002,$1232C
+.w	rts
 
 ; What the transform ($E32A), the sort ($E724) and the draw write, and the camera: chip
 ; address, longs - 1. The interrupt writes none of it (tools/dataflow.py).
