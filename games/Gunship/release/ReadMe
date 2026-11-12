@@ -1,5 +1,5 @@
 
- Gunship Enhanced 2.0b (21.10.2026)
+ Gunship Enhanced 2.0b (12.11.2026)
 
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
@@ -75,13 +75,11 @@
 
  History:
  --------
- version 2.0b (21.10.2026) done by Vesa Halttunen:
- - smoother framerate and responsive controls on 68020 and later, enabled in
-   the installed icon (CUSTOM1=1)
- - faster CPU renderer for the 3D view, selected automatically
- - fixes for enhanced-mode ground climb indication, missile kills and
-   small-bank left drift; damage-flash background colour restores correctly
- - smoother damaged-tail-rotor turning; 68040 graphics corruption fixed
+ version 2.0b (12.11.2026) done by Vesa Halttunen:
+ - Enhanced framerate for the PAL 0658 and NTSC 1489 releases on 68020 and
+   later: smoother 3D view and more responsive controls, enabled in the
+   installed icon (CUSTOM1=1)
+ - blitter waits fixed for fast CPUs, in all modes and releases
  - updated installer with PAL/NTSC selection
 
  version 1.2 (15.02.2020) done by JOTD:

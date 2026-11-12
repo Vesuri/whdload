@@ -1,6 +1,6 @@
 # Gunship hybrid timing design
 
-This describes the 2.0b (21.10.2026) hybrid timing implementation.
+This describes the 2.0b (12.11.2026) hybrid timing implementation.
 [PERFORMANCE_PLAN.md](PERFORMANCE_PLAN.md), section C's refocus, defines release
 acceptance. C-R1–C-R3 are complete; C-R4/C-R5 remain open. C is not complete.
 Implementation history and superseded experiments are in git.
