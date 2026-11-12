@@ -40,6 +40,14 @@ presentation_build:
 	move.b $37(a0),d0
 	neg.b d0
 	move.b d0,12(a1)
+	; At zero height the world tick's ground step clears pitch and roll, so
+	; native frames always show the grounded helicopter level. Field motion
+	; previews stick input before that reset: present it level as well.
+	tst.w $1c(a0)
+	bne .attitude_ready
+	clr.b 11(a1)
+	clr.b 12(a1)
+.attitude_ready:
 	btst #4,$0f(a0)
 	beq .undamaged
 	moveq #6,d1

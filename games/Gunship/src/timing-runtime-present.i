@@ -54,6 +54,12 @@ timing_runtime_present_state:
  bsr endpoint_camera_angles
  tst.l d0
  bne .done
+ ; Grounded: the next world tick clears pitch and roll (native ground step);
+ ; keep the previewed stick attitude out of the camera, as in native frames.
+ tst.w $1c(a0)
+ bne .attitude
+ clr.l 8(a2) ; camera pitch and roll
+.attitude:
  movea.l a6,a0
  bsr timing_runtime_damage_yaw
  lea RT_ACTOR_PRESENT(a6),a0

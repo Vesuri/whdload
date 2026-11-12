@@ -26,7 +26,7 @@ otherwise land in the view buffer.
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
 The arena is 30,436 bytes for 0658 and 30,428 for 1489; each release slave
-has 49,908 bytes of text (49,944-byte hunk executable).
+has 49,936 bytes of text (49,972-byte hunk executable).
 The CPU renderer separately allocates 36,010 bytes of fast RAM: 18,000 for
 the view and 18,010 for cached cockpit artwork and its mask.
 `timing-core.i` defines the included implementation. Exact guided forecast,
@@ -149,7 +149,9 @@ slew per consumed field; needles derive directly from current instrument
 angles. Per-buffer saved backgrounds and two-buffer repaint counters remain
 drawing-owned. Negative vertical speed at zero height displays as zero to
 prevent the grounded needle jitter; positive lift and airborne readings keep
-native conversion, and physics is unchanged.
+native conversion, and physics is unchanged. Likewise at zero height the camera
+and attitude indicator present zero pitch and roll: the world tick's ground
+step clears both, so native frames never show the stick's grounded attitude.
 
 Damage-induced yaw is the one deliberate camera easing: only the retained
 random tail-rotor heading impulse is spread over the full following world
