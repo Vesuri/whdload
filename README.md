@@ -21,7 +21,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Ferrari Formula One Enhanced | StingRay | [2.0b (11.11.2026)](https://github.com/Vesuri/whdload/releases/tag/FerrariFormulaOneEnhanced-2.0b-20261111) |
 | Formula One Grand Prix Enhanced | Codetapper | [2.0b (11.11.2026)](https://github.com/Vesuri/whdload/releases/tag/FormulaOneGrandPrixEnhanced-2.0b-20261111) |
 | Grand Prix Circuit Enhanced | JOTD | [2.0b (14.10.2026)](https://github.com/Vesuri/whdload/releases/tag/GrandPrixCircuitEnhanced-2.0b-20261014) |
-| Gunship Enhanced | JOTD | not yet released |
+| Gunship Enhanced | JOTD | [2.0b (12.11.2026)](https://github.com/Vesuri/whdload/releases/tag/GunshipEnhanced-2.0b-20261112) |
 | Hard Drivin' Enhanced | JOTD | [4.0b (06.11.2026)](https://github.com/Vesuri/whdload/releases/tag/HardDrivinEnhanced-4.0b-20261106) |
 | Indianapolis 500 Enhanced | StingRay | [4.0b (11.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Indianapolis500Enhanced-4.0b-20261111) |
 | Legends of Valour Enhanced | CFou! | [2.0b (09.11.2026)](https://github.com/Vesuri/whdload/releases/tag/LegendsOfValourEnhanced-2.0b-20261109) |
