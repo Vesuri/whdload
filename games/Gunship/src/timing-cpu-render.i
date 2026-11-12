@@ -295,6 +295,29 @@ cpu_render_overlay:
  movea.l (sp)+,a0
  bra cpu_render_overlay_native
 
+; The target panel painter (+468C) runs between the view render and the
+; copy at +AA4C. Its 3D target and text use the same primitives in panel
+; coordinates, which the CPU path would draw into the view buffer: keep the
+; panel native. Its native begin/fill leaves the mask and bbox in use, so the
+; next CPU begin clears them natively first. Preserve all registers.
+cpu_render_suspend:
+ move.l a0,-(sp)
+ lea cpu_render_active(pc),a0
+ move.w (a0),cpu_render_suspended-cpu_render_active(a0)
+ clr.w (a0)
+ movea.l (sp)+,a0
+ rts
+
+cpu_render_resume:
+ move.l a0,-(sp)
+ lea cpu_render_active(pc),a0
+ move.w cpu_render_suspended-cpu_render_active(a0),(a0)
+ beq .done
+ move.w #1,cpu_render_mask_dirty-cpu_render_active(a0)
+.done:
+ movea.l (sp)+,a0
+ rts
+
 ; Plot one pixel into all requested planes. d0=x,d1=y,d6=last plane,
 ; d7=pen. Preserve coordinates and line/span state.
 cpu_render_dot:
@@ -694,6 +717,7 @@ cpu_render_art_ready: dc.w 0
 cpu_render_overlay_native: ds.b 12
 cpu_render_active: dc.w 0
 cpu_render_mask_dirty: dc.w 1
+cpu_render_suspended: dc.w 0
 cpu_render_native_line: ds.b 16
 cpu_render_native_pixel: ds.b 16
 cpu_render_native_begin: ds.b 14

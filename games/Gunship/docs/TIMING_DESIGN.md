@@ -18,12 +18,15 @@ CUSTOM1=0 retains native timing. Other recognized executables retain native
 timing and are explicitly untested for this beta. `GUNSHIP_NATIVE` permits a
 small native-only regression build. CUSTOM4 chooses CPU (0, default) or native
 blitter (1) rendering, subordinate to CUSTOM1 and the 68020 CPU gate.
+The target panel painter (+468C) runs between the view render and its copy
+and always draws natively (`cpu_render_suspend`): its 3D target and text would
+otherwise land in the view buffer.
 
 `timing-slave.i` resolves loaded hunks, reads the display's 50/60 Hz frequency,
 allocates/prepares the runtime, and installs the flight entry hook last.
 Prepared native code is signature-checked; the loader's cache flush covers it.
 The arena is 30,436 bytes for 0658 and 30,428 for 1489; each release slave
-has 49,840 bytes of text (49,876-byte hunk executable).
+has 49,904 bytes of text (49,940-byte hunk executable).
 The CPU renderer separately allocates 36,010 bytes of fast RAM: 18,000 for
 the view and 18,010 for cached cockpit artwork and its mask.
 `timing-core.i` defines the included implementation. Exact guided forecast,

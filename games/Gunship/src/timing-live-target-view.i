@@ -53,18 +53,26 @@ timing_view_panel:
  ; The timing core can exceed the 68000's signed-word BSR range.
  ; Keep the call position independent without borrowing a caller register.
  move.l a1,-(sp)
+ bsr cpu_render_suspend
 .panel_call:
  lea .panel_call(pc),a1
  adda.l #timing_runtime_target_panel-.panel_call,a1
  jsr (a1)
+ bsr cpu_render_resume
  movea.l (sp)+,a1
 .skip:
  movem.l (sp)+,d0/a0
  rts
 .native:
  movem.l (sp)+,d0/a0
+ ; The panel's 3D target and text are below the CPU-rendered view: draw
+ ; them natively even while the CPU renderer owns the main view.
+ bsr cpu_render_suspend
+ pea .native_done(pc)
  move.l timing_view_native_panel(pc),-(sp)
  rts
+.native_done:
+ bra cpu_render_resume
 
 ; +46AA refreshes sprites after this call, reloading its own inputs. No stale
 ; selected-target drawing outside an active private panel projection.
