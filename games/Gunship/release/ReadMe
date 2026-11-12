@@ -51,11 +51,10 @@
  world updates. Weapons launch on the next world update. On a 68000 this
  option is ignored and native timing is retained.
 
- CUSTOM4=0: CPU renderer (default when Enhanced framerate is enabled).
- CUSTOM4=1: Original blitter renderer.
- The renderer choice only applies with CUSTOM1=1. The CPU renderer needs
- about 36 KB of additional free fast memory; if unavailable, drawing falls
- back to the blitter. All framerate enhancements share the CUSTOM1 switch.
+ Enhanced framerate draws the 3D view with a faster CPU renderer when about
+ 36 KB of additional free fast memory is available, and with the original
+ blitter renderer otherwise. All framerate enhancements share the CUSTOM1
+ switch.
 
  The installer uses Gunship.slave for PAL 0658 and GunshipNTSC.slave for
  NTSC 1489. Choose by the game release, not by your Amiga's video mode.
@@ -71,16 +70,15 @@
  The reported 68060 T-74 identification-screen graphics issue remains open.
  The 68040 graphics corruption caused by unfinished blitter clears has been
  fixed in enhanced mode. CACHE works in the tested full-MMU FS-UAE setup;
- a cycle-exact NOMMU workaround is no longer required. In that emulator
- profile, select CUSTOM4=1 for better speed. Real 68040 hardware has not
- been tested.
+ a cycle-exact NOMMU workaround is no longer required. Real 68040 hardware
+ has not been tested.
 
  History:
  --------
  version 2.0b (21.10.2026) done by Vesa Halttunen:
  - smoother framerate and responsive controls on 68020 and later, enabled in
    the installed icon (CUSTOM1=1)
- - selectable faster CPU renderer
+ - faster CPU renderer for the 3D view, selected automatically
  - fixes for enhanced-mode ground climb indication, missile kills and
    small-bank left drift; damage-flash background colour restores correctly
  - smoother damaged-tail-rotor turning; 68040 graphics corruption fixed

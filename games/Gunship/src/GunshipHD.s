@@ -104,8 +104,8 @@ slv_info		dc.b	"adapted & fixed by JOTD",10
 slv_CurrentDir:
 	dc.b	"data",0
 slv_config:
-	dc.b	"C1:B:Enhanced framerate;"
-		dc.b	"C4:L:Enhanced renderer:CPU,Blitter;",0
+	; CUSTOM4 (renderer) is not offered: CPU when its fast memory is available.
+	dc.b	"C1:B:Enhanced framerate;",0
 
 _program:
 	dc.b	"Gunship",0
