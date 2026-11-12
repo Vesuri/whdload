@@ -223,15 +223,23 @@ cpu_render_finish:
 .plane:
  movea.l (a2)+,a1
  movea.l a4,a6
- ; Top five rows are wholly opaque cockpit art: leave them in place.
- adda.w #200,a0
- adda.w #200,a1
- adda.w #200,a5
- adda.w #200,a6
+ ; Top five rows: the cockpit frame and pillar tops. The native top-strip
+ ; restore is skipped, and a native fill still reaches these rows in chip,
+ ; so compose them from the cached art and mask every frame.
+ moveq #99,d6
+.top:
+ move.w (a6)+,d1
+ move.w (a5)+,d0
+ and.w d1,d0
+ not.w d1
+ and.w (a0)+,d1
+ or.w d1,d0
+ move.w d0,(a1)+
+ dbf d6,.top
  moveq #84,d6 ; remaining 85 view rows
 .row:
  ; Native right strip wraps one word into the next row. Compose both
- ; edges; row 90 and the wholly opaque top strip are never overwritten.
+ ; edges; row 90 is never overwritten.
  move.w (a6)+,d1
  move.w (a5)+,d0
  and.w d1,d0
