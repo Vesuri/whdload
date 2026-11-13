@@ -6924,8 +6924,9 @@ FAST set, CHIP clear and a nonempty physical Zorro II Fast or high-Fast bank.
 68000/68010, slow-only and unverified memory configurations never install the
 clock, prediction, input, converter or publication hooks. Every path installs
 the four bit-exact E1 arithmetic/collision hooks (see below), the two
-[waypoint marker order](#waypoint-marker-layering) hooks and the
-[TrainSim key fix](#trainsim-enemy-selection-by-keyboard).
+[waypoint marker order](#waypoint-marker-layering) hooks, the
+[TrainSim key fix](#trainsim-enemy-selection-by-keyboard) and the four
+[mouse](#mouse-in-rooms-and-menus-both-release-builds-every-mode) hooks.
 
 Public slave hunk offsets: the existing `OS:$11c6` detour (file `$11e6`) calls
 startup at `$14a8` (file `$14c8`); the new gate is `$16b0` (file `$16d0`).
@@ -8433,14 +8434,14 @@ the A1200/030 model.
 
 Static evidence from the pinned CD32 English/German and OCS SPS 1657 English
 executables and Psygore's v1.0 slaves, gathered after a user report of a
-separately developed slave. Nothing here has been run live. `O:` is OCS H0,
+separately developed slave. Only the mouse section has live evidence. `O:` is OCS H0,
 `OD:` its data hunk (A4 = `OD:7ffe`); `E:`/`G:` are CD32 English/German H0 and
 `D:` the CD32 English data hunk (A4 = `D:7ffe`). H0 file offsets are hunk
 offset +`2c` in all three executables; slave file offsets are +`20`.
 
-### No mouse input in any version
+### No mouse input in the original executables
 
-Neither game reads mouse counters or uses a mouse event:
+Neither original executable reads mouse counters or uses a mouse event (the release slaves add [mouse control](#mouse-in-rooms-and-menus-both-release-builds-every-mode)):
 
 - **Joystick polling is port 1 only.** OCS `O:33f24(port)` decodes JOY0DAT or
   JOY1DAT as a digital stick into `OD:77bc`/`OD:77c8`; all seven callers pass 1.
@@ -8474,6 +8475,84 @@ is therefore digital and paced by the room loop (25 Hz in the enhanced room
 input clock). Callers: TrainSim selection `O:17952`/`E:181c0`, bar
 `O:24f2c`/`E:25d5a`, barracks `O:26138`/`E:2702e`, and one unidentified caller
 at `O:1f440`/`E:20218`.
+
+### Mouse in rooms and menus (both release builds, every mode)
+
+`src/mouse.s` is shared by both slaves; each variant supplies a parameter table
+and its fire and guard hooks. Addresses:
+
+| Item | OCS | CD32 English | CD32 German |
+|---|---|---|---|
+| Room position stores (PL_PS, 8 bytes) | `O:2651a` | `E:273fc` | `G:275be` |
+| Room exit sprite move (call replaced) | `O:26480` | `E:27362` | `G:27524` |
+| Native sprite move wrapper | `O:31d22` | `E:3171e` | `G:318e0` |
+| Position / rectangle / hide counter (A4) | `412`/`444`/`-2154` | `2696`/`2728`/`-1160` | `2740`/`2772`/`-1116` |
+| RAWMOUSE slot (A4) | `-2028` (`OD:7812`) | `162` (`D:80a0`) | `206` (`D:80cc`) |
+| Port-1 fire sample | `O:33f88` (CIA-A bit 7) | `E:33e78` (Psygore's `S:1c2e`) | `G:3403a` |
+| Pad record reset guard | `O:33f1c` | `E:33de6` | `G:33fa8` |
+
+- **Motion.** The room position hook stores the game's A4 and installs
+  `mouse_event` in the RAWMOUSE slot on every call. The game's input handler
+  calls the slot with `a3` = event and keeps only `d2/a2/a3`; the callback keeps
+  the rest. It takes relative events only, adds the counts to a half-pixel
+  position (two mouse counts per lores pixel), clamps it to the room rectangle
+  and moves the sprite at once through the native wrapper, which adds the
+  image hotspot. It acts only while a room is active (from the room routine's
+  first call to the exit's sprite move) and the hide counter is zero. The bar
+  hides the pointer during conversations; the sprite itself is allocated once
+  (`E:31536`) and freed only at exit (`E:31598`).
+- **Room routine.** If the callback moved since the last call, the native
+  position becomes the mouse position. Otherwise, a native step (stick or keys)
+  becomes the mouse's position. Highlighting and clicks stay native.
+- **Left button as fire.** OCS samples port-1 fire as CIA-A bits 6 or 7 low.
+  CD32 calls Psygore's pad read and sets the red-button bit 22 when bit 6 is
+  low. Every native fire state then follows: current, held, click and double
+  click. That includes the input history of the enhanced builds, which copies
+  the native record.
+- **Click release guard.** Every screen change resets the pad records
+  (OCS `O:33f02`, 21 callers; CD32 `E:33dee`, 21 callers), setting the click
+  counter to -1. The VBL decoder ignores the next release while it is -1, so the
+  first full fire click on a new screen did nothing, for the stick and pad too.
+  The guard now stays armed only while the red button or the left mouse button
+  is held at the reset, so a held button still cannot click the new screen.
+- **Coverage of continue/skip waits.** These waits use key-or-fire
+  routines, so the left button continues them: for example `O:180c4` (36
+  callers), `O:18126` (22), `O:1819e` (4), `O:872`/`8ba`, and the bar's
+  `O:25d2c`. The live checks cover only the intro. Key-only waits
+  remain: name entry, flight keys, the nav map (`O:22558`, `O:22640`) and an
+  Esc loop at `O:142ac`.
+
+How it is checked:
+- **CD32, native.** `tools/cd32_fixes_check.py` runs the room routine from after
+  its input call to its sprite move, for both languages. It drives the callback
+  with relative, absolute, empty and clamped events and with a hidden pointer,
+  and checks that the stick still steps the pointer. It runs the room exit, the
+  VBL pad read with and without the left button, and the record reset with each
+  button held. Psygore's list alone is the control; `--sabotage mouse-ignored`
+  must fail.
+- **OCS, native.** `tools/ocs_options_check.py` runs the same scenario on the
+  68000 model after both the enhanced and the original-mode install.
+- **Live.** `tools/mouse_live_check.py` skips the intro with the left button
+  (the port-0 button) where `modal_live_check.py` presses Esc. At the start menu
+  it moves the mouse 4 counts per field, out and back, and samples the sprite's
+  `x` every field. Then one click must select.
+
+Live results (deterministic warp, PAL, 2026-11-13):
+- **CD32, enhanced and Psygore normal (`a1200-030`):** the sprite moves 2 pixels
+  every field. The room position follows at the room routine's rate (25 Hz
+  when enhanced).
+- **OCS enhanced (`a1200-030`):** every field too. OS event timing sometimes
+  splits two fields' motion 1/3.
+- **OCS original mode, `a1200-030` and `a500`:** the motion arrives in bursts,
+  for example 0, 0, 6, 2. At field boundaries the game is either in
+  Forbid+Disable inside the native display code (`O:32942`–`32cfc`) or in its
+  VBL chain, so input.device, and the native room loop with it, gets no CPU for
+  several fields. The full distance arrives and the position settles exactly.
+  The native stick pointer has the same cadence.
+- **All five runs:** the first click selects.
+
+Not yet checked live: the bar, barracks and TrainSim rooms (they use the same
+routine), German, and real hardware.
 
 ### Flight steering input
 

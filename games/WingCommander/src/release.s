@@ -44,19 +44,62 @@ release_limit:
 ;   save-failure branch he NOPed.
 ; - TrainSim keys 1-4 (game bug). The fly-off animation is passed the pointer
 ;   choice d4, still -1 after a key; pass the stored choice (a2) instead.
+; - Mouse (mouse.s). The room pointer follows port-0 mouse motion, and the left
+;   button is port-1 fire, so it also clicks hotspots and skips what fire skips.
+;   Each screen's pad reset arms a release guard that swallowed the first fire
+;   click after it; it now arms only while a fire button is held.
 release_patchseg:
         bsr.w   timing_patchseg
         movem.l d0-d1/a0-a1,-(sp)
         lea     fix_patch_en(pc),a0
+        lea     mouse_params_en(pc),a1
         move.l  slave+$1de4(pc),d0
         subq.l  #1,d0
         bne.s   .english
         lea     fix_patch_de(pc),a0
+        lea     mouse_params_de(pc),a1
 .english:
+        move.l  a1,-(sp)
         movea.l d7,a1
         jsr     116(a2)          ; resload_PatchSeg
+        movea.l (sp)+,a0
+        move.l  d7,d0
+        lsl.l   #2,d0
+        addq.l  #4,d0
+        bsr.w   mouse_init
         movem.l (sp)+,d0-d1/a0-a1
         rts
+
+; Port-1 pad read in the VBL server (Psygore's S:1c2e); the left mouse button
+; (CIA-A PRA bit 6) adds the red button, which the game decodes as fire.
+mouse_pad:
+        bsr.w   slave+$1c2e
+        btst    #6,$bfe001
+        bne.s   .up
+        bset    #22,d0
+.up:
+        rts
+
+; Pad record reset (a0 = record): the click counter -1 ignores the next
+; release. Keep it only for a red button or left mouse button held now.
+mouse_guard:
+        move.w  #-1,18(a0)
+        btst    #7,$bfe001
+        beq.s   .held
+        btst    #6,$bfe001
+        beq.s   .held
+        clr.w   18(a0)
+.held:
+        rts
+
+; mouse.s parameters: position, rectangle, RAWMOUSE slot, hide counter (A4),
+; native sprite move (H0).
+mouse_params_en:
+        dc.w    2696,2728,162,-1160
+        dc.l    $3171e
+mouse_params_de:
+        dc.w    2740,2772,206,-1116
+        dc.l    $318e0
 
 ; Raw patch lists (no includes in this build): command, long offset, argument.
 fix_patch_en:
@@ -72,6 +115,18 @@ fix_patch_en:
         dc.w    7                ; PL_W move.w (a2),-(sp): TrainSim choice
         dc.l    $1827e
         dc.w    $3f12
+        dc.w    3                ; PL_PS room routine position stores
+        dc.l    $273fc
+        dc.w    mouse_room-fix_patch_en
+        dc.w    3                ; PL_PS room exit sprite move
+        dc.l    $27362
+        dc.w    mouse_exit-fix_patch_en
+        dc.w    3                ; PL_PS VBL port-1 pad read, after Psygore's
+        dc.l    $33e78
+        dc.w    mouse_pad-fix_patch_en
+        dc.w    3                ; PL_PS pad record reset: click release guard
+        dc.l    $33de6
+        dc.w    mouse_guard-fix_patch_en
         dc.w    0
 fix_patch_de:
         dc.w    3
@@ -86,6 +141,18 @@ fix_patch_de:
         dc.w    7
         dc.l    $18338
         dc.w    $3f12
+        dc.w    3
+        dc.l    $275be
+        dc.w    mouse_room-fix_patch_de
+        dc.w    3
+        dc.l    $27524
+        dc.w    mouse_exit-fix_patch_de
+        dc.w    3
+        dc.l    $3403a
+        dc.w    mouse_pad-fix_patch_de
+        dc.w    3
+        dc.l    $33fa8
+        dc.w    mouse_guard-fix_patch_de
         dc.w    0
 
 ; StoreNV(a1 item name, a2 data, d0 size): as Psygore's S:16b6, but returns

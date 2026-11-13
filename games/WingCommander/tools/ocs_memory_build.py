@@ -27,8 +27,13 @@ NATIVE={'OCS_CHIP_ALLOC':0x33b60,'OCS_REGISTER':0x33c8e,
 # E1 shortcuts that are bit-exact with native code; public builds install them
 # in every mode and on every CPU.
 EXACT=('ocs_multiply','ocs_distance_ratio','ocs_radius','ocs_collision_pair')
-# Installed on every path: bit-exact E1 shortcuts and the waypoint marker order.
-ALWAYS=EXACT+('waypoint_early','waypoint_scene')
+# Mouse in rooms (src/mouse.s), public builds, every mode: the room routine's
+# position stores, the room exit's sprite move, the VBL port-1 fire sample and
+# the port-1 record reset's click release guard.
+MOUSE=((0x2651a,'mouse_room',0x4eb9),(0x26480,'mouse_exit',0x4eb9),(0x33f88,'mouse_fire',0x4eb9),
+       (0x33f1c,'mouse_guard',0x4eb9))
+# Installed on every path: bit-exact E1 shortcuts, the waypoint marker order and the mouse.
+ALWAYS=EXACT+('waypoint_early','waypoint_scene')+tuple(label for _,label,_ in MOUSE)
 # Game-bug word fixes, public builds, every mode: (offset, guarded bytes, word).
 # TrainSim keys 1-4: the fly-off animation gets the stored choice (a2), not d4.
 WORDS=((0x179e2,'3f04486c3d60','3f12'),)
@@ -65,6 +70,7 @@ def build(out,option,exit_probe=False,changed="off", clock=False, prediction=Fal
         from ocs_intro_source import NATIVE as intro_native, HOOKS as intro_hooks
         native.update(intro_native);hooks+=intro_hooks
     if public:
+        hooks+=MOUSE
         hooks+=tuple((off,'cinematic_background',0x4eb9) for off in (0x1d0f2,0x1d10e,0x1d222,0x1d23e))
         native['OCS_CINEMATIC_DRAW']=0x2f9a6
     if math_fast:
@@ -411,7 +417,36 @@ exact_hooks_done:
             words+=(f' movea.l d6,a5\n adda.l #${off:x},a5\n cmpi.l #${guard[:8]},(a5)\n'
                     f' bne.s .skip{off:x}\n cmpi.w #${guard[8:]},4(a5)\n bne.s .skip{off:x}\n'
                     f' move.w #${value},(a5)\n.skip{off:x}:\n')
-        words+=' rts\n'
+        words+=' lea ocs_mouse_params(pc),a0\n move.l d6,d0\n bsr.w mouse_init\n rts\n'
+        # The left button (CIA-A PRA bit 6) is sampled as port-1 fire too.
+        # Replaces btst #7,$bfe001 / seq d0 / neg.b d0 (12 bytes).
+        words+='''
+mouse_fire:
+ move.b $bfe001,d0
+ not.b d0
+ andi.b #$c0,d0
+ sne d0
+ neg.b d0
+ addq.l #6,(sp)
+ rts
+; Port-1 record reset: the click counter -1 ignores the next release (the
+; first click after each screen change). Keep it only while fire is held.
+; Registers and the caller's condition codes are not used after this.
+mouse_guard:
+ move.w #-1,-2092(a4)
+ btst #7,$bfe001
+ beq.s .held
+ btst #6,$bfe001
+ beq.s .held
+ clr.w -2092(a4)
+.held:
+ rts
+; mouse.s parameters: position, rectangle, RAWMOUSE slot, hide counter (A4),
+; native sprite move (H0).
+ocs_mouse_params:
+ dc.w 412,444,-2028,-2154
+ dc.l $31d22
+'''+(ROOT/'src/mouse.s').read_text()
         require('exact_hooks_done:\n bsr.w slave+$ee8' in exact,'original install end missing')
         exact=exact.replace('exact_hooks_done:\n bsr.w slave+$ee8','exact_hooks_done:\n bsr.w word_fixes\n bsr.w slave+$ee8',1)
         require(text.count(' bsr.w slave+$ee8\ninstall_done:')==1,'enhanced install end missing')
@@ -493,6 +528,7 @@ exact_hooks_done:
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
                 public_option=public,opening=public,word_fixes=[list(w) for w in WORDS] if public else [],
+                mouse=[[off,label] for off,label,_ in MOUSE] if public else [],
                 version='2.0b' if public else None, release_date='19.10.2026' if public else None,
                 expansion_bytes=0x100000 if public else 0xf0000,
                 game_pool_bytes=0xc0000 if public else 0xb0000,

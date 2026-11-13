@@ -15,7 +15,7 @@ throughput.
 The OCS public candidate now gates all enhancements with CUSTOM5=1 and verified
 68020+/true Fast memory; its generated icon enables the toggle. Off/ineligible
 keeps original behaviour; only E1's bit-exact arithmetic/collision shortcuts,
-the waypoint marker order and the TrainSim key fix run on every path. Legacy diagnostic candidates remain reproducible.
+the waypoint marker order, the TrainSim key fix and the mouse hooks run on every path. Legacy diagnostic candidates remain reproducible.
 Normal OCS reconstruction and CD32 slaves remain byte-identical. C2 recommends
 native blitter on the measured 68000 and no-Fast 68020 profiles; CPU/Fast longword
 conversion wins the measured 14 MHz 68020/Fast profile. These are scoped emulator

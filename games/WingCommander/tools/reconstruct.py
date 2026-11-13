@@ -141,6 +141,7 @@ def cd32_main(argv):
         lines.append(render_source(ROOT, variant="cd32"))
     if a.release:
         lines.append((ROOT/'src/release.s').read_text())
+        lines.append((ROOT/'src/mouse.s').read_text())
     if a.timing:
         lines.append('TIMING_VERIFY equ '+str(int(a.timing_verify)))
         lines.append('FRAME_STATS equ '+str(int(a.frame_stats)))

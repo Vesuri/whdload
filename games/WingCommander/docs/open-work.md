@@ -853,14 +853,14 @@ behaviour, save/load and nonvolatile storage, options in the slave, the ReadMe, 
 release archive per AmigaXDev's playbook. Final play-test by the user on real hardware
 if available.
 
-#### Reported defects and mouse control (static findings)
+#### Reported defects and mouse control
 
 A user who developed a separate slave reported a delayed bunk save, a TrainSim
 selection fault with number keys, non-persistent TrainSim high scores and missing
 mouse control. His base, "Psygore 1.1", is not listed on whdload.de (only 1.0);
 his remaining fixes are not yet known. Static evidence for everything below is
 in [input, saves and TrainSim](internals.md#input-devices-bunk-saves-and-trainsim-selection);
-none of it has been run live. It covers the three pinned executables only; the
+only the mouse has been run live. It covers the three pinned executables only; the
 two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files.
 
 - **CD32 bunk save (slave bug; English and German): fixed in the release build,
@@ -886,14 +886,25 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   table (OCS `OD:bbcc`, six 6-byte entries). Save it per slot beside the save and
   restore it on load. First locate the CD32 table, find when the game resets it,
   and confirm that its pilot indices refer to the loaded campaign.
-- **Smooth mouse pointer (rooms).** The pointer is already a hardware sprite, but
-  the game moves it in 5/3-pixel steps from digital input. Install a callback in
-  the input handler's unused RAWMOUSE slot that accumulates mouse motion within
-  the room rectangle and moves the sprite on every event. The native room routine
-  takes that position when the mouse has moved, keeping stick and keys, and the
-  left button enters through the sampled port-0 fire state (menus need its
-  double-tap). It must fit the enhanced 25 Hz room input clock. First identify the
-  fourth room-routine caller and any other pointer screens, such as the nav map.
+- **Mouse pointer in rooms and menus: done in both release builds, every mode
+  (2026-11-13).**
+  - Port-0 mouse motion moves the room pointer sprite through the input
+    handler's RAWMOUSE slot. The left button is port-1 fire, so it clicks
+    hotspots and continues or skips whatever fire does, including the intro.
+  - The first click after a screen change is no longer swallowed, for the stick
+    and pad too.
+  - The native checks pass. The live check passes on the start menu for CD32
+    enhanced and original, OCS enhanced, and OCS original on `a1200-030` and
+    `a500`.
+  - The sprite moves every field, except in OCS original mode: the native
+    renderer holds Forbid+Disable across field boundaries, so the motion
+    arrives in bursts there, as the stick pointer does.
+  - Still to do live: the bar, barracks and TrainSim rooms, German, and a user
+    play-test.
+  - Unchanged: key-only waits such as the nav map and name entry, and the right
+    button.
+
+  See [mouse](internals.md#mouse-in-rooms-and-menus-both-release-builds-every-mode).
 - **Mouse flight (new control).** No proportional steering exists. A virtual
   stick would turn mouse motion into an offset from screen centre that sets the
   steering ramps or rates proportionally, shown by a crosshair sprite. It also

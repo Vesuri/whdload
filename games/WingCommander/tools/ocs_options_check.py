@@ -9,9 +9,60 @@ import ctypes as C
 import hashlib
 import json
 from pathlib import Path
-from ocs_display_check import Native, CODE, STARTUP, STOP, ck, u, word, long
+import struct
+from ocs_display_check import Native, CODE, DATA, STARTUP, STACK, STOP, ck, u, word, long
 from ocs_reconstruct import ROOT, new_output, require
 from ocs_icon import enhanced_icon, tooltypes
+
+
+GFX,RECT,IMAGE,EVENT=0x1a0000,0x1a1000,0x1a1100,0x1a2000
+
+
+def mouse_scenario(c,slave,sy):
+    """The installed mouse hooks on the native room routine, its exit, the
+    RAWMOUSE callback and the VBL fire sample (68000)."""
+    a4=DATA+0x7ffe;moves=[];saved={r:c.reg(r) for r in range(1,19)}
+    var=lambda name:struct.unpack('>h',c.read(slave+sy[name],2))[0]
+    require(c.get(slave+sy['mouse_params'],4)==slave+sy['ocs_mouse_params'] and
+            c.get(slave+sy['mouse_move'],4)==CODE+0x31d22,'mouse not initialised')
+    c.write(CODE+0x33518,long(GFX));c.write(GFX-426,word(0x4e75))
+    c.intercept(GFX-426,lambda:moves.append((struct.unpack('>h',word(c.reg(9)))[0],struct.unpack('>h',word(c.reg(10)))[0])))
+    c.write(RECT+24,struct.pack('>4h',40,30,280,180));c.write(IMAGE+4,struct.pack('>hh',-3,-2))
+    c.write(a4+444,long(RECT));c.write(a4-2158,long(IMAGE));c.write(a4-2154,word(0))
+    c.write(a4+412,struct.pack('>hh',160,100));c.write(a4-13522,long(0))
+    def segment(start,stop,sp=STACK):
+        c.reg(17,0x2700);c.reg(5,a4);c.reg(8,sp)
+        ck(u.uc_emu_start(c.h,CODE+start,CODE+stop,0,100000))
+        if c.error:raise c.error
+        require(c.reg(18)==CODE+stop,f'mouse segment stopped at O:{c.reg(18)-CODE:x}')
+    def room(stick=(0,0,0,0)):
+        c.write(a4+16084,bytes(stick));segment(0x2649a,0x26536)
+        return struct.unpack('>hh',c.read(a4+412,4))
+    def event(dx,dy,qualifier=0x8000):
+        c.write(EVENT,struct.pack('>IBBHHhh',0,2,0,0xff,qualifier,dx,dy));n=len(moves)
+        c.run(slave-CODE+sy['mouse_event'],registers={4:EVENT})
+        return moves[n:]
+    require(event(8,8)==[],'mouse callback active before the room routine')
+    require(room()==(160,100) and var('mouse_active')==1 and c.get(a4-2028,4)==slave+sy['mouse_event'],'mouse room entry')
+    require(event(10,-6)==[(162,95)] and event(1,1)==[(162,95)] and event(1,1)==[(163,96)],'mouse motion')
+    require(room()==(166,98) and room((1,0,0,0))==(161,98),'room routine mouse/stick position')
+    for _ in range(4):last=event(127,127)
+    require(last==[(277,178)] and room()==(280,180),'mouse rectangle clamp')
+    require(event(5,5,0)==[] and event(0,0)==[],'mouse non-relative event accepted')
+    c.write(a4-2154,word(0x4000));require(event(-9,-9)==[],'hidden pointer moved');c.write(a4-2154,word(0))
+    c.write(STACK-8,long(STOP));segment(0x26478,0x26486,STACK-8)
+    require(moves[-1]==(997,998) and var('mouse_active')==0 and event(-9,-9)==[],'mouse room exit')
+    fire={}
+    for pra in (0xff,0xbf,0x7f,0x3f):
+        c.write(0xbfe001,bytes([pra]));segment(0x33f88,0x33f94);fire[pra]=c.reg(9)&255
+    require(fire=={0xff:0,0xbf:1,0x7f:1,0x3f:1},'left button is not port-1 fire')
+    guard={}
+    for pra in (0xff,0xbf,0x7f):
+        c.write(0xbfe001,bytes([pra]));c.write(a4-2114,b'\x5a'*24)
+        c.run(0x33f02);guard[pra]=c.read(a4-2114,24)
+    require(all(g[:10]==bytes(10) and g[10:12]==word(-1) and g[12:22]==bytes(10) for g in guard.values()),'record reset')
+    require([g[22:] for g in guard.values()]==[word(0),word(-1),word(-1)],'click release guard')
+    for r,v in saved.items():c.reg(r,v)
 
 
 def check(build, mutation=None):
@@ -54,6 +105,7 @@ def check(build, mutation=None):
            (0x500000,0,'unmapped'),(0x500000,6,'chip-and-fast'),
            (0x500000,1,'public-only'),(0x80000,4,'chip-slave-fast'),
            (0x500000,4,'empty'),(0x500000,4,'invalid-bounds'))
+    mouse_runs=set()
     for slave,kind,bank in banks:
         for flags in (0,1,2,3,4,8,128):
             for option in (0,1,2,0xffffffff):
@@ -103,8 +155,10 @@ def check(build, mutation=None):
                                     require(c.get(CODE+at,2)==opcode and c.get(CODE+at+2,4)==slave+sy[label],'missing enhanced hook')
                                 for at,guard,value in words:
                                     require(c.read(CODE+at,2)==(before[at:at+2] if corrupt=='word' else bytes.fromhex(value)),'word fix state')
+                                if 'enhanced' not in mouse_runs and not corrupt:
+                                    mouse_scenario(c,slave,sy);mouse_runs.add('enhanced')
                             elif revision==0x1302 and corrupt!='exact':
-                                # Original mode: only the E1 shortcuts, waypoint marker order and word fixes.
+                                # Original mode: only the E1 shortcuts, waypoint marker order and mouse.
                                 after=bytearray(c.read(CODE,0x358c8))
                                 for at,label,opcode in exact:
                                     require(after[at:at+6]==word(opcode)+long(slave+sy[label]),'missing exact hook')
@@ -117,6 +171,8 @@ def check(build, mutation=None):
                                 for pos in meta['fixups']:
                                     value=int.from_bytes(payload[pos:pos+4],'big')
                                     require(c.read(slave+pos,4)==long((value&0x0fffffff)+CODE),'exact native operand unresolved')
+                                if 'original' not in mouse_runs and not corrupt:
+                                    mouse_scenario(c,slave,sy);mouse_runs.add('original')
                             else:
                                 require(c.read(CODE,0x358c8)==before and c.read(STARTUP,0x1d94)==opening_before,'original mode modified game')
                                 require('flush' not in events and 'abort' not in events,'original mode enhanced')
@@ -136,6 +192,7 @@ def check(build, mutation=None):
         try:enhanced_icon(bad)
         except (ValueError,IndexError):rejected+=1
     require(rejected==3,'unsafe icon accepted')
+    require(mouse_runs=={'enhanced','original'},'mouse scenario not run on both install paths')
     return dict(passed=True,sha256=meta['sha256'],cases=results,icon_rejections=rejected)
 
 
