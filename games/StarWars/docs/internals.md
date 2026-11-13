@@ -109,6 +109,8 @@ Always applied (no option): they repair drawing and sound on faster CPUs and lea
 | $1b70, $1bb0 | `PL_PSS SetPixel,8` | set or clear per plane from the flags the setter stores (-28138..-28135(a4)) |
 | $0898, $0a9c, $1a7e, $1aae, $990e, $9942, $9a16, $9a4a, $9b3c, $9b76 | `PL_PSS BlitWait` | every BBUSY poll reads DMACONR once first (WHDLoad's `BLITWAIT`); several polled right after BLTSIZE |
 | $1b2c, $1b86, $1c08 | `PL_P`/`PL_PSS` | the CPU plot, horizontal line and screen clear wait for the blitter first: on a 68000 with the nasty blitter the CPU could not reach Chip RAM during a blit |
+| $3958 | `PL_W 3` | the title zoom's wait (`cmpi.w #1,-26430(a4)`) waits for 3 fields of work: a pass took 2 fields on a1200-030, 4 or 5 on a500-1.5m (which never waits at 3, so it is unchanged) |
+| $26f6, $270c | `PL_PSS SelectStart,2`, `SelectEnd,2` | the wave select loop $26f6-$2720 (stars, cannons, until fire or the counter reaches 500) had no wait: a pass took 3 fields on a500-1.5m, 2 on a1200-030, 1 on a1200-060. Now it notes the counter after the swap wait ($26f6, with the `jsr -32670(a4)` after it) and, after the cannons (`jsr $59e6(pc)` at $270c), waits for 2 more before the swap request, so a pass takes 3 (a500-1.5m unchanged: 3, now and then 4). The counter keeps running for the 10 s timeout. The loop enters at $2714 (`bra.s` from $26f4), so the patch stays before it |
 | $9f7c | `PL_PSS AudioWait,10` | the music player counted a 50-pass CPU loop (about 5 lines on a 68000) between starting channel 0 and writing its repeat pointer; now 8 raster lines by the beam (two periods of period 880). FS-UAE's `AUD0LCH HACK` log lines came from it |
 
 ## Enhanced framerate (CUSTOM2, `src/StarWarsSmooth.s`, `PLSMOOTH403`)
@@ -118,12 +120,12 @@ interpolation, not a finer simulation tick (a 50 Hz tick would mean dividing eve
 countdown, spawn chance and random draw of the three phases by three, and AI decisions
 would run three times as often). Each tick runs once, unchanged, while the drawing
 primitives it calls are recorded as 16-byte ops; the presenter then draws the recording
-n times, at j/n of the way from the previous tick's recording (n = 3 in the game, 2 or
-3 in the attract loops). Game logic, random numbers and sounds are untouched: 1500 ticks
+n times, at j/n of the way from the previous tick's recording (n = 3 in the game and the
+wave select, 2 to 4 in the attract loops). Game logic, random numbers and sounds are untouched: 1500 ticks
 through space and surface after firing left the game state at $51e2 the same as the
 default, tick for tick (`tmp/scripts/ticks2.sh`). Only the star table -25758(a4) differs:
-the unpaced wave select loop (below) leaves it in a state that depends on the CPU and
-the frames drawn, as it does between machines in the original.
+the attract leaves it in a state that depends on how far the attract ran before the
+fire, as it does between machines in the original.
 
 | Code hunk | Patch | What |
 |---|---|---|
@@ -132,7 +134,12 @@ the frames drawn, as it does between machines in the original.
 | $514a, $516c | `PL_PS SmPauseOn/Off` | the pause key draws "Game Paused" into the front screen: not recorded |
 | $8962, $b55e, $b63a, $d584 | `PL_PSS SmTick*,2` | game tick start: picks smooth or direct mode, starts recording |
 | $897e, $b612, $b65e, $d5a8 | `PL_PSS SmPresent*,8` | replaces the paced wait and the swap call: calls the swap request ($09c0 or $0a10, its flag suppressed) while recording, then draws and queues the frames |
-| $771e/$7734, $393c/$3956, $398c/$39dc, $42ce/$432c | `PL_PSS SmTick*,2`, `SmPresent*,8` | the attract loops (text pages, title zoom, title recede, crawl): `jsr $09a8; clr.w` at the start, the wait for the counter (1 or 2) and `jsr $09c0` at the end |
+| $771e/$7734, $393c/$3956, $398c/$39dc, $42ce/$432c | `PL_PSS SmTick*,2`, `SmPresent*,8` | the attract loops (text pages, title zoom, the Obi-Wan text, the flight instructions): `jsr $09a8; clr.w` at the start, the wait for the counter (1, 2, or the zoom's 3) and `jsr $09c0` at the end |
+| $389a/$38c0, $43b4/$441c | `PL_PSS SmTick*,4`, `SmPresent2,14` | the credits and the scoring page, which keep the counter running: `jsr $09a8; move.w -26430(a4),-n(a5)` at the start, the wait for 1 more and `jsr $09c0` |
+| $26f6/$270c | `PL_PSS SmTickSelect,2`, `SmPresentSelect,2` | the wave select loop, paced as the fix paces it (n = 3); its cannons are drawn (recorded) before the present |
+
+The loops that keep the counter running (phase 8 on) note it at a direct tick's start
+(sv_cstart) instead of clearing it, and the direct wait counts from there.
 
 Run-time hooks, installed with `jmp` when a tick records and taken out (the saved bytes
 put back, the cache flushed) in direct mode: colour $1840, line $19ae, plot $1b2c, shape
@@ -145,7 +152,10 @@ $839c (keys its ops by the fighter), and the swap flag store $09fa.
   stars wrapping round), are drawn where they are now.
 - **Pacing.** The counter -26430(a4) runs free. Frame j of a tick is for field B + j;
   each frame is drawn for the first field it can still make, judged by the beam and the
-  last frame's drawing time, so a slow frame skips the in-between frame after it.
+  last frame's drawing time r, so a slow frame skips the in-between frame after it. An
+  in-between frame is drawn only if the exact frame can still make its field after it
+  (2.25 r from now, checked again after waiting for a free screen and copying the HUD
+  strip), so slow frames thin out the in-between frames rather than make the tick late.
 - **Screens.** The exact frame (j = n) is drawn into the game's own back screen, as the
   game would have drawn it, and becomes the game's front screen. In-between frames go into
   one of two extra Chip screens (allocated once, when the largest free block holds them
@@ -165,17 +175,25 @@ surface and trench with the trainer):
 
 | Machine | Mode | Frames per tick | Fields per tick | Frame drawing (lines) |
 |---|---|---|---|---|
-| a500-1.5m | direct from the third attract tick | 1 | as the default | |
-| a1200 | direct from the attract | 1 | as the default | direct tick work about 490 mean |
-| a1200-fast | direct from the attract | 1 | as the default | direct tick work about 300; frames averaged 447 |
-| a1200-030 | smooth throughout | 2.84 | 2.96 | average 275-305 |
+| a500-1.5m | direct from the attract | 1 | as the default | direct tick work 600-670 mean |
+| a1200 | direct from the attract | 1 | as the default | direct tick work about 470 mean |
+| a1200-fast | smooth (1 % of ticks late by a field) | 1.68 | 2.97 | average 380-540; 3499 in-between frames dropped |
+| a1200-030 | smooth throughout | 2.81 | 2.97 | average about 280 |
+
+The attract on a1200-030, scene by scene (`tmp/scripts/scenes.sh`): the credits, the
+title zoom (n = 4, frames up to about 380 lines: about 3.6 frames a tick), the Obi-Wan
+text, the flight instructions, the scoring page and the text pages all stayed smooth,
+with no late tick and one dropped frame in 2772 ticks. The wave select (frames about
+290-380 lines) gets one in-between frame a tick there; a1200-060 changed the stars on
+every field in the zoom and the Obi-Wan text.
 
 On a1200-030 the text pages drew 3839 frames in 3888 fields, with the "PULL TRIGGER"
 flash in the default's pattern (each colour two fields); a500-1.5m in direct mode flashed
 in the same pattern. Smooth on a500-1.5m, before direct mode also caught exact frames
-missing their field, the ticks came 1 to 3 fields apart and the flash was irregular. On
-the title recede and the crawl only the stars change in the in-between frames; the logo
-and the crawl text are not interpolated. At most 398 ops in a tick (room for 4096).
+missing their field, ticks came 1 to 3 fields apart and the flash was irregular. In
+every attract scene and the wave select the stars change on every field; the Obi-Wan
+text and the flight instructions scroll by plane copies, which are not interpolated (they
+move per tick). At most 398 ops in a tick (room for 4096).
 
 With CUSTOM2 off the recordings are not allocated, no hook is installed and
 `PLSMOOTH403` applies nothing. The patched code hunk after reaching play
@@ -222,8 +240,7 @@ $1b2c 1.7 %; object update $7c6e and its callees about 2 %. DMA slots: 61 % free
   box covers what is under them (the wave select screen's Death Star). StingRay's
   original slave does the same on a500-1.5m: a bug of the game, not of the sprites or of
   fast CPUs; not fixed.
-- Not paced by the counter: the wave select loop $26f6-$2720 (stars, cannons, until the
-  counter reaches 500) runs as fast as the CPU draws, and the title zoom ($393c) takes 4
-  fields a pass on a500-1.5m and 2 on a1200-030. The pause key in enhanced framerate is
-  not yet tested.
+- The pause key in enhanced framerate is not yet tested.
+- The gdb stub reads data the 68060 keeps writing as stale (the counter -26430 read 0 on
+  a1200-060, the copyback data cache): measure the 060 by screenshots.
 - Quit is Del (`slv_keyexit` $46); F10 is the game's own key in one version.

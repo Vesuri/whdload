@@ -47,7 +47,33 @@ PLFIX403
 	PL_PSS	$9f7c,AudioWait,10	; music: 50-pass CPU loop after AUD0 DMA on
 	PL_GA	$1c10,BlitClearRet
 	PL_P	$1c08,BlitClear		; CPU clear: movem.l d0-a3/a5,-(sp); movea.l -26442(a4),a0
+	PL_W	$3958,3			; title zoom: cmpi.w #1,-26430(a4) waits for 3
+	PL_PSS	$26f6,SelectStart,2	; wave select: jsr -32700(a4); jsr -32670(a4)
+	PL_GA	$59e6,SelectCannons
+	PL_PSS	$270c,SelectEnd,2	; jsr $59e6(pc); jsr -32694(a4) (the loop enters at
+					; $2714, so that stays)
 	PL_NEXT	PLSMOOTH403		; StarWarsSmooth.s (CUSTOM2)
+
+; Paces on fast CPUs, waits an A500 never reaches (it is slower): the title zoom waits
+; for 3 fields of work (4 or 5 a pass on an A500, 2 on an A1200 with a 68030), and the
+; wave select loop, which had no wait (3 fields a pass on an A500, 1 on a 68060), for 2
+; after the swap, so a pass takes 3. Its 10 s timeout reads the counter, which keeps
+; running: the pass start is noted instead of clearing it.
+SelectStart
+	jsr	-32700(a4)		; the swap wait $09a8
+	lea	SelectT(pc),a0
+	move.w	-26430(a4),(a0)
+	jmp	-32670(a4)
+SelectEnd
+	move.l	SelectCannons(pc),a0	; the cannons and the cockpit
+	jsr	(a0)
+.w	move.w	-26430(a4),d0
+	sub.w	SelectT(pc),d0
+	cmp.w	#2,d0
+	blt.b	.w
+	jmp	-32694(a4)		; the swap request $09c0
+SelectCannons	dc.l	0
+SelectT	dc.w	0
 
 BlitWait
 	BLIT_WAIT

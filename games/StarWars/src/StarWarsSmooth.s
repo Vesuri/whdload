@@ -1,14 +1,13 @@
-; Smooth mode (CUSTOM2): 50 frames a second at the game's own speed (SPS 0403).
+; Enhanced framerate (CUSTOM2): 50 frames a second at the game's own speed (SPS 0403).
 ;
-; The game updates its world once per tick, three fields (16.7 Hz, the timing fix),
-; and draws each tick once. Here each tick still runs exactly once, unchanged, but
-; what it draws is recorded instead of drawn: every call to the seven routines the
-; game draws with (colour, line, plot, shape, rectangle fill, plane copy, screen
-; clear). After the tick the presenter draws the recording three times, one frame per
-; field: at 1/3 and 2/3 of the way from the previous tick's recording to this one,
-; then this one exactly. The game logic, its random numbers and its sounds run as
-; they did; only the pictures between two ticks are new. The exact frame of a tick is
-; shown one field earlier than the timing fix showed it.
+; The game updates its world once per tick (three fields in the game and the wave
+; select, two to four in the attract loops) and draws each tick once. Here each tick
+; still runs exactly once, unchanged, but what it draws is recorded instead of drawn:
+; every call to the seven routines the game draws with (colour, line, plot, shape,
+; rectangle fill, plane copy, screen clear). After the tick the presenter draws the
+; recording n times, one frame per field: at j/n of the way from the previous tick's
+; recording to this one, then this one exactly. The game logic, its random numbers and
+; its sounds run as they did; only the pictures between two ticks are new.
 ;
 ; Pairing: each line, plot and shape is keyed by the code address that drew it (and,
 ; for TIE fighters, by the fighter), and paired with the next op of the same key in
@@ -16,24 +15,25 @@
 ; SM_T pixels (a respawn, a star wrapping round), are drawn where they are now.
 ;
 ; Pacing: in smooth mode the counter -26430(a4) runs free (one count per field).
-; Frames are queued with the field they belong to: frame j of a tick (j = 1, 2, 3)
-; belongs to field B+j, B being the field the previous tick's exact frame was for, and
-; the vertical blank shows a queued frame no earlier than its field (the hook at
-; $0066). A frame is drawn for the first field it can still make (by the beam
-; position and the last frame's drawing time), so a slow frame skips the in-between
-; frame after it, and a machine too slow for more draws only each tick's exact frame,
-; as before. The game's two screens and a third (Chip RAM, when free) rotate: a frame
-; is drawn into whichever is neither shown nor queued, so drawing need not wait for
-; the swap and the next tick's logic runs while the last frame waits for its field.
-; Without the third screen, drawing waits for the queued frame to be shown.
-
+; Frames are queued with the field they belong to: frame j of a tick belongs to field
+; B+j, B being the field the previous tick's exact frame was for, and the display
+; (the hook at $00a0) shows a queued frame no earlier than its field. One frame at most
+; is queued. A frame is drawn for the first field it can still make (by the beam
+; position and the last frame's drawing time r). An in-between frame is drawn only if
+; the exact frame can still make its field after it (2.25 r, checked again after
+; waiting for a screen), and is dropped if it misses its field after all, so slow
+; frames thin out the in-between frames instead of making the tick late.
+;
+; Screens: the exact frame is drawn into the game's own back screen, as the game would
+; have drawn it; in-between frames into one of two extra Chip RAM screens (when free),
+; with the HUD strip of the game's back screen copied first.
+;
 ; Direct mode: when more than half of the recent ticks are late (a tick's exact frame
-; misses its field, or the tick starts late), the machine is too
-; slow for in-between frames. Then the drawing hooks are taken out again (SmHooks) and
-; ticks run as the timing fix ran them, drawing directly and waiting for the third
-; field, until a direct tick's work plus its in-between frames' drawing (the running
-; average frame time) fits SM_GO quarters of the tick's fields (after SM_HOLD ticks at
-; least). A 68000 or a stock A1200 stays in direct mode.
+; misses its field, or the tick starts late), the machine is too slow for in-between
+; frames. Then the drawing hooks are taken out again (SmHooks) and ticks run as the
+; default runs them, until a direct tick's work plus its in-between frames' drawing
+; (the running average frame time) fits SM_GO quarters of the tick's fields (after
+; SM_HOLD ticks at least). A 68000 and a stock A1200 stay in direct mode.
 ;
 ; Without the recording buffers (CUSTOM2 off, or AllocMem failed) the hooks are never
 ; installed and the tick and present patches do what the timing fix does.
@@ -132,7 +132,11 @@ sv_thr		rs.w	1		; its wait threshold (direct ticks)
 sv_call		rs.w	1		; and the swap routine it calls then (code-hunk offset)
 sv_exact	rs.b	1		; the queued frame is a tick's exact frame
 sv_prec		rs.b	1		; sv_rec while the game is paused
-sv_pad		rs.w	1
+sv_cstart	rs.w	1		; the counter at the tick start (relative loops)
+sv_rel		rs.b	1		; the loop keeps the counter running (phase 8 on)
+sv_pad		rs.b	1
+sv_pad2		rs.w	1
+sv_dropped	rs.l	1		; VERIFY: in-between frames that missed their field
 sv_SIZE		rs.b	0
 
 ; the game routine at code-hunk offset \1, called
@@ -170,11 +174,20 @@ PLSMOOTH403
 	PL_PSS	$771e,SmTickText,2	; jsr $09a8; clr.w -26430(a4): the text pages
 	PL_PSS	$7734,SmPresent2,8	; cmpi.w #1; bge.s; bra.s; jsr $09c0
 	PL_PSS	$393c,SmTickZoom,2	; the title zooming in
-	PL_PSS	$3956,SmPresent2,8
-	PL_PSS	$398c,SmTickRecede,2	; the title receding
+	PL_PSS	$3956,SmPresent4,8	; (paced to 3 by the fix)
+	PL_PSS	$398c,SmTickObiWan,2	; the Obi-Wan text scrolling up
 	PL_PSS	$39dc,SmPresent2,8
-	PL_PSS	$42ce,SmTickCrawl,2
+	PL_PSS	$42ce,SmTickCrawl,2	; the flight instructions
 	PL_PSS	$432c,SmPresent3c,8	; cmpi.w #2
+	; the loops that keep the counter running: the counter noted at the start, the
+	; wait for 1 more (move.w; sub.w; cmp.w #1,d0; bge.s; bra.s) and jsr $09c0
+	PL_PSS	$389a,SmTickCredits,4	; the credits (jsr $09a8; move.w -26430(a4),-4(a5))
+	PL_PSS	$38c0,SmPresent2,14
+	PL_PSS	$43b4,SmTickScoring,4	; the scoring page (... -10(a5))
+	PL_PSS	$441c,SmPresent2,14
+	PL_PSS	$26f6,SmTickSelect,2	; the wave select loop (jsr $09a8; jsr -32670(a4)),
+	PL_PSS	$270c,SmPresentSelect,2	; paced as the fix paces it (jsr $59e6(pc);
+					; jsr $09c0)
 	PL_ENDIF
 	PL_END
 
@@ -205,17 +218,17 @@ SmAlloc
 
 SmTickSpace
 	moveq	#1,d0
-	bsr.b	SmBegin
+	bsr.w	SmBegin
 	GOTOG	$8720
 
 SmTickSurface
 	moveq	#2,d0
-	bsr.b	SmBegin
+	bsr.w	SmBegin
 	GOTOG	$b2f8
 
 SmTickTrench
 	moveq	#3,d0
-	bsr.b	SmBegin
+	bsr.w	SmBegin
 	jmp	-32454(a4)
 
 ; the attract loops' jsr $09a8; clr.w -26430(a4)
@@ -225,24 +238,53 @@ SmTickText
 SmTickZoom
 	moveq	#5,d0
 	bra.b	SmTickA
-SmTickRecede
+SmTickObiWan
 	moveq	#6,d0
 	bra.b	SmTickA
 SmTickCrawl
 	moveq	#7,d0
+	bra.b	SmTickA
+; the loops that keep the counter running: jsr $09a8; move.w -26430(a4),-n(a5)
+; (the store only fed the replaced wait)
+SmTickCredits
+	moveq	#8,d0
+	bra.b	SmTickA
+SmTickScoring
+	moveq	#9,d0
 SmTickA	move.l	SmV+sv_buf(pc),d1	; (d0-d1/a0-a1 are free: the jsr took them)
-	bne.b	SmBegin			; (a direct tick waits for the swap there)
+	bne.w	SmBegin			; (a direct tick waits for the swap there)
+	move.l	d0,-(a7)
 	CALLG	$09a8
+	move.l	(a7)+,d0
+	bra.w	SmClr
+; the wave select loop: jsr $09a8; jsr -32670(a4)
+SmTickSelect
+	moveq	#10,d0
+	bsr.b	SmTickA
+	jmp	-32670(a4)
+
+; A direct tick's start, d0.b its phase: the loop's clr.w -26430(a4), or for the loops
+; that keep the counter running (phase 8 on) the counter noted in sv_cstart
+SmClr	move.l	a0,-(a7)
+	lea	SmV(pc),a0
+	clr.w	sv_cstart(a0)
+	cmp.b	#8,d0
+	shs	sv_rel(a0)
+	bhs.b	.r
 	clr.w	-26430(a4)
+	bra.b	.x
+.r	move.w	-26430(a4),sv_cstart(a0)
+.x	move.l	(a7)+,a0
 	rts
 
-; d0.b: phase (1 space, 2 surface, 3 trench, 4.. the attract loops)
+; d0.b: phase (1 space, 2 surface, 3 trench, 4-7 the attract loops, 8 on the loops that
+; keep the counter running)
 SmBegin
 	movem.l	d1-d2/a0-a1,-(a7)
 	lea	SmV(pc),a1
 	tst.l	sv_buf(a1)
 	bne.b	.sm
-	clr.w	-26430(a4)		; (the original; smooth mode lets it run)
+	bsr	SmClr			; (the original; smooth mode lets it run)
 	bra.w	.out
 .sm	bsr	SmScreens
 	tst.l	sv_x(a1)		; no screen for in-between frames: always direct
@@ -257,7 +299,7 @@ SmBegin
 	bsr	SmHooks
 	move.l	(a7)+,d0
 .dh	bsr	SmDirectScreen		; a direct tick: as the game, on a screen not shown
-	clr.w	-26430(a4)
+	bsr	SmClr
 	clr.b	sv_ran(a1)
 	move.l	d0,-(a7)
 	bsr	SmLineNow
@@ -741,6 +783,14 @@ SmPresent3c
 	moveq	#2,d1
 	move.w	#$09c0,a1
 	bra.b	SmPresent
+SmPresentSelect
+	CALLG	$59e6			; the wave select loop: its cannons and cockpit
+	bra.b	SmPresent3c		; (recorded), then paced as the fix paces it
+SmPresent4
+	moveq	#4,d0			; the title zoom, waiting for 3 (the fix): jsr $09c0
+	moveq	#3,d1
+	move.w	#$09c0,a1
+	bra.b	SmPresent
 SmPresent2
 	moveq	#2,d0			; the attract loops waiting for 1: jsr $09c0
 	moveq	#1,d1
@@ -757,7 +807,9 @@ SmPresent
 	tst.l	sv_buf(a3)
 	bne.b	.go0
 .wait	move.w	sv_thr(a3),d0		; no recordings: as the loop waits (the timing
-.w	cmp.w	-26430(a4),d0		; fix's thresholds)
+.w	move.w	-26430(a4),d1		; fix's thresholds), from the tick start
+	sub.w	sv_cstart(a3),d1
+	cmp.w	d1,d0
 	bgt.b	.w
 	moveq	#0,d0
 	move.w	sv_call(a3),d0
@@ -774,6 +826,7 @@ SmPresent
 	bsr	SmLineNow		; whether to try smooth again
 	moveq	#0,d1
 	move.w	-26430(a4),d1
+	sub.w	sv_cstart(a3),d1
 	mulu	#313,d1
 	add.l	d0,d1
 	sub.l	sv_l0(a3),d1
@@ -857,25 +910,56 @@ SmPresent
 .b	move.w	d0,d6
 	cmp.w	sv_n(a3),d6		; the exact frame: into the game's own back
 	bhs.b	.ex			; screen, as the game would have drawn it
-	bsr	SmFreeX			; in between: one of ours, with the HUD strip
+	move.l	sv_rl0(a3),d0		; an in-between frame only if the exact frame
+	add.w	sv_r(a3),d0		; still makes its field after it (two frames'
+	add.w	sv_r(a3),d0		; time from now, and a quarter more: the
+	move.w	sv_r(a3),d1		; recording may have grown since)
+	lsr.w	#2,d1
+	add.w	d1,d0
+	divu	#313,d0
+	add.w	-26430(a4),d0
+	addq.w	#1,d0
+	sub.w	sv_base(a3),d0
+	cmp.w	sv_n(a3),d0
+	ble.b	.fx
+	move.w	sv_n(a3),d6		; no: the exact frame now
+	bra.b	.ex
+.fx	bsr	SmFreeX			; in between: one of ours, with the HUD strip
 	tst.l	d0			; of the game's back screen
 	bne.b	.in
 	move.w	sv_base(a3),d0		; none free: skip this frame
 	add.w	d6,d0
 	move.w	d0,sv_lastt(a3)
-	bra.b	.frame
+	bra.w	.frame
 .in	move.l	d0,-26442(a4)
 	bsr	SmHudCopy
-	bra.b	.dr
+	bsr	SmLineNow		; again after any wait for the screen and the
+	add.w	sv_r(a3),d0		; HUD copy: still time for both?
+	add.w	sv_r(a3),d0
+	move.w	sv_r(a3),d1
+	lsr.w	#2,d1
+	add.w	d1,d0
+	divu	#313,d0
+	add.w	-26430(a4),d0
+	addq.w	#1,d0
+	sub.w	sv_base(a3),d0
+	cmp.w	sv_n(a3),d0
+	ble.b	.dr
+	move.w	sv_n(a3),d6		; no: the exact frame now (SmWaitB0 sets the
+	bra.w	.ex			; game's back screen again)
 .ex	bsr	SmWaitB0
 .dr	tst.w	d4			; VERIFY: the field of each first frame
 	beq.b	.jj
 	moveq	#0,d4
 	move.w	d6,d0
+	cmp.w	#3,d0			; (four counts: 0-3)
+	bhi.b	.jj
 	add.w	d0,d0
 	add.w	d0,d0
 	addq.l	#1,sv_first(a3,d0.w)
-.jj	move.w	-26430(a4),d7
+.jj	bsr	SmLineNow		; the drawing time from here (not the waits)
+	move.l	d0,sv_rl0(a3)
+	move.w	-26430(a4),d7
 	bsr	SmRender
 	bsr	SmLineNow		; the drawing time in lines
 	move.w	-26430(a4),d1
@@ -906,6 +990,17 @@ SmPresent
 	addq.l	#1,sv_frames(a3)
 .q	tst.l	sv_ready(a3)		; queue it: one frame at most waits
 	bne.b	.q
+	cmp.w	sv_n(a3),d6		; an in-between frame that missed its field
+	bhs.b	.qe			; (it, or the frame queued before it, took
+	move.w	sv_base(a3),d0		; longer than planned) is dropped: queued,
+	add.w	d6,d0			; it would hold up the exact frame
+	cmp.w	-26430(a4),d0
+	bgt.b	.qe
+	move.w	d0,sv_lastt(a3)
+	move.l	sv_b0(a3),-26442(a4)
+	addq.l	#1,sv_dropped(a3)
+	bra.w	.frame
+.qe
 	move.w	sv_base(a3),d0
 	add.w	d6,d0
 	move.w	d0,sv_t(a3)

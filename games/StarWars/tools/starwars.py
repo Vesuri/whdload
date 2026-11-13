@@ -15,6 +15,8 @@
     python3 tools/starwars.py code FILE      the patched code hunk ($e9e8 bytes) to FILE
     python3 tools/starwars.py mouse DX DY [N]
                                              move the mouse by DX, DY a field, N fields
+    python3 tools/starwars.py pc             the PC and the code-hunk return addresses on
+                                             the stack, as code-hunk offsets
     python3 tools/starwars.py reach OFF      run until code-hunk offset OFF (hex), stay stopped
     python3 tools/starwars.py sweep DX DY N PREFIX [SKIP]
                                              N times: move the mouse by DX, DY, run SKIP
@@ -49,11 +51,26 @@ def base(server, g, rest):
     return f'code {code:#x} a4 {a4:#x} data {a4 - 0x7ffe:#x}'
 
 
+def _slave_base(g, code):
+    """The slave's runtime base: the patched jsr at $897e (+2) goes to SmPresent3a, whose
+    offset the VERIFY build's listing gives."""
+    import re
+    import struct
+    lst = Path(__file__).resolve().parents[1] / 'tmp/build/verify/StarWars.lst'
+    m = re.search(rb'^SmPresent3a +00:([0-9A-F]+)', lst.read_bytes(), re.M)
+    tgt = struct.unpack('>I', _read(g, code + 0x8980, 4))[0]
+    return tgt - int(m.group(1), 16)
+
+
 def hits(server, g, rest):
+    """OFF: a code-hunk offset, or sOFF a VERIFY slave offset (its listing); `SLV` in
+    the expressions stands for the slave's base."""
     off, n, *exprs = rest.split()
     code, a4 = _bases(g)
+    slv = _slave_base(g, code) if off.startswith('s') or any('SLV' in e for e in exprs) else 0
+    exprs = [e.replace('SLV', str(slv)) for e in exprs]
     g.cmd('delete')
-    g.cmd(f'break *{code + int(off, 16)}')
+    g.cmd(f'break *{(slv + int(off[1:], 16)) if off.startswith("s") else code + int(off, 16)}')
     rows = []
     for _ in range(int(n)):
         out = g.cmd('continue', timeout=600)
@@ -128,7 +145,7 @@ def probe(server, g, rest):
 
 
 SV = ('buf cur prev ptr end pend b0 f0 vp0 vp1 vp2 vbuf tmp0 tmp1 obj_r flags '
-      'maxops ovf ticks frames paired unpaired fields j0 j1 j2 j3 rl0').split() + [f'h{i}' for i in range(16)] + 'rmax x0 x1 shown ready t_base lastt_lastc hudcopies dir_slow_hold l0 work dticks hooked_saved_ravg worksum late_lates chipfree n_mul thr_call exact_prec'.split()
+      'maxops ovf ticks frames paired unpaired fields j0 j1 j2 j3 rl0').split() + [f'h{i}' for i in range(16)] + 'rmax x0 x1 shown ready t_base lastt_lastc hudcopies dir_slow_hold l0 work dticks hooked_saved_ravg worksum late_lates chipfree n_mul thr_call exact_prec_cstart rel_pad dropped'.split()
 
 
 def smooth(server, g, rest):
@@ -147,7 +164,7 @@ def smooth(server, g, rest):
     used = (v['ptr'] - v['cur']) // 16 if v['buf'] else 0
     return (f"buf {v['buf']:#x} ops now {used} max {v['maxops']} overflows {v['ovf']} "
             f"ticks {v['ticks']} frames {v['frames']} paired {v['paired']} "
-            f"unpaired {v['unpaired']} fields {v['fields']} first-frame field {[v[k] for k in ('j0','j1','j2','j3')]} render lines hist/32 {[v[f'h{i}'] for i in range(16)]} max {v['rmax']} screens {v['x0']:#x} {v['x1']:#x} chipfree {v['chipfree']} hudcopies {v['hudcopies']} direct {v['dir_slow_hold'] >> 24} dticks {v['dticks']} work {v['work']} mean work {v['worksum'] // max(1, v['dticks'])} ravg {(v['hooked_saved_ravg'] & 0xffff) // 8} late ticks {v['late_lates'] & 0xffff} r {v['obj_r'] & 0xffff} flags {v['flags']:#010x}")
+            f"unpaired {v['unpaired']} fields {v['fields']} first-frame field {[v[k] for k in ('j0','j1','j2','j3')]} render lines hist/32 {[v[f'h{i}'] for i in range(16)]} max {v['rmax']} screens {v['x0']:#x} {v['x1']:#x} chipfree {v['chipfree']} hudcopies {v['hudcopies']} direct {v['dir_slow_hold'] >> 24} dticks {v['dticks']} work {v['work']} mean work {v['worksum'] // max(1, v['dticks'])} ravg {(v['hooked_saved_ravg'] & 0xffff) // 8} late ticks {v['late_lates'] & 0xffff} dropped {v['dropped']} r {v['obj_r'] & 0xffff} flags {v['flags']:#010x}")
 
 
 def seq(server, g, rest):
@@ -180,6 +197,18 @@ def mouse(server, g, rest):
         g.cmd('monitor fields 1')
     g.cont()
     return 'ok'
+
+
+def pc(server, g, rest):
+    import struct
+    c, _ = _bases(g)
+    p = int(g.cmd('printf "%u\\n", $pc').split()[-1])
+    sp = int(g.cmd('printf "%u\\n", $sp').split()[-1])
+    words = struct.unpack('>64I', _read(g, sp, 256))
+    g.cont()
+    rets = [f'{w - c:x}' for w in words if c <= w < c + CODE_SIZE]
+    where = f'{p - c:x}' if c <= p < c + CODE_SIZE else f'abs {p:x}'
+    return f'pc {where} stack {" ".join(rets[:10])}'
 
 
 def reach(server, g, rest):
@@ -228,6 +257,6 @@ server = game_server('starwars', commands={'base': base, 'hits': hits, 'fire': f
                                            'probe': probe, 'smooth': smooth,
                                            'seq': seq, 'code': code,
                                            'mouse': mouse, 'sweep': sweep,
-                                           'reach': reach})
+                                           'reach': reach, 'pc': pc})
 if __name__ == '__main__':
     server.main(sys.argv[1:])

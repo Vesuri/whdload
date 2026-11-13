@@ -9,8 +9,8 @@
 - `src/StarWarsSmooth.s`: CUSTOM2, "Enhanced framerate": interpolated frames at 50 a
   second in the game and the attract loops, with the game at its own 16.7 updates a second
   (`internals.md`, "Enhanced framerate"). It replaces v2.00's CUSTOM2 "Disable Timing
-  Fix", which ran the game too fast. Machines too slow for it (a500, a1200, a1200-fast)
-  fall back to the default's drawing.
+  Fix", which ran the game too fast. Machines too slow for it (a500, a1200) fall back to
+  the default's drawing.
 - `src/StarWarsProbe.s`: the VERIFY-only work timer.
 
 `release/slaves.sha256` records this build. With CUSTOM2 off the patched code is that of
@@ -25,13 +25,13 @@ the fixes alone (`internals.md`, the end of "Enhanced framerate").
   over the wave select Death Star; `internals.md`, "Limitations"), also with StingRay's
   original slave on an A500. A fix needs masks that cover only the shapes, checked against
   what the boxes also erase.
-- The unpaced wave select loop and the title zoom run faster on fast CPUs than on an
-  A500 (`internals.md`, "Limitations"): pace them, as bug fixes, if wanted.
-- The title recede logo and the crawl text are not interpolated (they are not drawn by
-  the recorded primitives).
-- a1200-fast (020 with Fast RAM) falls back to direct mode: frames average about 450
-  lines. Cheaper frames would help it: the CPU clear $1c08 by the blitter or only over the
-  drawn area, pairing only when the recording changed. The retry uses the last smooth
+- The Obi-Wan text and the flight instructions scroll by plane copies, which move per
+  tick in enhanced framerate: interpolate the copy's position.
+- Cheaper frames: a1200-fast draws about 1.7 frames a tick (frames 380-540 lines), and
+  a1200-030 only two of the wave select's three (frames about 330 lines). The replayed
+  CPU clear $1c08 costs about 57 lines on a1200-030 (the zoom stayed smooth without it);
+  clearing only the rows the screen's last frame drew, or pairing only when the
+  recording changed, would help. The retry from direct mode uses the last smooth
   frame-time average, which direct ticks do not update.
 - The ReadMe for 3.0b (the slave info says "Version 3.0b (13.11.2026)" and "Enhanced by
   Vesuri"; Features and History: the fixes, the timing fix always on, CUSTOM2 now
