@@ -5,7 +5,7 @@ Test Drive 2.0b for Accolade's Test Drive (the 1.3 installs): optional Enhanced 
 road and traffic rendering, unused blitter interrupts suppressed, shorter blitter waits and
 triple buffering, plus fixes that apply
 with either setting (the overlay cache flush for accelerated Amigas, the opening-music
-samples, close traffic and the rev counters). The original slave is by JOTD (game.conf `AUTHOR`, `UPSTREAM`): his
+samples, the race sound loops, close traffic and the rev counters). The original slave is by JOTD (game.conf `AUTHOR`, `UPSTREAM`): his
 `T/TestDrive/usr` in whdload_slaves at 48557a5f. Upstream merged this work (3e2d99b5) but has
 not released it.
 
@@ -23,7 +23,7 @@ Read `docs/open-work.md` first.
 | `docs/ENHANCEMENT_PLAN.md` | the plan, phases 1-12, and each phase's outcome |
 | `docs/phase3.md` to `docs/phase11.md` | each phase's evidence: gameplay, profiling, timing, fixes, VERIFY fixtures, simulation, blitter, rendering, release regression |
 | `docs/release-2.0b.md` | the 2.0b installer and ReadMe, installer coverage, packaging |
-| `docs/road-shift.md`, `docs/corner-jump.md`, `docs/steer-reversal.md`, `docs/handling-collision.md`, `docs/rpm-needle.md`, `docs/audio-repeat.md`, `docs/dead-code.md` | the later 2.0b corrections, each with its reproduction and checks |
+| `docs/road-shift.md`, `docs/corner-jump.md`, `docs/steer-reversal.md`, `docs/handling-collision.md`, `docs/rpm-needle.md`, `docs/audio-repeat.md`, `docs/sound-loops.md`, `docs/dead-code.md` | the later 2.0b corrections, each with its reproduction and checks |
 | `docs/draw-rate.md` | Enhanced framerate's blitter waits and the drawer's third screen buffer |
 | `docs/wheel-dot.md` | the open post-crash steering-dot report |
 

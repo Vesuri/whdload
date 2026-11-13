@@ -6,7 +6,8 @@ fractional rendering and the road-jump correction (`road-shift.md`) and analogue
 (`rpm-needle.md`), steering-reversal visual correction (`steer-reversal.md`),
 restored bend response and visible close traffic (`handling-collision.md`),
 continuous cornering scenery (`corner-jump.md`, including its measured cost exception),
-the opening-music sample repeat fix (`audio-repeat.md`), and shorter blitter waits
+the opening-music sample repeat fix (`audio-repeat.md`), clean race sound loops
+(`sound-loops.md`), and shorter blitter waits
 and triple buffering for the drawer (`draw-rate.md`). `phase11.md` records full release regression and verified
 local regression evidence; `release-2.0b.md` describes the release archive (`make dist`).
 

@@ -635,7 +635,35 @@ instrument_patches:
     PL_PSS $042a0,instrument_rpm,2
     ; SIM_RANGE h4 01ad4 8 ALL traffic_near_edge
     PL_PSS $01ad4,traffic_near_edge,2
+    ; SIM_RANGE h4 0a390 8 ALL sound_loop_squeal
+    PL_PSS $0a390,sound_loop_squeal,2
+    ; SIM_RANGE h4 0a3b0 8 ALL sound_loop_turbo
+    PL_PSS $0a3b0,sound_loop_turbo,2
+    ; SIM_RANGE h4 0a3da 8 ALL sound_loop_engine
+    PL_PSS $0a3da,sound_loop_engine,2
     PL_END
+
+; h4 $a370 starts the race's three looping sounds (Squeal on channel 1,
+; TheTurbo on 2, TheEngine on 3) through root $24c4 with the loaded file's
+; address, so each loop played the file's 6-byte header (sample length and
+; rate) and dropped the last 6 sample bytes: a click on every pass. The
+; one-shot wrapper at root $246a passes the file address + 6. Each hook
+; replaces "move.l sample,-(sp); jsr -32514(a4)" and passes the sample data
+; instead, keeping a missing sample (0) as 0; the length pushed before is the
+; header's sample length, so the loop now covers exactly the sample.
+SOUND_LOOP:MACRO
+sound_loop_\1:
+    move.l (sp),-(sp)         ; return address; 4(sp) becomes the pointer
+    move.l \2(a4),4(sp)
+    beq.b .play
+    addq.l #6,4(sp)
+.play
+    jmp -32514(a4)            ; root $24c4, returns to the caller
+    ENDM
+    SOUND_LOOP squeal,-25668
+    SOUND_LOOP turbo,-25672
+    SOUND_LOOP engine,-25676
+
 instrument_car:
     move.w 8(a5),d0           ; displaced car selection, also used by caller
     move.l a0,-(sp)

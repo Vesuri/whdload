@@ -56,6 +56,7 @@
  - Fixed nearby vehicles disappearing before a collision.
  - Fixed the rev counter needle wrapping around when over-revving.
  - Fixed repeated drum hits in the opening music.
+ - Fixed the click in the looping engine and tyre squeal sounds.
  - Improved compatibility with accelerated Amigas.
  - Updated installer and clearer setup instructions.
 
