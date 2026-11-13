@@ -33,8 +33,9 @@ the fixes alone (`internals.md`, the end of "Enhanced framerate").
   lines. Cheaper frames would help it: the CPU clear $1c08 by the blitter or only over the
   drawn area, pairing only when the recording changed. The retry uses the last smooth
   frame-time average, which direct ticks do not update.
-- `$VER` string and the ReadMe (Features and History: the fixes, the timing fix always on,
-  CUSTOM2 now "Enhanced framerate") before a release; gameplay tests on `SETUPS`.
+- The ReadMe for 3.0b (the slave info says "Version 3.0b (13.11.2026)" and "Enhanced by
+  Vesuri"; Features and History: the fixes, the timing fix always on, CUSTOM2 now
+  "Enhanced framerate") before a release; gameplay tests on `SETUPS`.
 
 ## Later
 
