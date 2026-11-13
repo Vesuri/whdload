@@ -21,10 +21,6 @@ the fixes alone (`internals.md`, the end of "Enhanced framerate").
 - Play-test enhanced framerate through all three phases on a1200-030 and a1200-060: look
   for pairing glitches (short diagonal fragments seen in surface and trench captures, not
   yet confirmed as glitches rather than geometry), at the HUD strip and at the pause key.
-- The cannon and cockpit boxes: their masks clear the whole bounding box (the black box
-  over the wave select Death Star; `internals.md`, "Limitations"), also with StingRay's
-  original slave on an A500. A fix needs masks that cover only the shapes, checked against
-  what the boxes also erase.
 - The Obi-Wan text and the flight instructions scroll by plane copies, which move per
   tick in enhanced framerate: interpolate the copy's position.
 - Cheaper frames: a1200-fast draws about 1.7 frames a tick (frames 380-540 lines), and

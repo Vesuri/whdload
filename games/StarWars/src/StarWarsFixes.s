@@ -38,6 +38,8 @@ PLFIX403
 	PL_PSS	$9a4a,BlitWait,4
 	PL_PSS	$9b3c,BlitWait,4
 	PL_PSS	$9b76,BlitWait,4
+	PL_PS	$9918,BlitMasks		; shape drawer, the clipped shape's copy:
+	PL_PS	$9a20,BlitMasks		; move.w #$8400,150(a3)
 	PL_PSS	$1b86,BlitHLine,2	; CPU horizontal line: sub.w d2,d0; bpl; neg; sub
 	PL_GA	$1b32,BlitPlotRet
 	PL_P	$1b2c,BlitPlot		; CPU plot: move.w d6,-(sp); move.w 6(sp),d6
@@ -79,6 +81,18 @@ BlitWait
 	BLIT_WAIT
 	rts
 
+; The game never writes BLTALWM (only the line drawer writes BLTAFWM, $ffff), so its
+; blits ran with whatever was there: 0 in FS-UAE, what the OS last left under WHDLoad.
+; The shape drawer copies a shape clipped at the left or right edge (mask and planes)
+; through a buffer with the A channel, so the mask's last word came out opaque and the
+; cannons (wave select, the left ones at some crosshair x) cut a black box, up to 16
+; pixels wide, into the WAVE 1 text and Death Star. Both masks are set open there and
+; at the screen clear; the rectangle fill ($0810, BLTADAT) gets its last word too.
+BlitMasks
+	move.w	#$8400,150(a3)
+	move.l	#-1,$44(a3)
+	rts
+
 BlitHLine
 	BLIT_WAIT
 	sub.w	d2,d0
@@ -96,6 +110,7 @@ BlitPlot
 
 BlitClear
 	BLIT_WAIT
+	move.l	#-1,$dff044		; BLTAFWM, BLTALWM (BlitMasks)
 	movem.l	d0-a3/a5,-(a7)
 	move.l	-26442(a4),a0		; the drawing buffer
 	move.l	BlitClearRet(pc),-(a7)

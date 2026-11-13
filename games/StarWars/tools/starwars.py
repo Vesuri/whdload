@@ -17,6 +17,9 @@
                                              move the mouse by DX, DY a field, N fields
     python3 tools/starwars.py pc             the PC and the code-hunk return addresses on
                                              the stack, as code-hunk offsets
+    python3 tools/starwars.py mem EXPR LEN FILE
+                                             LEN bytes at EXPR (gdb syntax, `A4`, `CODE`)
+                                             to FILE
     python3 tools/starwars.py reach OFF      run until code-hunk offset OFF (hex), stay stopped
     python3 tools/starwars.py sweep DX DY N PREFIX [SKIP]
                                              N times: move the mouse by DX, DY, run SKIP
@@ -243,6 +246,17 @@ def sweep(server, g, rest):
 CODE_SIZE = 0xe9e8
 
 
+def mem(server, g, rest):
+    import os
+    expr, n, path = rest.split()
+    c, a4 = _bases(g)
+    a = int(g.cmd(f'printf "%u\\n", (unsigned int)({_subst(expr, c, a4)})').split()[-1])
+    path = os.path.abspath(path)
+    g.cmd(f'dump binary memory {path} {a} {a + int(n, 0)}', timeout=120)
+    g.cont()
+    return f'{a:#x} {os.path.getsize(path)} bytes'
+
+
 def code(server, g, rest):
     """The code hunk as the game runs it, patched, to a file."""
     import os
@@ -257,6 +271,7 @@ server = game_server('starwars', commands={'base': base, 'hits': hits, 'fire': f
                                            'probe': probe, 'smooth': smooth,
                                            'seq': seq, 'code': code,
                                            'mouse': mouse, 'sweep': sweep,
-                                           'reach': reach, 'pc': pc})
+                                           'reach': reach, 'pc': pc,
+                                           'mem': mem})
 if __name__ == '__main__':
     server.main(sys.argv[1:])
