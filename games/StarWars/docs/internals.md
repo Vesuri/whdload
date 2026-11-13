@@ -145,25 +145,45 @@ Run-time hooks, installed with `jmp` when a tick records and taken out (the save
 put back, the cache flushed) in direct mode: colour $1840, line $19ae, plot $1b2c, shape
 $9806, rectangle $0810, plane copy $0a1c, clear $1c08, swap wait $09a8, TIE fighter draw
 $839c (keys its ops by the fighter), surface object draw $a982 (keys a tower's or a
-base's lines by its record), the ground dots ($1e6c, $1ea6, $a67e), and the swap flag
-store $09fa.
+base's lines by its world position), the ground dots ($1e6c, $1ea6, $a67e), and the swap
+flag store $09fa. Static (CUSTOM2, also in direct mode): the world's movement summed at
+$a6aa, and the dots' wrap marks at $a640 and $a666.
 
 - **Pairing.** An op is keyed by the code address that called the primitive, and for TIE
-  fighters and the surface's towers and bases by the object (the low word of its record).
-  It is paired with the next op of the same key in the previous recording, within 64 ops.
-  Unpaired ops, and ops that moved more than 40 pixels (respawns, stars wrapping round),
-  are drawn where they are now.
+  fighters by the fighter (the low word of its record). It is paired with the next op of
+  the same key in the previous recording, within 64 ops. Unpaired ops, and ops that moved
+  more than 40 pixels (respawns, stars wrapping round), are drawn where they are now.
+- **Towers and bases.** $b0bc draws the object table (-26080(a4), 14 bytes: z, x, type at
+  +6, the map cell at +10), which $a7a8 rebuilds each tick from the map rows in view, near
+  row first and each row outward from a column that changes as the view steers. Neither
+  the record nor the draw order names an object. Each tick, $a6aa moves the world:
+  -27068(a4) -= d4, -27066(a4) += d5. A row shift (+3500) or a column shift (+-1000)
+  moves the map with it, so an object's z and x stay continuous, and z + the summed d4
+  and x - the summed d5 stay constant. A line's key is a hash of those two and the type
+  (top 10 bits) plus its number in the object (low 6). It is flagged `OPF_ID` and
+  interpolated however far it moves. Each recording keeps an object list at its end (47
+  objects: the key and the index of the object's first op). The pairing finds an object's
+  first line through the previous recording's list, then pairs its other lines in order
+  from there, with a cursor of their own.
 - **Ground dots.** The surface's dots are a table of 25 entries (-25758(a4), z and x of
   two points each) sorted by depth, which $1dda projects into six points per entry and
   plots at $1ea6. When the nearest entry passes, $a67e shifts the table down one entry
   and adds a far one, so by draw order every dot paired with the next one along after a
   shift, within 40 pixels often enough to slide across. Their ops are keyed by identity
   instead: (entry index + shifts counted at $a67e) * 8 + point, flagged (`OPF_ID`), and
-  interpolated however far they moved. Over seven wave 3 surface ticks
+  interpolated however far they moved. Steering moves each point sideways ($a648), and a
+  point beyond x = +-2048 wraps round by 4096: $a666 marks its entry (shifted along with
+  the table at $a67e), and the entry's dots are drawn where they are that tick. Over seven
+  wave 3 surface ticks
   (`tools/starwars.py recdump`, `tmp/scripts/paireval.py`) the 532 dots paired changed
   velocity by more than 12 pixels only in the tick the view turned, all alike; before,
   most dots were not interpolated (moved more than 40) and 16 of the 22 that were
   jumped. Pairing by the nearest op instead was tried and paired dots worse (126 of 231).
+  Steering (the crosshair held right, `tmp/scripts/surfdump.sh`), 16 ticks: every dot and
+  surface line whose key the previous recording held was paired (keyed by the record
+  before, 15 to 85 lines a tick missed their pair). The dots that moved more than 40
+  pixels were the wrapped ones, drawn in place, and objects near the camera growing in
+  perspective.
 - **Pacing.** The counter -26430(a4) runs free. Frame j of a tick is for field B + j;
   each frame is drawn for the first field it can still make, judged by the beam and the
   last frame's drawing time r, so a slow frame skips the in-between frame after it. An
@@ -195,8 +215,9 @@ surface and trench with the trainer):
 | a1200-030 | smooth throughout | 2.81 | 2.97 | average about 280 |
 
 Wave 3 on a1200-030 (`tmp/scripts/wave3.sh`: space, the surface with towers, the trench),
-5 to 35 s after the start: 2.50 frames a tick, 11 late ticks and 63 dropped frames in
-2868 ticks; the build before the dot and object keys: 2.53, 14 and 80 in 2799.
+5 to 35 s after the start: 2.47 frames a tick, 9 late ticks and 90 dropped frames in
+3251 ticks; the build before the world-position keys, in the same run: 2.50, 15 and 87
+in 3447.
 
 The attract on a1200-030, scene by scene (`tmp/scripts/scenes.sh`): the credits, the
 title zoom (2 frames a tick: 242 in its 121 ticks), the Obi-Wan text, the flight

@@ -40,6 +40,8 @@
 ; installed and the tick and present patches do what the timing fix does.
 
 SM_OPS		= 4096			; ops per recording
+SM_OBJOPS	= 12			; of them the object list's room at the end:
+SM_OBJS		= 47			; a count, then key.w, op index.w per object
 SM_OPSZ		= 16
 SM_T		= 40			; farther than this (pixels) is not interpolated
 SM_W		= 64			; how far ahead pairing searches the previous recording
@@ -66,7 +68,8 @@ SM_HOLD		= 50			; direct ticks at least, before trying
 ;          +12 -25800(a4).l (x min, max)
 ;   BUF    +12 the drawing buffer: 0 back, 1 front, else the address
 OPF_ID		= 6			; flags: the key is the object's own identity
-					; (the ground dots), interpolated however far
+					; (the ground dots, the surface's towers and
+					; bases), interpolated however far
 OP_NOP		= 0
 OP_COLOR	= 1
 OP_LINE		= 2
@@ -168,6 +171,9 @@ PLSMOOTH403
 	PL_PSS	$b55e,SmTickSurface,2	; clr.w -26430(a4); jsr $b2f8(pc)
 	PL_PSS	$b63a,SmTickSurface,2	; the same
 	PL_PSS	$d584,SmTickTrench,2	; clr.w -26430(a4); jsr -32454(a4)
+	PL_PSS	$a6aa,SmSurfMove,2	; sub.w d4,-27068(a4); add.w d5,-27066(a4)
+	PL_PS	$a640,SmDotMove		; lea -25758(a4),a2; moveq #51,d6
+	PL_PS	$a666,SmDotWrap		; move.w d7,2(a2); addq.l #4,a2
 	PL_PSS	$897e,SmPresent3a,8	; the wait (cmpi.w; bge.s; bra.s) and the swap jsr
 	PL_PSS	$b612,SmPresent3b,8
 	PL_PSS	$b65e,SmPresent3a,8
@@ -214,6 +220,11 @@ SmAlloc
 	move.l	d0,sv_prev(a0)
 	move.l	d0,sv_pend(a0)
 	move.w	#SM_MARGIN,sv_r(a0)
+	move.l	d0,a1
+	add.l	#(SM_OPS-SM_OBJOPS)*SM_OPSZ,a1
+	clr.w	(a1)			; the object lists
+	sub.l	#SM_OPS*SM_OPSZ,a1
+	clr.w	(a1)
 .out	rts
 
 ;----------------------------------------------------------------------------
@@ -334,8 +345,10 @@ SmBegin
 	move.l	sv_ptr(a1),sv_pend(a1)
 	move.l	d1,sv_cur(a1)
 	move.l	d1,sv_ptr(a1)
-	add.l	#SM_OPS*SM_OPSZ,d1
+	add.l	#(SM_OPS-SM_OBJOPS)*SM_OPSZ,d1
 	move.l	d1,sv_end(a1)
+	move.l	d1,a0
+	clr.w	(a0)			; its object list (SmSurf)
 	move.l	-26442(a4),sv_b0(a1)
 	move.l	-26446(a4),sv_f0(a1)
 	moveq	#-1,d1
@@ -621,9 +634,19 @@ SmLine
 	bne.b	.k
 	move.l	16+4+36(a7),d1
 .k	bsr	SmKey
-	bsr	SmNew
+	moveq	#0,d0
+	btst	#0,SmSurfOn(pc)
+	beq.b	.n
+	lea	SmSurfN(pc),a1		; a surface object's line: its key and number
+	move.w	(a1),d1
+	addq.w	#1,(a1)
+	or.w	SmSurfK(pc),d1
+	moveq	#1<<OPF_ID,d0
+.n	bsr	SmNew
 	beq.b	.x
 	move.b	#OP_LINE,(a0)
+	move.b	d0,1(a0)
+	move.w	2(a7),d0		; d0 as saved
 	move.w	d1,2(a0)
 	move.w	d0,4(a0)
 	move.w	6(a7),6(a0)		; d1 as saved
@@ -771,23 +794,71 @@ SmTie
 	GOTOG	$83a4
 
 ; $a982 draws a surface object (a tower, a base; the points, the object record on the
-; stack): its lines get the object's key (the low word of its record), as SmTie
+; stack). Its record (-26080(a4), 14 bytes: z, x, ..., type at +6) is rebuilt each tick
+; from the map rows in view, so neither the record nor the draw order names the object:
+; its world position does, z + SmSurfZ and x - SmSurfX (the game's own scrolling,
+; summed at $a6aa, which keeps each object's z and x continuous across the row and
+; column shifts). Its lines are keyed by a hash of that and the type, plus their
+; number in the object, and interpolated however far.
 SmSurf
-	move.w	SmV+sv_obj(pc),-(a7)
-	move.l	10(a7),a0
-	move.w	a0,d0
-	lea	SmV+sv_obj(pc),a0
+	move.l	8(a7),a0		; the object
+	move.w	(a0),d0
+	add.w	SmSurfZ(pc),d0
+	mulu	#40503,d0
+	move.w	2(a0),d1
+	sub.w	SmSurfX(pc),d1
+	add.w	d1,d0
+	mulu	#40503,d0
+	add.w	6(a0),d0
+	mulu	#40503,d0
+	swap	d0
+	and.w	#$ffc0,d0		; the line number below
+	lea	SmSurfK(pc),a0
+	move.w	d0,(a0)+
+	clr.w	(a0)+			; SmSurfN
+	st	(a0)			; SmSurfOn
+	btst	#0,SmV+sv_rec(pc)
+	beq.b	.go
+	move.l	SmV+sv_end(pc),a0	; in the recording's object list: the key and
+	move.w	(a0),d1			; where its ops start (SmPair finds it there)
+	cmp.w	#SM_OBJS,d1
+	bhs.b	.go
+	addq.w	#1,(a0)+
+	lsl.w	#2,d1
+	add.w	d1,a0
+	move.w	d0,(a0)+
+	move.l	SmV+sv_ptr(pc),d0
+	sub.l	SmV+sv_cur(pc),d0
+	lsr.l	#4,d0
 	move.w	d0,(a0)
-	move.l	10(a7),-(a7)		; the object
-	move.l	10(a7),-(a7)		; the points
+.go	move.l	8(a7),-(a7)		; the object
+	move.l	8(a7),-(a7)		; the points
 	bsr.b	.draw
 	addq.l	#8,a7
-	lea	SmV+sv_obj(pc),a0
-	move.w	(a7)+,(a0)
+	lea	SmSurfOn(pc),a0
+	clr.b	(a0)
 	rts
 .draw	link	a5,#-20
 	movem.l	d4-d7/a2,-(a7)
 	GOTOG	$a98a
+SmSurfK	dc.w	0
+SmSurfN	dc.w	0
+SmSurfOn	dc.b	0
+	even
+
+; $a6aa (the world moving, each tick: sub.w d4,-27068(a4); add.w d5,-27066(a4)): the
+; movement summed. Not a hook (it runs in direct mode too).
+SmSurfMove
+	move.l	a0,-(a7)
+	lea	SmSurfZ(pc),a0
+	add.w	d4,(a0)+
+	add.w	d5,(a0)
+	move.l	(a7)+,a0
+	sub.w	d4,-27068(a4)
+	add.w	d5,-27066(a4)
+	rts
+SmSurfZ	dc.w	0
+SmSurfX	dc.w	0
 
 ; The ground dots ($1dda): a table of 25 entries (-25758(a4)) sorted by depth, each two
 ; points that $1dda projects into six, plotted at $1ea6 with d6 counting down. When the
@@ -803,9 +874,40 @@ SmDots
 SmDotShift
 	lea	SmDotSh(pc),a3		; $a67e: the table shifts
 	addq.w	#1,(a3)
+	lea	SmDotW(pc),a3
+	move.l	(a3),d0			; and its wrap marks (d0 is free)
+	lsr.l	#1,d0
+	move.l	d0,(a3)
 	lea	-25758(a4),a3
 	lea	8(a3),a2
 	GOTOG	$a686
+; Steering moves each point sideways ($a648), and one beyond x = +-2048 wraps round by
+; 4096, to the far side: its entry is marked, and its dots are drawn where they are
+; (not interpolated) this tick. Not hooks (they run in direct mode too).
+SmDotMove
+	lea	SmDotW(pc),a2		; $a640: lea -25758(a4),a2; moveq #51,d6
+	clr.l	(a2)
+	lea	-25758(a4),a2
+	moveq	#51,d6
+	rts
+SmDotWrap
+	move.w	2(a2),d0		; $a666: move.w d7,2(a2); addq.l #4,a2 (d0 is free)
+	add.w	d5,d0
+	cmp.w	d7,d0
+	beq.b	.s
+	movem.l	d1/a0,-(a7)
+	move.l	a2,d0
+	sub.l	a4,d0
+	add.l	#25758,d0
+	lsr.l	#3,d0			; the entry
+	lea	SmDotW(pc),a0
+	move.l	(a0),d1
+	bset	d0,d1
+	move.l	d1,(a0)
+	movem.l	(a7)+,d1/a0
+.s	move.w	d7,2(a2)
+	addq.l	#4,a2
+	rts
 SmDot
 	btst	#0,SmV+sv_rec(pc)	; $1ea6: plot the dot (x, y on the stack)
 	beq.b	.run
@@ -817,8 +919,13 @@ SmDot
 	moveq	#0,d0
 	move.w	SmDotN(pc),d0
 	sub.w	d6,d0			; the point's index
-	divu	#6,d0
-	move.l	d0,d1
+	divu	#6,d0			; its entry
+	clr.w	8(a0)
+	move.l	SmDotW(pc),d1
+	btst	d0,d1
+	beq.b	.nw
+	addq.w	#1,8(a0)		; wrapped round: not interpolated
+.nw	move.l	d0,d1
 	swap	d1			; its point in the entry
 	add.w	SmDotSh(pc),d0
 	lsl.w	#3,d0
@@ -834,6 +941,7 @@ SmDot
 	GOTOG	$1eac
 SmDotN	dc.w	0
 SmDotSh	dc.w	0
+SmDotW	dc.l	0			; the entries that wrapped round this tick
 
 ;----------------------------------------------------------------------------
 ; Presenting: replaces each loop's wait for three fields and its swap
@@ -926,7 +1034,7 @@ SmPresent
 	cmp.l	sv_maxops(a3),d0
 	bls.b	.m
 	move.l	d0,sv_maxops(a3)
-.m	cmp.w	#SM_OPS-2,d0
+.m	cmp.w	#SM_OPS-SM_OBJOPS-2,d0
 	blo.b	.o
 	addq.l	#1,sv_ovf(a3)
 .o	addq.l	#1,sv_ticks(a3)
@@ -1192,6 +1300,7 @@ SmLineNow
 ; of the same type and key (and shape) at most SM_W ops after the last pair in the
 ; previous recording.
 SmPair
+	move.l	a6,-(a7)
 	move.l	sv_cur(a3),a0
 	move.l	sv_ptr(a3),a2
 	move.l	sv_prev(a3),a1
@@ -1199,22 +1308,55 @@ SmPair
 	tst.b	sv_ok(a3)
 	bne.b	.go
 	move.l	a1,d4			; nothing to pair with
-.go	move.l	#SM_BUDGET,d7
+.go	move.l	d4,a6			; the object cursor
+	move.l	#SM_BUDGET,d7
 	moveq	#0,d5			; paired
 	moveq	#0,d6			; not paired
 .loop	cmp.l	a2,a0
-	bhs.b	.done
+	bhs.w	.done
 	move.b	(a0),d0
 	cmp.b	#OP_LINE,d0
 	beq.b	.p
 	cmp.b	#OP_PLOT,d0
 	beq.b	.p
 	cmp.b	#OP_SHAPE,d0
-	bne.b	.next
+	bne.w	.next
 .p	move.w	#-1,12(a0)
 	move.l	(a0),d1			; type, flags, key
 	move.l	a1,a5
 	move.w	#SM_W-1,d3
+	cmp.b	#OP_LINE,d0
+	bne.b	.s
+	btst	#OPF_ID,1(a0)
+	beq.b	.s
+	moveq	#-1,d0			; a surface object's line: its own cursor (a6)
+	move.l	a6,a5
+	moveq	#$3f,d2
+	and.w	d1,d2
+	bne.b	.s
+	move.l	d4,a6			; its first: where the object's ops start in
+	move.l	d4,a5			; the previous recording, from its object list
+	tst.b	sv_ok(a3)
+	beq.b	.s
+	move.l	sv_prev(a3),a6
+	add.l	#(SM_OPS-SM_OBJOPS)*SM_OPSZ,a6
+	move.w	(a6)+,d2
+	cmp.w	#SM_OBJS,d2
+	bls.b	.lk
+	moveq	#0,d2
+	bra.b	.lk
+.lk1	cmp.w	(a6)+,d1
+	beq.b	.lf
+	addq.l	#2,a6
+.lk	dbf	d2,.lk1
+	move.l	d4,a6			; not there
+	bra.b	.s
+.lf	moveq	#0,d2
+	move.w	(a6),d2
+	lsl.l	#4,d2
+	add.l	sv_prev(a3),d2
+	move.l	d2,a6
+	move.l	d2,a5
 .s	cmp.l	d4,a5
 	bhs.b	.none
 	subq.l	#1,d7
@@ -1233,14 +1375,20 @@ SmPair
 	sub.l	sv_prev(a3),d2
 	lsr.l	#4,d2
 	move.w	d2,12(a0)
+	tst.b	d0
+	bmi.b	.ok2
 	lea	SM_OPSZ(a5),a1
+	addq.l	#1,d5
+	bra.b	.next
+.ok2	lea	SM_OPSZ(a5),a6
 	addq.l	#1,d5
 	bra.b	.next
 .none	addq.l	#1,d6
 .next	lea	SM_OPSZ(a0),a0
-	bra.b	.loop
+	bra.w	.loop
 .done	move.l	d5,sv_paired(a3)
 	move.l	d6,sv_unpaired(a3)
+	move.l	(a7)+,a6
 	rts
 
 ; a3: SmV, d6.w: the field (1..sv_n) the frame is for. Draws the current recording
@@ -1396,7 +1544,11 @@ SmRender
 .pos	cmp.l	#SM_T,d0
 	bgt.b	.snap
 	dbf	d3,.chk
-.id	movem.l	(a7),d1-d3/d7/a0-a1
+.id	cmp.b	#OP_PLOT,(a2)		; a ground dot that wrapped round
+	bne.b	.id2
+	tst.w	8(a2)
+	bne.b	.snap
+.id2	movem.l	(a7),d1-d3/d7/a0-a1
 	move.w	12(a2),d0
 	ext.l	d0
 	lsl.l	#4,d0
