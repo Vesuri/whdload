@@ -190,6 +190,8 @@ def cd32_main(argv):
     from runtime_buffers import source as workspace_source, container as workspace_container
     assembled='\n'.join(lines)+'\n'
     if a.release:assembled=workspace_source(assembled,int.from_bytes(code[0x18:0x1a],"big"))
+    from german_map import equates
+    assembled=equates(assembled)+assembled
     source.write_text(assembled)
     binary = out/'payload.bin'
     subprocess.run([os.environ['VASM'], '-m68020','-spaces','-no-opt','-Fbin','-L',str(out/'slave.lst'),'-o',str(binary),str(source)],check=True)

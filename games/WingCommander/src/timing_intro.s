@@ -44,14 +44,14 @@ intro_world:
         move.l  timing_game(pc),a6
         jsr     WC_NATIVE_WORLD(a6)
         move.l  timing_game(pc),a6
-        jsr     $15fb4(a6)       ; background flash countdown is tick-owned
+        jsr     E_15fb4(a6)       ; background flash countdown is tick-owned
         ; Asteroid generation/cleanup also lived inside E:02e4 drawing.
         ; Rebuild native visibility first, and use the world counter for its
         ; one-in-twenty cleanup slot. New asteroids persist into the snapshot.
-        tst.l   4470(a4)
+        tst.l   A_4470(a4)
         beq.s   .no_asteroids
         move.l  timing_game(pc),a6
-        jsr     $2a086(a6)
+        jsr     E_2a086(a6)
         bsr.w   intro_field_world
 .no_asteroids:
         bsr.w   timing_scene_tick
@@ -63,7 +63,7 @@ intro_world:
 
 ; Shared flight/intro field maintenance, after authoritative geometry.
 intro_field_world:
-        tst.l   4470(a4)
+        tst.l   A_4470(a4)
         beq.s   .done
         move.w  WC_A4_DRAW_COUNT(a4),-(sp)
         move.w  WC_A4_WORLD_COUNT(a4),WC_A4_DRAW_COUNT(a4)
@@ -87,7 +87,7 @@ intro_flash_draw:
         tst.w   intro_active(pc)
         bne.s   .done
         move.l  timing_game(pc),-(sp)
-        addi.l  #$15fb4,(sp)
+        addi.l  #E_15fb4,(sp)
 .done:
         rts
 
@@ -98,10 +98,10 @@ intro_draw:
         FSTAT   5
         ; Render-only attachment randomness cannot change the next world tick.
         lea     intro_game_seed(pc),a0
-        move.l  -4326(a4),(a0)
-        move.l  timing_render_seed(pc),-4326(a4)
+        move.l  A_m4326(a4),(a0)
+        move.l  timing_render_seed(pc),A_m4326(a4)
         move.l  timing_game(pc),a6
-        move.w  #1,-32624(a4)
+        move.w  #1,A_m32624(a4)
         jsr     WC_NATIVE_DRAW(a6)
         FSTAT   6
         movem.l (sp)+,d0-d7/a0-a6
@@ -113,8 +113,8 @@ intro_finish:
         move.l  timing_game(pc),a6
         jsr     WC_NATIVE_FINISH(a6)
         lea     timing_render_seed(pc),a0
-        move.l  -4326(a4),(a0)
-        move.l  intro_game_seed(pc),-4326(a4)
+        move.l  A_m4326(a4),(a0)
+        move.l  intro_game_seed(pc),A_m4326(a4)
         bsr.w   timing_scene_end
         FSTAT   8
         movem.l (sp)+,d0-d7/a0-a6
@@ -155,10 +155,10 @@ intro_title:
         move.l  timing_game(pc),a6
         cmpi.w  #35,d2
         bge.s   .title
-        move.l  -22652(a4),-(sp)
+        move.l  A_m22652(a4),-(sp)
         move.w  #50,-(sp)
-        pea     4438(a4)
-        jsr     $13f50(a6)
+        pea     A_4438(a4)
+        jsr     E_13f50(a6)
         lea     10(sp),sp
 .title:
         bsr.w   intro_title_sample
@@ -168,11 +168,11 @@ intro_title:
         bge.s   .depart_draw
         move.w  d0,-(sp)        ; projected scale, with fractional depth retained
         clr.w   -(sp)
-        move.l  -22256(a4),-(sp)
+        move.l  A_m22256(a4),-(sp)
         move.w  a3,-(sp)
-        move.w  -4314(a4),-(sp)
-        pea     4438(a4)
-        jsr     $2ec98(a6)
+        move.w  A_m4314(a4),-(sp)
+        pea     A_4438(a4)
+        jsr     E_2ec98(a6)
         lea     16(sp),sp
         bra.s   .finish
 .depart_draw:
@@ -180,16 +180,16 @@ intro_title:
         move.w  d0,-(sp)
         move.w  d1,-(sp)
         clr.w   -(sp)
-        move.l  -22256(a4),-(sp)
+        move.l  A_m22256(a4),-(sp)
         move.w  a3,-(sp)
-        move.w  -4314(a4),-(sp)
-        pea     4438(a4)
-        jsr     $2d746(a6)
+        move.w  A_m4314(a4),-(sp)
+        pea     A_4438(a4)
+        jsr     E_2d746(a6)
         lea     20(sp),sp
 .finish:
         bsr.w   intro_finish
         move.l  timing_game(pc),a6
-        jsr     $1898a(a6)
+        jsr     E_1898a(a6)
         tst.w   d0
         beq.w   .loop
         addq.b  #1,d7
@@ -197,7 +197,7 @@ intro_title:
 .exit:
         bsr.w   intro_stop
         move.l  timing_game(pc),-(sp)
-        addi.l  #$1fd90,(sp)
+        addi.l  #E_1fd90,(sp)
         rts
 
 ; D0/D1 = render-only projected scale/rotation angle. D2 is the next script tick.
@@ -272,11 +272,11 @@ intro_credits_end:
         tst.b   d3
         beq.s   .repeat
         move.l  timing_game(pc),-(sp)
-        addi.l  #$1fe4c,(sp)
+        addi.l  #E_1fe4c,(sp)
         rts
 .repeat:
         move.l  timing_game(pc),-(sp)
-        addi.l  #$1fc8e,(sp)
+        addi.l  #E_1fc8e,(sp)
         rts
         cnop 0,4
 intro_active: dc.w 0

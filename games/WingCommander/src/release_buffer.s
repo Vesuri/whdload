@@ -3,10 +3,10 @@
 ; The IRQ may retire the pending picture while this snapshot is taken.
 release_predict:
 .sample:
-        move.l  -252(a4),d0
+        move.l  A_m252(a4),d0
         moveq   #0,d1
         move.w  release_pending(pc),d1
-        cmp.l   -252(a4),d0
+        cmp.l   A_m252(a4),d0
         bne.s   .sample
         addq.l  #1,d0
         add.l   d1,d0
@@ -40,14 +40,14 @@ release_publish:
         bsr.w   release_buffer_wait
         movem.l d0/a0-a1,-(sp)
         move.l  timing_game(pc),a0
-        move.w  $33210(a0),d0     ; completed index, after E:33772
+        move.w  E_33210(a0),d0     ; completed index, after E:33772
         lea     release_pending_index(pc),a1
         move.w  d0,(a1)
         lea     release_pending_a4(pc),a1
         move.l  a4,(a1)
         andi.l  #1,d0
         lsl.w   #2,d0
-        lea     $331f8(a0),a0
+        lea     E_331f8(a0),a0
         move.l  (a0,d0.w),d0
         lea     release_pending_plane(pc),a1
         move.l  d0,(a1)
@@ -104,7 +104,7 @@ release_vblank:
         tst.w   release_pending(pc)
         beq.w   release_vblank_done
         move.l  timing_data(pc),a0
-        move.l  $7f02(a0),d0
+        move.l  D_7f02(a0),d0
         sub.l   release_pending_time(pc),d0
         bmi.w   release_vblank_done ; never show a future prediction early
 release_vblank_early:
@@ -114,11 +114,11 @@ release_vblank_early:
         cmpi.w  #12,d0           ; leave time for native pointer bookkeeping
         bhi.s   release_vblank_late
         move.l  release_pending_a4(pc),a4
-        tst.w   -752(a4)         ; native publication lock must be idle (-1)
+        tst.w   A_m752(a4)         ; native publication lock must be idle (-1)
         bpl.s   release_vblank_late
         move.w  release_pending_index(pc),-(sp)
         move.l  timing_game(pc),a0
-        jsr     $33a12(a0)       ; native View/BitMap/COP2LC publication, no OS call
+        jsr     E_33a12(a0)       ; native View/BitMap/COP2LC publication, no OS call
         addq.l  #2,sp
         bsr.w   release_beam
         cmpi.w  #16,d0           ; never restart the copper in the visible window

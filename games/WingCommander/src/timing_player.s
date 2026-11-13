@@ -4,11 +4,11 @@
 timing_player_reset:
         movem.l d0-d7/a0-a6,-(sp)
         bsr.w   timing_prediction_reset
-        clr.l   5882(a4)
-        clr.w   5886(a4)
-        clr.w   5498(a4)
-        clr.w   5626(a4)
-        clr.w   5754(a4)
+        clr.l   A_5882(a4)
+        clr.w   A_5886(a4)
+        clr.w   A_5498(a4)
+        clr.w   A_5626(a4)
+        clr.w   A_5754(a4)
         lea     timing_angles(pc),a0
         clr.l   (a0)
         clr.w   4(a0)
@@ -29,41 +29,41 @@ timing_preview_controls:
         lea     timing_angles(pc),a0
         clr.l   (a0)
         clr.w   4(a0)
-        cmpi.w  #12,5888(a4)
+        cmpi.w  #12,A_5888(a4)
         bne.w   .inactive
-        cmpi.w  #-1,5478(a4)
+        cmpi.w  #-1,A_5478(a4)
         ifne BUFFERED
         beq.s   .thrust
-        cmpi.w  #1,5478(a4)
+        cmpi.w  #1,A_5478(a4)
         beq.s   .thrust
-        cmpi.w  #3,5478(a4)
+        cmpi.w  #3,A_5478(a4)
         endif
         bne.w   .inactive
 .thrust:
-        cmpi.w  #8,-18280(a4)
+        cmpi.w  #8,A_m18280(a4)
         beq.w   .inactive
-        move.l  5882(a4),-(sp)
-        move.w  5886(a4),-(sp)
-        move.w  5498(a4),-(sp)
-        move.w  5626(a4),-(sp)
-        move.w  5754(a4),-(sp)
+        move.l  A_5882(a4),-(sp)
+        move.w  A_5886(a4),-(sp)
+        move.w  A_5498(a4),-(sp)
+        move.w  A_5626(a4),-(sp)
+        move.w  A_5754(a4),-(sp)
         lea     timing_preview(pc),a0
         move.w  #1,(a0)
         move.l  timing_game(pc),a6
-        jsr     $18daa(a6)
+        jsr     E_18daa(a6)
         move.l  timing_game(pc),a6
-        jsr     $742(a6)
+        jsr     E_742(a6)
         lea     timing_angles(pc),a0
-        move.w  5626(a4),(a0)
-        move.w  5498(a4),2(a0)
-        move.w  5754(a4),4(a0)
+        move.w  A_5626(a4),(a0)
+        move.w  A_5498(a4),2(a0)
+        move.w  A_5754(a4),4(a0)
         lea     timing_preview(pc),a0
         clr.w   (a0)
-        move.w  (sp)+,5754(a4)
-        move.w  (sp)+,5626(a4)
-        move.w  (sp)+,5498(a4)
-        move.w  (sp)+,5886(a4)
-        move.l  (sp)+,5882(a4)
+        move.w  (sp)+,A_5754(a4)
+        move.w  (sp)+,A_5626(a4)
+        move.w  (sp)+,A_5498(a4)
+        move.w  (sp)+,A_5886(a4)
+        move.l  (sp)+,A_5882(a4)
         bra.s   .done
 .inactive:
         bsr.w   player_basis_reset
@@ -79,7 +79,7 @@ timing_fire_gate:
         tst.w   timing_preview(pc)
         bne.s   .done
         move.l  timing_game(pc),-(sp)
-        addi.l  #$6fe,(sp)
+        addi.l  #E_6fe,(sp)
         rts
 .done:
         rts
@@ -88,7 +88,7 @@ timing_throttle_gate:
         tst.w   timing_preview(pc)
         bne.s   .done
         move.l  timing_game(pc),-(sp)
-        addi.l  #$ccda,(sp)
+        addi.l  #E_ccda,(sp)
         rts
 .done:
         rts
@@ -101,25 +101,25 @@ timing_world_rotation:
         beq.s   .native
         tst.w   d2
         bne.s   .native
-        cmpi.w  #12,5888(a4)
+        cmpi.w  #12,A_5888(a4)
         bne.s   .native
-        cmpi.w  #-1,5478(a4)
+        cmpi.w  #-1,A_5478(a4)
         ifne BUFFERED
         beq.s   .thrust
-        cmpi.w  #1,5478(a4)
+        cmpi.w  #1,A_5478(a4)
         beq.s   .thrust
-        cmpi.w  #3,5478(a4)
+        cmpi.w  #3,A_5478(a4)
         endif
         bne.s   .native
 .thrust:
-        cmpi.w  #8,-18280(a4)
+        cmpi.w  #8,A_m18280(a4)
         beq.s   .native
         bra.s   .compare
 .native:
         move.l  a6,-(sp)
         move.w  8(sp),-(sp)
         move.l  timing_game(pc),a6
-        jsr     $7c86(a6)
+        jsr     E_7c86(a6)
         addq.l  #2,sp
         move.l  (sp)+,a6
 .compare:
@@ -170,12 +170,12 @@ timing_player_field:
 timing_player_camera:
         ; Ready uses ordinary mode 0 under the modal clock. Rebuild from
         ; the staged player here too; old intro camera rates are not its owner.
-        cmpi.w  #3,-18280(a4)
+        cmpi.w  #3,A_m18280(a4)
         bhi.s   .done
-        tst.w   -29978(a4)
+        tst.w   A_m29978(a4)
         bne.s   .done
         move.l  timing_game(pc),a6
-        jsr     $680e(a6)
+        jsr     E_680e(a6)
 .done:
         rts
         cnop    0,4

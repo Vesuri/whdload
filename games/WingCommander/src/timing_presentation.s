@@ -4,12 +4,12 @@ timing_target_tick:
         movem.l d0-d7/a0-a6,-(sp)
         bsr.w   timing_player_camera
         move.l  timing_game(pc),a6
-        jsr     $2a086(a6)
+        jsr     E_2a086(a6)
         bsr.w   timing_geometry_history
-        move.w  4434(a4),-(sp)
-        move.w  4430(a4),4434(a4)
+        move.w  A_4434(a4),-(sp)
+        move.w  A_4430(a4),A_4434(a4)
         bsr.w   timing_target_original
-        move.w  (sp)+,4434(a4)
+        move.w  (sp)+,A_4434(a4)
         movem.l (sp)+,d0-d7/a0-a6
         rts
 
@@ -25,8 +25,8 @@ timing_target_draw:
 timing_sim_score_draw:
         tst.w   timing_active(pc)
         bne.s   .done
-        addq.l  #1,4480(a4)
-        subq.w  #1,4474(a4)
+        addq.l  #1,A_4480(a4)
+        subq.w  #1,A_4474(a4)
 .done:
         rts
 
@@ -42,10 +42,10 @@ timing_emission_clock:
         ifne BUFFERED
 .world:
         endif
-        move.w  4430(a4),d0
+        move.w  A_4430(a4),d0
         bra.s   .mask
 .native:
-        move.w  4434(a4),d0
+        move.w  A_4434(a4),d0
 .mask:
         andi.w  #3,d0
         rts
@@ -56,7 +56,7 @@ timing_systems_draw:
         tst.w   timing_active(pc)
         bne.s   .done
         move.l  timing_game(pc),-(sp)
-        addi.l  #$af84,(sp)
+        addi.l  #E_af84,(sp)
 .done:
         rts
 
@@ -64,7 +64,7 @@ timing_message_draw:
         tst.w   timing_active(pc)
         bne.s   .done
         move.l  timing_game(pc),-(sp)
-        addi.l  #$22a0,(sp)
+        addi.l  #E_22a0,(sp)
 .done:
         rts
 
@@ -77,10 +77,10 @@ timing_sim_draw:
 .done:
         rts
 timing_sim_update:
-        tst.w   -29986(a4)
+        tst.w   A_m29986(a4)
         beq.s   .done
         move.l  timing_game(pc),-(sp)
-        addi.l  #$536,(sp)
+        addi.l  #E_536,(sp)
 .done:
         rts
 
@@ -92,29 +92,29 @@ timing_selection:
         tst.w   timing_active(pc)
         beq.s   .native
         move.w  timing_selection_delta(pc),d0
-        sub.w   d0,12972(a4)
+        sub.w   d0,A_12972(a4)
         bra.s   .result
 .native:
-        subq.w  #1,12972(a4)
+        subq.w  #1,A_12972(a4)
 .result:
         bgt.s   .waiting
         move.l  (sp)+,d0
         move.l  timing_game(pc),-(sp)
-        addi.l  #$4b1e,(sp)
+        addi.l  #E_4b1e,(sp)
         rts
 .waiting:
         move.l  (sp)+,d0
         move.l  timing_game(pc),-(sp)
-        addi.l  #$4c56,(sp)
+        addi.l  #E_4c56,(sp)
         rts
 
 timing_portrait_clock:
         tst.w   timing_active(pc)
         beq.s   .native
-        btst    #0,4431(a4)
+        btst    #0,A_4431(a4)
         rts
 .native:
-        btst    #0,4435(a4)
+        btst    #0,A_4435(a4)
         rts
 
 timing_portrait_random:
@@ -124,7 +124,7 @@ timing_portrait_random:
         rts
 .native:
         move.l  timing_game(pc),-(sp)
-        addi.l  #$2cb86,(sp)
+        addi.l  #E_2cb86,(sp)
         rts
 
 ; Advance an independent visual RNG at the fixed tick even if no picture is
@@ -132,32 +132,32 @@ timing_portrait_random:
 ; seed before returning. Interrupt work does not call the gameplay RNG.
 timing_presentation_tick:
         movem.l d0-d1/a0-a1/a6,-(sp)
-        move.l  -4326(a4),-(sp)
-        move.l  timing_visual_seed(pc),-4326(a4)
+        move.l  A_m4326(a4),-(sp)
+        move.l  timing_visual_seed(pc),A_m4326(a4)
         move.w  #7,-(sp)
         clr.w   -(sp)
         move.l  timing_game(pc),a6
-        jsr     $2cb86(a6)
+        jsr     E_2cb86(a6)
         addq.l  #4,sp
         lea     timing_visual_random(pc),a0
         move.w  d0,(a0)
         lea     timing_visual_seed(pc),a0
-        move.l  -4326(a4),(a0)
-        move.l  (sp)+,-4326(a4)
+        move.l  A_m4326(a4),(a0)
+        move.l  (sp)+,A_m4326(a4)
         move.l  timing_game(pc),a6
-        jsr     $22a0(a6)
-        tst.w   -29986(a4)
+        jsr     E_22a0(a6)
+        tst.w   A_m29986(a4)
         beq.s   .no_score
-        tst.w   -32626(a4)
+        tst.w   A_m32626(a4)
         bgt.s   .no_score
-        addq.l  #1,4480(a4)
-        subq.w  #1,4474(a4)
+        addq.l  #1,A_4480(a4)
+        subq.w  #1,A_4474(a4)
         bgt.s   .no_score
-        move.w  #4,-32628(a4)
+        move.w  #4,A_m32628(a4)
 .no_score:
         bsr.w   timing_sim_update
         move.l  timing_game(pc),a6
-        jsr     $af84(a6)
+        jsr     E_af84(a6)
         movem.l (sp)+,d0-d1/a0-a1/a6
         rts
 

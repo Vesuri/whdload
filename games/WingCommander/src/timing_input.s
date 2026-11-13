@@ -22,8 +22,8 @@ timing_record_input:
         lea     timing_input_ring(pc),a0
         adda.l  d0,a0
         move.l  timing_data(pc),a2
-        move.l  $7f02(a2),(a0)+
-        lea     $7e06(a2),a1
+        move.l  D_7f02(a2),(a0)+
+        lea     D_7e06(a2),a1
         moveq   #14,d2
 .pad:
         move.b  (a1)+,(a0)+
@@ -31,14 +31,14 @@ timing_record_input:
         clr.b   (a0)+
         ; Native read clears these event latches. Sampling now transfers their
         ; ownership to the history; the consumer must carry them to its tick.
-        clr.b   $7e0c(a2)
-        clr.b   $7e0d(a2)
-        lea     $7f58(a2),a1
+        clr.b   D_7e0c(a2)
+        clr.b   D_7e0d(a2)
+        lea     D_7f58(a2),a1
         moveq   #31,d2
 .keys:
         move.l  (a1)+,(a0)+
         dbf     d2,.keys
-        move.w  $805e(a2),(a0)+
+        move.w  D_805e(a2),(a0)+
         clr.w   (a0)+
         lea     timing_input_head(pc),a0
         move.w  d1,(a0)
@@ -68,7 +68,7 @@ timing_pad_read:
         rts
 .native:
         move.l  timing_game(pc),-(sp)
-        addi.l  #$33dfc,(sp)
+        addi.l  #E_33dfc,(sp)
         rts
 
 timing_keys_read:
@@ -83,7 +83,7 @@ timing_keys_read:
         rts
 .native:
         move.l  timing_game(pc),-(sp)
-        addi.l  #$34376,(sp)
+        addi.l  #E_34376,(sp)
         rts
 
 ; Stop ordinary command draining at the producer cursor captured for this field.
@@ -91,14 +91,14 @@ timing_keys_read:
 timing_key_command:
         tst.w   timing_replay(pc)
         beq.s   .native
-        move.w  94(a4),d0
+        move.w  A_94(a4),d0
         cmp.w   timing_sample_producer(pc),d0
         bne.s   .native
         moveq   #-1,d0
         rts
 .native:
         move.l  timing_game(pc),-(sp)
-        addi.l  #$34318,(sp)
+        addi.l  #E_34318,(sp)
         rts
         cnop    0,4
 timing_data: dc.l 0
@@ -184,22 +184,22 @@ timing_pad_edges:
 .loop:
         tst.w   d2
         beq.s   .done
-        lea     18122(a4),a0
-        lea     18138(a4),a1
+        lea     A_18122(a4),a0
+        lea     A_18138(a4),a1
         move.l  (a0)+,(a1)+
         move.l  (a0)+,(a1)+
         move.l  (a0)+,(a1)+
         move.l  (a0)+,(a1)+
-        lea     18122(a4),a0
+        lea     A_18122(a4),a0
         move.l  (a2)+,(a0)+
         move.l  (a2)+,(a0)+
         move.l  (a2)+,(a0)+
         move.l  (a2)+,(a0)+
         move.l  timing_game(pc),a6
-        jsr     $19278(a6)
+        jsr     E_19278(a6)
         tst.w   d0
         beq.s   .next
-        move.w  #5,-32628(a4)
+        move.w  #5,A_m32628(a4)
         bra.s   .done
 .next:
         tst.w   timing_abort(pc)

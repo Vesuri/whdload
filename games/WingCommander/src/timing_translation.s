@@ -2,17 +2,17 @@
 ; collisions and all other objects remain world-owned.
 translation_allowed:
         moveq   #0,d0
-        cmpi.w  #12,5888(a4)
+        cmpi.w  #12,A_5888(a4)
         bne.s   .done
-        cmpi.w  #8,-18280(a4)
+        cmpi.w  #8,A_m18280(a4)
         beq.s   .done
-        tst.w   -29978(a4)
+        tst.w   A_m29978(a4)
         bne.s   .done
-        cmpi.w  #-1,5478(a4)
+        cmpi.w  #-1,A_5478(a4)
         beq.s   .yes
-        cmpi.w  #1,5478(a4)
+        cmpi.w  #1,A_5478(a4)
         beq.s   .yes
-        cmpi.w  #3,5478(a4)
+        cmpi.w  #3,A_5478(a4)
         bne.s   .done
 .yes:
         moveq   #1,d0
@@ -73,9 +73,9 @@ translation_field:
         move.w  #1,(a0)
         bsr.w   translation_acceleration
         lea     translation_remainders+12(pc),a0
-        lea     4508(a4),a1
+        lea     A_4508(a4),a1
         ; D:9d6c = A4+7534, native velocity in fixed8 units/world tick.
-        lea     7534(a4),a2
+        lea     A_7534(a4),a2
         move.l  timing_hz(pc),d7
         moveq   #2,d4
 .axis:
@@ -98,19 +98,19 @@ translation_acceleration:
         link    a5,#-24
         movem.l d2-d5,-(sp)
         lea     translation_saved_effect(pc),a0
-        move.b  15082(a4),(a0)
+        move.b  A_15082(a4),(a0)
         moveq   #0,d2
         clr.l   -24(a5)
         clr.l   -20(a5)
         clr.l   -16(a5)
-        move.l  6592(a4),d0      ; set speed (D:99be)
-        cmpi.w  #3,5478(a4)
+        move.l  A_6592(a4),d0      ; set speed (D:99be)
+        cmpi.w  #3,A_5478(a4)
         beq.s   .braking
-        cmpi.w  #1,5478(a4)
+        cmpi.w  #1,A_5478(a4)
         bne.s   .target
-        move.w  6136(a4),d0
+        move.w  A_6136(a4),d0
         muls.w  #104,d0
-        lea     -11354(a4),a0
+        lea     A_m11354(a4),a0
         move.w  22(a0,d0.l),d0
         add.w   d0,d0
         addi.w  #40,d0
@@ -122,14 +122,14 @@ translation_acceleration:
 .target:
         pea     -12(a5)
         move.l  d0,-(sp)
-        pea     8522(a4)        ; forward vector D:a148
+        pea     A_8522(a4)        ; forward vector D:a148
         move.l  timing_game(pc),a6
-        jsr     $2b7f0(a6)
+        jsr     E_2b7f0(a6)
         lea     12(sp),sp
         lea     translation_preview(pc),a0
         move.w  #1,(a0)
         move.l  timing_game(pc),-(sp)
-        addi.l  #$7f78,(sp)
+        addi.l  #E_7f78,(sp)
         rts                     ; native epilogue returns to translation_field
 
 translation_world_owned:
@@ -160,22 +160,22 @@ translation_velocity:
         move.w  d2,d0
         muls.w  #12,d0
         move.l  timing_game(pc),-(sp)
-        addi.l  #$8080,(sp)
+        addi.l  #E_8080,(sp)
         rts
 .world_done:
         lea     -24(a5),a0
-        lea     15150(a4),a1
+        lea     A_15150(a4),a1
         move.l  (a0)+,(a1)+
         move.l  (a0)+,(a1)+
         move.l  (a0)+,(a1)+
         bra.w   translation_epilogue
 .fraction:
-        move.b  translation_saved_effect(pc),15082(a4)
+        move.b  translation_saved_effect(pc),A_15082(a4)
         lea     translation_preview(pc),a0
         clr.w   (a0)
         lea     translation_remainders(pc),a0
         lea     -24(a5),a1
-        lea     7534(a4),a2
+        lea     A_7534(a4),a2
         lea     translation_last_acceleration(pc),a3
         move.l  timing_hz(pc),d7
         moveq   #2,d4
@@ -187,7 +187,7 @@ translation_velocity:
         dbra    d4,.axis
 translation_epilogue:
         move.l  timing_game(pc),-(sp)
-        addi.l  #$80ea,(sp)
+        addi.l  #E_80ea,(sp)
         rts
 
 ; Replaces E:80b6's MOVE/MULS. Non-player and non-controlled paths are native.
@@ -200,7 +200,7 @@ translation_position:
         move.w  d2,d0
         muls.w  #12,d0
         move.l  timing_game(pc),-(sp)
-        addi.l  #$80bc,(sp)
+        addi.l  #E_80bc,(sp)
         rts
         cnop 0,4
 translation_active: dc.w 0
@@ -224,11 +224,11 @@ translation_tick_begin:
         beq.s   .done
         move.w  #1,(a0)
         lea     translation_tick_pose(pc),a0
-        lea     4508(a4),a1
+        lea     A_4508(a4),a1
         move.l  (a1)+,(a0)+
         move.l  (a1)+,(a0)+
         move.l  (a1)+,(a0)+
-        lea     5240(a4),a1      ; camera position, slot 61
+        lea     A_5240(a4),a1      ; camera position, slot 61
         move.l  (a1)+,(a0)+
         move.l  (a1)+,(a0)+
         move.l  (a1)+,(a0)+
@@ -245,10 +245,10 @@ translation_tick_end:
         lea     translation_ticks_checked(pc),a0
         addq.l  #1,(a0)
         lea     translation_tick_pose(pc),a0
-        lea     4508(a4),a1
+        lea     A_4508(a4),a1
         lea     translation_position_corrections(pc),a2
         bsr.s   .compare
-        lea     5240(a4),a1
+        lea     A_5240(a4),a1
         lea     translation_camera_corrections(pc),a2
         bsr.s   .compare
 .done:
@@ -283,10 +283,10 @@ timing_scene_velocity:
         beq.s   .done
         cmpi.w  #10,d4
         bhs.s   .done
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         cmpi.w  #11,(a0,d4.w*2)
         blo.s   .done
-        lea     5478(a4),a0
+        lea     A_5478(a4),a0
         move.w  (a0,d4.w*2),d0
         cmpi.w  #-1,d0
         beq.s   .stage
@@ -295,11 +295,11 @@ timing_scene_velocity:
         cmpi.w  #3,d0
         bne.s   .done
 .timer:
-        lea     15126(a4),a0
+        lea     A_15126(a4),a0
         cmpi.w  #1,(a0,d4.w*2)
         ble.s   .done
 .stage:
-        lea     14932(a4),a0
+        lea     A_14932(a4),a0
         cmpi.w  #1,(a0,d4.w*2)
         beq.s   .done
         movem.l d0-d7/a0-a6,-(sp)
@@ -314,22 +314,22 @@ timing_scene_velocity_solve:
         move.w  d4,d2
         lea     timing_scene_velocity_preview(pc),a0
         move.w  #1,(a0)
-        lea     15082(a4),a1
+        lea     A_15082(a4),a1
         move.b  (a1,d2.w),2(a0)
         clr.l   -24(a5)
         clr.l   -20(a5)
         clr.l   -16(a5)
-        lea     6592(a4),a0
+        lea     A_6592(a4),a0
         move.l  (a0,d2.w*4),d0
-        lea     5478(a4),a0
+        lea     A_5478(a4),a0
         cmpi.w  #3,(a0,d2.w*2)
         beq.s   .brake
         cmpi.w  #1,(a0,d2.w*2)
         bne.s   .target
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         move.w  (a0,d2.w*2),d0
         muls.w  #104,d0
-        lea     -11354(a4),a0
+        lea     A_m11354(a4),a0
         move.w  22(a0,d0.l),d0
         add.w   d0,d0
         addi.w  #40,d0
@@ -341,24 +341,24 @@ timing_scene_velocity_solve:
 .target:
         pea     -12(a5)
         move.l  d0,-(sp)
-        lea     8522(a4),a0
+        lea     A_8522(a4),a0
         adda.w  d5,a0
         move.l  a0,-(sp)
         move.l  timing_game(pc),a6
-        jsr     $2b7f0(a6)
+        jsr     E_2b7f0(a6)
         lea     12(sp),sp
         move.l  timing_game(pc),-(sp)
-        addi.l  #$7f78,(sp)
+        addi.l  #E_7f78,(sp)
         rts
 
 timing_scene_velocity_result:
         lea     timing_scene_velocity_preview(pc),a0
         clr.w   (a0)
-        lea     15082(a4),a1
+        lea     A_15082(a4),a1
         move.b  2(a0),(a1,d2.w)
         move.w  d2,d0
         mulu.w  #12,d0
-        lea     7534(a4),a2
+        lea     A_7534(a4),a2
         adda.w  d0,a2
         lea     -24(a5),a3
         moveq   #2,d3

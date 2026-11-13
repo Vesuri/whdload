@@ -96,8 +96,8 @@ render_converted:
         ; before returning to the original single publication/swap sequence.
 render_wait:
         move.l  48(sp),a4
-        lea     -660(a4),a0
-        move.l  -778(a4),a6
+        lea     A_m660(a4),a0
+        move.l  A_m778(a4),a6
         jsr     -402(a6)              ; graphics.library WaitBOVP
 render_wait_done:
         movem.l (sp)+,d0-a6

@@ -56,7 +56,7 @@ projectile_created:
         bne.w   .done
         cmpi.w  #60,d0
         bhi.w   .done
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         move.w  (a0,d0.w*2),d1
         cmpi.w  #5,d1              ; native approximate AI shot (model 48)
         beq.s   .record
@@ -69,16 +69,16 @@ projectile_created:
 .record:
         lea     projectile_types(pc),a0
         move.w  d1,(a0,d0.w*2)
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         move.w  (a0,d0.w*2),d1
         lea     projectile_models(pc),a0
         move.w  d1,(a0,d0.w*2)
         cmpi.w  #9,d3
         bhi.s   .done
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         cmpi.w  #11,(a0,d3.w*2)
         blo.s   .done
-        lea     5320(a4),a0
+        lea     A_5320(a4),a0
         move.w  (a0,d3.w*2),d1
         bmi.s   .done
         lea     projectile_cooldown(pc),a0

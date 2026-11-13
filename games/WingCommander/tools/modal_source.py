@@ -1,6 +1,7 @@
 """Pinned, variant-specific modal scene adapters. Native spans stay in tmp/."""
 import hashlib
 from variants import get
+from german_map import Symbols
 
 
 def specification(variant):
@@ -26,6 +27,7 @@ def source(root, variant):
     code=raw[44:44+v.HUNKS[0][1]]
     ocs=variant=='ocs'
     upper,feet,sim,begin,wait,patches=specification(variant)
+    S=Symbols(variant)
     fields=dict(MODAL_TEXT_CONTEXT=-0xc74 if ocs else -0x8de,MODAL_LABEL_CONTEXT=0x1a0 if ocs else 0xa8c,MODAL_TRANSPARENT=0x21fa if ocs else 0x2c6c,MODAL_LABEL_SURFACE=0x1b8 if ocs else 0xaa4,MODAL_LABEL_COLOUR=0x1b7 if ocs else 0xaa3,MODAL_FIELD=v.A4['field_clock'],MODAL_COUNTDOWN=-32592 if ocs else -32624,
                 MODAL_CENTRE_X=-4184 if ocs else -4314,MODAL_CENTRE_Y=-4182 if ocs else -4312,
                 MODAL_ABORT=-0x707c if ocs else -0x7094,MODAL_CONTEXT=-31670 if ocs else -31696,
@@ -34,11 +36,11 @@ def source(root, variant):
     fields.update(dict(zip(('BAR_SURFACE','BAR_COLOUR','BAR_STATIC','BAR_STATIC_COUNT','BAR_MOVING','BAR_MOVING_COUNT','BAR_IMAGE'),
                            (-754,2274,0x40e2,0x40de,0x411e,0x40e0,-0x2d70) if ocs else
                            (0x5fa,0x1154,0x48f2,0x48ee,0x492e,0x48f0,-0x2df2))))
-    lines=[*(f'{k} equ {n}' for k,n in fields.items()),
+    lines=[*(f'{k} equ {S.a4(n)}' for k,n in fields.items()),
            'MODAL_CLOCK equ '+('ocs_clock_state' if ocs else 'timing_clock'),
            'MODAL_HZ equ '+('ocs_clock_hz' if ocs else 'timing_hz'),
            (root/'src/modal_clock.s').read_text()]
-    room_tables=(-0x4b78,-0x4ab8) if ocs else (-0x4b8a,-0x4aca)
+    room_tables=[S.a4(n) for n in ((-0x4b78,-0x4ab8) if ocs else (-0x4b8a,-0x4aca))]
     fix=[]
     def native(label, target):
         lines.append(label+': jmp $0');fix.append((label,target))
@@ -57,7 +59,7 @@ def source(root, variant):
                           ('modal_context_begin',0x13b30 if ocs else 0x13dba),
                           ('modal_context_end',0x13bc8 if ocs else 0x13e52)]:native(label,target)
     for name,off in [('upper',upper),('feet',feet)]:
-        lines+=['modal_'+name+'_resume:',' dc.b '+','.join(str(x) for x in code[off:off+6])]
+        lines+=['modal_'+name+'_resume:',S.copy(code,off,off+6)]
         native('modal_'+name+'_tail',off+6)
     for off,width,label in patches:
         if label.startswith('modal_crowd_publish'):
@@ -65,14 +67,14 @@ def source(root, variant):
             native(label+'_native',int.from_bytes(code[off+2:off+6],'big'))
     death=0x19a94 if ocs else 0x1a7a8
     lines += ['modal_death_begin:', ' bsr.w modal_death_rebase',
-              ' dc.b '+','.join(str(x) for x in code[death:death+8])]
+              S.copy(code,death,death+8)]
     native('modal_death_resume',death+8)
     native('modal_death_native_publish',0xb80 if ocs else 0xc40)
     portrait=0x24ae0 if ocs else 0x25922
-    lines+=['modal_portrait_native:',' dc.b '+','.join(str(x) for x in code[portrait:portrait+8])]
+    lines+=['modal_portrait_native:',S.copy(code,portrait,portrait+8)]
     native('modal_portrait_resume',portrait+8)
     lines+=['modal_dispatch:',' tst.w 14(sp)',' beq.w modal_simulator',
-            ' dc.b '+','.join(str(x) for x in code[sim:sim+8])]
+            S.copy(code,sim,sim+8)]
     native('modal_sim_native',sim+8)
     for kind,sites in [('begin',begin),('wait',wait)]:
         for i,off in enumerate(sites):
@@ -90,17 +92,17 @@ def source(root, variant):
     for off,width,_ in patches:
         if code[off:off+2]==bytes.fromhex('4eb9'):
             target=int.from_bytes(code[off+2:off+6],'big')
-            lines += [f' cmpi.w #$4eb9,${off:x}(a0)',' bne.w modal_bad',
-                      ' move.l a0,d0',f' addi.l #${target:x},d0',f' cmp.l ${off+2:x}(a0),d0',' bne.w modal_bad']
+            lines += [f' cmpi.w #$4eb9,{S.code(off)}(a0)',' bne.w modal_bad',
+                      ' move.l a0,d0',f' addi.l #{S.code(target)},d0',f' cmp.l {S.code(off+2)}(a0),d0',' bne.w modal_bad']
         else:
-            for n in range(0,width,2):lines += [f' cmpi.w #${int.from_bytes(code[off+n:off+n+2],"big"):x},${off+n:x}(a0)',' bne.w modal_bad']
+            for n in range(0,width,2):lines += [f' cmpi.w #{S.word(code,off+n)},{S.code(off+n)}(a0)',' bne.w modal_bad']
     lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_install:',' bsr.w funeral_install',' bsr.w landing_install',' bsr.w ejection_install',' bsr.w autopilot_install',' bsr.w launch_install',' movem.l d0-d7/a0-a6,-(sp)']
     for label,target in fix:
-        lines += [' move.l a0,d0',f' addi.l #${target:x},d0',f' lea {label}+2(pc),a1',' move.l d0,(a1)']
+        lines += [' move.l a0,d0',f' addi.l #{S.code(target)},d0',f' lea {label}+2(pc),a1',' move.l d0,(a1)']
     for off,width,label in patches:
         op=0x4eb9 if off in begin+wait or label in ('modal_room_input','modal_death_publish') or label.startswith(('modal_label_','modal_crowd_publish')) else 0x4ef9
-        lines += [f' move.w #${op:x},${off:x}(a0)',f' lea {label}(pc),a1',f' move.l a1,${off+2:x}(a0)']
-        for n in range(6,width,2):lines += [f' move.w #$4e71,${off+n:x}(a0)']
+        lines += [f' move.w #${op:x},{S.code(off)}(a0)',f' lea {label}(pc),a1',f' move.l a1,{S.code(off+2)}(a0)']
+        for n in range(6,width,2):lines += [f' move.w #$4e71,{S.code(off+n)}(a0)']
     lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_bad:',
             ' movem.l (sp)+,d0-d7/a0-a6','modal_bad_target:',' bra.w '+('wrong_revision' if ocs else 'timing_bad')]
     from launch_source import source as launch_source

@@ -13,7 +13,7 @@ timing_scene_save_active:
 .slot:
         cmpi.w  #61,d4
         bhs.s   .save
-        tst.w   $1700(a4,d4.w*2)
+        tst.w   AX_1700(a4,d4.w*2)
         beq.s   .next
 .save:
         move.w  d4,d0
@@ -45,48 +45,48 @@ timing_scene_save_slot:
         mulu.w  #120,d0
         lea     timing_scene_saved(pc),a1
         adda.w  d0,a1
-        move.l  $119c(a5),(a1)+
-        move.l  $11a0(a5),(a1)+
-        move.l  $11a4(a5),(a1)+
-        move.l  $214a(a5),(a1)+
-        move.l  $214e(a5),(a1)+
-        move.l  $2152(a5),(a1)+
-        move.l  $3452(a5),(a1)+
-        move.l  $3456(a5),(a1)+
-        move.l  $345a(a5),(a1)+
-        move.l  $3752(a5),(a1)+
-        move.l  $3756(a5),(a1)+
-        move.l  $375a(a5),(a1)+
-        move.l  $1d6e(a5),(a1)+
-        move.l  $1d72(a5),(a1)+
-        move.l  $1d76(a5),(a1)+
-        move.w  $1700(a2),(a1)+
-        move.w  $17f8(a2),(a1)+
-        move.w  $14c8(a2),(a1)+
-        move.w  $157a(a2),(a1)+
-        move.w  $15fa(a2),(a1)+
-        move.w  $167a(a2),(a1)+
-        move.l  $2e6e(a3),(a1)+
-        move.w  $1afc(a2),(a1)+
-        move.w  $3e90(a2),(a1)+
-        move.w  $33cc(a2),(a1)+
-        move.w  $3fbc(a2),(a1)+
-        move.w  $18c8(a2),(a1)+
-        move.w  $2c6e(a2),(a1)+
-        move.w  $2d6e(a2),(a1)+
-        move.b  $3a6a(a6),(a1)+
-        move.b  $3b46(a6),(a1)+
-        move.w  $4078(a2),(a1)+
-        move.w  $40f8(a2),(a1)+
-        move.w  $2dee(a2),(a1)+
-        move.w  $245e(a2),(a1)+
-        move.w  $24de(a2),(a1)+
-        move.w  $255e(a2),(a1)+
-        move.w  $2bea(a2),(a1)+
-        move.w  $2cee(a2),(a1)+
-        move.l  $3b86(a5),(a1)+
-        move.l  $3b8a(a5),(a1)+
-        move.l  $3b8e(a5),(a1)+
+        move.l  AX_119c(a5),(a1)+
+        move.l  AX_11a0(a5),(a1)+
+        move.l  AX_11a4(a5),(a1)+
+        move.l  AX_214a(a5),(a1)+
+        move.l  AX_214e(a5),(a1)+
+        move.l  AX_2152(a5),(a1)+
+        move.l  AX_3452(a5),(a1)+
+        move.l  AX_3456(a5),(a1)+
+        move.l  AX_345a(a5),(a1)+
+        move.l  AX_3752(a5),(a1)+
+        move.l  AX_3756(a5),(a1)+
+        move.l  AX_375a(a5),(a1)+
+        move.l  AX_1d6e(a5),(a1)+
+        move.l  AX_1d72(a5),(a1)+
+        move.l  AX_1d76(a5),(a1)+
+        move.w  AX_1700(a2),(a1)+
+        move.w  AX_17f8(a2),(a1)+
+        move.w  AX_14c8(a2),(a1)+
+        move.w  AX_157a(a2),(a1)+
+        move.w  AX_15fa(a2),(a1)+
+        move.w  AX_167a(a2),(a1)+
+        move.l  AX_2e6e(a3),(a1)+
+        move.w  AX_1afc(a2),(a1)+
+        move.w  AX_3e90(a2),(a1)+
+        move.w  AX_33cc(a2),(a1)+
+        move.w  AX_3fbc(a2),(a1)+
+        move.w  AX_18c8(a2),(a1)+
+        move.w  AX_2c6e(a2),(a1)+
+        move.w  AX_2d6e(a2),(a1)+
+        move.b  AX_3a6a(a6),(a1)+
+        move.b  AX_3b46(a6),(a1)+
+        move.w  AX_4078(a2),(a1)+
+        move.w  AX_40f8(a2),(a1)+
+        move.w  AX_2dee(a2),(a1)+
+        move.w  AX_245e(a2),(a1)+
+        move.w  AX_24de(a2),(a1)+
+        move.w  AX_255e(a2),(a1)+
+        move.w  AX_2bea(a2),(a1)+
+        move.w  AX_2cee(a2),(a1)+
+        move.l  AX_3b86(a5),(a1)+
+        move.l  AX_3b8a(a5),(a1)+
+        move.l  AX_3b8e(a5),(a1)+
 .done:
         rts
 
@@ -108,48 +108,48 @@ timing_scene_restore_active:
         mulu.w  #120,d0
         lea     timing_scene_saved(pc),a1
         adda.w  d0,a1
-        move.l  (a1)+,$119c(a5)
-        move.l  (a1)+,$11a0(a5)
-        move.l  (a1)+,$11a4(a5)
-        move.l  (a1)+,$214a(a5)
-        move.l  (a1)+,$214e(a5)
-        move.l  (a1)+,$2152(a5)
-        move.l  (a1)+,$3452(a5)
-        move.l  (a1)+,$3456(a5)
-        move.l  (a1)+,$345a(a5)
-        move.l  (a1)+,$3752(a5)
-        move.l  (a1)+,$3756(a5)
-        move.l  (a1)+,$375a(a5)
-        move.l  (a1)+,$1d6e(a5)
-        move.l  (a1)+,$1d72(a5)
-        move.l  (a1)+,$1d76(a5)
-        move.w  (a1)+,$1700(a2)
-        move.w  (a1)+,$17f8(a2)
-        move.w  (a1)+,$14c8(a2)
-        move.w  (a1)+,$157a(a2)
-        move.w  (a1)+,$15fa(a2)
-        move.w  (a1)+,$167a(a2)
-        move.l  (a1)+,$2e6e(a3)
-        move.w  (a1)+,$1afc(a2)
-        move.w  (a1)+,$3e90(a2)
-        move.w  (a1)+,$33cc(a2)
-        move.w  (a1)+,$3fbc(a2)
-        move.w  (a1)+,$18c8(a2)
-        move.w  (a1)+,$2c6e(a2)
-        move.w  (a1)+,$2d6e(a2)
-        move.b  (a1)+,$3a6a(a6)
-        move.b  (a1)+,$3b46(a6)
-        move.w  (a1)+,$4078(a2)
-        move.w  (a1)+,$40f8(a2)
-        move.w  (a1)+,$2dee(a2)
-        move.w  (a1)+,$245e(a2)
-        move.w  (a1)+,$24de(a2)
-        move.w  (a1)+,$255e(a2)
-        move.w  (a1)+,$2bea(a2)
-        move.w  (a1)+,$2cee(a2)
-        move.l  (a1)+,$3b86(a5)
-        move.l  (a1)+,$3b8a(a5)
-        move.l  (a1)+,$3b8e(a5)
+        move.l  (a1)+,AX_119c(a5)
+        move.l  (a1)+,AX_11a0(a5)
+        move.l  (a1)+,AX_11a4(a5)
+        move.l  (a1)+,AX_214a(a5)
+        move.l  (a1)+,AX_214e(a5)
+        move.l  (a1)+,AX_2152(a5)
+        move.l  (a1)+,AX_3452(a5)
+        move.l  (a1)+,AX_3456(a5)
+        move.l  (a1)+,AX_345a(a5)
+        move.l  (a1)+,AX_3752(a5)
+        move.l  (a1)+,AX_3756(a5)
+        move.l  (a1)+,AX_375a(a5)
+        move.l  (a1)+,AX_1d6e(a5)
+        move.l  (a1)+,AX_1d72(a5)
+        move.l  (a1)+,AX_1d76(a5)
+        move.w  (a1)+,AX_1700(a2)
+        move.w  (a1)+,AX_17f8(a2)
+        move.w  (a1)+,AX_14c8(a2)
+        move.w  (a1)+,AX_157a(a2)
+        move.w  (a1)+,AX_15fa(a2)
+        move.w  (a1)+,AX_167a(a2)
+        move.l  (a1)+,AX_2e6e(a3)
+        move.w  (a1)+,AX_1afc(a2)
+        move.w  (a1)+,AX_3e90(a2)
+        move.w  (a1)+,AX_33cc(a2)
+        move.w  (a1)+,AX_3fbc(a2)
+        move.w  (a1)+,AX_18c8(a2)
+        move.w  (a1)+,AX_2c6e(a2)
+        move.w  (a1)+,AX_2d6e(a2)
+        move.b  (a1)+,AX_3a6a(a6)
+        move.b  (a1)+,AX_3b46(a6)
+        move.w  (a1)+,AX_4078(a2)
+        move.w  (a1)+,AX_40f8(a2)
+        move.w  (a1)+,AX_2dee(a2)
+        move.w  (a1)+,AX_245e(a2)
+        move.w  (a1)+,AX_24de(a2)
+        move.w  (a1)+,AX_255e(a2)
+        move.w  (a1)+,AX_2bea(a2)
+        move.w  (a1)+,AX_2cee(a2)
+        move.l  (a1)+,AX_3b86(a5)
+        move.l  (a1)+,AX_3b8a(a5)
+        move.l  (a1)+,AX_3b8e(a5)
         addq.w  #1,d4
         bra.w   .slot
 .done:
@@ -167,7 +167,7 @@ timing_scene_allocate:
 .native:
         movem.l (sp)+,d0-d2/a0-a3/a5-a6
         move.l  timing_game(pc),-(sp)
-        addi.l  #$2b64e,(sp)
+        addi.l  #E_2b64e,(sp)
         move.w  d2,d0
         ext.l   d0
         add.l   d0,d0

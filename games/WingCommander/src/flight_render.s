@@ -81,8 +81,8 @@ flight_reference_done:
         ; Same safe display-end publication policy as phase 6.
         FSTAT   14
         move.l  48(sp),a4
-        lea     -660(a4),a0
-        move.l  -778(a4),a6
+        lea     A_m660(a4),a0
+        move.l  A_m778(a4),a6
         jsr     -402(a6)
         FSTAT   15
         movem.l (sp)+,d0-a6

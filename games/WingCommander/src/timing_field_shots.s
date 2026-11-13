@@ -13,12 +13,12 @@ field_shot_snapshot:
         bne.w   .done
         moveq   #10,d4
 .shot:
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         cmpi.w  #8,(a0,d4.w*2)
         bne.w   .next_shot
         lea     field_shot_effects(pc),a0
         clr.b   (a0,d4.w)
-        lea     14954(a4),a0
+        lea     A_14954(a4),a0
         tst.b   (a0,d4.w)
         bne.w   .next_shot
         lea     timing_scene_predictable(pc),a0
@@ -29,13 +29,13 @@ field_shot_snapshot:
         bsr.w   field_native_target
         cmpi.w  #-1,d0
         beq.s   .scan
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         move.w  (a0,d0.w*2),d1
         cmpi.w  #9,d1
         beq.s   .scan
         cmpi.w  #10,d1
         bne.w   .next_shot
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         cmpi.w  #33,(a0,d0.w*2)
         bne.w   .next_shot
 .scan:
@@ -43,13 +43,13 @@ field_shot_snapshot:
         move.l  #65537,(a0)
         moveq   #0,d5
 .target:
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         move.w  (a0,d5.w*2),d0
         cmpi.w  #9,d0
         beq.s   .hazard
         cmpi.w  #10,d0
         bne.w   .next_target
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         cmpi.w  #33,(a0,d5.w*2)   ; class 10 also contains non-mine objects
         bne.w   .next_target
 .hazard:
@@ -60,10 +60,10 @@ field_shot_snapshot:
         mulu.w  #12,d0
         move.w  d5,d1
         mulu.w  #12,d1
-        lea     4508(a4),a0
+        lea     A_4508(a4),a0
         lea     (a0,d0.w),a1
         adda.w  d1,a0
-        lea     7534(a4),a2
+        lea     A_7534(a4),a2
         lea     (a2,d0.w),a3
         adda.w  d1,a2
         lea     field_segment(pc),a5
@@ -81,7 +81,7 @@ field_shot_snapshot:
         move.l  d1,12(a5)
         addq.l  #4,a5
         dbra    d2,.relative
-        lea     6908(a4),a0
+        lea     A_6908(a4),a0
         moveq   #0,d0
         move.w  (a0,d4.w*2),d0
         move.w  (a0,d5.w*2),d1
@@ -125,15 +125,15 @@ field_shot_snapshot:
 
 field_native_target:
         movem.l d1-d3/a0-a1/a6,-(sp)
-        lea     15162(a4),a0
+        lea     A_15162(a4),a0
         move.l  8(a0),-(sp)
         move.l  4(a0),-(sp)
         move.l  (a0),-(sp)
         move.w  d4,-(sp)
         movea.l timing_game(pc),a6
-        jsr     $1597e(a6)
+        jsr     E_1597e(a6)
         addq.l  #2,sp
-        lea     15162(a4),a0
+        lea     A_15162(a4),a0
         move.l  (sp)+,(a0)+
         move.l  (sp)+,(a0)+
         move.l  (sp)+,(a0)+
@@ -267,7 +267,7 @@ field_inside:
         move.l  d0,-(sp)
         pea     field_point_value(pc)
         movea.l timing_game(pc),a6
-        jsr     $2c8dc(a6)
+        jsr     E_2c8dc(a6)
         addq.l  #8,sp
         rts
 
@@ -317,7 +317,7 @@ field_shot_query:
         move.w  60(sp),d4
         move.w  d4,-(sp)
         movea.l timing_game(pc),a6
-        jsr     $1597e(a6)
+        jsr     E_1597e(a6)
         addq.l  #2,sp
         move.l  d0,d7
         tst.w   timing_active(pc)
@@ -326,21 +326,21 @@ field_shot_query:
         bne.w   .return
         cmpi.w  #60,d4
         bhi.w   .return
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         cmpi.w  #8,(a0,d4.w*2)
         bne.w   .return
-        lea     14954(a4),a0
+        lea     A_14954(a4),a0
         tst.b   (a0,d4.w)
         bne.w   .return
         cmpi.w  #-1,d7
         beq.s   .cached
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         move.w  (a0,d7.w*2),d0
         cmpi.w  #9,d0
         beq.s   .native_field
         cmpi.w  #10,d0
         bne.w   .return
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         cmpi.w  #33,(a0,d7.w*2)
         bne.w   .return
 .native_field:
@@ -372,10 +372,10 @@ field_shot_query:
         mulu.w  #12,d1
         lea     field_shot_contacts(pc),a0
         adda.w  d0,a0
-        lea     4508(a4),a1
+        lea     A_4508(a4),a1
         lea     (a1,d0.w),a2
         adda.w  d1,a1
-        lea     15162(a4),a3
+        lea     A_15162(a4),a3
         moveq   #2,d2
 .contact:
         move.l  (a0)+,d0
@@ -389,18 +389,18 @@ field_shot_query:
         rts
 
 field_identity:
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         lea     timing_scene_types(pc),a1
         move.w  (a0,d0.w*2),d1
         cmp.w   (a1,d0.w*2),d1
         bne.s   .bad
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         lea     timing_scene_models(pc),a1
         move.w  (a0,d0.w*2),d1
         cmp.w   (a1,d0.w*2),d1
         bne.s   .bad
         mulu.w  #12,d0
-        lea     4508(a4),a0
+        lea     A_4508(a4),a0
         lea     timing_scene_positions(pc),a1
         adda.w  d0,a0
         adda.w  d0,a1
@@ -449,7 +449,7 @@ field_shot_limit:
         mulu.w  #12,d0
         move.w  d5,d1
         mulu.w  #12,d1
-        lea     4508(a4),a0
+        lea     A_4508(a4),a0
         lea     (a0,d0.w),a1
         adda.w  d1,a0
         lea     field_shot_contacts(pc),a2

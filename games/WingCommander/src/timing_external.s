@@ -3,7 +3,7 @@
 ; changes. Sample completed camera poses instead of executing it at draw rate.
 ; The simulator Game Over modal clock uses the same native mode-4 owner.
 timing_external_allowed:
-        move.w  -18280(a4),d0
+        move.w  A_m18280(a4),d0
         cmpi.w  #4,d0
         beq.s   .yes
         cmpi.w  #6,d0
@@ -24,11 +24,11 @@ timing_external_allowed:
 ; must cut history just as changing the view does.
 timing_external_identity:
         lea     external_identity(pc),a0
-        move.w  -18280(a4),(a0)+
-        move.w  -18296(a4),(a0)+
-        move.w  -18278(a4),(a0)+
-        move.b  5468(a4),(a0)+
-        move.b  -32109(a4),(a0)+
+        move.w  A_m18280(a4),(a0)+
+        move.w  A_m18296(a4),(a0)+
+        move.w  A_m18278(a4),(a0)+
+        move.b  A_5468(a4),(a0)+
+        move.b  A_m32109(a4),(a0)+
         rts
 
 timing_external_snapshot:
@@ -37,7 +37,7 @@ timing_external_snapshot:
         bsr.s   timing_external_allowed
         tst.w   d0
         beq.w   .reset
-        tst.w   -29978(a4)
+        tst.w   A_m29978(a4)
         bne.w   .reset
         move.l  external_identity(pc),d4
         move.l  external_identity+4(pc),d5
@@ -158,4 +158,4 @@ external_valid: dc.w 0
 external_identity: dcb.l 2,0
 external_pose: dcb.l 12,0
 external_delta: dcb.l 12,0
-external_offsets: dc.w $1478,$2426,$372e,$3a2e
+external_offsets: dc.w AX_1478,AX_2426,AX_372e,AX_3a2e

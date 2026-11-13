@@ -2,6 +2,7 @@
 import hashlib
 from capstone import Cs, CS_ARCH_M68K, CS_MODE_BIG_ENDIAN, CS_MODE_M68K_000
 from variants import get
+from german_map import Symbols
 
 
 def specification(variant):
@@ -17,14 +18,15 @@ def source(root, variant):
         raise ValueError('changed ejection input')
     code = raw[44:44 + v.HUNKS[0][1]]
     ocs = variant == 'ocs'
+    S = Symbols(variant)
     finish = 0xb80 if ocs else 0xc40
     spans = ([(0x19f78, 0x1a014), (0x1a134, 0x1a16a), (0, 0),
               (0x1a014, 0x1a030), (0x1a21c, 0x1a22a), (0x1a246, 0x1a26a)] if ocs else
              [(0x1ac3c, 0x1acd8), (0x1ae3c, 0x1ae86), (0x1af5e, 0x1af7c),
               (0x1acd8, 0x1acf4), (0x1af44, 0x1af52), (0x1af8c, 0x1afb0)])
-    lines = [f'EJECTION_SLOT equ {-0x478a if ocs else -0x4764}',
-             f'EJECTION_VIEW equ {-18318 if ocs else -18280}',
-             f'EJECTION_SUBJECT equ {-18334 if ocs else -18296}',
+    lines = [f'EJECTION_SLOT equ {S.a4(-0x478a if ocs else -0x4764)}',
+             f'EJECTION_VIEW equ {S.a4(-18318 if ocs else -18280)}',
+             f'EJECTION_SUBJECT equ {S.a4(-18334 if ocs else -18296)}',
              (root / 'src/ejection_clock.s').read_text()]
     fix = []
     dis = Cs(CS_ARCH_M68K, CS_MODE_BIG_ENDIAN | CS_MODE_M68K_000)
@@ -56,7 +58,7 @@ def source(root, variant):
                 lines.append(f' ble.w {prefix}_{target:x}')
             else:
                 assert not ins.mnemonic.startswith(('b', 'j', 'db')) and 'pc' not in ins.op_str, ins
-                lines.append(' dc.b ' + ','.join(str(x) for x in op))
+                lines.append(S.copy(code, ins.address, ins.address+ins.size))
         assert cursor == end
         lines.append(f'{prefix}_{end:x}:')
         if name == 'effect':
@@ -70,21 +72,21 @@ def source(root, variant):
     for off, _ in specification(variant):
         if code[off:off+2] == b'\x4e\xb9':
             target = int.from_bytes(code[off+2:off+6], 'big')
-            lines += [f' cmpi.w #$4eb9,${off:x}(a0)', ' bne.w ejection_bad',
-                      ' move.l a0,d0', f' addi.l #${target:x},d0',
-                      f' cmp.l ${off+2:x}(a0),d0', ' bne.w ejection_bad']
+            lines += [f' cmpi.w #$4eb9,{S.code(off)}(a0)', ' bne.w ejection_bad',
+                      ' move.l a0,d0', f' addi.l #{S.code(target)},d0',
+                      f' cmp.l {S.code(off+2)}(a0),d0', ' bne.w ejection_bad']
         else:
             for n in range(0, 6, 2):
-                lines += [f' cmpi.w #${int.from_bytes(code[off+n:off+n+2],"big"):x},${off+n:x}(a0)',
+                lines += [f' cmpi.w #{S.word(code,off+n)},{S.code(off+n)}(a0)',
                           ' bne.w ejection_bad']
     lines += [' movem.l (sp)+,d0-d1', ' rts', 'ejection_bad:',
               ' movem.l (sp)+,d0-d1', ' bra.w modal_bad_target',
               'ejection_install:', ' movem.l d0/a1,-(sp)']
     for label, target in fix:
-        lines += [' move.l a0,d0', f' addi.l #${target:x},d0',
+        lines += [' move.l a0,d0', f' addi.l #{S.code(target)},d0',
                   f' lea {label}+2(pc),a1', ' move.l d0,(a1)']
     for i, (off, _) in enumerate(specification(variant)):
-        lines += [f' move.w #$4ef9,${off:x}(a0)', f' lea ejection_entry{i}(pc),a1',
-                  f' move.l a1,${off+2:x}(a0)']
+        lines += [f' move.w #$4ef9,{S.code(off)}(a0)', f' lea ejection_entry{i}(pc),a1',
+                  f' move.l a1,{S.code(off+2)}(a0)']
     lines += [' movem.l (sp)+,d0/a1', ' rts']
     return '\n'.join(lines) + '\n'

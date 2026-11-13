@@ -1,6 +1,7 @@
 """Pinned, separately mapped waypoint fly-by call sites."""
 import hashlib
 from variants import get
+from german_map import Symbols
 
 
 def site(variant):
@@ -15,6 +16,7 @@ def source(root, variant):
     code = raw[44:44 + v.HUNKS[0][1]]
     off = site(variant)
     ocs = variant == 'ocs'
+    S = Symbols(variant)
     assert code[off:off + 6] == bytes.fromhex('4ebafacc5c4f')
     lines = [(root / 'src/autopilot_clock.s').read_text()]
     fix = [('autopilot_camera', 0x6e24 if ocs else 0x70ae),
@@ -30,12 +32,12 @@ def source(root, variant):
         lines += [label + ': jmp $0']
     lines += ['autopilot_guard:']
     for i in range(0, 6, 2):
-        lines += [f' cmpi.w #${int.from_bytes(code[off+i:off+i+2], "big"):x},${off+i:x}(a0)',
+        lines += [f' cmpi.w #{S.word(code,off+i)},{S.code(off+i)}(a0)',
                   ' bne.w modal_bad_target']
     lines += [' rts', 'autopilot_install:', ' movem.l d0/a1,-(sp)']
     for label, target in fix:
-        lines += [' move.l a0,d0', f' addi.l #${target:x},d0',
+        lines += [' move.l a0,d0', f' addi.l #{S.code(target)},d0',
                   f' lea {label}+2(pc),a1', ' move.l d0,(a1)']
-    lines += [f' move.w #$4ef9,${off:x}(a0)', ' lea autopilot_entry(pc),a1',
-              f' move.l a1,${off+2:x}(a0)', ' movem.l (sp)+,d0/a1', ' rts']
+    lines += [f' move.w #$4ef9,{S.code(off)}(a0)', ' lea autopilot_entry(pc),a1',
+              f' move.l a1,{S.code(off+2)}(a0)', ' movem.l (sp)+,d0/a1', ' rts']
     return '\n'.join(lines) + '\n'

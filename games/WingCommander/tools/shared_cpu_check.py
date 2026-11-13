@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 from c2p_check import CPU, BASE, STACK, STOP, u, ck
 from shared_cpu import UNITS, select, unit, preamble
+from german_map import english
 from variants import cd32, assembly_definitions
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,7 +54,7 @@ def assembly_gate(out):
     rows=[]
     for buffered,stats,verify in ((0,0,0),(0,1,1),(1,0,0),(1,1,0)):
         for name in UNITS:
-            src = unit(ROOT,name,'68000')
+            src = english(unit(ROOT,name,'68000'))
             header = assembly_definitions(cd32) + f'BUFFERED equ {buffered}\nFRAME_STATS equ {stats}\nTIMING_VERIFY equ {verify}\n'
             if name != 'timing':
                 header += fstat_macro()
@@ -80,8 +81,8 @@ def trunc(n,d): return (abs(n)//d)*(-1 if n<0 else 1)
 
 
 def arithmetic_gate(out):
-    scene=(ROOT/'src/timing_scene.s').read_text()
-    trans=(ROOT/'src/timing_translation.s').read_text()
+    scene=english((ROOT/'src/timing_scene.s').read_text())
+    trans=english((ROOT/'src/timing_translation.s').read_text())
     src=scene[scene.index('timing_scene_scale:'):scene.index('timing_scene_begin:')]
     src+=trans[trans.index('translation_fraction:'):trans.index('translation_field:')]
     src+=(ROOT/'src/timing_clock.s').read_text()
@@ -185,7 +186,7 @@ def operand_flag_gate(out):
 
 
 def linked_fixture(out,name,cpu,stats=0):
-    src=unit(ROOT,name,cpu)
+    src=english(unit(ROOT,name,cpu))
     header=assembly_definitions(cd32)+f'BUFFERED equ 1\nFRAME_STATS equ {stats}\nTIMING_VERIFY equ 0\n'
     # Data/callback placeholders are only for isolated execution, explicitly
     # distinct from the real game or any OCS hook/ABI implementation.

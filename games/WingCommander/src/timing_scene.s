@@ -11,7 +11,7 @@ timing_edge_geometry:
         subq.w  #1,d0
         lea     timing_pad_pending(pc),a2
 .sample:
-        lea     $46ca(a4),a1
+        lea     AX_46ca(a4),a1
         moveq   #3,d1
 .compare:
         cmpm.l  (a1)+,(a2)+
@@ -36,11 +36,11 @@ timing_geometry_history:
         beq.s   .done
         moveq   #WC_OBJECTS_WORLD_SLOTS-1,d0
 .slot:
-        move.w  $1700(a4,d0.w*2),d1
+        move.w  AX_1700(a4,d0.w*2),d1
         beq.s   .next
         cmpi.w  #7,d1
         beq.s   .next
-        move.w  $24de(a4,d0.w*2),$255e(a4,d0.w*2)
+        move.w  AX_24de(a4,d0.w*2),AX_255e(a4,d0.w*2)
 .next:
         dbra    d0,.slot
 .done:
@@ -55,7 +55,7 @@ timing_scene_geometry:
         movem.l d0-d7/a0-a6,-(sp)
         bsr.w   timing_player_camera
         move.l  timing_game(pc),a6
-        jsr     $2a086(a6)
+        jsr     E_2a086(a6)
         movem.l (sp)+,d0-d7/a0-a6
         rts
 
@@ -72,7 +72,7 @@ timing_scene_snapshot:
         clr.b   (a5,d4.w)
         tst.w   timing_scene_valid(pc)
         beq.w   .check_next
-        move.w  -18280(a4),d0
+        move.w  A_m18280(a4),d0
         cmp.w   timing_scene_view(pc),d0
         bne.w   .check_next
         ifne BUFFERED
@@ -81,10 +81,10 @@ timing_scene_snapshot:
         lea     field_shot_effects(pc),a0
         tst.b   (a0,d4.w)
         beq.s   .ordinary_birth
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         cmpi.w  #5,(a0,d4.w*2)
         bne.s   .clear_field_effect
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         cmpi.w  #51,(a0,d4.w*2)
         beq.w   .accept
 .clear_field_effect:
@@ -95,18 +95,18 @@ timing_scene_snapshot:
         lea     projectile_types(pc),a0
         move.w  (a0,d4.w*2),d0
         beq.s   .old_slot
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         cmp.w   (a0,d4.w*2),d0
         bne.w   .check_next
         lea     projectile_models(pc),a0
         move.w  (a0,d4.w*2),d0
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         cmp.w   (a0,d4.w*2),d0
         bne.w   .check_next
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         cmpi.w  #5,(a0,d4.w*2)     ; effect-script shot has no word lifetime
         beq.w   .accept
-        lea     5320(a4),a0
+        lea     A_5320(a4),a0
         move.w  (a0,d4.w*2),d0
         bgt.w   .accept
         cmpi.w  #-1,d0
@@ -114,17 +114,17 @@ timing_scene_snapshot:
         bra.w   .check_next
 .old_slot:
         endif
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         lea     timing_scene_types(pc),a1
         move.w  (a0,d4.w*2),d0
         cmp.w   (a1,d4.w*2),d0
         bne.w   .check_next
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         lea     timing_scene_models(pc),a1
         move.w  (a0,d4.w*2),d0
         cmp.w   (a1,d4.w*2),d0
         bne.w   .check_next
-        lea     5320(a4),a0
+        lea     A_5320(a4),a0
         lea     timing_scene_life(pc),a1
         move.w  (a0,d4.w*2),d0
         cmp.w   (a1,d4.w*2),d0
@@ -145,7 +145,7 @@ timing_scene_snapshot:
         endif
         cmpi.w  #10,d4
         bhs.s   .position
-        lea     5478(a4),a0
+        lea     A_5478(a4),a0
         lea     timing_scene_actions(pc),a1
         move.w  (a0,d4.w*2),d0
         cmp.w   (a1,d4.w*2),d0
@@ -163,7 +163,7 @@ timing_scene_snapshot:
         bra.w   .check_next
         endif
 .position:
-        lea     4508(a4),a0
+        lea     A_4508(a4),a0
         adda.w  d5,a0
         lea     timing_scene_positions(pc),a1
         adda.w  d5,a1
@@ -226,7 +226,7 @@ timing_scene_snapshot:
         dbra    d2,.range
         lea     timing_scene_valid(pc),a0
         move.w  #1,(a0)
-        move.w  -18280(a4),2(a0)
+        move.w  A_m18280(a4),2(a0)
         ifne BUFFERED
         bsr.w   timing_intro_shot_contacts
         bsr.w   field_shot_snapshot
@@ -282,11 +282,11 @@ timing_scene_tick:
         movem.l d0-d7/a0-a6,-(sp)
         bsr.w   timing_player_camera
         move.l  timing_game(pc),a6
-        jsr     $2a086(a6)
-        move.l  -4326(a4),-(sp)
-        move.l  timing_render_seed(pc),-4326(a4)
+        jsr     E_2a086(a6)
+        move.l  A_m4326(a4),-(sp)
+        move.l  timing_render_seed(pc),A_m4326(a4)
         moveq   #0,d0
-        tst.l   4470(a4)
+        tst.l   A_4470(a4)
         beq.s   .arg
         moveq   #1,d0
 .arg:
@@ -294,8 +294,8 @@ timing_scene_tick:
         bsr.w   timing_debris_original
         addq.l  #2,sp
         lea     timing_render_seed(pc),a0
-        move.l  -4326(a4),(a0)
-        move.l  (sp)+,-4326(a4)
+        move.l  A_m4326(a4),(a0)
+        move.l  (sp)+,A_m4326(a4)
         ifne BUFFERED
         ; Flight field objects must survive render snapshot restoration, just
         ; like intro asteroids. Intro already dispatches this before this call.
@@ -378,7 +378,7 @@ timing_scene_begin:
         endif
         tst.w   timing_scene_valid(pc)
         beq.w   .camera
-        move.w  -18280(a4),d0
+        move.w  A_m18280(a4),d0
         cmp.w   timing_scene_view(pc),d0
         bne.w   .cut
         ifne BUFFERED
@@ -395,17 +395,17 @@ timing_scene_begin:
         bra.w   .cut
         endif
 .flight_view:
-        tst.w   -29978(a4)
+        tst.w   A_m29978(a4)
         bne.w   .cut
-        cmpi.w  #12,5888(a4)
+        cmpi.w  #12,A_5888(a4)
         bne.w   .cut
         ifne BUFFERED
-        move.w  5478(a4),d0
+        move.w  A_5478(a4),d0
         bsr.w   timing_scene_thrust_action
         tst.w   d0
         beq.w   .cut
         else
-        cmpi.w  #-1,5478(a4)
+        cmpi.w  #-1,A_5478(a4)
         bne.w   .cut
         endif
         ifne BUFFERED
@@ -435,7 +435,7 @@ timing_scene_begin:
         lea     timing_scene_predictable(pc),a0
         tst.b   (a0,d4.w)
         beq.w   .next
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         move.w  (a0,d4.w*2),d0
         ifne BUFFERED
         cmpi.w  #61,d4
@@ -454,19 +454,19 @@ timing_scene_begin:
         bsr.w   timing_external_allowed
         tst.w   d0
         bne.w   .next
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         move.w  (a0,d4.w*2),d0
 .camera_owner_done:
         endif
         lea     timing_scene_types(pc),a1
         cmp.w   (a1,d4.w*2),d0
         bne.w   .next
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         lea     timing_scene_models(pc),a1
         move.w  (a0,d4.w*2),d0
         cmp.w   (a1,d4.w*2),d0
         bne.w   .next
-        lea     4508(a4),a2
+        lea     A_4508(a4),a2
         adda.w  d5,a2
         lea     timing_scene_positions(pc),a3
         adda.w  d5,a3
@@ -493,7 +493,7 @@ timing_scene_begin:
         endif
         tst.w   d4
         bne.s   .rotate_player_done
-        cmpi.w  #8,-18280(a4)
+        cmpi.w  #8,A_m18280(a4)
         bne.w   .translate       ; other player views already elapsed-field
 .rotate_player_done:
         ; Native axis rotations rebuild an orthogonal fixed-point basis.
@@ -502,9 +502,9 @@ timing_scene_begin:
 .rotate:
         cmpi.w  #61,d4
         bne.s   .object_rotation
-        cmpi.w  #3,-18280(a4)
+        cmpi.w  #3,A_m18280(a4)
         bls.w   .translate       ; ordinary views copy the staged player basis
-        cmpi.w  #12,-18280(a4)
+        cmpi.w  #12,A_m18280(a4)
         beq.w   .translate       ; fly-by aim is rebuilt after all poses
         bsr.w   timing_intro_camera_rotate
         bra.w   .translate
@@ -526,15 +526,15 @@ timing_scene_begin:
         move.l  timing_game(pc),a6
         tst.w   d3
         bne.s   .yaw
-        jsr     $2acb2(a6)
+        jsr     E_2acb2(a6)
         bra.s   .axis_pop
 .yaw:
         cmpi.w  #1,d3
         bne.s   .roll
-        jsr     $2acf2(a6)
+        jsr     E_2acf2(a6)
         bra.s   .axis_pop
 .roll:
-        jsr     $2ad32(a6)
+        jsr     E_2ad32(a6)
 .axis_pop:
         addq.l  #4,sp
 .axis_next:
@@ -556,13 +556,13 @@ timing_scene_begin:
         ; Field hazards and their cannon impact effects share this interval.
         tst.w   intro_active(pc)
         bne.w   .shot_phase_done
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         move.w  (a0,d4.w*2),d0
         cmpi.w  #9,d0
         beq.s   .shot_phase_bounded_check
         cmpi.w  #10,d0
         bne.s   .field_effect
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         cmpi.w  #33,(a0,d4.w*2)
         beq.s   .shot_phase_bounded_check
         bra.s   .shot_phase_done
@@ -572,14 +572,14 @@ timing_scene_begin:
         lea     field_shot_effects(pc),a0
         tst.b   (a0,d4.w)
         beq.s   .shot_phase_done
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         cmpi.w  #51,(a0,d4.w*2)
         beq.s   .shot_phase_bounded_check
         bra.s   .shot_phase_done
 .player_bolt:
         cmpi.w  #8,d0
         bne.w   .shot_phase_done
-        lea     14954(a4),a0
+        lea     A_14954(a4),a0
         tst.b   (a0,d4.w)         ; native shooter byte: player is slot zero
         bne.w   .shot_phase_done
 .shot_phase_bounded_check:
@@ -587,9 +587,9 @@ timing_scene_begin:
         bls.s   .shot_phase_bounded
         move.l  d7,d6             ; never forecast beyond the completed step
 .shot_phase_bounded:
-        lea     4508(a4),a0
+        lea     A_4508(a4),a0
         adda.w  d5,a0
-        lea     7534(a4),a1
+        lea     A_7534(a4),a1
         adda.w  d5,a1
         moveq   #2,d0
 .shot_previous:
@@ -598,10 +598,10 @@ timing_scene_begin:
         dbra    d0,.shot_previous
 .shot_phase_done:
         endif
-        lea     4508(a4),a2
+        lea     A_4508(a4),a2
         adda.w  d5,a2
         ifne BUFFERED
-        lea     7534(a4),a3
+        lea     A_7534(a4),a3
         else
         lea     timing_scene_velocities(pc),a3
         endif
@@ -626,7 +626,7 @@ timing_scene_begin:
         bls.s   .player_bounded
         moveq   #20,d6
 .player_bounded:
-        lea     7534(a4),a3
+        lea     A_7534(a4),a3
         moveq   #2,d3
 .player_axis:
         move.l  (a3)+,d0
@@ -678,7 +678,7 @@ timing_intro_shot_contacts:
         beq.w   .done
         moveq   #10,d4
 .find:
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         cmpi.w  #8,(a0,d4.w*2)
         beq.s   .prepare
         addq.w  #1,d4
@@ -688,13 +688,13 @@ timing_intro_shot_contacts:
 .prepare:
         lea     -780(sp),sp
         movea.l sp,a5
-        lea     4508(a4),a0
+        lea     A_4508(a4),a0
         movea.l a5,a1
         move.w  #191,d0
 .save:
         move.l  (a0)+,(a1)+
         dbra    d0,.save
-        lea     15162(a4),a0
+        lea     A_15162(a4),a0
         move.l  (a0)+,(a1)+
         move.l  (a0)+,(a1)+
         move.l  (a0)+,(a1)+
@@ -705,19 +705,19 @@ timing_intro_shot_contacts:
         lea     timing_intro_shot_targets(pc),a0
         tst.b   (a0,d4.w)
         bpl.s   .next
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         cmpi.w  #8,(a0,d4.w*2)
         bne.s   .next
         move.w  d4,-(sp)
         move.l  timing_game(pc),a6
-        jsr     $1597e(a6)
+        jsr     E_1597e(a6)
         addq.l  #2,sp
         cmpi.w  #9,d0
         bhi.s   .next
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         cmpi.w  #12,(a0,d0.w*2)
         blo.s   .next
-        lea     14954(a4),a0
+        lea     A_14954(a4),a0
         cmp.b   (a0,d4.w),d0      ; native response ignores the shooter
         beq.s   .next
         lea     timing_intro_shot_targets(pc),a0
@@ -730,8 +730,8 @@ timing_intro_shot_contacts:
         blo.s   .slot
         tst.w   d5
         bne.s   .restore
-        lea     4508(a4),a0
-        lea     7534(a4),a1
+        lea     A_4508(a4),a0
+        lea     A_7534(a4),a1
         move.w  #182,d0          ; native world slots 0..60, three longs
 .advance:
         move.l  (a1)+,d1
@@ -741,12 +741,12 @@ timing_intro_shot_contacts:
         bra.s   .pass
 .restore:
         movea.l a5,a0
-        lea     4508(a4),a1
+        lea     A_4508(a4),a1
         move.w  #191,d0
 .copy:
         move.l  (a0)+,(a1)+
         dbra    d0,.copy
-        lea     15162(a4),a1
+        lea     A_15162(a4),a1
         move.l  (a0)+,(a1)+
         move.l  (a0)+,(a1)+
         move.l  (a0)+,(a1)+
@@ -781,7 +781,7 @@ timing_intro_shot_limit:
         move.w  d4,d0
         mulu.w  #12,d0
         mulu.w  #12,d2
-        lea     4508(a4),a0
+        lea     A_4508(a4),a0
         lea     (a0,d0.w),a1     ; rendered bolt
         adda.w  d2,a0            ; rendered target
         lea     timing_scene_positions(pc),a2
@@ -820,14 +820,14 @@ timing_intro_shot_steps: dcb.b 64,0
 timing_autopilot_camera:
         tst.w   intro_active(pc)
         beq.s   .done
-        cmpi.w  #12,-18280(a4)
+        cmpi.w  #12,A_m18280(a4)
         bne.s   .done
         tst.b   timing_scene_predictable+61(pc)
         beq.s   .done
         tst.l   timing_scene_fraction(pc)
         beq.s   .done
-        lea     14894(a4),a3     ; camera right vector (slot 61)
-        lea     5240(a4),a2      ; camera position, velocity already sampled
+        lea     A_14894(a4),a3     ; camera right vector (slot 61)
+        lea     A_5240(a4),a2      ; camera position, velocity already sampled
         moveq   #2,d3
 .axis:
         move.l  (a3)+,d0
@@ -838,7 +838,7 @@ timing_autopilot_camera:
         dbra    d3,.axis
         clr.w   -(sp)           ; native aim at player slot 0
         move.l  timing_game(pc),a6
-        jsr     $2a820(a6)
+        jsr     E_2a820(a6)
         addq.l  #2,sp
 .done:
         rts
@@ -853,15 +853,15 @@ timing_intro_camera_rotate:
         movem.l d0-d3/a0-a3/a5-a6,-(sp)
         lea     -36(sp),sp
         movea.l sp,a5
-        lea     9254(a4),a0
+        lea     A_9254(a4),a0
         move.l  (a0)+,0(a5)
         move.l  (a0)+,4(a5)
         move.l  (a0)+,8(a5)
-        lea     14126(a4),a0
+        lea     A_14126(a4),a0
         move.l  (a0)+,12(a5)
         move.l  (a0)+,16(a5)
         move.l  (a0)+,20(a5)
-        lea     14894(a4),a0
+        lea     A_14894(a4),a0
         move.l  (a0)+,24(a5)
         move.l  (a0)+,28(a5)
         move.l  (a0)+,32(a5)
@@ -870,7 +870,7 @@ timing_intro_camera_rotate:
         move.w  #61,-(sp)
         move.w  d0,-(sp)
         move.l  timing_game(pc),a6
-        jsr     $2acb2(a6)
+        jsr     E_2acb2(a6)
         addq.l  #4,sp
 .axis_122:
         move.w  timing_scene_angles+250(pc),d0
@@ -878,7 +878,7 @@ timing_intro_camera_rotate:
         move.w  #61,-(sp)
         move.w  d0,-(sp)
         move.l  timing_game(pc),a6
-        jsr     $2acf2(a6)
+        jsr     E_2acf2(a6)
         addq.l  #4,sp
 .axis_250:
         move.w  timing_scene_angles+378(pc),d0
@@ -886,15 +886,15 @@ timing_intro_camera_rotate:
         move.w  #61,-(sp)
         move.w  d0,-(sp)
         move.l  timing_game(pc),a6
-        jsr     $2ad32(a6)
+        jsr     E_2ad32(a6)
         addq.l  #4,sp
 .axis_378:
         movea.l a5,a3
-        lea     9254(a4),a2
+        lea     A_9254(a4),a2
         bsr.s   .vector
-        lea     14126(a4),a2
+        lea     A_14126(a4),a2
         bsr.s   .vector
-        lea     14894(a4),a2
+        lea     A_14894(a4),a2
         bsr.s   .vector
         lea     36(sp),sp
         movem.l (sp)+,d0-d3/a0-a3/a5-a6
@@ -915,7 +915,7 @@ timing_intro_camera_rotate:
 ; D4=slot, D6/D7=display fraction/rate. The existing slot backup owns size.
 timing_scene_effect_size:
         movem.l d0-d3/d5-d6/a0-a2,-(sp)
-        lea     5888(a4),a0
+        lea     A_5888(a4),a0
         move.w  (a0,d4.w*2),d0
         cmpi.w  #5,d0
         beq.s   .effect
@@ -926,20 +926,20 @@ timing_scene_effect_size:
         cmpi.w  #10,d0
         bne.w   .done
 .effect:
-        lea     6136(a4),a0
+        lea     A_6136(a4),a0
         move.w  (a0,d4.w*2),d0
         muls.w  #104,d0
-        lea     -11354(a4),a0
+        lea     A_m11354(a4),a0
         adda.l  d0,a0
         move.w  36(a0),d5
         movea.l 26(a0),a1
         move.l  a1,d0
         beq.w   .done
-        lea     16504(a4),a0
+        lea     A_16504(a4),a0
         move.w  (a0,d4.w*2),d3
-        lea     16632(a4),a0
+        lea     A_16632(a4),a0
         move.w  (a0,d4.w*2),d2
-        lea     13260(a4),a2
+        lea     A_13260(a4),a2
         adda.w  d4,a2
         adda.w  d4,a2
         ; The display predictor can lead by one tick plus two fields. Walk
@@ -1041,35 +1041,35 @@ timing_scene_restored:
 ; Save the native class-7 flame allocation fields too. E:2914c creates
 ; render-only attachments in free slots; none may survive into simulation.
 timing_scene_pose_ranges:
-        dc.w $119c,191
-        dc.w $214a,191
-        dc.w $3452,191
-        dc.w $3752,191
-        dc.w $1d6e,191
-        dc.w $1700,31
-        dc.w $17f8,31
-        dc.w $14c8,31
-        dc.w $157a,95
-        dc.w $2e6e,63
-        dc.w $1afc,31
-        dc.w $3e90,31
-        dc.w $33cc,31
-        dc.w $3fbc,31
-        dc.w $18c8,31
-        dc.w $2c6e,31
-        dc.w $2d6e,31
-        dc.w $3a6a,15
-        dc.w $3b46,15
-        dc.w $4078,63
-        dc.w $2dee,31
-        dc.w $245e,95
-        dc.w $2bea,31
-        dc.w $2cee,31
-        dc.w $3b86,191
+        dc.w AX_119c,191
+        dc.w AX_214a,191
+        dc.w AX_3452,191
+        dc.w AX_3752,191
+        dc.w AX_1d6e,191
+        dc.w AX_1700,31
+        dc.w AX_17f8,31
+        dc.w AX_14c8,31
+        dc.w AX_157a,95
+        dc.w AX_2e6e,63
+        dc.w AX_1afc,31
+        dc.w AX_3e90,31
+        dc.w AX_33cc,31
+        dc.w AX_3fbc,31
+        dc.w AX_18c8,31
+        dc.w AX_2c6e,31
+        dc.w AX_2d6e,31
+        dc.w AX_3a6a,15
+        dc.w AX_3b46,15
+        dc.w AX_4078,63
+        dc.w AX_2dee,31
+        dc.w AX_245e,95
+        dc.w AX_2bea,31
+        dc.w AX_2cee,31
+        dc.w AX_3b86,191
 
 timing_scene_snapshot_ranges:
-        dc.w $119c,383,$1d6e,383,$1700,63,$17f8,63
-        dc.w $15fa,63,$157a,63,$167a,63,$14c8,63,$1566,9
+        dc.w AX_119c,383,AX_1d6e,383,AX_1700,63,AX_17f8,63
+        dc.w AX_15fa,63,AX_157a,63,AX_167a,63,AX_14c8,63,AX_1566,9
 timing_scene_valid: dc.w 0
 timing_scene_view: dc.w 0
 timing_scene_staged: dc.w 0

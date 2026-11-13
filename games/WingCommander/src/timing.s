@@ -105,7 +105,7 @@ timing_loop:
         ; Load initial flight assets on the original input/world path, before
         ; enabling the producer. This initial update establishes the epoch.
         bsr.w   timing_native_input
-        tst.w   -32628(a4)
+        tst.w   A_m32628(a4)
         bne.w   timing_leave
         bsr.w   timing_world
         bsr.w   timing_rebase
@@ -116,7 +116,7 @@ timing_loop:
         ifne FRAME_STATS
         bsr.w   frame_stats_flush
         endif
-        tst.w   -32628(a4)
+        tst.w   A_m32628(a4)
         bne.w   timing_leave
         tst.w   timing_input_lost(pc)
         beq.s   .budget
@@ -137,7 +137,7 @@ timing_loop:
         ; Merge the frozen keyboard and pad sample through the native decoder.
         pea     timing_sample_pad(pc)
         move.l  timing_game(pc),a6
-        jsr     $18c5e(a6)
+        jsr     E_18c5e(a6)
         addq.l  #4,sp
         bsr.w   timing_preview_controls
         bsr.w   timing_player_field
@@ -152,13 +152,13 @@ timing_loop:
         beq.s   .next_field
         bsr.w   timing_edge_geometry
         bsr.w   timing_pad_edges
-        tst.w   -32628(a4)
+        tst.w   A_m32628(a4)
         bne.w   timing_leave
         tst.w   timing_abort(pc)
         bne.s   .cancel
         bsr.w   timing_target_tick
         bsr.w   timing_native_input
-        tst.w   -32628(a4)
+        tst.w   A_m32628(a4)
         bne.w   timing_leave
         tst.w   timing_abort(pc)
         bne.s   .cancel
@@ -168,7 +168,7 @@ timing_loop:
         lea     timing_in_world(pc),a0
         clr.w   (a0)
 .next_field:
-        tst.w   -32628(a4)
+        tst.w   A_m32628(a4)
         bne.w   timing_leave
         subq.w  #1,d7
         bne.w   .fields
@@ -188,7 +188,7 @@ timing_loop:
 .draw:
         FSTAT   4
         lea     timing_selection_last(pc),a0
-        move.w  4430(a4),d0
+        move.w  A_4430(a4),d0
         move.w  d0,d1
         sub.w   (a0),d0
         move.w  d1,(a0)
@@ -200,23 +200,23 @@ timing_loop:
 
 timing_render:
         ifne TIMING_VERIFY
-        move.l  -252(a4),-(sp)
+        move.l  A_m252(a4),-(sp)
         cmpi.w  #1,timing_verify_schedule(pc)
         beq.s   .wait
         endc
         bsr.w   timing_scene_begin
         FSTAT   5
-        move.l  -4326(a4),-(sp)
-        move.l  timing_render_seed(pc),-4326(a4)
+        move.l  A_m4326(a4),-(sp)
+        move.l  timing_render_seed(pc),A_m4326(a4)
         move.l  timing_game(pc),a6
-        jsr     $510(a6)
+        jsr     E_510(a6)
         FSTAT   6
         move.l  timing_game(pc),a6
-        jsr     $46e6(a6)
+        jsr     E_46e6(a6)
         FSTAT   7
         lea     timing_render_seed(pc),a0
-        move.l  -4326(a4),(a0)
-        move.l  (sp)+,-4326(a4)
+        move.l  A_m4326(a4),(a0)
+        move.l  (sp)+,A_m4326(a4)
         bsr.w   timing_scene_end
         FSTAT   8
         ifne TIMING_VERIFY
@@ -225,7 +225,7 @@ timing_render:
         move.w  timing_verify_schedule(pc),d0
         beq.s   .finish
 .again:
-        move.l  -252(a4),d1
+        move.l  A_m252(a4),d1
         sub.l   (sp),d1
         cmp.l   d0,d1
         blo.s   .again
@@ -236,10 +236,10 @@ timing_render:
 
 timing_native_input:
         move.l  timing_game(pc),a6
-        jsr     $19330(a6)
+        jsr     E_19330(a6)
         cmpi.w  #-1,d0
         bne.s   .done
-        move.w  #5,-32628(a4)
+        move.w  #5,A_m32628(a4)
 .done:
         rts
 
@@ -251,7 +251,7 @@ timing_world:
         endif
         FSTAT   2
         move.l  timing_game(pc),a6
-        jsr     $2a8(a6)
+        jsr     E_2a8(a6)
         ifne BUFFERED
         ifne FRAME_STATS
         bsr.w   translation_tick_end
@@ -278,7 +278,7 @@ timing_rebase:
         clr.w   (a0)
         tst.w   (sp)
         beq.s   .discarded
-        move.l  -252(a4),d0
+        move.l  A_m252(a4),d0
         sub.l   timing_clock(pc),d0
         lea     timing_input_dropped_fields(pc),a0
         add.l   d0,(a0)
@@ -296,18 +296,18 @@ timing_rebase:
         lea     timing_pad_count(pc),a0
         clr.l   (a0)
         lea     timing_selection_last(pc),a0
-        move.w  4430(a4),(a0)
+        move.w  A_4430(a4),(a0)
         clr.w   2(a0)
         lea     timing_angle_remainder(pc),a0
         clr.l   (a0)+
         clr.l   (a0)+
         clr.l   (a0)
-        move.l  -252(a4),d0
+        move.l  A_m252(a4),d0
         move.l  timing_hz(pc),d1
         moveq   #0,d2
         lea     timing_clock(pc),a0
         bsr.w   timing_advance
-        move.l  -252(a4),d0
+        move.l  A_m252(a4),d0
         move.l  timing_hz(pc),d1
         moveq   #1,d2
         bsr.w   timing_advance

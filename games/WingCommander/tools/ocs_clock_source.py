@@ -1,5 +1,6 @@
 """Pinned OCS clock integration; generated displaced native bytes stay in tmp/."""
 from shared_cpu import preamble, select, unit
+from german_map import english
 
 NATIVE = dict(OCS_WORLD=0x2be, OCS_FLIGHT_INPUT=0x18d14,
  OCS_WAYPOINT=0x34e0,
@@ -33,7 +34,7 @@ waypoint_native_scene: bra.w ocs_clock_scene_draw
 '''
     # Reuse the established beam classification and scheduler, selecting the
     # previously checked 68000 arithmetic expansions. No CD32 game ABI enters.
-    shared=(root/'src/timing.s').read_text()
+    shared=english((root/'src/timing.s').read_text())
     rate=shared[shared.index('timing_rate:'):shared.index('; Ordinary loop consumes')]
     text += '\n'+rate+'\n'+unit(root,'timing_clock','68000')
     for off,width,name,arg in MODALS:

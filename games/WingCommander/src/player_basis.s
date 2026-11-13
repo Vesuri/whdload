@@ -220,7 +220,7 @@ player_basis_cross:
         move.w  d0,4(a2)
         rts
 
-player_basis_offsets: dc.w $214a,$3452,$3752
+player_basis_offsets: dc.w AX_214a,AX_3452,AX_3752
 player_basis_valid: dc.w 0
 player_basis_values: dcb.w 9,0
 player_basis_native: dcb.l 9,0
