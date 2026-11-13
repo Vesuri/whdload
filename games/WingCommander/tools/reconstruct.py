@@ -191,7 +191,10 @@ def cd32_main(argv):
     assembled='\n'.join(lines)+'\n'
     if a.release:assembled=workspace_source(assembled,int.from_bytes(code[0x18:0x1a],"big"))
     from german_map import equates
-    assembled=equates(assembled)+assembled
+    if a.release:
+        assembled,german_report=german_fixups(out,assembled)
+    else:
+        assembled=equates(assembled)+assembled
     source.write_text(assembled)
     binary = out/'payload.bin'
     subprocess.run([os.environ['VASM'], '-m68020','-spaces','-no-opt','-Fbin','-L',str(out/'slave.lst'),'-o',str(binary),str(source)],check=True)
@@ -249,8 +252,59 @@ def cd32_main(argv):
         report['release_date']='13.11.2026'
         report['runtime_workspace_bytes']=len(built)-symbols['runtime_workspace']
         report['initialized_bytes']=symbols['runtime_workspace']
+        report['german']=german_report
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
+
+def vasm(out, name, text):
+    """Assemble text in out/; return the payload and its label offsets."""
+    (out/(name+'.s')).write_text(text)
+    subprocess.run([os.environ['VASM'],'-m68020','-spaces','-no-opt','-Fbin','-L',str(out/(name+'.lst')),
+                    '-o',str(out/(name+'.bin')),str(out/(name+'.s'))],check=True,capture_output=True)
+    defined=set(re.findall(r'^(\w+):',text,re.M))
+    labels={n:v for v,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(out/(name+'.lst')).read_text(),re.M)
+            if n in defined}
+    return (out/(name+'.bin')).read_bytes(),labels
+
+
+def german_fixups(out, body):
+    """English release source with its German fixup table.
+
+    The same source is assembled with English and with German language
+    symbols (german_map.py); identical layout is required. Every differing
+    word becomes a (slave offset, German word) entry that release_setcpu
+    applies when German is selected. The table follows all code, so the
+    offsets hold once it is filled in; the second pass proves it.
+    """
+    from german_map import equates
+    marker='\n cnop 0,4\nruntime_workspace:\n'
+    assert body.count(marker)==1
+    def table(entries):
+        rows=''.join(f' dc.w ${o:x},${w:x}\n' for o,w in entries)
+        return body.replace(marker,'\n cnop 0,4\ngerman_fixups:\n'+rows+' dc.w 0\n'+marker)
+    from german_map import check_blocks
+    blocks=check_blocks(body)
+    english_symbols=equates(body);german_symbols=equates(body,german=True)
+    passes=[]
+    entries=[]
+    for name in ('pass1','pass2'):
+        text=table(entries)
+        e,el=vasm(out,'english-'+name,english_symbols+text)
+        g,gl=vasm(out,'german-'+name,german_symbols+text)
+        if len(e)!=len(g) or el!=gl:
+            moved=[k for k in el if el[k]!=gl.get(k)]
+            raise ValueError(f'German layout differs from English: {moved[:10]}')
+        found=[(o,int.from_bytes(g[o:o+2],'big')) for o in range(0,len(e),2) if e[o:o+2]!=g[o:o+2]]
+        if name=='pass2' and found!=entries:
+            raise ValueError('German fixups changed when filled in')
+        if any(o<0x1e0c or o>=int(el['german_fixups'],16) for o,_ in found):
+            raise ValueError('German fixup outside the enhanced code')
+        entries=found
+        passes.append((e,g))
+    (out/'german.bin').write_bytes(passes[-1][1])
+    report=dict(fixups=len(entries),symbols=german_symbols.count('\n'),blocks=blocks)
+    return english_symbols+table(entries),report
+
 
 def main():
     select = argparse.ArgumentParser(description='Build a selected variant; outputs stay in tmp/.', add_help=False)

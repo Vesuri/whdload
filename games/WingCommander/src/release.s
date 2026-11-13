@@ -1,5 +1,8 @@
 ; Translate public language/pacing options once before language selection.
-; Internal CUSTOM1=3 is reserved for enhanced English; 0/1 are Psygore.
+; Internal CUSTOM1=3 is enhanced; 0/1 are Psygore's English/German. German
+; keeps 1 until Psygore's loader has chosen wing.german (S:142a), so the
+; converter setup sees 3 only for its call; release_patchseg then maps German
+; to 3 or 0. German first rewrites the enhanced code's English game addresses.
 release_setcpu:
         movem.l d0-d2/a0-a1,-(sp)
         lea     slave+$1de4(pc),a0
@@ -10,20 +13,61 @@ release_setcpu:
         move.l  (a1),d2
         cmpi.l  #4,d2
         bhi.s   .bad
+        tst.l   (a0)
+        beq.s   .language
+        bsr.w   release_german_install
+        lea     release_german(pc),a0
+        move.w  #1,(a0)
+        lea     slave+$1de4(pc),a0
+.language:
         tst.l   d2
         beq.s   .enhanced
         subq.l  #1,(a1)          ; public 1..4 -> Psygore 0..3
         bra.s   .ready
 .enhanced:
         tst.l   (a0)
-        bne.s   .ready           ; German: normal until ported
+        beq.s   .english
+        lea     release_german(pc),a0
+        move.w  #2,(a0)
+        lea     slave+$1de4(pc),a0
+.english:
         move.l  #3,(a0)
 .ready:
         movem.l (sp)+,d0-d2/a0-a1
-        bra.l   render_setcpu
+        bsr.l   render_setcpu
+        move.l  a0,-(sp)
+        cmpi.w  #2,release_german(pc)
+        bne.s   .done
+        lea     slave+$1de4(pc),a0
+        move.l  #1,(a0)          ; Psygore's loader takes wing.german
+.done:
+        move.l  (sp)+,a0
+        rts
 .bad:
         movem.l (sp)+,d0-d2/a0-a1
         bra.w   timing_bad
+
+; The build assembles the enhanced code a second time with German game
+; addresses (german_map.py) and lists every differing word here as slave
+; offset and German word. Rewrite them once, before any of it runs.
+release_german_install:
+        movem.l d0/a0-a1,-(sp)
+        lea     .anchor(pc),a0
+.anchor:
+        adda.l  #german_fixups-.anchor,a0
+        lea     slave(pc),a1
+.next:
+        moveq   #0,d0
+        move.w  (a0)+,d0
+        beq.s   .flush
+        move.w  (a0)+,(a1,d0.l)
+        bra.s   .next
+.flush:
+        jsr     32(a2)           ; resload_FlushCache
+        movem.l (sp)+,d0/a0-a1
+        rts
+
+release_german:  dc.w 0          ; 1 German Psygore's modes, 2 German enhanced
 
 ; Full enhanced converter gate, including flight allocation fallback.
 ; Flight and the clocked world intro have no limiter; other scenes keep normal.
@@ -51,14 +95,25 @@ release_limit:
 ; - Mouse in name entry. The TrainSim top-score name entry moves a selection
 ;   box over a character grid by stick edges; whole cells of mouse motion now
 ;   move it too.
+; German now runs the English paths with German addresses: enhanced as 3 and
+; Psygore's modes as 0, which adds only the waypoint marker order.
 release_patchseg:
+        movem.l d0/a0,-(sp)
+        move.w  release_german(pc),d0
+        beq.s   .language
+        lea     slave+$1de4(pc),a0
+        clr.l   (a0)
+        subq.w  #1,d0
+        beq.s   .language
+        move.l  #3,(a0)
+.language:
+        movem.l (sp)+,d0/a0
         bsr.w   timing_patchseg
         movem.l d0-d1/a0-a1,-(sp)
         lea     fix_patch_en(pc),a0
         lea     mouse_params_en(pc),a1
-        move.l  slave+$1de4(pc),d0
-        subq.l  #1,d0
-        bne.s   .english
+        tst.w   release_german(pc)
+        beq.s   .english
         lea     fix_patch_de(pc),a0
         lea     mouse_params_de(pc),a1
 .english:
