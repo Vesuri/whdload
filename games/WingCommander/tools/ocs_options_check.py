@@ -13,9 +13,10 @@ import struct
 from ocs_display_check import Native, CODE, DATA, STARTUP, STACK, STOP, ck, u, word, long
 from ocs_reconstruct import ROOT, new_output, require
 from ocs_icon import enhanced_icon, tooltypes
+from mouse_model import APERTURE, KEY, pointer_at, cockpit, lines
 
 
-GFX,RECT,IMAGE,EVENT,CHIP,ROOM_IMAGE=0x1a0000,0x1a1000,0x1a1100,0x1a2000,0x1a3000,0x1a3100
+GFX,RECT,IMAGE,EVENT,CHIP,ANY,SURFACE=0x1a0000,0x1a1000,0x1a1100,0x1a2000,0x1a3000,0x1a4000,0x1b0000
 
 
 def mouse_scenario(c,slave,sy):
@@ -26,7 +27,10 @@ def mouse_scenario(c,slave,sy):
     require(c.get(slave+sy['mouse_params'],4)==slave+sy['ocs_mouse_params'] and
             c.get(slave+sy['mouse_move'],4)==CODE+0x31d22,'mouse not initialised')
     c.write(CODE+0x33518,long(GFX));c.write(GFX-426,word(0x4e75))
-    c.intercept(GFX-426,lambda:moves.append((struct.unpack('>h',word(c.reg(9)))[0],struct.unpack('>h',word(c.reg(10)))[0])))
+    def move():
+        moves.append((struct.unpack('>h',word(c.reg(9)))[0],struct.unpack('>h',word(c.reg(10)))[0]))
+        if c.get(c.reg(2),4)==CHIP:c.write(CHIP,long(0x6a7e7101))    # control words, as MoveSprite
+    c.intercept(GFX-426,move)
     c.write(RECT+24,struct.pack('>4h',40,30,280,180));c.write(IMAGE+4,struct.pack('>hh',-3,-2))
     c.write(a4+444,long(RECT));c.write(a4-2158,long(IMAGE));c.write(a4-2154,word(0))
     c.write(a4+412,struct.pack('>hh',160,100));c.write(a4-13522,long(0))
@@ -68,15 +72,25 @@ def mouse_scenario(c,slave,sy):
 
 def steer_scenario(c,slave,sy,moves):
     """Mouse flight: the native flight controller O:183e4 with the slave's ramp
-    store hook; mouse_init's pointer image; the VBL field count and hide."""
-    a4=DATA+0x7ffe;changes=[]
-    centre=struct.unpack('>hh',c.read(slave+sy['ocs_mouse_params']+20,4))
-    require(c.get(slave+sy['stick_image'],4)==CHIP and c.get(slave+sy['stick_gfx'],4)==GFX,'pointer image not allocated')
-    require(c.read(CHIP,36)==bytes(4)+bytes.fromhex('10001000'*2+'00000000c600c60000000000'+'10001000'*2+'00000000'),'pointer image')
-    c.write(GFX-420,word(0x4e75))
+    store hook; mouse_init's allocations; the aperture scan hook's mask; the
+    pointer on sprite 7 (no colour bank on OCS); the VBL field count and hide."""
+    a4=DATA+0x7ffe;changes=[];sprites=[]
+    for site in (0x16ffc,0x1aff8):
+        require(c.read(CODE+site,6)==bytes.fromhex('4eb9')+long(slave+sy['mouse_scan']),f'scan call O:{site:x} not hooked')
+    require(c.get(slave+sy['stick_image'],4)==CHIP and c.get(slave+sy['stick_ss'],4)==ANY and c.get(slave+sy['stick_gfx'],4)==GFX,'pointer not allocated')
+    require(c.get(slave+sy['mouse_scan_native'],4)==CODE+0x2bc9a,'native aperture scan')
+    require(c.read(CHIP,44)==bytes(44),'pointer image not blank')
+    for off in (-408,-420):c.write(GFX+off,word(0x4e75))
     def change():changes.append((c.reg(2),c.reg(3)));c.write(c.reg(2),long(c.reg(3)))
-    c.intercept(GFX-420,change)
-    c.write(a4-2150,long(ROOM_IMAGE))
+    def sprite():sprites.append((c.reg(1),c.reg(9)&0xffff));c.write(c.reg(1)+10,word(c.reg(9)&0xffff))
+    c.intercept(GFX-420,change);c.intercept(GFX-408,sprite)
+    # The native scan sets the aperture block; here it returns at once.
+    c.write(CODE+0x2bc9a,word(0x4e75));c.write(a4-4188,struct.pack('>6h',*APERTURE))
+    c.write(SURFACE,long(SURFACE+0x100));c.write(SURFACE+24,struct.pack('>4h',0,0,319,199))
+    for y in range(200):
+        c.write(SURFACE+0x100+4*y,long(SURFACE+0x1000+320*y));c.write(SURFACE+0x1000+320*y,bytes(cockpit(x,y) for x in range(320)))
+    c.run(slave-CODE+sy['mouse_scan'],struct.pack('>IIBB',SURFACE,SURFACE+0x800,KEY,0))
+    require(c.get(slave+sy['mask_top'],2)==62-27,'mask rows')
     def tick(n=1):
         for _ in range(n):c.run(slave-CODE+sy['mouse_vbl'])
     def event(dx,dy):
@@ -87,28 +101,32 @@ def steer_scenario(c,slave,sy,moves):
         c.write(a4+16084,bytes(flags));c.write(a4-18318,word(view));n=len(moves)
         c.run(0x183e4)
         return struct.unpack('>hh',c.read(a4+3720,4)),moves[n:]
-    at=lambda dx,dy:[(centre[0]+dx,centre[1]+dy)]
+    def at(stick):
+        px,py=pointer_at(stick);return [(px-5,py-4)]
+    image=lambda:[struct.unpack('>HH',c.read(CHIP+4+4*r,4)) for r in range(9)]
     shown=lambda:c.read(CHIP,4)!=bytes(4)
     tick(100)
     require(steer((5,-3))==((3,-1),[]),'native ramp decay')
-    event(32,0);tick();require(steer((0,0))==((0,4),at(16,0)),'mouse right: yaw right')
-    require(changes==[(a4-2150,CHIP)] and c.get(a4-2150+4,2)==7,'pointer not bound')
-    c.write(CHIP,long(0x6a7e7101))
-    event(0,16);tick();require(steer()==((-2,4),at(16,8)),'mouse down: pitch up')
+    event(32,0);tick();require(steer((0,0))==((0,4),at((32,0))),'mouse right: yaw right')
+    require(sprites==[(ANY,7)] and changes==[(ANY,CHIP)] and c.get(ANY+4,2)==9,'pointer sprite not bound')
+    require(image()==[(x,x) for x in lines((32,0))],'pointer image')
+    event(0,16);tick();require(steer()==((-2,4),at((32,16))),'mouse down: pitch up')
     tick();require(steer()==((-2,4),[]),'held stick position')
-    event(1000,1000);tick();require(steer()==((-9,9),at(36,36)),'full deflection')
+    event(1000,1000);tick();require(steer()==((-9,9),[(319-5,62+23-4)]),'full deflection')
+    event(-72,-72);tick();require(steer()[1]==at((0,0)) and image()==[(x,x) for x in lines((0,0))],'pointer behind the cockpit')
     tick();require(steer((0,-9),(0,1,0,0,0))==((0,1),[]) and not shown(),'stick steering re-centres')
     tick();require(steer((0,0))==((0,0),[]),'not re-centred')
-    event(8,8);tick();require(steer(flags=(1,0,0,0,1))==((-1,1),at(4,4)),'modifier: the mouse steers')
+    event(8,8);tick();require(steer(flags=(1,0,0,0,1))==((-1,1),at((8,8))),'modifier: the mouse steers')
     tick();require(steer((3,3),view=8)==((1,1),[]),'external view')
-    event(24,0);tick();steer();c.write(CHIP,long(0x6a7e7101))
+    event(24,0);tick();steer()
     for _ in range(500):tick();require(steer()==((0,3),[]),'idle steering')
     require(shown(),'idle pointer hidden early');tick();require(not shown(),'idle pointer not hidden')
     tick();require(steer()==((0,3),[]) and not shown(),'idle pointer shown again')
-    event(1,0);tick();require(steer()==((0,3),at(12,0)),'pointer not shown on motion')
-    event(16,0);tick();steer();c.write(CHIP,long(0x6a7e7101))
+    event(1,0);tick();require(steer()==((0,3),at((25,0))),'pointer not shown on motion')
+    event(16,0);tick();steer()
     tick(25);require(shown(),'hidden early');tick();require(not shown(),'pointer not hidden')
     tick(30);event(16,0);tick();require(steer((0,0))[0]==(0,0),'new flight not re-centred')
+    require(len(sprites)==1 and len(changes)==1,'sprite taken or bound again')
 
 
 def check(build, mutation=None):
@@ -182,7 +200,7 @@ def check(build, mutation=None):
                             def abort():
                                 events.append('abort');c.reg(18,STOP);ck(u.uc_emu_stop(c.h))
                             c.intercept(0x8000-552,lambda:c.return_call(GFX))      # OpenLibrary
-                            c.intercept(0x8000-198,lambda:c.return_call(CHIP))     # AllocMem
+                            c.intercept(0x8000-198,lambda:c.return_call(CHIP if c.reg(10)&2 else ANY))     # AllocMem
                             c.intercept(0x190034,control)
                             c.intercept(0x190074,patch);c.intercept(0x190020,flush);c.intercept(0x190000,abort)
                             off={'exact':exact[0][0],'word':words[0][0]+2}.get(corrupt,meta['hooks'][0][0])

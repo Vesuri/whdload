@@ -13,7 +13,15 @@
 ; mouse_steer, which adds the mouse motion since its last call to a stick
 ; position and sets the pitch and yaw ramps in proportion to it, as a held
 ; stick does; the ship keeps turning while the mouse is held off centre. The
-; pointer sprite shows that position around the gunsight in the forward view.
+; pointer, the PC version's 9x9 one, shows that position in the forward view:
+; from the gunsight, which is the centre of the cockpit aperture, to the
+; aperture's left and right edges and 23 pixels up or down. It is sprite 7
+; with its own images, behind the cockpit: the two calls of the native
+; aperture scan also copy the cockpit's transparent pixels near the gunsight
+; into a mask, and the pointer image keeps only the pixels over them.
+; Sprite 7's colour 3 is colour 31, white on OCS; on CD32 the slave moves the
+; odd sprites' colour bank in the flight copper lists to 192, which makes it
+; colour 207, the PC pointer's own (243,255,235).
 ; The stick or keys steering, the external view and a new flight re-centre it.
 ; The pointer appears only once the mouse moves and hides after 10 seconds
 ; without motion; the variant's VBL hook calls mouse_vbl, which also hides it
@@ -27,14 +35,23 @@ MP_MOVE = 8                     ; H0 offset: native sprite move (x.w, y.w)
 MP_RAMP = 12                    ; A4 offset: pitch ramp; the yaw ramp follows
 MP_VIEW = 14                    ; A4 offset: camera view (0 forward, 8 external)
 MP_FLAGS = 16                   ; A4 offset: left, right, up, down, modifier bytes
-MP_SPRITE = 18                  ; A4 offset: pointer SimpleSprite (posctldata.l)
-MP_CENTRE = 20                  ; pointer centre x.w, y.w (sprite move coordinates)
+MP_APERTURE = 18                ; A4 offset: aperture width, height, centre x, y, left, top
+MP_COPPER = 20                  ; A4 offset: the two flight copper lists (0: no colour bank)
+MP_SCAN = 22                    ; H0 offset: native aperture scan (long)
 
 STICK_RANGE = 72                ; mouse counts from centre to full deflection
 STICK_STEP = 8                  ; counts per ramp step: ramps reach +-9
 FLIGHT_GAP = 50                 ; fields without a controller call: a new flight
 HIDE_GAP = 25                   ; fields without one before the pointer hides
 IDLE_GAP = 500                  ; fields without motion before it hides (10 s PAL)
+REACH_Y = 23                    ; pointer pixels from the gunsight at full pitch
+POINTER_SPRITE = 7              ; odd: its colour bank leaves sprites 0-6 alone
+SPRITE_BANK = 12                ; odd sprites' colours from 192: sprite 7 colour 3 is 207
+MASK_REACH = REACH_Y+4          ; mask rows from the gunsight row, either side
+MASK_ROWS = 2*MASK_REACH+1
+MASK_STRIDE = 44                ; bytes per mask row: a pad byte, 40, three pad bytes
+MASK_SIZE = MASK_ROWS*MASK_STRIDE
+SS_SIZE = 12                    ; SimpleSprite: posctldata.l, height, x, y, num
 
 ; a0 = parameter table, d0 = game H0 base.
 mouse_init:
@@ -47,9 +64,15 @@ mouse_init:
         lea     mouse_active(pc),a1
         clr.w   (a1)
         movea.l (sp)+,a1
-        ; The flight pointer: its own Chip image, bound only while shown (the
-        ; room images belong to their rooms). Without it the mouse still steers.
         movem.l d0-d1/a0-a2/a6,-(sp)
+        sub.l   MP_MOVE(a0),d0          ; H0
+        add.l   MP_SCAN(a0),d0
+        lea     mouse_scan_native(pc),a1
+        move.l  d0,(a1)
+        ; The flight pointer: its own cleared Chip image (hidden: no control
+        ; words), and a SimpleSprite and the cockpit mask in any memory. The
+        ; sprite is allocated at its first showing. Without them the mouse
+        ; still steers.
         move.l  stick_image(pc),d0      ; 68000: no tst d16(pc)
         bne.s   .ready
         movea.l 4.w,a6
@@ -59,19 +82,15 @@ mouse_init:
         lea     stick_gfx(pc),a1
         move.l  d0,(a1)
         beq.s   .ready
+        move.l  #SS_SIZE+MASK_SIZE,d0
+        move.l  #$10000,d1              ; MEMF_CLEAR
+        jsr     -198(a6)                ; AllocMem
+        lea     stick_ss(pc),a1
+        move.l  d0,(a1)
+        beq.s   .ready
         moveq   #POINTER_SIZE,d0
         move.l  #$10002,d1              ; MEMF_CHIP!MEMF_CLEAR
         jsr     -198(a6)                ; AllocMem
-        tst.l   d0
-        beq.s   .ready
-        movea.l d0,a1
-        addq.l  #4,a1                   ; control words stay clear: hidden
-        lea     pointer_lines(pc),a0
-        moveq   #POINTER_H-1,d1
-.line:
-        move.w  (a0)+,(a1)+
-        move.w  (a0)+,(a1)+
-        dbf     d1,.line
         lea     stick_image(pc),a1
         move.l  d0,(a1)
 .ready:
@@ -276,32 +295,7 @@ mouse_steer:
         cmpi.w  #IDLE_GAP,d0
         bhi.s   .store
 .show:
-        movea.l stick_image(pc),a3
-        move.l  a3,d0
-        beq.s   .store
-        movea.l stick_gfx(pc),a6
-        move.w  MP_SPRITE(a1),d0
-        lea     (a4,d0.w),a5            ; SimpleSprite
-        cmpa.l  (a5),a3
-        beq.s   .bound
-        move.w  #POINTER_H,4(a5)
-        suba.l  a0,a0
-        movea.l a5,a1
-        movea.l a3,a2
-        jsr     -420(a6)                ; ChangeSprite
-        lea     stick_x(pc),a2
-.bound:
-        move.w  #1,ST_SHOWN(a2)
-        movea.l mouse_params(pc),a1
-        move.w  (a2),d0
-        asr.w   #1,d0
-        add.w   MP_CENTRE(a1),d0
-        move.w  2(a2),d1
-        asr.w   #1,d1
-        add.w   MP_CENTRE+2(a1),d1
-        suba.l  a0,a0
-        movea.l a5,a1
-        jsr     -426(a6)                ; MoveSprite
+        bsr.w   stick_show
         bra.s   .store
 .centre:
         clr.l   (a2)
@@ -355,36 +349,315 @@ mouse_vbl:
         rts
 
 ; Hide the flight pointer by clearing its image's control words, with no
-; library call, while the sprite is still bound to it; a room rebinds its own
-; image on entry. Keeps every register.
+; library call. Keeps every register.
 stick_hide:
-        movem.l d0/a0-a1,-(sp)
+        movem.l d0/a0,-(sp)
         lea     stick_shown(pc),a0
         clr.w   (a0)
         move.l  stick_image(pc),d0
         beq.s   .done
-        movea.l mouse_params(pc),a1
-        move.w  MP_SPRITE(a1),d0
-        movea.l mouse_a4(pc),a1
-        movea.l (a1,d0.w),a1            ; posctldata
-        cmpa.l  stick_image(pc),a1
-        bne.s   .done
-        clr.l   (a1)
+        movea.l d0,a0
+        clr.l   (a0)
 .done:
-        movem.l (sp)+,d0/a0-a1
+        movem.l (sp)+,d0/a0
         rts
 
-; The pointer image: a small cross with an open centre, colour 3.
-POINTER_H = 7
+; Show the flight pointer at the stick position (from mouse_steer, a4 = game
+; A4). The first showing allocates sprite 7 and binds the image, still blank;
+; without the sprite there is no pointer. Keeps every register.
+stick_show:
+        movem.l d0-d7/a0-a3/a5-a6,-(sp)
+        move.l  stick_image(pc),d0
+        beq.w   .done
+        movea.l d0,a3
+        movea.l stick_ss(pc),a5
+        movea.l stick_gfx(pc),a6
+        lea     stick_owned(pc),a0
+        tst.w   (a0)
+        bgt.s   .owned
+        bmi.w   .done                   ; sprite 7 was taken
+        move.w  #-1,(a0)
+        movea.l a5,a0
+        moveq   #POINTER_SPRITE,d0
+        jsr     -408(a6)                ; GetSprite
+        tst.w   d0
+        bmi.w   .done
+        lea     stick_owned(pc),a0
+        move.w  #1,(a0)
+        move.w  #POINTER_H,4(a5)
+        suba.l  a0,a0
+        movea.l a5,a1
+        movea.l a3,a2
+        jsr     -420(a6)                ; ChangeSprite
+.owned:
+        bsr.w   stick_bank
+        ; From the aperture centre to its left or right edge, and REACH_Y
+        ; pixels up or down, at full deflection.
+        movea.l mouse_params(pc),a1
+        move.w  MP_APERTURE(a1),d0
+        lea     (a4,d0.w),a0            ; width, height, centre x, y, left, top
+        lea     stick_x(pc),a2
+        move.w  4(a0),d4
+        move.w  d4,d1
+        sub.w   8(a0),d1                ; centre - left
+        move.w  (a2),d0
+        bmi.s   .reach
+        move.w  8(a0),d1
+        add.w   (a0),d1
+        subq.w  #1,d1
+        sub.w   d4,d1                   ; right - centre
+.reach:
+        muls.w  d1,d0
+        divs.w  #STICK_RANGE,d0
+        add.w   d0,d4                   ; pointer centre x
+        move.w  2(a2),d0
+        muls.w  #REACH_Y,d0
+        divs.w  #STICK_RANGE,d0
+        move.w  6(a0),d5
+        add.w   d0,d5                   ; pointer centre y
+        tst.w   d4
+        bpl.s   .xlow
+        moveq   #0,d4
+.xlow:
+        cmpi.w  #319,d4
+        ble.s   .xhigh
+        move.w  #319,d4
+.xhigh:
+        tst.w   d5
+        bpl.s   .ylow
+        moveq   #0,d5
+.ylow:
+        cmpi.w  #199,d5
+        ble.s   .yhigh
+        move.w  #199,d5
+.yhigh:
+        ; Each line keeps the pixels over the aperture: mask bits from the
+        ; image's left pixel (x-4, bit x+4 of the row with its pad byte).
+        lea     4(a3),a1
+        lea     pointer_lines(pc),a2
+        lea     SS_SIZE(a5),a0          ; mask
+        move.w  d5,d6
+        subq.w  #4,d6
+        sub.w   mask_top(pc),d6         ; mask row of the first line
+        move.w  d4,d7
+        addq.w  #4,d7
+        move.w  d7,d3
+        lsr.w   #3,d3                   ; byte
+        andi.w  #7,d7                   ; bit
+        moveq   #POINTER_H-1,d2
+.line:
+        moveq   #0,d0
+        cmpi.w  #MASK_ROWS,d6
+        bhs.s   .put                    ; outside the mask rows: hidden
+        move.w  d6,d1
+        mulu.w  #MASK_STRIDE,d1
+        add.w   d3,d1
+        move.b  (a0,d1.l),d0
+        lsl.l   #8,d0
+        move.b  1(a0,d1.l),d0
+        lsl.l   #8,d0
+        move.b  2(a0,d1.l),d0
+        lsl.l   d7,d0
+        lsr.l   #8,d0
+        and.w   (a2),d0
+.put:
+        move.w  d0,(a1)+                ; colour 3: both planes
+        move.w  d0,(a1)+
+        addq.l  #2,a2
+        addq.w  #1,d6
+        dbf     d2,.line
+        lea     stick_shown(pc),a0
+        move.w  #1,(a0)
+        move.w  d4,d0
+        subq.w  #5,d0                   ; sprite pixel 0 is at MoveSprite x+1
+        move.w  d5,d1
+        subq.w  #4,d1
+        suba.l  a0,a0
+        movea.l a5,a1
+        jsr     -426(a6)                ; MoveSprite
+.done:
+        movem.l (sp)+,d0-d7/a0-a3/a5-a6
+        rts
+
+; CD32: the odd sprites' colour bank in each of the game's two flight copper
+; lists (their BPLCON4 move, found once per list). OCS has no bank (0).
+; a4 = game A4; uses d0-d3/a0-a2.
+BANK_SEARCH = 1024              ; copper moves searched for BPLCON4
+stick_bank:
+        movea.l mouse_params(pc),a1
+        move.w  MP_COPPER(a1),d0
+        beq.s   .done
+        lea     (a4,d0.w),a1            ; two cprlist pointers
+        lea     bank_lists(pc),a2       ; per list: start.l, offset.w, pad
+        moveq   #2-1,d1
+.list:
+        move.l  (a1)+,d0
+        beq.s   .next
+        movea.l d0,a0
+        move.l  4(a0),d0                ; cprlist start
+        beq.s   .next
+        movea.l d0,a0
+        cmp.l   (a2),d0
+        bne.s   .find
+        move.w  4(a2),d2
+        cmpi.w  #$010c,(a0,d2.w)
+        beq.s   .set
+.find:
+        clr.l   (a2)
+        moveq   #0,d2
+        move.w  #BANK_SEARCH-1,d3
+.search:
+        cmpi.w  #$010c,(a0,d2.w)
+        beq.s   .found
+        cmpi.l  #$fffffffe,(a0,d2.w)
+        beq.s   .next                   ; no BPLCON4: search again next time
+        addq.w  #4,d2
+        dbf     d3,.search
+        bra.s   .next
+.found:
+        move.l  a0,(a2)
+        move.w  d2,4(a2)
+.set:
+        move.b  3(a0,d2.w),d0
+        andi.b  #$f0,d0
+        ori.b   #SPRITE_BANK,d0
+        move.b  d0,3(a0,d2.w)
+.next:
+        addq.l  #8,a2
+        dbf     d1,.list
+.done:
+        rts
+
+; Replaces both calls of the native cockpit aperture scan (a 6-byte jsr; on
+; the stack the surface, the span output and the transparent key byte; a4 =
+; game A4). Before the scan, which redirects the surface's aperture rows to
+; new scratch rows, copies the key pixels of the rows within MASK_REACH of the
+; aperture's centre row into the pointer mask: a bit is set where the view
+; shows through. The centre row is the native one: halfway between the first
+; and the last rows with a key pixel. Then runs the scan with the caller's
+; stack. Keeps d2-d7/a2-a6 as a C call.
+mouse_scan:
+        movem.l d0-d7/a0-a3,-(sp)       ; arguments from 52(sp)
+        move.l  stick_ss(pc),d0
+        beq.w   .native
+        movea.l d0,a1
+        lea     SS_SIZE+1(a1),a1        ; mask, pixel 0 of the first row
+        movea.l 52(sp),a2               ; surface: row table; x0, y0, x1, y1 at +24
+        move.b  60(sp),d1               ; key
+        move.w  26(a2),d6
+.first:
+        cmp.w   30(a2),d6
+        bgt.s   .none                   ; no key pixel: no aperture
+        move.w  d6,d0
+        bsr.w   .haskey
+        beq.s   .top
+        addq.w  #1,d6
+        bra.s   .first
+.top:
+        move.w  30(a2),d7
+.last:
+        move.w  d7,d0
+        bsr.w   .haskey
+        beq.s   .bottom
+        subq.w  #1,d7
+        bra.s   .last
+.none:
+        move.w  #1000,d6                ; every pointer line outside the mask
+        lea     mask_top(pc),a0
+        move.w  d6,(a0)
+        bra.w   .native
+.bottom:
+        addq.w  #1,d7
+        sub.w   d6,d7
+        lsr.w   #1,d7
+        add.w   d7,d6                   ; centre row
+        subi.w  #MASK_REACH,d6          ; first mask row
+        lea     mask_top(pc),a0
+        move.w  d6,(a0)
+        moveq   #MASK_ROWS-1,d7
+.row:
+        movea.l a1,a3
+        moveq   #40-1,d2
+        cmp.w   26(a2),d6
+        blt.s   .clear
+        cmp.w   30(a2),d6
+        bgt.s   .clear
+        movea.l (a2),a0
+        move.w  d6,d0
+        lsl.w   #2,d0
+        movea.l (a0,d0.w),a0            ; the row's pixel 0
+        tst.w   24(a2)
+        bgt.s   .bounded
+        cmpi.w  #319,28(a2)
+        blt.s   .bounded
+.byte:                                  ; the row spans the screen
+        moveq   #8-1,d5
+.pixel:
+        cmp.b   (a0)+,d1
+        seq     d0
+        add.b   d0,d0
+        addx.b  d4,d4
+        dbf     d5,.pixel
+        move.b  d4,(a3)+
+        dbf     d2,.byte
+        bra.s   .next
+.bounded:
+        moveq   #0,d3                   ; x
+.bbyte:
+        moveq   #8-1,d5
+.bpixel:
+        moveq   #0,d0
+        cmp.w   24(a2),d3
+        blt.s   .bit
+        cmp.w   28(a2),d3
+        bgt.s   .bit
+        cmp.b   (a0,d3.w),d1
+        seq     d0
+.bit:
+        add.b   d0,d0
+        addx.b  d4,d4
+        addq.w  #1,d3
+        dbf     d5,.bpixel
+        move.b  d4,(a3)+
+        dbf     d2,.bbyte
+        bra.s   .next
+.clear:
+        clr.b   (a3)+
+        dbf     d2,.clear
+.next:
+        lea     MASK_STRIDE(a1),a1
+        addq.w  #1,d6
+        dbf     d7,.row
+.native:
+        movem.l (sp)+,d0-d7/a0-a3
+        move.l  mouse_scan_native(pc),-(sp)
+        rts                             ; the scan returns to the caller
+; Z set if row d0 has a key pixel d1 within x0..x1 of surface a2. Uses d0/d2/a0.
+.haskey:
+        movea.l (a2),a0
+        lsl.w   #2,d0
+        movea.l (a0,d0.w),a0
+        adda.w  24(a2),a0
+        move.w  28(a2),d2
+        sub.w   24(a2),d2
+.search:
+        cmp.b   (a0)+,d1
+        dbeq    d2,.search
+        rts
+
+; The pointer image: the PC version's ring with four ticks, colour 3.
+POINTER_H = 9
 POINTER_SIZE = 4+POINTER_H*4+4
 pointer_lines:
-        dc.w    $1000,$1000
-        dc.w    $1000,$1000
-        dc.w    $0000,$0000
-        dc.w    $c600,$c600
-        dc.w    $0000,$0000
-        dc.w    $1000,$1000
-        dc.w    $1000,$1000
+        dc.w    $1c00                   ; ...###...
+        dc.w    $6b00                   ; .##.#.##.
+        dc.w    $4900                   ; .#..#..#.
+        dc.w    $8080                   ; #.......#
+        dc.w    $eb80                   ; ###.#.###
+        dc.w    $8080
+        dc.w    $4900
+        dc.w    $6b00
+        dc.w    $1c00
 
 ST_LAST = 4                     ; stick record: x.w, y.w, then these
 ST_FIELD = 8
@@ -411,7 +684,12 @@ stick_field:    dc.w 0                  ; mouse_fields at the last call
 stick_used:     dc.w 0                  ; the mouse has steered this flight
 stick_shown:    dc.w 0                  ; the pointer is on screen
 stick_moved:    dc.w 0                  ; mouse_fields at the last motion
+stick_owned:    dc.w 0                  ; sprite 7: 0 not yet, 1 ours, -1 taken
+mask_top:       dc.w 0                  ; screen row of the mask's first row
         cnop    0,4
 stick_image:    dc.l 0                  ; Chip pointer image, 0 without one
+stick_ss:       dc.l 0                  ; SimpleSprite, then the mask
 stick_gfx:      dc.l 0                  ; GfxBase
+mouse_scan_native: dc.l 0               ; H0 aperture scan
+bank_lists:     dc.l 0,0,0,0            ; per copper list: start, BPLCON4 offset
         even

@@ -55,9 +55,10 @@
  enter your name. The joystick, CD32 pad and keys work as before.
  In flight the mouse steers like a stick held off centre: move it right to
  turn right and towards you to pull the nose up; the further from centre, the
- faster the turn, and the ship keeps turning until you move it back. A small
- cross around the gunsight shows the stick position in the front view while
- you move the mouse; it hides after 10 seconds without mouse movement. Using
+ faster the turn, and the ship keeps turning until you move it back. The PC
+ version's mouse pointer shows the stick position in the front view, behind
+ the cockpit, from the gunsight to the sides of the canopy; it appears when
+ you move the mouse and hides after 10 seconds without mouse movement. Using
  the joystick or keys to steer re-centres it.
  On CD32, saving a pilot in the barracks also saves the Training Simulator high
  scores, as Bed_N.hi beside the Bed_N save, and loading that pilot restores

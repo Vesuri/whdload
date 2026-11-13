@@ -24,20 +24,24 @@ import wc_run
 from amigaxdev import barto
 from ocs_reconstruct import ROOT, new_output
 from variants import get
+from mouse_model import POINTER, pointer_at
+from PIL import Image
 
 # Per game: A4 offsets of the room pointer position, the pointer SimpleSprite
 # (x at +6) and the field clock; H0 intro waits (wait, done), menu (ready,
 # accepted); name entry (input loop, poll result) and its A4 selected cell and
-# columns. German CD32 addresses map the English ones by matching code.
+# columns; flight: ramp store site (H0), ramps, view, aperture block and copper
+# list pair (A4; OCS none). German CD32 addresses map the English ones by
+# matching code.
 GAMES = {
     'ocs': dict(pointer=(0x19c, -2150), field=-0x800, intro=((0x180c4, 0x1edde), (0x180c4, 0x1f396)),
-                menu=(0x1f43c, 0x1f44e), flight=(0x1869e, 3720, -18318)),
+                menu=(0x1f43c, 0x1f44e), flight=(0x1869e, 3720, -18318, -4188, 0)),
     'cd32': dict(pointer=(0xa88, -1156), field=-252, intro=((0x1898a, 0x1fbba), (0x1898a, 0x20164)),
                  menu=(0x20214, 0x20226), name=(0x16fc6, 0x16fd0, 17716, 17706),
-                 flight=(0x19064, 5882, -18280)),
+                 flight=(0x19064, 5882, -18280, -4318, -532)),
     'cd32-de': dict(pointer=(2740, -1112), field=-208, intro=((0x18a44, 0x1fcbe), (0x18a44, 0x2026c)),
                     menu=(0x2031c, 0x2032e), name=(0x17064, 0x1706e, 17766, 17756),
-                    flight=(0x1911e, 5926, -18236)),
+                    flight=(0x1911e, 5926, -18236, -4274, -488)),
 }
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -49,11 +53,15 @@ def main():
     p.add_argument('--name-entry', action='store_true', help='CD32: also the TrainSim name entry grid')
     p.add_argument('--flight', action='store_true', help='mouse steering and the pointer in the simulator flight')
     p.add_argument('--german', action='store_true', help='CD32: the German executable (CUSTOM1=1)')
+    p.add_argument('--direct-flight', action='store_true',
+                   help='CD32 English --flight only, on a tools/flight_fixture.py --release build: the mission flight, no menu')
     a = p.parse_args()
     if a.name_entry and a.variant != 'cd32':
         p.error('--name-entry: the OCS name entry is keyboard only')
     if a.german and a.variant != 'cd32':
         p.error('--german: the OCS release supports English only')
+    if a.direct_flight and (a.variant != 'cd32' or a.german or a.original_mode or a.name_entry or not a.flight):
+        p.error('--direct-flight: CD32 English enhanced --flight only')
     game = GAMES['cd32-de' if a.german else a.variant]
     out = new_output(a.output); out.mkdir(parents=True)
     v = get(a.variant); ocs = a.variant == 'ocs'
@@ -68,6 +76,8 @@ def main():
         if a.german:
             whd = 'CUSTOM1=1 '+whd
             locate = functools.partial(locate, german=True)
+        if a.direct_flight:     # the fixture's direct-flight argument (docs/development.md)
+            whd = 'CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 '+whd
     length = 0x400000 if ocs else 0x800000
     env = wc_run.run_env(out, variant=a.variant, SLAVE=str(slave.resolve()),
                          WARP='1', NTSC='0', WINDOW='front', JOY0='none', JOY1='none',
@@ -137,16 +147,39 @@ def main():
     def flight():
         # The simulator flight: the controller's ramp stores (the slave's
         # mouse_steer). Mouse right and down: yaw right, pitch up (stick back),
-        # in proportion, and the pointer sprite moves the same way.
-        site, ramp, view = game['flight']
-        until(h0+site, 600)
+        # in proportion; the pointer (sprite 7, the slave's image) moves the
+        # same way over the cockpit aperture, behind the cockpit.
+        site, ramp, view, aperture, copper = game['flight']
+        if ocs:
+            sym = json.loads((a.build/'build.json').read_text())['symbols']
+        else:
+            sym = {n: int(o, 16) for o, n in re.findall(r'^([0-9A-F]{8}) (\S+)$', (a.build/'slave.lst').read_text(), re.M)}
+        sb = layout['slave']
+        var = lambda name, kind='short': number(f'*({kind}*){sb+sym[name]:#x}')
+        until(h0+site, 900 if a.direct_flight else 600)
         cmd('monitor fields 4'); until(h0+site)
         def state():
             until(h0+site); cmd('stepi')
             until(h0+site); cmd('stepi')
-            return dict(pitch=number(f'*(short*){a4+ramp:#x}'), yaw=number(f'*(short*){a4+ramp+2:#x}'),
-                        view=number(f'*(short*){a4+view:#x}'), sprite=number(f'*(short*){a4+sprite+6:#x}'),
-                        sprite_y=number(f'*(short*){a4+sprite+8:#x}'))
+            ss, image = var('stick_ss', 'int'), var('stick_image', 'int')
+            row = dict(pitch=number(f'*(short*){a4+ramp:#x}'), yaw=number(f'*(short*){a4+ramp+2:#x}'),
+                       view=number(f'*(short*){a4+view:#x}'), stick=(var('stick_x'), var('stick_y')),
+                       aperture=[number(f'*(short*){a4+aperture+2*i:#x}') for i in range(6)],
+                       sprite=(number(f'*(short*){ss+6:#x}'), number(f'*(short*){ss+8:#x}')),
+                       number=number(f'*(short*){ss+10:#x}'), control=number(f'*(int*){image:#x}'),
+                       lines=[number(f'*(unsigned int*){image+4+4*r:#x}') & 0xffffffff for r in range(9)])
+            if copper:              # BPLCON4 in both flight copper lists, where mouse.s found it
+                lists = sb+sym['bank_lists']
+                row['bplcon4'] = [number(f'*(unsigned short*)(*(int*){lists+8*i:#x}+*(short*){lists+8*i+4:#x}+2)') for i in range(2)]
+            return row
+        def pixels(row, name):
+            # Each image pixel at its screen place: playfield origin (74, 92),
+            # two screen pixels per playfield pixel, sprite pixel 0 at x+1.
+            image = Image.open(out/(name+'.png')).convert('RGB')
+            colour = (255, 255, 255) if ocs else (243, 255, 235)
+            x, y = row['sprite']
+            drawn = [(x+1+c, y+r) for r in range(9) for c in range(9) if row['lines'][r] >> (31-c) & 1]
+            return drawn, all(image.getpixel((74+2*px, 92+2*py)) == colour for px, py in drawn)
         rows = [dict(motion=(0, 0), **state())]
         shot('flight-before')
         for dx, dy, n in ((4, 0, 8), (0, 4, 4), (4, 4, 30), (-12, -12, 16)):
@@ -155,14 +188,28 @@ def main():
             cmd('monitor fields 4')
             rows.append(dict(motion=(dx*n, dy*n), **state()))
             shot(f'flight-{len(rows)-1}')
+            drawn, ok = pixels(rows[-1], f'flight-{len(rows)-1}')
+            rows[-1].update(drawn=len(drawn), on_screen=ok)
         # The world tick's ramps can lag the pointer by a call. Right: yaw +;
-        # down: pitch - (stick back); full deflection +-9; the pointer covers
-        # the clamped stick range (+-36 pixels) in screen directions.
+        # down: pitch - (stick back); full deflection +-9.
         r = rows
-        assert r[0]['view'] == 0 and r[1]['yaw'] > 0 and r[1]['pitch'] == 0 and r[2]['pitch'] < 0, r
+        assert r[0]['view'] == 0 and r[0]['control'] == 0 and r[1]['yaw'] > 0 and r[1]['pitch'] == 0 and r[2]['pitch'] < 0, r
         assert (r[3]['pitch'], r[3]['yaw']) == (-9, 9) and (r[4]['pitch'], r[4]['yaw']) == (9, -9), r
-        assert r[3]['sprite']-r[4]['sprite'] == 72 and r[3]['sprite_y']-r[4]['sprite_y'] == 72, r
-        assert r[2]['sprite_y']-r[1]['sprite_y'] == 8 and r[1]['sprite'] == r[2]['sprite'], r
+        assert [x['stick'] for x in r[1:]] == [(32, 0), (32, 16), (72, 72), (-72, -72)], r
+        for x in r[1:]:
+            # Sprite 7, shown at the stick's place in the aperture; its lines
+            # are the PC pointer's, in colour 3 (both planes), less the
+            # pixels over the cockpit, and they are on screen in its colour.
+            px, py = pointer_at(x['stick'], x['aperture'])
+            assert x['number'] == 7 and x['control'] != 0 and x['sprite'] == (px-5, py-4), x
+            assert all(v >> 16 == v & 0xffff and v >> 16 & ~POINTER[i] == 0 for i, v in enumerate(x['lines'])), x
+            assert x['drawn'] > 0 and x['on_screen'], x
+            if copper:
+                assert all(v & 0x0f == 12 for v in x['bplcon4']), x
+        # On the aperture's edges, the half of the pointer outside it is over
+        # the cockpit: the right half at full right, the left half at full left.
+        assert all(v >> 16 & 0x0780 == 0 for v in r[3]['lines']), r[3]
+        assert all(v >> 16 & 0xf000 == 0 for v in r[4]['lines']), r[4]
         return rows
 
     rows = {}
@@ -184,70 +231,72 @@ def main():
         a4 = h1+v.A4_BASE
         field = a4+game['field']
         pos, sprite = game['pointer']
-        # Intro: the left button where modal_live_check presses Esc.
-        for wait, done in game['intro']:
-            until(h0+wait)
-            cmd('monitor input JOY1_FIRE_BUTTON 1')
-            until(h0+done)
-            cmd('monitor input JOY1_FIRE_BUTTON 0')
-        rows['intro_skipped_by_left_button'] = True
-        menu, chosen = game['menu']
-        until(h0+menu)
-        cmd('monitor fields 4')
-        until(h0+menu)
-        start = dict(x=number(f'*(short*){a4+pos:#x}'), y=number(f'*(short*){a4+pos+2:#x}'),
-                     sprite=number(f'*(short*){a4+sprite+6:#x}'))
-        shot('menu-before')
-        trace = []
-        for dx in [4]*12+[-4]*12:
-            cmd(f'monitor mouse {dx} 0')
-            cmd('monitor fields 1')
-            trace.append(dict(field=number(f'*(unsigned int*){field:#x}'),
-                              sprite=number(f'*(short*){a4+sprite+6:#x}'),
-                              x=number(f'*(short*){a4+pos:#x}')))
-            if len(trace) == 12:
-                shot('menu-moved')
-        sprites = [r['sprite'] for r in trace]
-        steps = [b-a for a, b in zip([start['sprite']]+sprites, sprites)]
-        rows.update(start=start, trace=trace, sprite_steps=steps)
-        # The sprite covers the mouse's 24 pixels out and back. OS event timing
-        # can split two fields' motion 1/3. OCS original mode keeps the native
-        # renderer, whose Forbid/Disable stretches leave input.device (and the
-        # native room loop) without CPU time for several fields: motion arrives
-        # in bursts there, so per-field updates are required everywhere else.
-        assert max(sprites) >= start['sprite']+22, steps
-        per_field = all(1 <= s <= 3 for s in steps[1:12]) and all(-3 <= s <= -1 for s in steps[13:])
-        rows['per_field'] = per_field
-        native_renderer = ocs and (a.original_mode or a.setup == 'a500')   # 68000: original path
-        assert per_field or native_renderer, steps
-        assert max(r['x'] for r in trace) >= start['x']+20, 'room position did not follow the mouse'
-        cmd('monitor fields 10')                # let queued input events arrive
-        until(h0+menu)
-        settled = dict(x=number(f'*(short*){a4+pos:#x}'), sprite=number(f'*(short*){a4+sprite+6:#x}'))
-        rows['settled'] = settled
-        assert settled == dict(x=start['x'], sprite=start['sprite']), (start, settled)
-        # The menu's pad record reset armed a release guard that swallowed the
-        # first click natively; the slave arms it only while fire is held, so
-        # the first click selects.
-        def click():
-            cmd('monitor input JOY1_FIRE_BUTTON 1'); cmd('monitor fields 3')
-            cmd('monitor input JOY1_FIRE_BUTTON 0')
-            for _ in range(3):                  # room routine results after the release
-                until(h0+menu+10)
-                if number('(short)$d0') >= 0:
-                    return 'selected'
-            return 'ignored'
-        if a.flight and ocs:
-            # OCS starts over the absent Secret Missions option; Vega's
-            # rectangle ends at y 89.
-            for _ in range(10):
-                cmd('monitor mouse 0 -4'); cmd('monitor fields 1')
-            cmd('monitor fields 10')
+        steps = None
+        if not a.direct_flight:
+            # Intro: the left button where modal_live_check presses Esc.
+            for wait, done in game['intro']:
+                until(h0+wait)
+                cmd('monitor input JOY1_FIRE_BUTTON 1')
+                until(h0+done)
+                cmd('monitor input JOY1_FIRE_BUTTON 0')
+            rows['intro_skipped_by_left_button'] = True
+            menu, chosen = game['menu']
             until(h0+menu)
-            assert number(f'*(short*){a4+pos+2:#x}') <= 85, 'pointer not over Vega'
-        rows['clicks'] = [click()]
-        assert rows['clicks'] == ['selected'], rows['clicks']
-        rows['menu_selected_by_click'] = True
+            cmd('monitor fields 4')
+            until(h0+menu)
+            start = dict(x=number(f'*(short*){a4+pos:#x}'), y=number(f'*(short*){a4+pos+2:#x}'),
+                         sprite=number(f'*(short*){a4+sprite+6:#x}'))
+            shot('menu-before')
+            trace = []
+            for dx in [4]*12+[-4]*12:
+                cmd(f'monitor mouse {dx} 0')
+                cmd('monitor fields 1')
+                trace.append(dict(field=number(f'*(unsigned int*){field:#x}'),
+                                  sprite=number(f'*(short*){a4+sprite+6:#x}'),
+                                  x=number(f'*(short*){a4+pos:#x}')))
+                if len(trace) == 12:
+                    shot('menu-moved')
+            sprites = [r['sprite'] for r in trace]
+            steps = [b-a for a, b in zip([start['sprite']]+sprites, sprites)]
+            rows.update(start=start, trace=trace, sprite_steps=steps)
+            # The sprite covers the mouse's 24 pixels out and back. OS event timing
+            # can split two fields' motion 1/3. OCS original mode keeps the native
+            # renderer, whose Forbid/Disable stretches leave input.device (and the
+            # native room loop) without CPU time for several fields: motion arrives
+            # in bursts there, so per-field updates are required everywhere else.
+            assert max(sprites) >= start['sprite']+22, steps
+            per_field = all(1 <= s <= 3 for s in steps[1:12]) and all(-3 <= s <= -1 for s in steps[13:])
+            rows['per_field'] = per_field
+            native_renderer = ocs and (a.original_mode or a.setup == 'a500')   # 68000: original path
+            assert per_field or native_renderer, steps
+            assert max(r['x'] for r in trace) >= start['x']+20, 'room position did not follow the mouse'
+            cmd('monitor fields 10')                # let queued input events arrive
+            until(h0+menu)
+            settled = dict(x=number(f'*(short*){a4+pos:#x}'), sprite=number(f'*(short*){a4+sprite+6:#x}'))
+            rows['settled'] = settled
+            assert settled == dict(x=start['x'], sprite=start['sprite']), (start, settled)
+            # The menu's pad record reset armed a release guard that swallowed the
+            # first click natively; the slave arms it only while fire is held, so
+            # the first click selects.
+            def click():
+                cmd('monitor input JOY1_FIRE_BUTTON 1'); cmd('monitor fields 3')
+                cmd('monitor input JOY1_FIRE_BUTTON 0')
+                for _ in range(3):                  # room routine results after the release
+                    until(h0+menu+10)
+                    if number('(short)$d0') >= 0:
+                        return 'selected'
+                return 'ignored'
+            if a.flight and ocs:
+                # OCS starts over the absent Secret Missions option; Vega's
+                # rectangle ends at y 89.
+                for _ in range(10):
+                    cmd('monitor mouse 0 -4'); cmd('monitor fields 1')
+                cmd('monitor fields 10')
+                until(h0+menu)
+                assert number(f'*(short*){a4+pos+2:#x}') <= 85, 'pointer not over Vega'
+            rows['clicks'] = [click()]
+            assert rows['clicks'] == ['selected'], rows['clicks']
+            rows['menu_selected_by_click'] = True
         if a.flight:
             rows['flight'] = flight()
             print(json.dumps(rows['flight']))

@@ -47,7 +47,7 @@ audit, frame statistics, OCS candidates) call the generators directly with a new
 build against `release/slaves.sha256`, rebuilds both reconstructions (each asserts
 byte identity with the pinned original) and runs `release_check.py`,
 `cd32_fixes_check.py` (the CD32 bunk save, TrainSim key fix, high scores, mouse and mouse
-flight on both languages; `--sabotage store-failure|list-stub|mouse-ignored|name-ignored|scores-ignored|steer-ignored`
+flight on both languages; `--sabotage store-failure|list-stub|mouse-ignored|name-ignored|scores-ignored|steer-ignored|mask-ignored`
 are its negative controls),
 `waypoint_check.py` on CD32 English and German,
 `ocs_options_check.py` (which also runs the OCS mouse and mouse flight scenarios after
@@ -60,8 +60,21 @@ python3 tools/mouse_live_check.py ocs tmp/build/release/WingCommander --output t
 
 `--flight` continues into the simulator flight that starts the Vega campaign
 (OCS moves the pointer onto Vega first), moves the mouse in four steps and reads
-the pitch and yaw ramps and the pointer sprite position at the controller's
-ramp store after each; screenshots `flight-*.png` show the pointer.
+the pitch and yaw ramps, the stick, the aperture block, sprite 7's position and
+image and (CD32) both flight copper lists' BPLCON4 at the controller's ramp
+store after each. It checks the position and image against
+`tools/mouse_model.py` and each image pixel in the screenshot `flight-*.png`,
+in the pointer colour (playfield origin (74, 92), two screen pixels a pixel).
+
+A real mission cockpit (the Nav-1 Hornet) needs the direct-flight fixture,
+CD32 English only: the release slave with the game's direct-flight argument.
+`--direct-flight` boots it with `CUSTOM2=2 CUSTOM3=1 CUSTOM4=0` and runs the
+flight steps without the intro and menu:
+
+```
+python3 tools/flight_fixture.py --release --nav 1 --output tmp/mouse-nav1-fixture
+python3 tools/mouse_live_check.py cd32 tmp/mouse-nav1-fixture --output tmp/mouse-live-nav1 --flight --direct-flight
+```
 
 The CD32 `--name-entry` run also asserts the slave state after the flight: the
 language's mode, and that the enhanced flight clock ran (none in

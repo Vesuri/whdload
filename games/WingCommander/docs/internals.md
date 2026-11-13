@@ -8611,7 +8611,10 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
 | Pitch, yaw ramps (A4) | `3720`, `3722` | `5882`, `5884` | `5926`, `5928` |
 | View (A4; 0 front, 1–3 other cockpit views, 8 external) | `-18318` | `-18280` | `-18236` |
 | Left, right, up, down, modifier flags (A4 bytes) | `16084` | `18116` | `18166` |
-| Pointer SimpleSprite (A4) | `-2150` | `-1156` | `-1112` |
+| Aperture block (A4: width, height, centre x, y, left, top) | `-4188` | `-4318` | `-4274` |
+| Aperture scan; its two calls (hooked) | `O:2bc9a`; `O:16ffc`, `O:1aff8` | `E:2cc36`; `E:1784c`, `E:1bd2e` | `G:2cdf8`; `G:178e4`, `G:1bdd8` |
+| Cockpit key colour (A4 byte) | `8698` | `11372` | `11422` |
+| Flight copper lists (A4, two cprlists) | none needed | `-532` | `-488` |
 
 - **Stick position.** Every relative mouse event already adds to
   `mouse_sum_x/y`. Each controller call adds the motion since its last call to
@@ -8627,62 +8630,104 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   roll natively and the mouse keeps steering. The external view (8), where the
   stick turns the camera, re-centres it. A call more than 50 fields after the
   last one starts a new flight: re-centred, earlier motion dropped.
-- **Pointer.** In the front view a 7×7 cross shows the stick position. It
-  appears only once the mouse moves in a flight, hides after 500 fields
-  (10 seconds PAL) without motion while the ship keeps turning, and shows
-  again at the next motion. Its
-  centre is at (155+x/2, 64+y/2) in MoveSprite coordinates, which puts it on
-  the gunsight at centre and ±36 pixels from it at full deflection, on both
-  releases. It uses the room pointer's SimpleSprite with its own 36-byte Chip
-  image: `mouse_init` opens graphics.library and allocates it once, cleared;
-  without it the mouse still steers. The room images are allocations of their
-  rooms, and in flight the sprite still points at the last room's. So the
-  slave binds its own image with ChangeSprite before its first MoveSprite, and
-  each room rebinds its own image on entry (`E:27328` selects image 0). Other
-  cockpit views hide it. The pointer is a hardware sprite over the cockpit art,
-  unlike the PC pointer, which the canopy and dashboard cover. Sprite 0's
-  colour 3 is blue in the simulator flight palette on both releases (colour 1
-  is black, colour 2 green); other flight palettes are not checked.
+- **Cockpit aperture.** The native aperture scan finds the rows and columns of
+  the cockpit image that hold its transparent key colour, where the view shows
+  through, and writes the block above: the centre is halfway between the first
+  and last such rows and columns. That centre is the gunsight's centre pixel in
+  both cockpits measured: the simulator (225×81 from (47, 29), centre (159, 69))
+  and the Nav-1 Hornet (320×105 from (0, 10), centre (159, 62); the PC's is
+  (160, 62)). After the scan the cockpit surface's aperture rows point at new
+  scratch rows: the cockpit pixels are no longer reachable through it.
+- **Pointer position.** The PC version's 9×9 pointer (a ring with four ticks,
+  captured from DOSBox) is centred at the gunsight with the stick centred. At
+  full deflection it reaches the aperture's left or right edge (0 and 319 in
+  the Hornet, 47 and 271 in the simulator) and 23 pixels up or down, the PC
+  pointer's measured top (y 39 in the Hornet). x = centre + stick × reach / 72
+  and y = centre + stick × 23 / 72, toward zero, clamped to the screen. The PC
+  bottom limit is hidden under the dashboard and was not measured; it is the
+  mirror of the top. Sprite pixel 0 appears at MoveSprite x + 1 on both
+  releases (measured against the composed image), so the slave moves it to
+  (x − 5, y − 4).
+- **Behind the cockpit.** Sprite priority cannot do it: the cockpit uses
+  colour 0 (the instrument screens), so a sprite behind the playfield would
+  show through them. Instead `mouse_scan` replaces both scan calls: before the
+  native scan it finds the first and last rows with a key pixel as the scan
+  does, and copies the key pixels of the 55 rows around the centre row into a
+  bit mask (44 bytes a row, with pad bytes, so the pointer can leave the screen
+  edges). Each pointer move writes the image lines ANDed with the mask under
+  them. Each view change scans again, so the mask is the current cockpit's;
+  the pointer shows in the front view only.
+- **Sprite and colour.** The pointer is sprite 7, allocated with GetSprite at
+  its first showing, with a 44-byte Chip image and a SimpleSprite plus the
+  2420-byte mask in any memory (`mouse_init` allocates both once, cleared).
+  Without them or without sprite 7 the mouse still steers, with no pointer. The
+  game's room pointer takes sprite 2, falling back to 4, 6 and 1
+  (`E:31536`, `O:31b1a`). Sprite 7's colour 3 is colour 31 on OCS, where the
+  flight screen has four planes and colours 16–31 are the sprites': the
+  simulator sets 31 to white ($FFF); the mission palette was not observed live
+  on OCS (no direct mission start there), but the game loads only 16 colours
+  (`O:339a8`). On CD32 the flight screen has eight planes and colours 17–31 are
+  black in the Nav-1 palette (in the simulator only 20–23 are set: black,
+  green, blue), so the old blue pointer (sprite 2, colour 23) was invisible in
+  missions. Colour 207 is (243, 255, 235), the PC pointer's own colour, in both
+  palettes, and it is sprite 7's colour 3 with the odd sprites' bank at 192. So
+  the slave sets BPLCON4's OSPRM to 12 in both flight copper lists, keeping its
+  other bits; it finds each list's BPLCON4 move once (about 530 moves in, after
+  the colour loads) and searches again when a list changes. The even sprites,
+  the room and Intuition pointers' among them, keep bank 16.
 - **Hiding.** `mouse_vbl`, called from each variant's VBL hook (CD32 the port-1
   pad read, OCS the port-1 fire sample), counts fields. Once the controller has
   not run for 25 fields (a pause, the map, the end of the flight), or the mouse
   has not moved for 500, it clears the image's control words, without a library
-  call and only while the sprite is still bound to that image. After a pause
-  the next controller call shows it again unless the mouse is idle.
+  call. After a pause the next controller call shows it again unless the mouse
+  is idle. Other cockpit views and the external view hide it.
 - **Timing.** In enhanced mode the controller runs on the world tick and as the
   per-field preview, and the hook acts in both. The position comes from the
   live sums, not from the per-field input history, so catch-up ticks in one
   frame share the latest position. In original modes it runs at the game's
   frame rate. The left button is still port-1 fire (the guns); the right button
-  is unused.
+  is unused. The mask copy runs at each aperture scan (flight start and view
+  changes): 55 rows of 320 pixels. Its cost is not measured.
 
 How it is checked:
 - **CD32, native.** `tools/cd32_fixes_check.py` runs the whole controller with
   the hook in both languages. It covers native decay and steps without motion,
-  right and down, the held position, the dead zone, full deflection, stick and
-  key hand-over, the modifier, the other and external views, the idle hide
-  and re-show, the new-flight gap, the VBL hide, a room's rebound image and register preservation.
-  Psygore's list alone is the control (the mouse does not steer);
-  `--sabotage steer-ignored` must fail.
-- **OCS, native.** `tools/ocs_options_check.py` runs the same controller
-  scenario on the 68000 model after both installs.
+  right and down, the held position, the dead zone, full deflection to the
+  aperture edges, stick and key hand-over, the modifier, the other and external
+  views, the idle hide and re-show, the new-flight gap, the VBL hide and
+  register preservation. The scan hook runs on a synthetic cockpit with a
+  native-scan stand-in that replaces the surface's row table, as the scan does:
+  the mask must match the cockpit, and each pointer image must be the PC
+  pointer less the pixels over the cockpit. Both copper lists' BPLCON4 must get
+  bank 12 with their other bits kept, a changed list must be found again, and
+  sprite 7 must be taken and bound once; a taken sprite 7 leaves steering
+  without a pointer. `tools/mouse_model.py` holds the expected position and
+  image. Psygore's list alone is the control (the mouse does not steer);
+  `--sabotage steer-ignored` and `mask-ignored` must fail.
+- **OCS, native.** `tools/ocs_options_check.py` runs the same controller and
+  mask scenario on the 68000 model after both installs.
 - **Live.** `tools/mouse_live_check.py --flight` enters the simulator flight
-  that opens the Vega campaign and moves the mouse in four steps. The ramps it
-  reads at the store can lag the pointer by one call in enhanced mode, because
-  the preview restores the world tick's ramps.
+  that opens the Vega campaign and moves the mouse in four steps. At each step
+  it reads the stick, the aperture block, sprite 7's position and image and
+  (CD32) both lists' BPLCON4, and checks every image pixel in the screenshot
+  in the pointer colour. The ramps it reads at the store can lag the pointer
+  by one call in enhanced mode, because the preview restores the world tick's
+  ramps.
 
-Live results (deterministic warp, PAL, `a1200-030`, 2026-11-13), in five
-configurations: CD32 English enhanced and Psygore normal, CD32 German enhanced,
-OCS enhanced and OCS original. Each one:
-- before any motion, the pointer stays off screen (995, 995);
-- 32 counts right give yaw 3–4 with the pointer 16 pixels right of the gunsight;
-- 16 counts down give pitch −1 or −2 with the pointer 8 pixels lower;
-- full deflection gives (−9, 9) and then (9, −9), with the pointer moving 72
-  pixels in each axis between the two.
+Live results (13.11.2026, enhanced mode, 4 mouse steps to stick (32,0),
+(32,16), (72,72), (-72,-72)):
 
-The screenshots show the blue cross on the gunsight's centre line at the
-expected offset. The idle hide is checked natively only. Not yet played by the
-user, and not tried on real hardware.
+| Run | Aperture (w,h,cx,cy,left,top) | Sprite 7 position (x−5, y−4) | Pixels drawn | Colour on screen |
+|---|---|---|---|---|
+| CD32 English, TrainSim | 225,81,159,69,47,29 | (203,65) (203,70) (266,88) (42,42) | 33 33 20 20 | (243,255,235), BPLCON4 $1c |
+| CD32 German, TrainSim | 225,81,159,69,47,29 | the same | the same | the same |
+| OCS, TrainSim | 225,81,159,69,47,29 | the same | the same | (255,255,255) |
+| CD32 English, Nav-1 Hornet (`--direct-flight`) | 320,105,159,62,0,10 | (225,58) (225,63) (314,81) (−5,35) | 33 33 20 20 | (243,255,235) |
+
+At full deflection the half of the pointer outside the aperture is masked
+(the TrainSim window frame, the Hornet's screen edge), so 20 of its 33
+pixels show. The Hornet's top is y 39 (62−23), the PC's top; the bottom
+(y 85) mirrors it, because the PC's bottom is under the instruments.
 
 ### CD32 bunk save: Psygore's StoreNV return value
 

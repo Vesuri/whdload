@@ -23,6 +23,7 @@ import argparse, ctypes as C, hashlib, json, re, struct
 from pathlib import Path
 from c2p_check import u, ck, P, I, Q, Z
 from runtime_buffers import load as load_slave
+from mouse_model import APERTURE, POINTER, KEY, pointer_at, cockpit, lines
 
 u.uc_emu_stop.argtypes = [P]; u.uc_emu_stop.restype = I
 
@@ -38,7 +39,8 @@ GAMES = {
                                leave=0x2735a, left=0x27368, pos=2696, rect=2728, flags=18116,
                                slot=162, hide=-1160, image=-1164, gfx=-778, params='mouse_params_en',
                                name=0x16ed0, step=0x16c66, sel=17716, cols=17706,
-                               steer=0x19064, controller=0x18daa, ramp=5882, view=-18280, sprite=-1156)),
+                               steer=0x19064, controller=0x18daa, ramp=5882, view=-18280,
+                               aperture=-4318, copper=-532, scan=0x2cc36, scans=(0x1784c, 0x1bd2e))),
     'german': dict(path='tmp/game/WingCommanderCD32/data/wing.german',
                    sha='2047da69f2c83803675921afd86204747609a5c59dd3e7f67d954d785677dabe',
                    psygore=0x1cf4, fix='fix_patch_de', save=0x277a0, a4=0x7ffe,
@@ -49,7 +51,8 @@ GAMES = {
                               leave=0x2751c, left=0x2752a, pos=2740, rect=2772, flags=18166,
                               slot=206, hide=-1116, image=-1120, gfx=-734, params='mouse_params_de',
                               name=0x16f6e, step=0x16d04, sel=17766, cols=17756,
-                              steer=0x1911e, controller=0x18e64, ramp=5926, view=-18236, sprite=-1112)),
+                              steer=0x1911e, controller=0x18e64, ramp=5926, view=-18236,
+                              aperture=-4274, copper=-488, scan=0x2cdf8, scans=(0x178e4, 0x1bdd8))),
 }
 SLAVE = 0x200000          # slave payload
 RES = 0x280000            # resload jump table, each entry an RTS
@@ -64,6 +67,9 @@ GFX = 0x341000            # graphics base; MoveSprite at -426
 EVENT = 0x342000          # InputEvent
 EXEC = 0x343000           # exec base; OpenLibrary at -552, AllocMem at -198
 CHIP = 0x344000           # AllocMem's Chip block
+ANY = 0x346000            # AllocMem's other block (the SimpleSprite, then the mask)
+COPPER = 0x34c000         # two cprlists, then their copper lists
+SURFACE = 0x350000        # cockpit surface record; its row table and rows follow
 CALLS = {12: 'SaveFile', 36: 'GetFileSize', 88: 'DeleteFile', 8: 'LoadFile'}
 
 
@@ -145,29 +151,42 @@ class Machine:
         self.moves = []
         self.write(GFX-426, b'\x4e\x75')
         # exec at 4.w for mouse_init (over E:0's jmp operand, which no check
-        # runs): OpenLibrary returns GFX, AllocMem CHIP; ChangeSprite binds
-        # a1's posctldata to a2.
+        # runs): OpenLibrary returns GFX, AllocMem CHIP for Chip and ANY
+        # otherwise; GetSprite gives the asked sprite unless sprite_free is
+        # cleared; ChangeSprite binds a1's posctldata to a2; MoveSprite writes
+        # control words into the flight pointer's image.
         if os:
             self.write(4, struct.pack('>I', EXEC))
-        self.allocs, self.changes = [], []
+        self.allocs, self.changes, self.sprites, self.sprite_free = [], [], [], True
         for off in (-552, -198):
             self.write(EXEC+off, b'\x4e\x75')
-        self.write(GFX-420, b'\x4e\x75')
+        for off in (-408, -420):
+            self.write(GFX+off, b'\x4e\x75')
 
         def lib(h, address, size, data):
             if address == EXEC-552:
                 self.reg(9, GFX)
             elif address == EXEC-198:
-                self.allocs.append((self.reg(9), self.reg(10))); self.reg(9, CHIP)
+                self.allocs.append((self.reg(9), self.reg(10)))
+                self.reg(9, CHIP if self.reg(10) & 2 else ANY)
+            elif address == GFX-408:
+                num = C.c_int16(self.reg(9)).value
+                self.sprites.append((self.reg(1), num))
+                if self.sprite_free:
+                    self.write(self.reg(1)+10, struct.pack('>h', num))
+                else:
+                    self.reg(9, 0xffffffff)
             else:
                 self.changes.append((self.reg(2), self.reg(3)))
                 self.write(self.reg(2), struct.pack('>I', self.reg(3)))
         self.lcb = C.CFUNCTYPE(None, P, Q, C.c_uint32, P)(lib)
-        for at in (EXEC-552, EXEC-198, GFX-420):
+        for at in (EXEC-552, EXEC-198, GFX-408, GFX-420):
             handle = Z(); ck(u.uc_hook_add(self.h, C.byref(handle), 4, self.lcb, None, at, at+1))
 
         def move(h, address, size, data):
             self.moves.append((C.c_int16(self.reg(9)).value, C.c_int16(self.reg(10)).value, self.reg(1), self.reg(2)))
+            if self.read(self.reg(2), 4) == struct.pack('>I', CHIP):
+                self.write(CHIP, b'\x6a\x7e\x71\x01')
         self.mcb = C.CFUNCTYPE(None, P, Q, C.c_uint32, P)(move)
         handle = Z(); ck(u.uc_hook_add(self.h, C.byref(handle), 4, self.mcb, None, GFX-426, GFX-425))
 
@@ -371,20 +390,52 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
 
 def steer_cases(cfg, psy, fixed, blob, sy):
     """Mouse flight: the game's whole flight controller with the slave's ramp
-    store hook, the RAWMOUSE callback's motion sums and the VBL field count."""
+    store hook, the RAWMOUSE callback's motion sums, the VBL field count, the
+    aperture scan hook's mask and the copper lists' sprite colour bank."""
     mc = cfg['mouse']
     out = {}
+    for site in mc['scans']:
+        assert fixed[site:site+6] == struct.pack('>HI', 0x4eb9, SLAVE+sy['mouse_scan']), hex(site)
     for name, code in (('psygore', psy), ('fixed', fixed)):
+        # The native scan, as far as the mask is concerned: it replaces the
+        # surface's row table (its first argument), here with empty rows. The
+        # aperture block it sets is written below.
+        code = bytearray(code)
+        code[mc['scan']:mc['scan']+12] = struct.pack('>HHHIH', 0x206f, 4, 0x20bc, SURFACE+0xa00, 0x4e75)
         m = Machine(code, blob, cfg, {}, os=True)
         a4 = m.a4
         m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
-        assert m.allocs == [(36, 0x10002)], m.allocs
-        assert m.read(CHIP, 36) == bytes(4)+bytes.fromhex(
-            '10001000 10001000 00000000 c600c600 00000000 10001000 10001000 00000000'.replace(' ', '')), m.read(CHIP, 36).hex()
+        mask_size = 55*44
+        assert m.allocs == [(12+mask_size, 0x10000), (44, 0x10002)], m.allocs
         m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
-        assert len(m.allocs) == 1, 'pointer image allocated twice'
-        room_image = 0x345000
-        m.write(a4+mc['sprite'], struct.pack('>Ih', room_image, 16))
+        assert len(m.allocs) == 2, 'pointer allocated twice'
+        m.write(a4+mc['aperture'], struct.pack('>6h', *APERTURE))
+        m.write(SURFACE+0xa00, struct.pack('>I', SURFACE+0xe00)*200)
+        # Two flight copper lists, BPLCON4 at different places and values.
+        lists = (COPPER+0x100, COPPER+0x900)
+        for i, (at, value) in enumerate(((5, 0x0011), (300, 0x00a3))):
+            body = [(0x0180+2*(k % 32), 0x010c) for k in range(at)]+[(0x010c, value), (0x0106, 0x0c00), (0xffff, 0xfffe)]
+            m.write(lists[i], b''.join(struct.pack('>HH', *x) for x in body))
+            m.write(COPPER+16*i+4, struct.pack('>I', lists[i]))
+        m.write(a4+mc['copper'], struct.pack('>II', COPPER, COPPER+16))
+        bplcon4 = lambda i, at: struct.unpack('>H', m.read(lists[i]+4*at+2, 2))[0]
+        # The cockpit surface: a row table (x = 0) and bounds at +24.
+        rows = SURFACE+0x1000
+        m.write(SURFACE, struct.pack('>I', SURFACE+0x100)); m.write(SURFACE+24, struct.pack('>4h', 0, 0, 319, 199))
+        for y in range(200):
+            m.write(SURFACE+0x100+4*y, struct.pack('>I', rows+320*y))
+            m.write(rows+320*y, bytes(cockpit(x, y) for x in range(320)))
+        m.call(SLAVE+sy['mouse_scan'], struct.pack('>IIBB', SURFACE, SURFACE+0x800, KEY, 0))
+        assert m.read(SURFACE, 4) == struct.pack('>I', SURFACE+0xa00), 'native scan not run with its arguments'
+        if name == 'fixed':
+            assert struct.unpack('>h', m.read(SLAVE+sy['mask_top'], 2))[0] == 62-27
+            mask = m.read(ANY+12, mask_size)
+            for r in range(55):
+                y = 62-27+r
+                row = mask[44*r:44*r+44]
+                want = bytes([0])+bytes(sum((cockpit(8*b+i, y) == KEY) << (7-i) for i in range(8)) for b in range(40))+bytes(3)
+                assert row == want, (y, row.hex())
+            out['mask'] = 'pass'
         fields = [struct.unpack('>H', m.read(SLAVE+sy['mouse_fields'], 2))[0]]
 
         def event(dx, dy):
@@ -405,8 +456,12 @@ def steer_cases(cfg, psy, fixed, blob, sy):
             m.call(mc['controller'], b'')
             return struct.unpack('>hh', m.read(a4+mc['ramp'], 4)), [x[:2] for x in m.moves[before:]]
 
-        def bound():
-            return struct.unpack('>I', m.read(a4+mc['sprite'], 4))[0] == CHIP
+        def at(stick):
+            px, py = pointer_at(stick)
+            return [(px-5, py-4)]
+
+        def image():
+            return [struct.unpack('>HH', m.read(CHIP+4+4*r, 4)) for r in range(9)]
 
         def shown():
             return m.read(CHIP, 4) != bytes(4)
@@ -418,65 +473,94 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         event(32, 0); tick()
         if name == 'psygore':
             assert steer((0, 0))[0] == (0, 0), 'control steered by the mouse'
+            assert m.sprites == [] and bplcon4(0, 5) == 0x0011
             out[name] = 'native'
             m.close(); continue
         assert struct.unpack('>I', m.read(a4+mc['slot'], 4))[0] == SLAVE+sy['mouse_event']
-        assert steer((0, 0)) == ((0, 4), [(155+16, 64)]), 'mouse right: yaw right'
-        assert m.changes == [(a4+mc['sprite'], CHIP)] and bound()
-        assert struct.unpack('>h', m.read(a4+mc['sprite']+4, 2))[0] == 7
-        m.write(CHIP, b'\x6a\x7e\x71\x01')         # as MoveSprite writes them
+        assert steer((0, 0)) == ((0, 4), at((32, 0))), 'mouse right: yaw right'
+        # The first showing takes sprite 7 and binds the image; the odd
+        # sprites' colour bank is 192 in both lists, the rest of BPLCON4 kept.
+        assert m.sprites == [(ANY, 7)] and m.changes == [(ANY, CHIP)]
+        assert struct.unpack('>h', m.read(ANY+4, 2))[0] == 9
+        assert (bplcon4(0, 5), bplcon4(1, 300)) == (0x001c, 0x00ac)
+        assert image() == [(x, x) for x in lines((32, 0))], image()
         event(0, 16); tick()
-        assert steer() == ((-2, 4), [(155+16, 64+8)]), 'mouse down: pitch up (stick back)'
-        assert len(m.changes) == 1
+        assert steer() == ((-2, 4), at((32, 16))), 'mouse down: pitch up (stick back)'
+        assert image() == [(x, x) for x in lines((32, 16))]
+        assert len(m.sprites) == 1 and len(m.changes) == 1
         # Held still off centre: the ramps hold, the ship keeps turning.
         tick(); assert steer() == ((-2, 4), [])
-        # Proportional, with a dead zone of under one step, to full deflection.
+        # Proportional, with a dead zone of under one step, to full deflection:
+        # the aperture's right edge and 23 pixels down.
         event(-25, -11); tick(); assert steer()[0] == (0, 0)
-        event(1000, 1000); tick(); assert steer() == ((-9, 9), [(155+36, 64+36)])
-        event(-72, -72); tick(); assert steer() == ((0, 0), [(155, 64)])
+        event(1000, 1000); tick(); assert steer() == ((-9, 9), [(319-5, 62+23-4)])
+        assert image() == [(x, x) for x in lines((72, 72))]
+        event(-144, -144); tick(); assert steer() == ((9, -9), [(0-5, 62-23-4)])
+        assert image() == [(x, x) for x in lines((-72, -72))]
+        # Pixels over the cockpit are left out (the solid ones beside the centre).
+        event(72, 72); tick(); steer()
+        assert image() == [(x, x) for x in lines((0, 0))] and image()[0][0] != POINTER[0]
         event(-80, 0); tick(); assert steer()[0] == (0, -9)
         out['motion'] = 'pass'
+        # A new copper list is found again; a list without BPLCON4 is left alone.
+        new = COPPER+0x1800
+        m.write(new, struct.pack('>HHHHHH', 0x0100, 0x0211, 0x010c, 0x0011, 0xffff, 0xfffe))
+        m.write(COPPER+4, struct.pack('>I', new))
+        m.write(lists[1], struct.pack('>HH', 0xffff, 0xfffe))
+        event(1, 0); tick(); steer()
+        assert struct.unpack('>H', m.read(new+6, 2))[0] == 0x001c
+        out['colour_bank'] = 'pass'
         # The stick or keys steer: re-centred, pointer hidden, native ramps.
         tick(); assert steer((0, -9), (0, 1, 0, 0, 0)) == ((0, 1), []) and not shown()
         tick(); assert steer((0, 0)) == ((0, 0), []), 'not re-centred'
-        event(-8, 0); tick(); assert steer()[0] == (0, -1)
-        assert not shown()
+        event(-8, 0); tick(); assert steer() == ((0, -1), at((-8, 0))) and shown()
         # The modifier routes the stick to throttle and roll: the mouse still steers.
         event(8, 8); tick()
-        assert steer(flags=(1, 0, 0, 0, 1)) == ((-1, 0), [(155, 64+4)])
+        assert steer(flags=(1, 0, 0, 0, 1)) == ((-1, 0), at((0, 8)))
         out['stick'] = 'pass'
         # Other cockpit views: steering, no pointer; the external view: neither.
         event(40, 0); tick()
         r, moves = steer(view=1)
         assert r == (-1, 5) and moves == [] and not shown()
-        tick(); assert steer(view=0)[1] == [(155+20, 64+4)]
-        m.write(CHIP, b'\x6a\x7e\x71\x01')
+        tick(); assert steer(view=0)[1] == at((40, 8))
         tick(); assert steer((3, 3), view=8) == ((1, 1), []) and not shown()
         tick(); assert steer((0, 0))[0] == (0, 0), 'not re-centred after the external view'
         out['views'] = 'pass'
         # Idle: the pointer hides after 500 fields without motion (at the 501st) while the
         # ship keeps turning, and shows again on the next motion.
-        event(24, 0); tick(); steer(); m.write(CHIP, b'\x6a\x7e\x71\x01')
+        event(24, 0); tick(); steer()
         for _ in range(500):
             tick(); assert steer() == ((0, 3), [])
         assert shown()
         tick(); assert not shown(), 'idle pointer not hidden'
         tick(); assert steer() == ((0, 3), []) and not shown(), 'idle pointer shown again'
-        event(1, 0); tick(); assert steer() == ((0, 3), [(155+12, 64)]), 'pointer not shown on motion'
+        event(1, 0); tick(); assert steer() == ((0, 3), at((25, 0))), 'pointer not shown on motion'
         out['idle'] = 'pass'
-        # VBL: hides the pointer once the controller stops; rooms keep theirs.
-        event(16, 0); tick(); steer(); m.write(CHIP, b'\x6a\x7e\x71\x01')
+        # VBL: hides the pointer once the controller stops.
+        event(16, 0); tick(); steer()
         tick(25); assert shown()
         tick(); assert not shown(), 'pointer not hidden after the controller stopped'
         tick(25)        # a new flight after a gap: re-centred
         event(16, 0); tick(); assert steer((0, 0))[0] == (0, 0)
         event(16, 0); tick(); assert steer()[0] == (0, 2)
-        # A room rebinds its own image: hiding leaves that image alone.
-        m.write(a4+mc['sprite'], struct.pack('>I', room_image)); m.write(room_image, b'\x12\x34\x56\x78')
-        tick(30); assert m.read(room_image, 4) == b'\x12\x34\x56\x78'
-        event(8, 0); tick(); steer()
-        assert m.changes[-1] == (a4+mc['sprite'], CHIP), 'pointer not rebound in the next flight'
+        assert len(m.sprites) == 1 and len(m.changes) == 1, 'sprite taken or bound again'
         out['hide'] = 'pass'
+        m.close()
+        # Sprite 7 taken: no pointer, asked once; the mouse still steers.
+        m = Machine(code, blob, cfg, {}, os=True)
+        m.sprite_free = False
+        m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
+        for _ in range(100):
+            m.call(SLAVE+sy['mouse_vbl'], b'')
+        for _ in range(2):
+            m.write(EVENT, struct.pack('>IBBHHhh', 0, 2, 0, 0xff, 0x8000, 32, 0))
+            m.call(SLAVE+sy['mouse_event'], b'', [(4, EVENT)])
+            m.call(SLAVE+sy['mouse_vbl'], b'')
+            m.write(m.a4+mc['flags'], bytes(5)); m.write(m.a4+mc['view'], bytes(2))
+            m.call(mc['controller'], b'')
+        assert m.sprites == [(ANY, 7)] and m.changes == [] and m.moves == []
+        assert struct.unpack('>hh', m.read(m.a4+mc['ramp'], 4)) == (0, 4)   # the first call starts the flight
+        out['sprite_taken'] = 'pass'
         m.close()
         # The hook keeps every register but the ramps it stores, on the native
         # (first call of a flight) and the pointer paths. A fresh machine: the
@@ -484,7 +568,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         m = Machine(code, blob, cfg, {}, os=True)
         a4 = m.a4
         m.write(mc['steer']+8, struct.pack('>HI', 0x4ef9, STOP)); m.write(STOP, b'\x4e\x71')
-        m.write(a4+mc['sprite'], struct.pack('>Ih', room_image, 16))
+        m.write(a4+mc['aperture'], struct.pack('>6h', *APERTURE))
         m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
         for _ in range(100):
             m.call(SLAVE+sy['mouse_vbl'], b'')
@@ -504,7 +588,16 @@ def steer_cases(cfg, psy, fixed, blob, sy):
             assert all(m.reg(r) == v for r, v in vals.items() if case == 'native' or r not in (11, 12)), case
             ramps = struct.unpack('>hh', m.read(a4+mc['ramp'], 4))
             assert ramps == ((7, -3) if case == 'native' else (3, 3)), (case, ramps)
-        assert len(m.moves) == 1 and m.changes == [(a4+mc['sprite'], CHIP)]
+        assert len(m.moves) == 1 and m.changes == [(ANY, CHIP)]
+        # The scan hook keeps d2-d7/a2-a6 and the stack, and passes the scan its arguments.
+        m.write(SURFACE, struct.pack('>I', SURFACE+0x100)); m.write(SURFACE+24, struct.pack('>4h', 0, 0, 319, 199))
+        for y in range(200):
+            m.write(SURFACE+0x100+4*y, struct.pack('>I', SURFACE+0x1000))
+        vals = {r: 0x1110*r+0x20000 for r in list(range(3, 5))+list(range(6, 8))+list(range(11, 17))}
+        for r, v in vals.items():
+            m.reg(r, v)
+        m.call(SLAVE+sy['mouse_scan'], struct.pack('>IIBB', SURFACE, SURFACE+0x800, KEY, 0))
+        assert all(m.reg(r) == v for r, v in vals.items())
         out['registers'] = 'pass'
         m.close()
     return out
@@ -567,7 +660,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path)
     p.add_argument('--output', required=True, type=Path)
-    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored'),
+    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored'),
                    help='negative control: the check must fail')
     a = p.parse_args()
     out = a.output.resolve()
@@ -594,6 +687,9 @@ def main():
         elif a.sabotage == 'steer-ignored':  # the yaw ramp never takes the stick position
             at = blob.index(bytes.fromhex('3601'), sy['mouse_steer'])
             blob[at:at+2] = bytes.fromhex('4e71')
+        elif a.sabotage == 'mask-ignored':  # the pointer drawn over the cockpit too
+            at = blob.index(bytes.fromhex('c052'), sy['stick_show'])
+            blob[at:at+2] = bytes.fromhex('3012')
         elif a.sabotage == 'scores-ignored':  # restore never copies the table file
             at = blob.index(bytes.fromhex('32d8'), sy['scores_load'])
             blob[at:at+2] = bytes.fromhex('4e71')
@@ -618,7 +714,7 @@ def main():
         sc = cfg['scores']
         assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']),
                           (3, mc['room']), (3, mc['exit']), (3, mc['pad']), (3, mc['guard']), (3, mc['name']),
-                          (3, mc['steer']), (3, sc['site'])], fixlog
+                          (3, mc['steer']), (3, mc['scans'][0]), (3, mc['scans'][1]), (3, sc['site'])], fixlog
         assert original[sc['site']:sc['site']+6] == bytes.fromhex('397c00018034')
         assert original[sc['restore']:sc['restore']+4] == bytes.fromhex('48e70030')
         assert all(original[x:x+2] == b'\x4e\xb9' for x in (sc['site']-12, sc['site']-6))
@@ -626,6 +722,8 @@ def main():
         assert original[mc['reset']:mc['guard']+8] == bytes.fromhex('224870094259 51c8fffc 317cffff0012 4e75'.replace(' ', ''))
         assert original[mc['steer']:mc['steer']+8] == struct.pack('>HhHh', 0x3942, mc['ramp'], 0x3943, mc['ramp']+2)
         assert original[mc['controller']:mc['controller']+4] == bytes.fromhex('4e55fffa')
+        assert all(original[x:x+6] == struct.pack('>HI', 0x4eb9, mc['scan']) for x in mc['scans'])
+        assert original[mc['scan']:mc['scan']+8] == bytes.fromhex('48e73f369efc00cc')
         assert original[mc['room']:mc['room']+8] == struct.pack('>HhHh', 0x3942, mc['pos'], 0x3943, mc['pos']+2)
         assert original[mc['exit']:mc['exit']+2] == bytes.fromhex('4eb9')
         assert original[mc['leave']:mc['leave']+8] == bytes.fromhex('3f3c03e83f3c03e8')
@@ -636,7 +734,7 @@ def main():
         assert original[t:t+4] == bytes.fromhex('3f04486c') and original[t+6:t+8] == bytes.fromhex('4eba')
         assert fixed[t:t+2] == bytes.fromhex('3f12') and fixed[t+2:t+8] == original[t+2:t+8]
         changed = [i for i in range(len(psy)) if psy[i] != fixed[i]]
-        assert all(any(x <= i < x+6 for x in list(s.values())+[mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], sc['site']]) or t <= i < t+2
+        assert all(any(x <= i < x+6 for x in list(s.values())+[mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], sc['site']]+list(mc['scans'])) or t <= i < t+2
                    for i in changed)
         cases = {}
         # Negative control: Psygore's list writes the file but clears the name.

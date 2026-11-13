@@ -919,19 +919,23 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
 
   See [mouse](internals.md#mouse-in-rooms-and-menus-both-release-builds-every-mode).
 - **Mouse flight: done in both release builds, every mode (2026-11-13).** A
-  virtual stick: mouse motion sets the pitch and yaw ramps in proportion, and a
-  small cross around the gunsight shows the stick position in the front view.
-  The cross appears when the mouse moves and hides after 10 seconds without
-  motion (user request, 2026-11-13).
+  virtual stick: mouse motion sets the pitch and yaw ramps in proportion. The
+  PC version's pointer shows the stick position in the front view, behind the
+  cockpit, from the gunsight to the aperture's sides and 23 pixels up and
+  down; on CD32 it is in the PC colour 207 through the odd sprites' colour
+  bank, on OCS white (colour 31). It appears when the mouse moves and hides
+  after 10 seconds without motion (user requests, 2026-11-13).
   The stick or keys take over and re-centre it. Always on, with no option.
   Native checks pass on CD32 English and German and on OCS after both installs.
   For live results see
   [mouse flight](internals.md#mouse-flight-both-release-builds-every-mode).
   Left open:
-  - The PC reference draws its pointer behind the canopy and dashboard; this
-    one is a sprite over them.
-  - The pointer colour comes from the flight palette: blue in the simulator,
-    other palettes unchecked.
+  - The PC pointer's bottom limit is hidden under the dashboard; this one
+    mirrors the top.
+  - OCS mission palettes are not observed live (only the simulator's); the
+    game loads 16 colours there, leaving 16-31 to the sprites.
+  - Other ships' cockpits (Rapier, Scimitar, Raptor) are not checked live.
+  - The mask copy's cost at view changes is not measured.
   - Enhanced mode reads the live position, not the per-field input history.
   - The response curve has no measured PC reference.
   - The right button is unused.
