@@ -110,13 +110,16 @@
  - More responsive room controls with limited cursor speed.
  - CD32 edition: the enhancements work in German too.
  - CD32 edition: a saved pilot appears in the bunk at once, not only after the
-   next reload.
- - Choosing a Training Simulator opponent with keys 1-4 shows the right ship.
- - CD32 edition: Training Simulator high scores are kept with each saved pilot.
+   next reload (thanks hexaae!).
+ - Choosing a Training Simulator opponent with keys 1-4 shows the right ship
+   (thanks hexaae!).
+ - CD32 edition: Training Simulator high scores are kept with each saved pilot
+   (thanks hexaae!).
  - Mouse control of the room and menu pointer, and on CD32 of the name entry
    box; the left mouse button works as fire. The first click after entering a
-   screen is no longer ignored.
- - Mouse flight: the mouse steers in proportion, as a virtual stick.
+   screen is no longer ignored (thanks hexaae!).
+ - Mouse flight: the mouse steers in proportion, as a virtual stick (thanks
+   hexaae!).
  - Disk edition: faster arithmetic and collision checks in every mode, including
    the Amiga 500, without changing game behaviour.
  - Enhanced mode and caches enabled in newly installed icons; original modes
