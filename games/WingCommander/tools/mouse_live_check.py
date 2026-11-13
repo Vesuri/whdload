@@ -31,11 +31,13 @@ from variants import get
 # columns. German CD32 addresses map the English ones by matching code.
 GAMES = {
     'ocs': dict(pointer=(0x19c, -2150), field=-0x800, intro=((0x180c4, 0x1edde), (0x180c4, 0x1f396)),
-                menu=(0x1f43c, 0x1f44e)),
+                menu=(0x1f43c, 0x1f44e), flight=(0x1869e, 3720, -18318)),
     'cd32': dict(pointer=(0xa88, -1156), field=-252, intro=((0x1898a, 0x1fbba), (0x1898a, 0x20164)),
-                 menu=(0x20214, 0x20226), name=(0x16fc6, 0x16fd0, 17716, 17706)),
+                 menu=(0x20214, 0x20226), name=(0x16fc6, 0x16fd0, 17716, 17706),
+                 flight=(0x19064, 5882, -18280)),
     'cd32-de': dict(pointer=(2740, -1112), field=-208, intro=((0x18a44, 0x1fcbe), (0x18a44, 0x2026c)),
-                    menu=(0x2031c, 0x2032e), name=(0x17064, 0x1706e, 17766, 17756)),
+                    menu=(0x2031c, 0x2032e), name=(0x17064, 0x1706e, 17766, 17756),
+                    flight=(0x1911e, 5926, -18236)),
 }
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -45,6 +47,7 @@ def main():
     p.add_argument('--original-mode', action='store_true', help='CUSTOM5 original behaviour')
     p.add_argument('--setup', default='a1200-030', help='AMIGA_SETUP (OCS also a500: 68000, 4 MiB Fast)')
     p.add_argument('--name-entry', action='store_true', help='CD32: also the TrainSim name entry grid')
+    p.add_argument('--flight', action='store_true', help='mouse steering and the pointer in the simulator flight')
     p.add_argument('--german', action='store_true', help='CD32: the German executable (CUSTOM1=1)')
     a = p.parse_args()
     if a.name_entry and a.variant != 'cd32':
@@ -131,6 +134,37 @@ def main():
         cmd('monitor fields 4'); shot('name-picked')
         return dict(columns=width, start=start, moved=moved, picked=code)
 
+    def flight():
+        # The simulator flight: the controller's ramp stores (the slave's
+        # mouse_steer). Mouse right and down: yaw right, pitch up (stick back),
+        # in proportion, and the pointer sprite moves the same way.
+        site, ramp, view = game['flight']
+        until(h0+site, 600)
+        cmd('monitor fields 4'); until(h0+site)
+        def state():
+            until(h0+site); cmd('stepi')
+            until(h0+site); cmd('stepi')
+            return dict(pitch=number(f'*(short*){a4+ramp:#x}'), yaw=number(f'*(short*){a4+ramp+2:#x}'),
+                        view=number(f'*(short*){a4+view:#x}'), sprite=number(f'*(short*){a4+sprite+6:#x}'),
+                        sprite_y=number(f'*(short*){a4+sprite+8:#x}'))
+        rows = [dict(motion=(0, 0), **state())]
+        shot('flight-before')
+        for dx, dy, n in ((4, 0, 8), (0, 4, 4), (4, 4, 30), (-12, -12, 16)):
+            for _ in range(n):
+                cmd(f'monitor mouse {dx} {dy}'); cmd('monitor fields 1')
+            cmd('monitor fields 4')
+            rows.append(dict(motion=(dx*n, dy*n), **state()))
+            shot(f'flight-{len(rows)-1}')
+        # The world tick's ramps can lag the pointer by a call. Right: yaw +;
+        # down: pitch - (stick back); full deflection +-9; the pointer covers
+        # the clamped stick range (+-36 pixels) in screen directions.
+        r = rows
+        assert r[0]['view'] == 0 and r[1]['yaw'] > 0 and r[1]['pitch'] == 0 and r[2]['pitch'] < 0, r
+        assert (r[3]['pitch'], r[3]['yaw']) == (-9, 9) and (r[4]['pitch'], r[4]['yaw']) == (9, -9), r
+        assert r[3]['sprite']-r[4]['sprite'] == 72 and r[3]['sprite_y']-r[4]['sprite_y'] == 72, r
+        assert r[2]['sprite_y']-r[1]['sprite_y'] == 8 and r[1]['sprite'] == r[2]['sprite'], r
+        return rows
+
     rows = {}
     try:
         g = boot()
@@ -203,9 +237,20 @@ def main():
                 if number('(short)$d0') >= 0:
                     return 'selected'
             return 'ignored'
+        if a.flight and ocs:
+            # OCS starts over the absent Secret Missions option; Vega's
+            # rectangle ends at y 89.
+            for _ in range(10):
+                cmd('monitor mouse 0 -4'); cmd('monitor fields 1')
+            cmd('monitor fields 10')
+            until(h0+menu)
+            assert number(f'*(short*){a4+pos+2:#x}') <= 85, 'pointer not over Vega'
         rows['clicks'] = [click()]
         assert rows['clicks'] == ['selected'], rows['clicks']
         rows['menu_selected_by_click'] = True
+        if a.flight:
+            rows['flight'] = flight()
+            print(json.dumps(rows['flight']))
         if a.name_entry:
             rows['name_entry'] = name_entry()
             # The language's enhanced (or original) modes were selected, and

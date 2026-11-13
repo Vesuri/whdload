@@ -918,23 +918,24 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   - Unchanged: key-only waits such as the nav map, and the right button.
 
   See [mouse](internals.md#mouse-in-rooms-and-menus-both-release-builds-every-mode).
-- **Mouse flight (new control).** No proportional steering exists. A virtual
-  stick would turn mouse motion into an offset from screen centre that sets the
-  steering ramps or rates proportionally, shown by a crosshair sprite. It also
-  needs buttons, hiding and re-centring outside the forward flight view, a
-  WHDLoad option (CUSTOM1–5 are taken), and, in enhanced mode, samples entering
-  the existing per-field input history. The PC original (disk release, run in
-  DOSBox and observed by eye, not traced) sets the reference behaviour. It
-  supports the mouse in menus from the campaign start screen. In flight it shows
-  a small white pointer that moves in screen directions (mouse down moves it
-  down) while the mouse steers with stick sense (mouse down raises the nose). The
-  pointer is hidden by the canopy frame and dashboard, so it is drawn into the
-  space view before the cockpit art. It is a virtual stick: with the mouse held
-  still off centre the ship keeps turning, faster the further the pointer is from centre (the exact
-  curve and any dead zone are not measured). Candidate Amiga mechanisms for the layering are
-  sprite-behind-playfield priority (visible only over colour 0), masking the
-  sprite with the cockpit's opaque pixels each frame, or a copper priority split
-  at the dashboard.
+- **Mouse flight: done in both release builds, every mode (2026-11-13).** A
+  virtual stick: mouse motion sets the pitch and yaw ramps in proportion, and a
+  small cross around the gunsight shows the stick position in the front view.
+  The cross appears when the mouse moves and hides after 10 seconds without
+  motion (user request, 2026-11-13).
+  The stick or keys take over and re-centre it. Always on, with no option.
+  Native checks pass on CD32 English and German and on OCS after both installs.
+  For live results see
+  [mouse flight](internals.md#mouse-flight-both-release-builds-every-mode).
+  Left open:
+  - The PC reference draws its pointer behind the canopy and dashboard; this
+    one is a sprite over them.
+  - The pointer colour comes from the flight palette: blue in the simulator,
+    other palettes unchecked.
+  - Enhanced mode reads the live position, not the per-field input history.
+  - The response curve has no measured PC reference.
+  - The right button is unused.
+  - Not yet played by the user.
 
 Deferred local work: the pre-existing save/load length guard and native checks
 are preserved in stash `5237ca28782a8e1fd1f615c91232c80b2fd93391`

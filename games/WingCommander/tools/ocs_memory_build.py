@@ -29,9 +29,10 @@ NATIVE={'OCS_CHIP_ALLOC':0x33b60,'OCS_REGISTER':0x33c8e,
 EXACT=('ocs_multiply','ocs_distance_ratio','ocs_radius','ocs_collision_pair')
 # Mouse in rooms (src/mouse.s), public builds, every mode: the room routine's
 # position stores, the room exit's sprite move, the VBL port-1 fire sample and
-# the port-1 record reset's click release guard.
+# the port-1 record reset's click release guard; mouse flight: the flight
+# controller's pitch and yaw ramp stores.
 MOUSE=((0x2651a,'mouse_room',0x4eb9),(0x26480,'mouse_exit',0x4eb9),(0x33f88,'mouse_fire',0x4eb9),
-       (0x33f1c,'mouse_guard',0x4eb9))
+       (0x33f1c,'mouse_guard',0x4eb9),(0x1869e,'mouse_steer',0x4eb9))
 # Installed on every path: bit-exact E1 shortcuts, the waypoint marker order and the mouse.
 ALWAYS=EXACT+('waypoint_early','waypoint_scene')+tuple(label for _,label,_ in MOUSE)
 # Game-bug word fixes, public builds, every mode: (offset, guarded bytes, word).
@@ -422,6 +423,7 @@ exact_hooks_done:
         # Replaces btst #7,$bfe001 / seq d0 / neg.b d0 (12 bytes).
         words+='''
 mouse_fire:
+ bsr.w mouse_vbl
  move.b $bfe001,d0
  not.b d0
  andi.b #$c0,d0
@@ -442,10 +444,12 @@ mouse_guard:
 .held:
  rts
 ; mouse.s parameters: position, rectangle, RAWMOUSE slot, hide counter (A4),
-; native sprite move (H0).
+; native sprite move (H0); flight: pitch ramp, view, direction flags, pointer
+; sprite (A4), pointer centre.
 ocs_mouse_params:
  dc.w 412,444,-2028,-2154
  dc.l $31d22
+ dc.w 3720,-18318,16084,-2150,155,64
 '''+(ROOT/'src/mouse.s').read_text()
         require('exact_hooks_done:\n bsr.w slave+$ee8' in exact,'original install end missing')
         exact=exact.replace('exact_hooks_done:\n bsr.w slave+$ee8','exact_hooks_done:\n bsr.w word_fixes\n bsr.w slave+$ee8',1)

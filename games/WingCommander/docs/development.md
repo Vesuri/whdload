@@ -46,17 +46,22 @@ audit, frame statistics, OCS candidates) call the generators directly with a new
 `--output` below `tmp/`, as the sections below show. `make check` checks the release
 build against `release/slaves.sha256`, rebuilds both reconstructions (each asserts
 byte identity with the pinned original) and runs `release_check.py`,
-`cd32_fixes_check.py` (the CD32 bunk save, TrainSim key fix, high scores and mouse on both
-languages; `--sabotage store-failure|list-stub|mouse-ignored|name-ignored|scores-ignored` are its
-negative controls),
+`cd32_fixes_check.py` (the CD32 bunk save, TrainSim key fix, high scores, mouse and mouse
+flight on both languages; `--sabotage store-failure|list-stub|mouse-ignored|name-ignored|scores-ignored|steer-ignored`
+are its negative controls),
 `waypoint_check.py` on CD32 English and German,
-`ocs_options_check.py` (which also runs the OCS mouse scenario after both install
-paths) and the installer staging check. The live mouse check is separate and bounded:
+`ocs_options_check.py` (which also runs the OCS mouse and mouse flight scenarios after
+both install paths) and the installer staging check. The live mouse check is separate and bounded:
 
 ```
-python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode] [--name-entry] [--german]
-python3 tools/mouse_live_check.py ocs tmp/build/release/WingCommander --output tmp/mouse-live-ocs [--original-mode] [--setup a500]
+python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode] [--flight] [--name-entry] [--german]
+python3 tools/mouse_live_check.py ocs tmp/build/release/WingCommander --output tmp/mouse-live-ocs [--original-mode] [--flight] [--setup a500]
 ```
+
+`--flight` continues into the simulator flight that starts the Vega campaign
+(OCS moves the pointer onto Vega first), moves the mouse in four steps and reads
+the pitch and yaw ramps and the pointer sprite position at the controller's
+ramp store after each; screenshots `flight-*.png` show the pointer.
 
 The CD32 `--name-entry` run also asserts the slave state after the flight: the
 language's mode, and that the enhanced flight clock ran (none in

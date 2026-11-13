@@ -15,7 +15,7 @@ from ocs_reconstruct import ROOT, new_output, require
 from ocs_icon import enhanced_icon, tooltypes
 
 
-GFX,RECT,IMAGE,EVENT=0x1a0000,0x1a1000,0x1a1100,0x1a2000
+GFX,RECT,IMAGE,EVENT,CHIP,ROOM_IMAGE=0x1a0000,0x1a1000,0x1a1100,0x1a2000,0x1a3000,0x1a3100
 
 
 def mouse_scenario(c,slave,sy):
@@ -62,7 +62,53 @@ def mouse_scenario(c,slave,sy):
         c.run(0x33f02);guard[pra]=c.read(a4-2114,24)
     require(all(g[:10]==bytes(10) and g[10:12]==word(-1) and g[12:22]==bytes(10) for g in guard.values()),'record reset')
     require([g[22:] for g in guard.values()]==[word(0),word(-1),word(-1)],'click release guard')
+    steer_scenario(c,slave,sy,moves)
     for r,v in saved.items():c.reg(r,v)
+
+
+def steer_scenario(c,slave,sy,moves):
+    """Mouse flight: the native flight controller O:183e4 with the slave's ramp
+    store hook; mouse_init's pointer image; the VBL field count and hide."""
+    a4=DATA+0x7ffe;changes=[]
+    centre=struct.unpack('>hh',c.read(slave+sy['ocs_mouse_params']+20,4))
+    require(c.get(slave+sy['stick_image'],4)==CHIP and c.get(slave+sy['stick_gfx'],4)==GFX,'pointer image not allocated')
+    require(c.read(CHIP,36)==bytes(4)+bytes.fromhex('10001000'*2+'00000000c600c60000000000'+'10001000'*2+'00000000'),'pointer image')
+    c.write(GFX-420,word(0x4e75))
+    def change():changes.append((c.reg(2),c.reg(3)));c.write(c.reg(2),long(c.reg(3)))
+    c.intercept(GFX-420,change)
+    c.write(a4-2150,long(ROOM_IMAGE))
+    def tick(n=1):
+        for _ in range(n):c.run(slave-CODE+sy['mouse_vbl'])
+    def event(dx,dy):
+        c.write(EVENT,struct.pack('>IBBHHhh',0,2,0,0xff,0x8000,dx,dy))
+        c.run(slave-CODE+sy['mouse_event'],registers={4:EVENT})
+    def steer(ramps=None,flags=(0,0,0,0,0),view=0):
+        if ramps is not None:c.write(a4+3720,struct.pack('>hh',*ramps))
+        c.write(a4+16084,bytes(flags));c.write(a4-18318,word(view));n=len(moves)
+        c.run(0x183e4)
+        return struct.unpack('>hh',c.read(a4+3720,4)),moves[n:]
+    at=lambda dx,dy:[(centre[0]+dx,centre[1]+dy)]
+    shown=lambda:c.read(CHIP,4)!=bytes(4)
+    tick(100)
+    require(steer((5,-3))==((3,-1),[]),'native ramp decay')
+    event(32,0);tick();require(steer((0,0))==((0,4),at(16,0)),'mouse right: yaw right')
+    require(changes==[(a4-2150,CHIP)] and c.get(a4-2150+4,2)==7,'pointer not bound')
+    c.write(CHIP,long(0x6a7e7101))
+    event(0,16);tick();require(steer()==((-2,4),at(16,8)),'mouse down: pitch up')
+    tick();require(steer()==((-2,4),[]),'held stick position')
+    event(1000,1000);tick();require(steer()==((-9,9),at(36,36)),'full deflection')
+    tick();require(steer((0,-9),(0,1,0,0,0))==((0,1),[]) and not shown(),'stick steering re-centres')
+    tick();require(steer((0,0))==((0,0),[]),'not re-centred')
+    event(8,8);tick();require(steer(flags=(1,0,0,0,1))==((-1,1),at(4,4)),'modifier: the mouse steers')
+    tick();require(steer((3,3),view=8)==((1,1),[]),'external view')
+    event(24,0);tick();steer();c.write(CHIP,long(0x6a7e7101))
+    for _ in range(500):tick();require(steer()==((0,3),[]),'idle steering')
+    require(shown(),'idle pointer hidden early');tick();require(not shown(),'idle pointer not hidden')
+    tick();require(steer()==((0,3),[]) and not shown(),'idle pointer shown again')
+    event(1,0);tick();require(steer()==((0,3),at(12,0)),'pointer not shown on motion')
+    event(16,0);tick();steer();c.write(CHIP,long(0x6a7e7101))
+    tick(25);require(shown(),'hidden early');tick();require(not shown(),'pointer not hidden')
+    tick(30);event(16,0);tick();require(steer((0,0))[0]==(0,0),'new flight not re-centred')
 
 
 def check(build, mutation=None):
@@ -135,6 +181,8 @@ def check(build, mutation=None):
                             def flush():events.append('flush');c.return_call()
                             def abort():
                                 events.append('abort');c.reg(18,STOP);ck(u.uc_emu_stop(c.h))
+                            c.intercept(0x8000-552,lambda:c.return_call(GFX))      # OpenLibrary
+                            c.intercept(0x8000-198,lambda:c.return_call(CHIP))     # AllocMem
                             c.intercept(0x190034,control)
                             c.intercept(0x190074,patch);c.intercept(0x190020,flush);c.intercept(0x190000,abort)
                             off={'exact':exact[0][0],'word':words[0][0]+2}.get(corrupt,meta['hooks'][0][0])

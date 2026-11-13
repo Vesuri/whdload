@@ -8592,8 +8592,97 @@ OCS `O:183e4` (CD32 counterpart `E:18daa`) keeps three signed ramps at
 left/right step `OD:8e88` by one per call, limited to ±9; an opposite direction
 first resets the ramp to zero. While `OD:bed6` is set the stick directions are routed to other controls
 instead, consistent with the manual's fire-plus-direction throttle. CD32 maps
-the ramps to angular rates at `E:0742`. How keyboard steering keys reach the
-flags is not traced. There is no proportional (analogue) steering path.
+the ramps to angular rates at `E:0742`: rate = ship rate × ramp / 8, so a ramp
+is a linear 19-level stick deflection. The keyboard steering keys are ORed into
+the same flags by the decoder (`E:18c5e`). The original has no proportional
+(analogue) steering path; the release slaves add
+[mouse flight](#mouse-flight-both-release-builds-every-mode).
+
+### Mouse flight (both release builds, every mode)
+
+The mouse is a virtual stick. `mouse_steer` (`src/mouse.s`) replaces the
+controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
+6-byte call that returns past the second store's last word):
+
+| Item | OCS | CD32 English | CD32 German |
+|---|---|---|---|
+| Flight controller | `O:183e4` | `E:18daa` | `G:18e64` |
+| Ramp stores (hooked) | `O:1869e` | `E:19064` | `G:1911e` |
+| Pitch, yaw ramps (A4) | `3720`, `3722` | `5882`, `5884` | `5926`, `5928` |
+| View (A4; 0 front, 1–3 other cockpit views, 8 external) | `-18318` | `-18280` | `-18236` |
+| Left, right, up, down, modifier flags (A4 bytes) | `16084` | `18116` | `18166` |
+| Pointer SimpleSprite (A4) | `-2150` | `-1156` | `-1112` |
+
+- **Stick position.** Every relative mouse event already adds to
+  `mouse_sum_x/y`. Each controller call adds the motion since its last call to
+  a stick position clamped to ±72 counts. The ramps become position / 8, toward
+  zero: yaw = x / 8, pitch = −y / 8 (mouse right is stick right; mouse towards
+  you is stick back, nose up). That is ±9 at 72 counts and 0 within ±7 counts.
+  Held still off centre, the ramps hold and the ship keeps turning. The native
+  ramps step by one per call and decay by two; the mouse sets them at once.
+- **Hand-over.** Until the mouse moves in a flight the native ramps stand, so
+  the stick and keys behave exactly as before. A direction flag without the
+  modifier (the stick or keys steering) re-centres the virtual stick, and the
+  native ramps take over again. With the modifier the directions throttle and
+  roll natively and the mouse keeps steering. The external view (8), where the
+  stick turns the camera, re-centres it. A call more than 50 fields after the
+  last one starts a new flight: re-centred, earlier motion dropped.
+- **Pointer.** In the front view a 7×7 cross shows the stick position. It
+  appears only once the mouse moves in a flight, hides after 500 fields
+  (10 seconds PAL) without motion while the ship keeps turning, and shows
+  again at the next motion. Its
+  centre is at (155+x/2, 64+y/2) in MoveSprite coordinates, which puts it on
+  the gunsight at centre and ±36 pixels from it at full deflection, on both
+  releases. It uses the room pointer's SimpleSprite with its own 36-byte Chip
+  image: `mouse_init` opens graphics.library and allocates it once, cleared;
+  without it the mouse still steers. The room images are allocations of their
+  rooms, and in flight the sprite still points at the last room's. So the
+  slave binds its own image with ChangeSprite before its first MoveSprite, and
+  each room rebinds its own image on entry (`E:27328` selects image 0). Other
+  cockpit views hide it. The pointer is a hardware sprite over the cockpit art,
+  unlike the PC pointer, which the canopy and dashboard cover. Sprite 0's
+  colour 3 is blue in the simulator flight palette on both releases (colour 1
+  is black, colour 2 green); other flight palettes are not checked.
+- **Hiding.** `mouse_vbl`, called from each variant's VBL hook (CD32 the port-1
+  pad read, OCS the port-1 fire sample), counts fields. Once the controller has
+  not run for 25 fields (a pause, the map, the end of the flight), or the mouse
+  has not moved for 500, it clears the image's control words, without a library
+  call and only while the sprite is still bound to that image. After a pause
+  the next controller call shows it again unless the mouse is idle.
+- **Timing.** In enhanced mode the controller runs on the world tick and as the
+  per-field preview, and the hook acts in both. The position comes from the
+  live sums, not from the per-field input history, so catch-up ticks in one
+  frame share the latest position. In original modes it runs at the game's
+  frame rate. The left button is still port-1 fire (the guns); the right button
+  is unused.
+
+How it is checked:
+- **CD32, native.** `tools/cd32_fixes_check.py` runs the whole controller with
+  the hook in both languages. It covers native decay and steps without motion,
+  right and down, the held position, the dead zone, full deflection, stick and
+  key hand-over, the modifier, the other and external views, the idle hide
+  and re-show, the new-flight gap, the VBL hide, a room's rebound image and register preservation.
+  Psygore's list alone is the control (the mouse does not steer);
+  `--sabotage steer-ignored` must fail.
+- **OCS, native.** `tools/ocs_options_check.py` runs the same controller
+  scenario on the 68000 model after both installs.
+- **Live.** `tools/mouse_live_check.py --flight` enters the simulator flight
+  that opens the Vega campaign and moves the mouse in four steps. The ramps it
+  reads at the store can lag the pointer by one call in enhanced mode, because
+  the preview restores the world tick's ramps.
+
+Live results (deterministic warp, PAL, `a1200-030`, 2026-11-13), in five
+configurations: CD32 English enhanced and Psygore normal, CD32 German enhanced,
+OCS enhanced and OCS original. Each one:
+- before any motion, the pointer stays off screen (995, 995);
+- 32 counts right give yaw 3–4 with the pointer 16 pixels right of the gunsight;
+- 16 counts down give pitch −1 or −2 with the pointer 8 pixels lower;
+- full deflection gives (−9, 9) and then (9, −9), with the pointer moving 72
+  pixels in each axis between the two.
+
+The screenshots show the blue cross on the gunsight's centre line at the
+expected offset. The idle hide is checked natively only. Not yet played by the
+user, and not tried on real hardware.
 
 ### CD32 bunk save: Psygore's StoreNV return value
 

@@ -95,6 +95,8 @@ release_limit:
 ; - Mouse in name entry. The TrainSim top-score name entry moves a selection
 ;   box over a character grid by stick edges; whole cells of mouse motion now
 ;   move it too.
+; - Mouse flight (mouse.s). A virtual stick: mouse motion moves a stick position
+;   that sets the pitch and yaw ramps in proportion, shown by the pointer.
 ; - TrainSim high scores. The game keeps its six-entry table only in memory,
 ;   seeded at boot and for a new game; its player entry (id 8) names the
 ;   current pilot. Saving a pilot also writes the table to Bed_N.hi beside
@@ -143,8 +145,7 @@ release_patchseg:
 ; (CIA-A PRA bit 6) adds the red button, which the game decodes as fire.
 mouse_pad:
         bsr.w   slave+$1c2e
-        lea     mouse_fields(pc),a0     ; a0 is reloaded after this call
-        addq.w  #1,(a0)
+        bsr.w   mouse_vbl               ; a0 is reloaded after this call
         btst    #6,$bfe001
         bne.s   .up
         bset    #22,d0
@@ -168,9 +169,9 @@ mouse_guard:
 ; pushed. Adds whole cells of mouse motion since the last poll. Columns stop
 ; at the grid edge (the stick wraps) and motion from other screens is dropped.
 ; Enters the native step with both arguments pushed, as the native call does.
-NAME_SEL = 12                   ; parameter table: A4 offset, selected cell code
-NAME_COLS = 14                  ; A4 offset, grid columns
-NAME_STEP = 16                  ; H0 offset, native step (column, row)
+NAME_SEL = 24                   ; parameter table: A4 offset, selected cell code
+NAME_COLS = 26                  ; A4 offset, grid columns
+NAME_STEP = 28                  ; H0 offset, native step (column, row)
 NAME_CELL = 18                  ; mouse counts per cell (cells are 9 pixels)
 mouse_name:
         subq.l  #2,sp
@@ -237,21 +238,25 @@ mouse_name:
         rts
 
 ; mouse.s parameters: position, rectangle, RAWMOUSE slot, hide counter (A4),
-; native sprite move (H0); then name entry: selected cell, columns (A4),
+; native sprite move (H0); flight: pitch ramp, view, direction flags, pointer
+; sprite (A4), pointer centre; then name entry: selected cell, columns (A4),
 ; native grid step (H0).
 mouse_params_en:
         dc.w    2696,2728,162,-1160
         dc.l    $3171e
+        dc.w    5882,-18280,18116,-1156,FLIGHT_X,FLIGHT_Y
         dc.w    17716,17706
         dc.l    $16c66
 mouse_params_de:
         dc.w    2740,2772,206,-1116
         dc.l    $318e0
+        dc.w    5926,-18236,18166,-1112,FLIGHT_X,FLIGHT_Y
         dc.w    17766,17756
         dc.l    $16d04
+FLIGHT_X = 155                  ; pointer image origin with its centre on
+FLIGHT_Y = 64                   ; the gunsight (MoveSprite coordinates)
 name_step:      dc.l 0
 name_used:      dc.w 0,0,0
-mouse_fields:   dc.w 0                  ; VBL pad reads
 
 ; Raw patch lists (no includes in this build): command, long offset, argument.
 fix_patch_en:
@@ -282,6 +287,9 @@ fix_patch_en:
         dc.w    3                ; PL_PS name entry grid poll
         dc.l    $16ed0
         dc.w    mouse_name-fix_patch_en
+        dc.w    3                ; PL_PS flight controller pitch/yaw ramp stores
+        dc.l    $19064
+        dc.w    mouse_steer-fix_patch_en
         dc.w    3                ; PL_PS pilot restore: its last store
         dc.l    $268be
         dc.w    scores_load_en-fix_patch_en
@@ -314,6 +322,9 @@ fix_patch_de:
         dc.w    3
         dc.l    $16f6e
         dc.w    mouse_name-fix_patch_de
+        dc.w    3
+        dc.l    $1911e
+        dc.w    mouse_steer-fix_patch_de
         dc.w    3
         dc.l    $26a6a
         dc.w    scores_load_de-fix_patch_de
