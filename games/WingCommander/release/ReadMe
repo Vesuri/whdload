@@ -11,7 +11,7 @@
  This install applies to "Wing Commander" (c) 1994 Origin.
  Disk versions (SPS #824 and #1657) and the CD32 Dangerous Streets /
  Wing Commander compilation are supported in English and German.
- Wing Commander Enhanced 2.0b (13.11.2026)
+ Wing Commander Enhanced 2.0b (14.11.2026)
  Original install: Psygore. Version 2.0b improvements: Vesuri.
 
  Requirements:
@@ -98,7 +98,7 @@
 
  History:
  --------
- Version 2.0b (13.11.2026) by Vesuri:
+ Version 2.0b (14.11.2026) by Vesuri:
  - CD32 edition: every change works in English and German. Disk edition: the
    changes apply to the English SPS #1657 version; other disk versions keep
    the 1.0 behaviour.

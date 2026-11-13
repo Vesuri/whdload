@@ -21,7 +21,7 @@ def main():
     sy={n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(a.build/'slave.lst').read_text(),re.M)}
     assert not any(n in sy for n in ('flight_verified','render_verified','timing_verify_schedule','frame_stat'))
     for off,key in ((0x24,'release_name'),(0x28,'release_info'),(0x32,'release_config')):assert struct.unpack_from('>H',blob,off)[0]==sy[key]
-    assert b'$VER: WingCommanderCD32 2.0b (13.11.2026)\0' in blob
+    assert b'$VER: WingCommanderCD32 2.0b (14.11.2026)\0' in blob
     # The German table lists exactly the enhanced code's differing words.
     at=sy['german_fixups'];table=[]
     while struct.unpack_from('>H',blob,at)[0]:

@@ -535,11 +535,11 @@ bunk_list:
 release_name:
         dc.b 'Wing Commander CD32',0
 release_info:
-        dc.b '2.0b (13.11.2026)',10
+        dc.b '2.0b (14.11.2026)',10
         dc.b 'Original slave: Psygore',10
         dc.b 'Enhancements: Vesuri',0
 release_version:
-        dc.b '$VER: WingCommanderCD32 2.0b (13.11.2026)',0
+        dc.b '$VER: WingCommanderCD32 2.0b (14.11.2026)',0
 release_config:
         dc.b 'C1:L:Language:English,German;'
         dc.b 'C2:L:Cheats:Off,Enabled,Invincible;'

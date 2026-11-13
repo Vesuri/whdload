@@ -36,15 +36,15 @@ def main():
     script=(ROOT/'release/Install').read_text(encoding='latin1');validate_script(script)
     readme=(ROOT/'release/ReadMe').read_bytes()
     assert readme==(ROOT/'release/ReadMe.OCS').read_bytes()
-    assert b'Version 2.0b (13.11.2026)' in readme and b'Version 1.0 (11.01.2014)' in readme
-    assert b'\n Wing Commander Enhanced 2.0b (13.11.2026)\n' in readme
+    assert b'Version 2.0b (14.11.2026)' in readme and b'Version 1.0 (11.01.2014)' in readme
+    assert b'\n Wing Commander Enhanced 2.0b (14.11.2026)\n' in readme
     assert 'QuickDocED' not in script
     for variant,build,name in [('cd32',a.cd32,'WingCommanderCD32'),('ocs',a.ocs,'WingCommander')]:
         meta=json.loads((build/'build.json').read_text());slave=(build/(name+'.Slave')).read_bytes()
-        assert meta['version']=='2.0b' and meta['release_date']=='13.11.2026'
+        assert meta['version']=='2.0b' and meta['release_date']=='14.11.2026'
         assert meta.get('release') if variant=='cd32' else meta.get('public_option')
         assert hashlib.sha256(slave).hexdigest()==meta['sha256']
-        assert ('$VER: '+name+' 2.0b (13.11.2026)\0').encode() in slave
+        assert ('$VER: '+name+' 2.0b (14.11.2026)\0').encode() in slave
     out.mkdir(parents=True)
     # Extract the verified original afresh, retaining its exact member names.
     subprocess.run(['lha','xq',str(installer)],cwd=out,check=True)
@@ -67,7 +67,7 @@ def main():
     assert '(source ("%s.slave" #icon_slave))' in script
     # Keep validation metadata outside the installer's original member list.
     out.with_name(out.name+'-package-check.json').write_text(json.dumps(dict(
-        version='2.0b',date='13.11.2026',files=report,replacements=sorted(replacements),
+        version='2.0b',date='14.11.2026',files=report,replacements=sorted(replacements),
         validation='exact original member list; four replacements; Amiga Installer not executed'),indent=2)+'\n')
     print('PASS: installer structure, version metadata, original assets and game-free staging')
 
