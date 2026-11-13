@@ -853,6 +853,59 @@ behaviour, save/load and nonvolatile storage, options in the slave, the ReadMe, 
 release archive per AmigaXDev's playbook. Final play-test by the user on real hardware
 if available.
 
+#### Reported defects and mouse control (static findings; not implemented)
+
+A user who developed a separate slave reported a delayed bunk save, a TrainSim
+selection fault with number keys, non-persistent TrainSim high scores and missing
+mouse control. His base, "Psygore 1.1", is not listed on whdload.de (only 1.0);
+his remaining fixes are not yet known. Static evidence for everything below is
+in [input, saves and TrainSim](internals.md#input-devices-bunk-saves-and-trainsim-selection);
+none of it has been run live. It covers the three pinned executables only; the
+two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files.
+
+- **CD32 bunk save (slave bug; English and German).** Psygore's StoreNV
+  replacement returns 1, so the game clears the new save's bunk until the slots
+  are reloaded. Fix: return 0; replace the stubbed GetNVList with one that clears
+  the presence array and marks each existing `Bed_N` file; restore the NOPed
+  failure branch. Check new, overwritten and deleted saves natively, then live:
+  the pilot must appear at once and survive a restart. Review it together with
+  the stashed save/load length guard above. OCS is unaffected.
+- **TrainSim keyboard selection (game bug; all three).** Keys `1`–`4` pass -1 to
+  the fly-off animation, which then reads and writes outside its tables. Fix: one
+  word per executable, `move.w d4,-(sp)` → `move.w (a2),-(sp)` (`3f04` → `3f12`)
+  at `O:179e2`, `E:1827e`, `G:18338`. Check that keys and clicks give the same
+  animation and that Escape is unchanged. Pending decision: apply it in original
+  modes too.
+- **Persistent TrainSim high scores (feature).** Neither save record holds the
+  table (OCS `OD:bbcc`, six 6-byte entries). Save it per slot beside the save and
+  restore it on load. First locate the CD32 table, find when the game resets it,
+  and confirm that its pilot indices refer to the loaded campaign.
+- **Smooth mouse pointer (rooms).** The pointer is already a hardware sprite, but
+  the game moves it in 5/3-pixel steps from digital input. Install a callback in
+  the input handler's unused RAWMOUSE slot that accumulates mouse motion within
+  the room rectangle and moves the sprite on every event. The native room routine
+  takes that position when the mouse has moved, keeping stick and keys, and the
+  left button enters through the sampled port-0 fire state (menus need its
+  double-tap). It must fit the enhanced 25 Hz room input clock. First identify the
+  fourth room-routine caller and any other pointer screens, such as the nav map.
+- **Mouse flight (new control).** No proportional steering exists. A virtual
+  stick would turn mouse motion into an offset from screen centre that sets the
+  steering ramps or rates proportionally, shown by a crosshair sprite. It also
+  needs buttons, hiding and re-centring outside the forward flight view, a
+  WHDLoad option (CUSTOM1–5 are taken), and, in enhanced mode, samples entering
+  the existing per-field input history. The PC original (disk release, run in
+  DOSBox and observed by eye, not traced) sets the reference behaviour. It
+  supports the mouse in menus from the campaign start screen. In flight it shows
+  a small white pointer that moves in screen directions (mouse down moves it
+  down) while the mouse steers with stick sense (mouse down raises the nose). The
+  pointer is hidden by the canopy frame and dashboard, so it is drawn into the
+  space view before the cockpit art. It is a virtual stick: with the mouse held
+  still off centre the ship keeps turning, faster the further the pointer is from centre (the exact
+  curve and any dead zone are not measured). Candidate Amiga mechanisms for the layering are
+  sprite-behind-playfield priority (visible only over colour 0), masking the
+  sprite with the cockpit's opaque pixels each frame, or a copper priority split
+  at the dashboard.
+
 Deferred local work: the pre-existing save/load length guard and native checks
 are preserved in stash `5237ca28782a8e1fd1f615c91232c80b2fd93391`
 (`Phase 12: deferred save-load length guard and native checks`). It contains only

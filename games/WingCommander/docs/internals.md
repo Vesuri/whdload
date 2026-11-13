@@ -8427,3 +8427,110 @@ as a negative control, neutral entry, fresh right input, retained mission
 velocity and the assembled entry/exit calls on CD32 020/040 and OCS 000/020.
 The user confirmed simulator-to-mission behaviour live in the CD32 version on
 the A1200/030 model.
+
+## Input devices, bunk saves and TrainSim selection
+
+Static evidence from the pinned CD32 English/German and OCS SPS 1657 English
+executables and Psygore's v1.0 slaves, gathered after a user report of a
+separately developed slave. Nothing here has been run live. `O:` is OCS H0,
+`OD:` its data hunk (A4 = `OD:7ffe`); `E:`/`G:` are CD32 English/German H0 and
+`D:` the CD32 English data hunk (A4 = `D:7ffe`). H0 file offsets are hunk
+offset +`2c` in all three executables; slave file offsets are +`20`.
+
+### No mouse input in any version
+
+Neither game reads mouse counters or uses a mouse event:
+
+- **Joystick polling is port 1 only.** OCS `O:33f24(port)` decodes JOY0DAT or
+  JOY1DAT as a digital stick into `OD:77bc`/`OD:77c8`; all seven callers pass 1.
+  The CD32 VBL server `E:33e62` decodes `ReadJoyPort` results as pad bits only
+  (directions bits 0–3, buttons 17–23), so a mouse result's counters are ignored;
+  Psygore's slave skips the port-0 read and replaces port 1 with direct pad
+  sampling (`S:1c2e`). All fourteen callers of `E:33dfc(port)` pass 1.
+- **Port-0 fire (the left mouse button) is sampled but unused.** The OCS VBL
+  server `O:33f6a` keeps press/double-tap state for CIA-A PRA bit 6 in `OD:77bc`;
+  nothing requests port 0.
+- **The input handler has unused mouse slots.** It dispatches by `ie_Class`
+  (OCS `O:3481a`, CD32 `E:34532`): RAWKEY → `OD:780e`/`D:809c`, RAWMOUSE →
+  `OD:7812`/`D:80a0`, POINTERPOS → `OD:7816`/`D:80a4`, disk removed/inserted →
+  `OD:781a`/`D:80a8`. Only the RAWKEY slot is ever written (`O:3434a`,
+  `E:341da`); the others stay null, so mouse events pass through untouched.
+- **The Intuition pointer is blanked.** OCS `O:34662` calls SetPointer on
+  IntuitionBase's active window with a zeroed 1×1 image; `O:346ce` restores it
+  with ClearPointer. CD32 makes the equivalent SetPointer call at `E:343fa`.
+
+### Room pointer: a hardware sprite moved in steps
+
+The bar, barracks and TrainSim selection pointer is an OS SimpleSprite, not a
+software-drawn image. `O:31cea`/`E:316e6` select the image with ChangeSprite and
+`O:31d22`/`E:3171e` position it with MoveSprite, adding the image hotspot. The
+shared room routine `O:26490`/`E:27372` (file `264bc`/`2739e`) calls them.
+
+In OCS it steps X by 5 and Y by 3 pixels per call from the left/right/up/down
+flags at `OD:bed2`–`bed5`, clamped to the room rectangle pointed to by
+`OD:81ba` (+24/+26/+28/+30), and stores the position at `OD:819a/819c`. Motion
+is therefore digital and paced by the room loop (25 Hz in the enhanced room
+input clock). Callers: TrainSim selection `O:17952`/`E:181c0`, bar
+`O:24f2c`/`E:25d5a`, barracks `O:26138`/`E:2702e`, and one unidentified caller
+at `O:1f440`/`E:20218`.
+
+### Flight steering input
+
+OCS `O:183e4` (CD32 counterpart `E:18daa`) keeps three signed ramps at
+`OD:8e86`, `8e88` and `8e8a`. The stick's up/down flags step `OD:8e86` and
+left/right step `OD:8e88` by one per call, limited to ±9; an opposite direction
+first resets the ramp to zero. While `OD:bed6` is set the stick directions are routed to other controls
+instead, consistent with the manual's fire-plus-direction throttle. CD32 maps
+the ramps to angular rates at `E:0742`. How keyboard steering keys reach the
+flags is not traced. There is no proportional (analogue) steering path.
+
+### CD32 bunk save: Psygore's StoreNV return value
+
+Barracks saving (`E:26c60` actions, common tail `E:26dc0` rebuilding the bunks
+through `E:26c32`) calls the slot save `E:275de` (file `2760a`). Saves are
+nonvolatile items `WC1`/`Bed_N` (H3 `0216`/`021a`, slot digits appended by
+`E:313e0`) of 116 bytes. Psygore's patches change its behaviour:
+
+| Site | Patch | Effect |
+|---|---|---|
+| `E:31498` (G `3165a`) | PS `S:16b6` | `resload_SaveFile`, then **returns 1**; StoreNV returns 0 on success |
+| `E:314b0` (G `31672`) | R | GetNVList enumeration returns at once, leaving its caller's two 8-byte presence arrays uninitialised |
+| `E:276b0` (G `27872`) | NOP 2 | Save failure branch falls through to success |
+
+`E:27640` stores the 1 as failure, so `E:276a0`–`276aa` (G `27862`) clears the
+slot's in-memory name byte. The bunk rebuild then shows an empty bunk although
+the file was written; the pilot appears only when all slots are next reloaded
+from file (`E:275ac`, called at `E:26f6e`). The NOP hides the failure message.
+If the return value is corrected alone, the post-save check at `E:2764a`–`2769e`
+compares the uninitialised arrays and can delete the new save and re-store
+another slot, so the enumeration needs a real replacement as well. OCS is not
+affected: `O:266fe` writes all eight slots to `SAVEGAME.WLD` through the game's
+own file code (`O:31a60`, 7,152 bytes), and every bunk action ends with the
+rebuild `O:25e14`/`252ba`.
+
+### TrainSim enemy selection by keyboard
+
+The selection loop (OCS function `O:1782a`, loop `O:17938`; CD32 `E:181a6`)
+accepts a pointer click on one of four hotspots, Escape, or the keys `1`–`4`.
+A click stores the hotspot index in both `d4` and the caller's selection word
+`(a2)`. A key stores `key - '1'` in `(a2)` only (`O:179a8`, `E:18244`), leaving
+`d4` as that pass's pointer result, -1. The fly-off animation is then called
+with `d4` (`O:179e2`/`E:1827e`/`G:18338`, file `17a0e`/`182aa`/`18364`;
+callee `O:17498`/`E:17d06`). With -1 it reads the ship-position table at index
+-1 (`-30042(a4)` - 4), decrements a stack word below its four-entry array and
+draws ship image -1. Other digits are ignored by the key switch
+(`O:179b4`/`E:18250`/`G:1830a`).
+
+### TrainSim high scores and save records
+
+The OCS high-score table at `OD:bbcc` holds six 6-byte entries: a pilot-index
+word and a score longword (display loop `O:16dfe`; lowest score read from
+`OD:bbec`). It ends at `OD:bbf0`, where the saved campaign block begins, and
+neither version saves it. The CD32 table has not been located.
+
+| Record | Contents |
+|---|---|
+| OCS, 894 bytes (`O:25a92`) | flag; +2: 342 bytes from `OD:bbf0`; +344: 70 bytes from `OD:8874`; +414: 480 bytes from `OD:931a` |
+| CD32, 116 bytes (`E:268cc`) | flag; +2: 64 bytes from `D:b374`; +66: 50 bytes from `D:90fa`; the caller also passes `D:9b8c`, which is not read |
+
+Whether the shorter CD32 record loses campaign state that OCS keeps is unknown.
