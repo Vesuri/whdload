@@ -82,7 +82,7 @@ slv_name		dc.b	"Test Drive"
 	ENDC
 			dc.b	0
 slv_copy		dc.b	"1987 Accolade",0
-slv_info		dc.b	"adapted by JOTD",10,10
+slv_info		dc.b	"adapted by JOTD, enhanced by Vesuri",10,10
 		dc.b	"Version "
 		DECL_VERSION
 		dc.b	0
