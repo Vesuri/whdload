@@ -54,6 +54,11 @@ def mouse_scenario(c,slave,sy):
     require(last==[(277,178)] and room()==(280,180),'mouse rectangle clamp')
     require(event(5,5,0)==[] and event(0,0)==[],'mouse non-relative event accepted')
     c.write(a4-2154,word(0x4000));require(event(-9,-9)==[],'hidden pointer moved');c.write(a4-2154,word(0))
+    # A new screen places the pointer without a room exit: the mouse continues from there.
+    c.write(a4+412,struct.pack('>hh',120,70))
+    require(event(4,0)==[(119,68)] and room()==(122,70),'mouse kept its old position')
+    c.write(a4+412,struct.pack('>hh',150,90))
+    require(room()==(150,90) and event(2,2)==[(148,89)] and room()==(151,91),'room routine kept the old mouse position')
     c.write(STACK-8,long(STOP));segment(0x26478,0x26486,STACK-8)
     require(moves[-1]==(997,998) and var('mouse_active')==0 and event(-9,-9)==[],'mouse room exit')
     fire={}

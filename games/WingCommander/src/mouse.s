@@ -4,7 +4,9 @@
 ; game input handler's unused RAWMOUSE slot: each relative event moves a
 ; half-pixel position clamped to the room rectangle and moves the sprite at
 ; once. The room routine takes that position when the mouse has moved since its
-; last call, and the stick or keys still step it otherwise. The callback acts
+; last call, and the stick or keys still step it otherwise. When the game
+; places the pointer itself (a new screen centres it without a room exit), the
+; mouse continues from there. The callback acts
 ; only between the room routine's first call and the room exit, and only while
 ; the pointer is not hidden. The variant supplies the left button as port-1
 ; fire and calls mouse_init with its parameter table and game H0 base.
@@ -119,6 +121,9 @@ mouse_room:
         beq.s   .native                 ; first call in this room
         cmp.w   mouse_seen(pc),d1
         bne.s   .mouse
+        movea.l (a4,d0.w),a1
+        cmpa.l  mouse_last(pc),a1
+        bne.s   .native                 ; the game placed it (a new screen)
         cmp.w   (a4,d0.w),d2
         bne.s   .native                 ; stick or keys moved it
         cmp.w   2(a4,d0.w),d3
@@ -146,6 +151,9 @@ mouse_room:
 .store:
         move.w  d2,(a4,d0.w)
         move.w  d3,2(a4,d0.w)
+        lea     mouse_last(pc),a0
+        move.w  d2,(a0)+
+        move.w  d3,(a0)
         movem.l (sp)+,d0-d1/a0-a1
         addq.l  #2,(sp)                 ; past the displaced store's last word
         rts
@@ -164,10 +172,10 @@ mouse_exit:
 ; The handler keeps d2/a2/a3 only: preserve everything except d0-d1/a0-a1.
 mouse_event:
         tst.b   8(a3)                   ; IEQUALIFIER_RELATIVEMOUSE
-        bpl.s   .out
+        bpl.w   .out
         move.w  10(a3),d0
         or.w    12(a3),d0
-        beq.s   .out
+        beq.w   .out
         lea     mouse_sum_x(pc),a0      ; running counts for a variant's grid screens
         move.w  10(a3),d0
         add.w   d0,(a0)+
@@ -186,6 +194,19 @@ mouse_event:
         move.l  (a4,d0.w),d0
         beq.s   .done
         movea.l d0,a0
+        move.w  MP_POS(a2),d0
+        move.l  (a4,d0.w),d1
+        lea     mouse_last(pc),a1
+        cmp.l   (a1),d1
+        beq.s   .synced
+        move.l  d1,(a1)                 ; the game placed the pointer: start there
+        lea     mouse_y(pc),a1
+        add.w   d1,d1
+        move.w  d1,(a1)
+        swap    d1
+        add.w   d1,d1
+        move.w  d1,-(a1)
+.synced:
         lea     mouse_x(pc),a1
         move.w  10(a3),d0
         moveq   #24,d1
@@ -716,6 +737,7 @@ mouse_x:        dc.w 0                  ; half pixels; mouse_y and mouse_seq fol
 mouse_y:        dc.w 0
 mouse_seq:      dc.w 0
 mouse_seen:     dc.w 0
+mouse_last:     dc.w 0,0                ; position the room routine last stored
 mouse_active:   dc.w 0
 mouse_sum_x:    dc.w 0                  ; counts, wrapping; mouse_sum_y follows
 mouse_sum_y:    dc.w 0

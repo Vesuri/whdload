@@ -8510,6 +8510,13 @@ and its fire and guard hooks. Addresses:
 - **Room routine.** If the callback moved since the last call, the native
   position becomes the mouse position. Otherwise, a native step (stick or keys)
   becomes the mouse's position. Highlighting and clicks stay native.
+- **New screens.** The room setup (`E:272fe`, file `2732a`) centres the
+  pointer in the new room rectangle, or takes a caller's saved position,
+  without passing the room exit, so the callback stays active: going from the
+  bar into the barracks, the next motion used to continue from the old
+  screen's position. The hook keeps the position it last stored; when the
+  native position differs, the game placed the pointer, and both the room
+  routine and the callback continue from there.
 - **Left button as fire.** OCS samples port-1 fire as CIA-A bits 6 or 7 low.
   CD32 calls Psygore's pad read and sets the red-button bit 22 when bit 6 is
   low. Every native fire state then follows: current, held, click and double
@@ -8545,7 +8552,9 @@ How it is checked:
 - **CD32, native.** `tools/cd32_fixes_check.py` runs the room routine from after
   its input call to its sprite move, for both languages. It drives the callback
   with relative, absolute, empty and clamped events and with a hidden pointer,
-  and checks that the stick still steps the pointer. It runs the room exit, the
+  and checks that the stick still steps the pointer. It places the pointer as a
+  new screen does and moves the mouse, with and without a room routine call
+  first; the previous build fails this. It runs the room exit, the
   VBL pad read with and without the left button, and the record reset with each
   button held. It runs the name entry hook with the native grid step through
   sub-cell, edge, row and stale motion and stick steps. Psygore's list alone is

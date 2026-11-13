@@ -345,6 +345,15 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
     assert event(-50, -50) == [] and room() == (280, 180)
     w(mc['hide'], '>h', 0)
     out['ignored'] = 'pass'
+    # A new screen places the pointer without a room exit (E:272fe centres it):
+    # the mouse continues from there, whether the room routine runs first or not.
+    w(mc['pos'], '>hh', 120, 70)
+    assert [x[:2] for x in event(4, 0)] == [(122-3, 70-2)], 'mouse kept its old position'
+    assert room() == (122, 70)
+    w(mc['pos'], '>hh', 150, 90)
+    assert room() == (150, 90) and (var('mouse_x'), var('mouse_y')) == (300, 180)
+    assert [x[:2] for x in event(2, 2)] == [(151-3, 91-2)] and room() == (151, 91)
+    out['placed'] = 'pass'
     # Room exit: native move off screen, callback inactive, next room resyncs.
     m.write(STACK-8, struct.pack('>I', STOP))
     m.reg(8, STACK-8); m.reg(5, a4)
