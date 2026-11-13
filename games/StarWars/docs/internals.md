@@ -40,7 +40,23 @@ waits until it reaches a threshold. The original thresholds are one frame at thr
 four sites and two at the fourth, so on a fast machine those loops ran at up to 50 (or 25)
 updates a second, which the ReadMe calls unplayable. StingRay's timing fix sets all four to
 three frames: at most 16.7 updates a second (PAL) at each, the same on every CPU fast
-enough to meet it. Which game state each site paces has not been traced.
+enough to meet it. Here the fix is a bug fix, always on (the original has no other
+pacing). Each site ends one of the four flight loops; the loop starts with
+`clr.w -26430(a4)` and a call:
+
+| Loop | Tick start (clear, call) | Paced wait, swap request |
+|---|---|---|
+| space | $8962, `jsr $8720(pc)` | $897e, `jsr $09c0` |
+| surface run-in | $b55e, `jsr $b2f8(pc)` | $b612, `jsr $0a10` |
+| surface | $b63a, `jsr $b2f8(pc)` | $b65e, `jsr $09c0` |
+| trench | $d584, `jsr -32454(a4)` | $d5a8, `jsr $0a10` |
+
+The swap request $09c0 does per-tick work besides setting the swap flag -26448(a4) (at
+$09fa): the shield countdown -26408(a4) through $4faa (a hit only counts when it is 1),
+$579c's countdown -26406(a4) and the -26404(a4) text. The vertical blank server at $0046
+swaps the shown and drawn screens (-26446, -26442) when the flag is set ($0066-$0077) and
+writes the bitplane pointers every field. The attract loops ($3956, $39dc, $432c, $46dc,
+$7734) are not paced.
 
 | Site (code hunk) | File | Original | Fixed |
 |---|---|---|---|
@@ -65,10 +81,12 @@ scores at $074c, 500 frames at $271a.
 | $0752 | $077a | `PL_W $4e71` over `blt.s` of the 350-frame wait | no delay after saving |
 | $511a | $5142 | CUSTOM1: `PL_B $4a`, `add.w d0,-25348(a4)` becomes `tst.w` | unlimited shields; `PL_GA` keeps the address for the toggle |
 | $51c2 | $51ea | CUSTOM1: `PL_PSS .CheckKey,2` over `cmpi.l #$59,8(a5)` | the S key toggles the shields patch (`eor.b #$9b`, `add.w` and `tst.w`), then the original F10 test |
-| $897e+2, $b612+2, $b65e+2, $d5a8+2 | +$28 | `PL_W 3`, unless CUSTOM2 | the timing fix (above) |
+| $897e+2, $b612+2, $b65e+2, $d5a8+2 | +$28 | `PL_W 3` | the timing fix (above); always on. StingRay's v2.00 skipped it with CUSTOM2 |
 
 CUSTOM1 (the trainer) also disables the high-score patches, so a trained score is never
-saved. CUSTOM2 keeps the original frame thresholds.
+saved. CUSTOM2 is "Enhanced framerate" below (in v2.00 it disabled the timing fix, which
+ran the game too fast). The VERIFY build replaces the four `PL_W` with the work timer
+(`src/StarWarsProbe.s`), which waits for the same three frames.
 
 ## SPS 2926 (`PLGAME2926`)
 
@@ -78,10 +96,134 @@ $874e; four `PL_PSS .fixDMAWait,10` at $023a, $028c, $02de and $0330 replace the
 player's CPU-dependent DMA waits with three raster lines; high-score saving is added (it
 calls the game's routine at $8d9e after name entry, $6ed4/$6eda/$6f50) unless CUSTOM1; the
 shields trainer at $4ac4 with the S key at $4b56 (before the original F3 test); the timing
-sites above.
+sites above, always (v2.00 skipped them with CUSTOM2). There is no enhanced framerate for it.
+
+## Fast-CPU fixes (`src/StarWarsFixes.s`, `PLFIX403`)
+
+Always applied (no option): they repair drawing and sound on faster CPUs and leave the
+68000's behaviour as it was. `PLGAME403` ends in `PL_NEXT PLFIX403`.
+
+| Code hunk | Patch | Why |
+|---|---|---|
+| $1890 | `PL_S` to $18b4 | the colour setter $1840 rewrote the four per-plane `bset`/`bclr` opcodes of the plot ($1b70) and of the CPU horizontal line ($1bb0) for each colour. With an instruction cache the stale opcodes ran: on the 68060 the vector-font text lost strokes or whole words (scoring page, wave select). The cause, not the blitter waits |
+| $1b70, $1bb0 | `PL_PSS SetPixel,8` | set or clear per plane from the flags the setter stores (-28138..-28135(a4)) |
+| $0898, $0a9c, $1a7e, $1aae, $990e, $9942, $9a16, $9a4a, $9b3c, $9b76 | `PL_PSS BlitWait` | every BBUSY poll reads DMACONR once first (WHDLoad's `BLITWAIT`); several polled right after BLTSIZE |
+| $1b2c, $1b86, $1c08 | `PL_P`/`PL_PSS` | the CPU plot, horizontal line and screen clear wait for the blitter first: on a 68000 with the nasty blitter the CPU could not reach Chip RAM during a blit |
+| $9f7c | `PL_PSS AudioWait,10` | the music player counted a 50-pass CPU loop (about 5 lines on a 68000) between starting channel 0 and writing its repeat pointer; now 8 raster lines by the beam (two periods of period 880). FS-UAE's `AUD0LCH HACK` log lines came from it |
+
+## Enhanced framerate (CUSTOM2, `src/StarWarsSmooth.s`, `PLSMOOTH403`)
+
+The WHDLoad option "Enhanced framerate": 50 frames a second at the game's own speed by
+interpolation, not a finer simulation tick (a 50 Hz tick would mean dividing every rate,
+countdown, spawn chance and random draw of the three phases by three, and AI decisions
+would run three times as often). Each tick runs once, unchanged, while the drawing
+primitives it calls are recorded as 16-byte ops; the presenter then draws the recording
+n times, at j/n of the way from the previous tick's recording (n = 3 in the game, 2 or
+3 in the attract loops). Game logic, random numbers and sounds are untouched: 1500 ticks
+through space and surface after firing left the game state at $51e2 the same as the
+default, tick for tick (`tmp/scripts/ticks2.sh`). Only the star table -25758(a4) differs:
+the unpaced wave select loop (below) leaves it in a state that depends on the CPU and
+the frames drawn, as it does between machines in the original.
+
+| Code hunk | Patch | What |
+|---|---|---|
+| $0066 | `PL_PSS SmVbl,12` | the VBL server's swap: the original, and drops a queued frame |
+| $00a0 | `PL_PSS SmBpl,2` | its bitplane pointers: shows the queued frame at its field (and the palette fade step with each exact frame), else the game's screen |
+| $514a, $516c | `PL_PS SmPauseOn/Off` | the pause key draws "Game Paused" into the front screen: not recorded |
+| $8962, $b55e, $b63a, $d584 | `PL_PSS SmTick*,2` | game tick start: picks smooth or direct mode, starts recording |
+| $897e, $b612, $b65e, $d5a8 | `PL_PSS SmPresent*,8` | replaces the paced wait and the swap call: calls the swap request ($09c0 or $0a10, its flag suppressed) while recording, then draws and queues the frames |
+| $771e/$7734, $393c/$3956, $398c/$39dc, $42ce/$432c | `PL_PSS SmTick*,2`, `SmPresent*,8` | the attract loops (text pages, title zoom, title recede, crawl): `jsr $09a8; clr.w` at the start, the wait for the counter (1 or 2) and `jsr $09c0` at the end |
+
+Run-time hooks, installed with `jmp` when a tick records and taken out (the saved bytes
+put back, the cache flushed) in direct mode: colour $1840, line $19ae, plot $1b2c, shape
+$9806, rectangle $0810, plane copy $0a1c, clear $1c08, swap wait $09a8, TIE fighter draw
+$839c (keys its ops by the fighter), and the swap flag store $09fa.
+
+- **Pairing.** An op is keyed by the code address that called the primitive, and for TIE
+  fighters by the fighter. It is paired with the next op of the same key in the previous
+  recording, within 64 ops. Unpaired ops, and ops that moved more than 40 pixels (respawns,
+  stars wrapping round), are drawn where they are now.
+- **Pacing.** The counter -26430(a4) runs free. Frame j of a tick is for field B + j;
+  each frame is drawn for the first field it can still make, judged by the beam and the
+  last frame's drawing time, so a slow frame skips the in-between frame after it.
+- **Screens.** The exact frame (j = n) is drawn into the game's own back screen, as the
+  game would have drawn it, and becomes the game's front screen. In-between frames go into
+  one of two extra Chip screens (allocated once, when the largest free block holds them
+  plus 64 KB; one screen if only that fits; none: always direct), with the HUD strip (the
+  31 rows the clear $1c08 leaves, which the game redraws only on change) copied from the
+  game's back screen first. One frame at most is queued; the display ($00a0) takes it at
+  its field. The palette fade the VBL server does with each swap is done when an exact
+  frame is shown.
+- **Direct mode.** A tick is late when it starts more than a frame behind or its exact
+  frame misses its field. When more than half the recent ticks are late the hooks come out
+  and ticks run exactly as the default runs them. Smooth is tried again (after 50 direct
+  ticks at least) when a direct tick's work plus n - 1 frames at the running average
+  drawing time fits 3/4 of the tick's fields.
+
+Measured (VERIFY, `tools/starwars.py smooth`, `tmp/scripts/phases.sh`: attract, then space,
+surface and trench with the trainer):
+
+| Machine | Mode | Frames per tick | Fields per tick | Frame drawing (lines) |
+|---|---|---|---|---|
+| a500-1.5m | direct from the third attract tick | 1 | as the default | |
+| a1200 | direct from the attract | 1 | as the default | direct tick work about 490 mean |
+| a1200-fast | direct from the attract | 1 | as the default | direct tick work about 300; frames averaged 447 |
+| a1200-030 | smooth throughout | 2.84 | 2.96 | average 275-305 |
+
+On a1200-030 the text pages drew 3839 frames in 3888 fields, with the "PULL TRIGGER"
+flash in the default's pattern (each colour two fields); a500-1.5m in direct mode flashed
+in the same pattern. Smooth on a500-1.5m, before direct mode also caught exact frames
+missing their field, the ticks came 1 to 3 fields apart and the flash was irregular. On
+the title recede and the crawl only the stars change in the in-between frames; the logo
+and the crawl text are not interpolated. At most 398 ops in a tick (room for 4096).
+
+With CUSTOM2 off the recordings are not allocated, no hook is installed and
+`PLSMOOTH403` applies nothing. The patched code hunk after reaching play
+(`tools/starwars.py code`) was the same byte for byte as a build whose `PLSMOOTH403` is
+empty and padded to the same length ($a8 bytes), on a500-1.5m and a1200-060.
+
+## Memory and caches
+
+The code and data hunks are in ExpMem (Fast RAM on an A1200 with it). Every buffer the
+game allocates goes through $0ba8, `AllocMem(MEMF_CHIP|MEMF_PUBLIC|MEMF_CLEAR)`: four
+32000-byte screens (-26446, -26442: displayed/drawn; -26402, -26262), the blitter mask
+-26258 (4000), tables -26254/-26250/-26246/-26242 (1000 each), the sound buffer -26238
+(800), the palette -26434 (32, CPU only), -26418 (10), 300 bytes per TIE fighter
+(52(record), allocated at each spawn, freed at $8912), and the loaded shapes and sounds.
+Which of the tables are CPU-only is not yet traced. KickEmu's `CACHE` is set: the 060
+dump shows CACR $a0808000 (both caches and the store buffer on).
+
+## Measurements
+
+VERIFY work timer (`tools/starwars.py probe`, `tmp/scripts/measure.sh`): lines from the end
+of one paced wait to the start of the next, swap wait included, space wave 1 with no input.
+
+| Machine | Thresholds | Mean | Fields at the wait |
+|---|---|---|---|
+| a500-1.5m | 3 (fix) | 1038 lines (66 ms) | 2–5, mostly 3 |
+| a500-1.5m | original | 999 lines | 2–5, mostly 3 |
+| a1200-030 | 3 (fix) | 540 lines | 1 |
+| a1200-030 | original | 322 lines (20.6 ms) | 1 |
+
+Cycle profile, a1200-030 without MMU (`--uae_mmu_model=0`), 50 fields, fix on: 71 % busy
+waits (paced wait $897e 44 %, swap wait $09b0 27 %), shape drawer $9806 8.7 % (mostly
+its blitter polls), clear $1c08 6.1 %, line $19ae 4.4 %, plane copy $0a1c 1.8 %, plot
+$1b2c 1.7 %; object update $7c6e and its callees about 2 %. DMA slots: 61 % free.
 
 ## Limitations
 
-- The game is capped at 16.7 updates a second by the timing fix; it is no faster on a fast
-  machine than on one that just meets three frames per update. Not measured here.
+- The game is capped at 16.7 updates a second by the timing fix, its original speed on
+  an A500. Enhanced framerate adds in-between frames but keeps that rate.
+- Enhanced framerate shows the in-between frames up to two fields behind the tick; input
+  is read per tick as before (the crosshair per field).
+- Enhanced framerate only exists for SPS 0403. On SPS 2926 CUSTOM2 does nothing.
+- The cannons and the cockpit ($59e6, drawn with the shape drawer $9806: D = A | (B & C),
+  B the mask) clear their whole bounding box, so with the crosshair at some x a black
+  box covers what is under them (the wave select screen's Death Star). StingRay's
+  original slave does the same on a500-1.5m: a bug of the game, not of the sprites or of
+  fast CPUs; not fixed.
+- Not paced by the counter: the wave select loop $26f6-$2720 (stars, cannons, until the
+  counter reaches 500) runs as fast as the CPU draws, and the title zoom ($393c) takes 4
+  fields a pass on a500-1.5m and 2 on a1200-030. The pause key in enhanced framerate is
+  not yet tested.
 - Quit is Del (`slv_keyexit` $46); F10 is the game's own key in one version.

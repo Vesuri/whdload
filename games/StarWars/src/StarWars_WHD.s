@@ -116,7 +116,7 @@ slv_info	dc.b	"installed by StingRay/[S]carab^Scoopex",10
 		ENDC
 		dc.b	"Version 2.00 (10.08.2016)",0
 slv_config	dc.b	"C1:B:Unlimited Shields;"
-		dc.b	"C2:B:Disable Timing Fix"
+		dc.b	"C2:B:Enhanced framerate"
 		dc.b	0
 		CNOP	0,4
 
@@ -136,7 +136,11 @@ _bootdos
 	move.l	d0,a6
 	lea	DOSbase(pc),a0
 	move.l	d0,(a0)
-	move.l	d0,a6
+	IFD	VERIFY
+	bsr	ProbeAlloc
+	ENDC
+	bsr	SmAlloc			; the smooth mode's recordings (StarWarsSmooth.s)
+	move.l	DOSbase(pc),a6
 
 
 .ok	
@@ -350,15 +354,11 @@ PLGAME2926
 
 
 
-; fix timing
-	PL_IFC2
-	PL_ELSE
+; fix timing: always on (a bug fix); the smooth mode (CUSTOM2) is SPS 0403 only
 	PL_W	$8390+2,3
 	PL_W	$b0fe+2,3
 	PL_W	$b14a+2,3
 	PL_W	$ceca+2,3
-
-	PL_ENDIF
 	PL_END
 
 .end		dc.l	0
@@ -425,16 +425,20 @@ PLGAME403
 	PL_ENDIF
 
 
-; fix timing
-	PL_IFC2
-	PL_ELSE
+; fix timing: three fields per update at each paced loop (CUSTOM2, the smooth mode,
+; replaces these waits; StarWarsSmooth.s)
+	IFD	VERIFY
+	PL_PSS	$897e,ProbeFix0,4	; the probe at each paced wait (StarWarsProbe.s)
+	PL_PSS	$b612,ProbeFix1,4
+	PL_PSS	$b65e,ProbeFix2,4
+	PL_PSS	$d5a8,ProbeFix3,4
+	ELSE
 	PL_W	$897e+2,3
 	PL_W	$b612+2,3
 	PL_W	$b65e+2,3
 	PL_W	$d5a8+2,3
-
-	PL_ENDIF
-	PL_END
+	ENDC
+	PL_NEXT	PLFIX403		; StarWarsFixes.s
 
 .CheckKey
 	cmp.l	#$21,8(a5)		; S - toggle unlimited shields
@@ -467,5 +471,26 @@ SetStack
 
 
 
+
+	INCLUDE	StarWarsFixes.s
+	INCLUDE	StarWarsSmooth.s
+
+	IFD	VERIFY
+PROBE	MACRO
+\1	movem.l	d0/d1,-(a7)
+	moveq	#\2,d0
+	moveq	#\3,d1
+	bsr	ProbeWait
+	movem.l	(a7)+,d0/d1
+	rts
+	ENDM
+	dc.l	"SWPB"			; the harness finds probe_buf behind this
+probe_buf	dc.l	0
+	PROBE	ProbeFix0,0,3
+	PROBE	ProbeFix1,1,3
+	PROBE	ProbeFix2,2,3
+	PROBE	ProbeFix3,3,3
+	INCLUDE	StarWarsProbe.s
+	ENDC
 
 	ENDC	; IFD BOOTDOS: the original leaves it open, which vasm refuses

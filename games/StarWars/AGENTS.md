@@ -1,9 +1,11 @@
 # Star Wars
 
-Star Wars (Domark, 1988) under WHDLoad. No improvement work has been done yet: the slave is
-StingRay's v2.00 (10.08.2016) as his installer ships it. The original slave is by StingRay
-(game.conf `AUTHOR`, `UPSTREAM`): neither his WHDLoad patches repository nor JOTD's holds it,
-so `src/` is the source from his installer (`StarWars_Install/Source/StarWars_WHD.s`).
+Star Wars (Domark, 1988) under WHDLoad. The slave is StingRay's v2.00 (10.08.2016) as his
+installer ships it, plus always-on fast-CPU fixes (`src/StarWarsFixes.s`) and CUSTOM2
+"Enhanced framerate", 50 frames a second at the game's speed (`src/StarWarsSmooth.s`).
+The original slave is by StingRay (game.conf `AUTHOR`, `UPSTREAM`): neither his WHDLoad
+patches repository nor JOTD's holds it, so `src/StarWars_WHD.s` is the source from his
+installer (`StarWars_Install/Source/StarWars_WHD.s`).
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.
 
