@@ -8490,6 +8490,8 @@ and its fire and guard hooks. Addresses:
 | RAWMOUSE slot (A4) | `-2028` (`OD:7812`) | `162` (`D:80a0`) | `206` (`D:80cc`) |
 | Port-1 fire sample | `O:33f88` (CIA-A bit 7) | `E:33e78` (Psygore's `S:1c2e`) | `G:3403a` |
 | Pad record reset guard | `O:33f1c` | `E:33de6` | `G:33fa8` |
+| Name entry grid poll (PL_PS, 6 bytes) | none (keyboard only) | `E:16ed0` | `G:16f6e` |
+| Native grid step / selected cell / columns (A4) | | `E:16c66` / `17716` / `17706` | `G:16d04` / `17766` / `17756` |
 
 - **Motion.** The room position hook stores the game's A4 and installs
   `mouse_event` in the RAWMOUSE slot on every call. The game's input handler
@@ -8519,8 +8521,21 @@ and its fire and guard hooks. Addresses:
   routines, so the left button continues them: for example `O:180c4` (36
   callers), `O:18126` (22), `O:1819e` (4), `O:872`/`8ba`, and the bar's
   `O:25d2c`. The live checks cover only the intro. Key-only waits
-  remain: name entry, flight keys, the nav map (`O:22558`, `O:22640`) and an
-  Esc loop at `O:142ac`.
+  remain: the OCS name entry, flight keys, the nav map (`O:22558`, `O:22640`)
+  and an Esc loop at `O:142ac`.
+- **CD32 name entry grid.** The TrainSim top-score name entry
+  (`E:16f52`, "PLEASE ENTER YOUR NAME AND CALLSIGN") shows a character grid
+  with a selection box; the OCS version takes keys instead (`O:16924`). Its
+  poll `E:16e54` turns stick edges into ±1 cell steps through `E:16c66`
+  (columns wrap, rows clamp) and fire picks the cell's character. Every relative
+  event also adds to `mouse_sum_x/y`, whatever the screen. The hook replaces
+  the poll's `move.w d0,-(sp)` / `jsr step(pc)`: it adds the whole cells
+  (18 counts each, so 9-pixel cells move at the pointer's rate) of motion since
+  the last poll. Mouse columns stop at the grid edge and drop the remainder
+  there; the stick still wraps. The VBL pad read counts fields, and motion is
+  dropped at the first poll after a gap of more than 8 fields, so motion on
+  other screens does not move the box. The left button picks a character as
+  fire does.
 
 How it is checked:
 - **CD32, native.** `tools/cd32_fixes_check.py` runs the room routine from after
@@ -8528,14 +8543,17 @@ How it is checked:
   with relative, absolute, empty and clamped events and with a hidden pointer,
   and checks that the stick still steps the pointer. It runs the room exit, the
   VBL pad read with and without the left button, and the record reset with each
-  button held. Psygore's list alone is the control; `--sabotage mouse-ignored`
-  must fail.
+  button held. It runs the name entry hook with the native grid step through
+  sub-cell, edge, row and stale motion and stick steps. Psygore's list alone is
+  the control; `--sabotage mouse-ignored` and `name-ignored` must fail.
 - **OCS, native.** `tools/ocs_options_check.py` runs the same scenario on the
   68000 model after both the enhanced and the original-mode install.
 - **Live.** `tools/mouse_live_check.py` skips the intro with the left button
   (the port-0 button) where `modal_live_check.py` presses Esc. At the start menu
   it moves the mouse 4 counts per field, out and back, and samples the sprite's
-  `x` every field. Then one click must select.
+  `x` every field. Then one click must select. With `--name-entry` (CD32) it
+  goes on into the simulator, lets the ship be destroyed, moves the mouse 36
+  counts right and 36 down at the name entry and clicks.
 
 Live results (deterministic warp, PAL, 2026-11-13):
 - **CD32, enhanced and Psygore normal (`a1200-030`):** the sprite moves 2 pixels
@@ -8550,6 +8568,9 @@ Live results (deterministic warp, PAL, 2026-11-13):
   several fields. The full distance arrives and the position settles exactly.
   The native stick pointer has the same cadence.
 - **All five runs:** the first click selects.
+- **CD32 name entry (enhanced, `a1200-030`):** the box moves exactly two
+  columns and two rows (8-column grid, from column 1, row 4 to 3, 6), and the
+  click enters "S".
 
 Not yet checked live: the bar, barracks and TrainSim rooms (they use the same
 routine), German, and real hardware. The user reports the mouse working in play

@@ -897,10 +897,12 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   - The sprite moves every field, except in OCS original mode: the native
     renderer holds Forbid+Disable across field boundaries, so the motion
     arrives in bursts there, as the stick pointer does.
+  - CD32 name entry: the mouse also moves the selection box over the
+    character grid, a cell per 18 counts (live-checked in English).
+    The OCS name entry is keyboard only.
   - The user reports the mouse working in play (2026-11-13). Not separately
     recorded: the bar, barracks and TrainSim rooms; German is not yet live-checked.
-  - Unchanged: key-only waits such as the nav map and name entry, and the right
-    button.
+  - Unchanged: key-only waits such as the nav map, and the right button.
 
   See [mouse](internals.md#mouse-in-rooms-and-menus-both-release-builds-every-mode).
 - **Mouse flight (new control).** No proportional steering exists. A virtual

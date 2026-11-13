@@ -29,7 +29,8 @@ GAMES = {
                     sites=dict(store=0x31498, list=0x314b0, branch=0x276b0), trainsim=0x1827e, flyoff=0x17d06,
                     mouse=dict(room=0x273fc, exit=0x27362, pad=0x33e78, guard=0x33de6, reset=0x33ddc, entry=0x2737c, move=0x27418,
                                leave=0x2735a, left=0x27368, pos=2696, rect=2728, flags=18116,
-                               slot=162, hide=-1160, image=-1164, gfx=-778, params='mouse_params_en')),
+                               slot=162, hide=-1160, image=-1164, gfx=-778, params='mouse_params_en',
+                               name=0x16ed0, step=0x16c66, sel=17716, cols=17706)),
     'german': dict(path='tmp/game/WingCommanderCD32/data/wing.german',
                    sha='2047da69f2c83803675921afd86204747609a5c59dd3e7f67d954d785677dabe',
                    psygore=0x1cf4, fix='fix_patch_de', save=0x277a0, a4=0x7ffe,
@@ -37,7 +38,8 @@ GAMES = {
                    sites=dict(store=0x3165a, list=0x31672, branch=0x27872), trainsim=0x18338, flyoff=0x17db6,
                    mouse=dict(room=0x275be, exit=0x27524, pad=0x3403a, guard=0x33fa8, reset=0x33f9e, entry=0x2753e, move=0x275da,
                               leave=0x2751c, left=0x2752a, pos=2740, rect=2772, flags=18166,
-                              slot=206, hide=-1116, image=-1120, gfx=-734, params='mouse_params_de')),
+                              slot=206, hide=-1116, image=-1120, gfx=-734, params='mouse_params_de',
+                              name=0x16f6e, step=0x16d04, sel=17766, cols=17756)),
 }
 SLAVE = 0x200000          # slave payload
 RES = 0x280000            # resload jump table, each entry an RTS
@@ -300,14 +302,68 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
             want = -1 if held or name == 'psygore' else 0
             assert struct.unpack('>h', record[18:])[0] == want, (name, hex(pra), record)
     out['click_guard'] = 'pass'
+    out['name_entry'] = name_cases(cfg, fixed, blob, sy)
     return out
+
+
+def name_cases(cfg, fixed, blob, sy):
+    """Name entry grid poll: the slave's hook and the native grid step, from
+    the hook site to the native redraw call."""
+    mc = cfg['mouse']; cols = 10
+    m = Machine(fixed, blob, cfg, {})
+    a4 = m.a4
+    m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
+    assert struct.unpack('>I', m.read(SLAVE+sy['name_step'], 4))[0] == 0     # set by release_patchseg
+    m.write(SLAVE+sy['name_step'], struct.pack('>I', mc['step']))
+    m.write(a4+mc['cols'], struct.pack('>h', cols))
+    fields = [100]
+
+    def event(dx, dy):
+        m.write(EVENT, struct.pack('>IBBHHhh', 0, 2, 0, 0xff, 0x8000, dx, dy))
+        m.call(SLAVE+sy['mouse_event'], b'', [(4, EVENT)])
+
+    def poll(stick=(0, 0), gap=1):
+        fields[0] += gap
+        m.write(SLAVE+sy['mouse_fields'], struct.pack('>H', fields[0] & 0xffff))
+        m.write(STACK-2, struct.pack('>h', stick[1]))
+        m.reg(8, STACK-2); m.reg(5, a4); m.reg(9, stick[0] & 0xffff)
+        ck(u.uc_emu_start(m.h, mc['name'], mc['name']+6, 0, 10000))
+        assert m.reg(18) == mc['name']+6 and m.reg(8) == STACK-4, 'stack differs from the native call'
+        cell = struct.unpack('>h', m.read(a4+mc['sel'], 2))[0]-32
+        return cell % cols, cell // cols
+
+    def at(col, row):
+        m.write(a4+mc['sel'], struct.pack('>h', 32+row*cols+col))
+
+    at(3, 4)
+    event(200, 200)
+    assert poll(gap=50) == (3, 4), 'motion from another screen moved the box'
+    assert struct.unpack('>I', m.read(a4+mc['slot'], 4))[0] == SLAVE+sy['mouse_event']
+    event(36, 0); assert poll() == (5, 4)
+    event(17, 0); assert poll() == (5, 4)          # less than a cell
+    event(1, 0); assert poll() == (6, 4)
+    event(-17, 0); assert poll() == (6, 4)
+    event(-1, 0); assert poll() == (5, 4)
+    event(0, 36); assert poll() == (5, 6)
+    event(0, -18); assert poll() == (5, 5)
+    # Columns stop at the edge and drop the rest; the stick still wraps.
+    event(1000, 0); assert poll() == (9, 5)
+    event(-18, 0); assert poll() == (8, 5)
+    event(-1000, 0); assert poll() == (0, 5)
+    assert poll((-1, 0)) == (9, 5) and poll((1, 0)) == (0, 5) and poll((0, 1)) == (0, 6)
+    # The native step clamps rows.
+    event(0, -1000); assert poll() == (0, 0)
+    event(30, 0); poll()
+    event(30, 0); assert poll(gap=20) == (1, 0), 'stale motion kept after a gap'
+    m.close()
+    return 'pass'
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path)
     p.add_argument('--output', required=True, type=Path)
-    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored'),
+    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored'),
                    help='negative control: the check must fail')
     a = p.parse_args()
     out = a.output.resolve()
@@ -328,6 +384,9 @@ def main():
             while blob[at] != 0x66:
                 at += 2
             blob[at:at+2] = bytes.fromhex('4e71')
+        elif a.sabotage == 'name-ignored':  # name entry drops the mouse's column steps
+            at = blob.index(bytes.fromhex('d36f001c'), sy['mouse_name'])
+            blob[at:at+4] = bytes.fromhex('4e714e71')
         else:                               # Psygore's PL_R
             blob[sy['bunk_list']:sy['bunk_list']+4] = bytes.fromhex('4cdf0c04')
             blob[sy['bunk_list']+4:sy['bunk_list']+6] = bytes.fromhex('4e75')
@@ -347,7 +406,8 @@ def main():
         apply(blob, sy[cfg['fix']], fixed, fixlog)
         mc = cfg['mouse']
         assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']),
-                          (3, mc['room']), (3, mc['exit']), (3, mc['pad']), (3, mc['guard'])], fixlog
+                          (3, mc['room']), (3, mc['exit']), (3, mc['pad']), (3, mc['guard']), (3, mc['name'])], fixlog
+        assert original[mc['name']:mc['name']+4] == bytes.fromhex('3f004eba')
         assert original[mc['reset']:mc['guard']+8] == bytes.fromhex('224870094259 51c8fffc 317cffff0012 4e75'.replace(' ', ''))
         assert original[mc['room']:mc['room']+8] == struct.pack('>HhHh', 0x3942, mc['pos'], 0x3943, mc['pos']+2)
         assert original[mc['exit']:mc['exit']+2] == bytes.fromhex('4eb9')
@@ -359,7 +419,7 @@ def main():
         assert original[t:t+4] == bytes.fromhex('3f04486c') and original[t+6:t+8] == bytes.fromhex('4eba')
         assert fixed[t:t+2] == bytes.fromhex('3f12') and fixed[t+2:t+8] == original[t+2:t+8]
         changed = [i for i in range(len(psy)) if psy[i] != fixed[i]]
-        assert all(any(x <= i < x+6 for x in list(s.values())+[mc['room'], mc['exit'], mc['pad'], mc['guard']]) or t <= i < t+2
+        assert all(any(x <= i < x+6 for x in list(s.values())+[mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name']]) or t <= i < t+2
                    for i in changed)
         cases = {}
         # Negative control: Psygore's list writes the file but clears the name.

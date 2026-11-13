@@ -85,16 +85,22 @@ mouse_exit:
         move.l  mouse_move(pc),-(sp)
         rts
 
-; RAWMOUSE slot, called from the game's input handler with a3 = event.
+; RAWMOUSE slot, called from the game's input handler with a3 = event. Every
+; relative event also adds to mouse_sum_x/y, which only their reader consumes.
 ; The handler keeps d2/a2/a3 only: preserve everything except d0-d1/a0-a1.
 mouse_event:
-        lea     mouse_active(pc),a0
-        tst.w   (a0)
-        beq.s   .out
         tst.b   8(a3)                   ; IEQUALIFIER_RELATIVEMOUSE
         bpl.s   .out
         move.w  10(a3),d0
         or.w    12(a3),d0
+        beq.s   .out
+        lea     mouse_sum_x(pc),a0      ; running counts for a variant's grid screens
+        move.w  10(a3),d0
+        add.w   d0,(a0)+
+        move.w  12(a3),d0
+        add.w   d0,(a0)
+        lea     mouse_active(pc),a0
+        tst.w   (a0)
         beq.s   .out
         movem.l d2-d3/a2/a4/a6,-(sp)
         movea.l mouse_a4(pc),a4
@@ -155,4 +161,6 @@ mouse_y:        dc.w 0
 mouse_seq:      dc.w 0
 mouse_seen:     dc.w 0
 mouse_active:   dc.w 0
+mouse_sum_x:    dc.w 0                  ; counts, wrapping; mouse_sum_y follows
+mouse_sum_y:    dc.w 0
         even

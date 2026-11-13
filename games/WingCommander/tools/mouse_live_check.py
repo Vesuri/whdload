@@ -7,8 +7,10 @@ port-0 mouse moves in small steps, one per field, with no breakpoint in the
 room routine: the pointer sprite must follow every field, the native room
 position must follow the mouse, and a click must select the menu item, as
 Return does. OCS original mode (the unchanged renderer) is only required to
-cover the distance; see the assertion. Screenshots and reports stay in the
-capture directory under tmp/.
+cover the distance; see the assertion. CD32 --name-entry continues into the
+simulator, lets the ship be destroyed and, at the top-score name entry, moves
+the selection box over the character grid with the mouse and clicks a
+character. Screenshots and reports stay in the capture directory under tmp/.
 """
 import argparse
 import hashlib
@@ -22,8 +24,16 @@ from amigaxdev import barto
 from ocs_reconstruct import new_output
 from variants import get
 
-# Native A4 offsets: room pointer position and the pointer SimpleSprite (x at +6).
-POINTER = {'ocs': (0x19c, -2150), 'cd32': (0xa88, -1156)}
+# Per game: A4 offsets of the room pointer position, the pointer SimpleSprite
+# (x at +6) and the field clock; H0 intro waits (wait, done), menu (ready,
+# accepted); name entry (input loop, poll result) and its A4 selected cell and
+# columns.
+GAMES = {
+    'ocs': dict(pointer=(0x19c, -2150), field=-0x800, intro=((0x180c4, 0x1edde), (0x180c4, 0x1f396)),
+                menu=(0x1f43c, 0x1f44e)),
+    'cd32': dict(pointer=(0xa88, -1156), field=-252, intro=((0x1898a, 0x1fbba), (0x1898a, 0x20164)),
+                 menu=(0x20214, 0x20226), name=(0x16fc6, 0x16fd0, 17716, 17706)),
+}
 
 
 def main():
@@ -33,7 +43,11 @@ def main():
     p.add_argument('--output', required=True)
     p.add_argument('--original-mode', action='store_true', help='CUSTOM5 original behaviour')
     p.add_argument('--setup', default='a1200-030', help='AMIGA_SETUP (OCS also a500: 68000, 4 MiB Fast)')
+    p.add_argument('--name-entry', action='store_true', help='CD32: also the TrainSim name entry grid')
     a = p.parse_args()
+    if a.name_entry and a.variant != 'cd32':
+        p.error('--name-entry: the OCS name entry is keyboard only')
+    game = GAMES[a.variant]
     out = new_output(a.output); out.mkdir(parents=True)
     v = get(a.variant); ocs = a.variant == 'ocs'
     if ocs:
@@ -68,9 +82,9 @@ def main():
             raise RuntimeError(r)
         return r
 
-    def until(addr):
+    def until(addr, timeout=60):
         print('checkpoint', hex(addr), flush=True)
-        r = cmd(f'break *{addr:#x}\ncontinue\ndelete', 60)
+        r = cmd(f'break *{addr:#x}\ncontinue\ndelete', timeout)
         if 'Breakpoint' not in r:
             raise ValueError('checkpoint missed: '+r)
 
@@ -83,6 +97,32 @@ def main():
         cmd(f'monitor profile 1 "" "{path}"', 60)
         (out/(name+'.png')).write_bytes(barto.load(str(path)).fields[-1].shot)
         path.unlink()
+
+    def name_entry():
+        # E:16fc6 first name-input iteration; E:16fd0 poll result in d0.
+        # Selected cell code at A4+17716, grid columns at A4+17706.
+        loop, result, sel, cols = game['name']
+        until(h0+loop, 600)
+        cmd('monitor fields 4'); until(h0+loop)
+        width = number(f'*(short*){a4+cols:#x}')
+
+        def cell():
+            c = number(f'*(short*){a4+sel:#x}')-32
+            return c % width, c // width
+        start = cell(); shot('name-before')
+        for dx, dy in [(4, 0)]*9+[(0, 4)]*9:
+            cmd(f'monitor mouse {dx} {dy}'); cmd('monitor fields 1')
+        cmd('monitor fields 4'); until(h0+loop)
+        moved = cell(); shot('name-moved')
+        assert moved == (start[0]+2, start[1]+2), (start, moved)
+        cmd('monitor input JOY1_FIRE_BUTTON 1')
+        r = cmd(f'break *{h0+result:#x}\ncondition $bpnum (short)$d0 != -1\ncontinue\ndelete', 60)
+        assert 'Breakpoint' in r, 'click did not pick a character'
+        code = number('(short)$d0')
+        cmd('monitor input JOY1_FIRE_BUTTON 0')
+        assert code not in (13, 127), code
+        cmd('monitor fields 4'); shot('name-picked')
+        return dict(columns=width, start=start, moved=moved, picked=code)
 
     rows = {}
     try:
@@ -101,16 +141,16 @@ def main():
         (out/'layout.json').write_text(json.dumps(layout, indent=2)+'\n')
         g = boot(); h0, h1, _, _ = layout['hunks']
         a4 = h1+v.A4_BASE
-        field = a4+v.A4['field_clock']
-        pos, sprite = POINTER[a.variant]
+        field = a4+game['field']
+        pos, sprite = game['pointer']
         # Intro: the left button where modal_live_check presses Esc.
-        for wait, done in ((0x180c4, 0x1edde), (0x180c4, 0x1f396)) if ocs else ((0x1898a, 0x1fbba), (0x1898a, 0x20164)):
+        for wait, done in game['intro']:
             until(h0+wait)
             cmd('monitor input JOY1_FIRE_BUTTON 1')
             until(h0+done)
             cmd('monitor input JOY1_FIRE_BUTTON 0')
         rows['intro_skipped_by_left_button'] = True
-        menu, chosen = (0x1f43c, 0x1f44e) if ocs else (0x20214, 0x20226)
+        menu, chosen = game['menu']
         until(h0+menu)
         cmd('monitor fields 4')
         until(h0+menu)
@@ -159,6 +199,8 @@ def main():
         rows['clicks'] = [click()]
         assert rows['clicks'] == ['selected'], rows['clicks']
         rows['menu_selected_by_click'] = True
+        if a.name_entry:
+            rows['name_entry'] = name_entry()
         (out/'report.json').write_text(json.dumps(dict(complete=True, variant=a.variant, original_mode=a.original_mode, setup=a.setup,
             slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(), **rows), indent=2)+'\n')
         print(json.dumps(dict(complete=True, sprite_steps=steps)))

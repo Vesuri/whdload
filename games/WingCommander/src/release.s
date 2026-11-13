@@ -48,6 +48,9 @@ release_limit:
 ;   button is port-1 fire, so it also clicks hotspots and skips what fire skips.
 ;   Each screen's pad reset arms a release guard that swallowed the first fire
 ;   click after it; it now arms only while a fire button is held.
+; - Mouse in name entry. The TrainSim top-score name entry moves a selection
+;   box over a character grid by stick edges; whole cells of mouse motion now
+;   move it too.
 release_patchseg:
         bsr.w   timing_patchseg
         movem.l d0-d1/a0-a1,-(sp)
@@ -67,6 +70,12 @@ release_patchseg:
         lsl.l   #2,d0
         addq.l  #4,d0
         bsr.w   mouse_init
+        move.l  d7,d0
+        lsl.l   #2,d0
+        addq.l  #4,d0
+        add.l   NAME_STEP(a0),d0
+        lea     name_step(pc),a1
+        move.l  d0,(a1)
         movem.l (sp)+,d0-d1/a0-a1
         rts
 
@@ -74,6 +83,8 @@ release_patchseg:
 ; (CIA-A PRA bit 6) adds the red button, which the game decodes as fire.
 mouse_pad:
         bsr.w   slave+$1c2e
+        lea     mouse_fields(pc),a0     ; a0 is reloaded after this call
+        addq.w  #1,(a0)
         btst    #6,$bfe001
         bne.s   .up
         bset    #22,d0
@@ -92,14 +103,95 @@ mouse_guard:
 .held:
         rts
 
+; Name entry grid poll (E:16ed0, G:16f6e): replaces move.w d0,-(sp) and
+; jsr step(pc), with d0 = the stick's column step and the row step already
+; pushed. Adds whole cells of mouse motion since the last poll. Columns stop
+; at the grid edge (the stick wraps) and motion from other screens is dropped.
+; Enters the native step with both arguments pushed, as the native call does.
+NAME_SEL = 12                   ; parameter table: A4 offset, selected cell code
+NAME_COLS = 14                  ; A4 offset, grid columns
+NAME_STEP = 16                  ; H0 offset, native step (column, row)
+NAME_CELL = 18                  ; mouse counts per cell (cells are 9 pixels)
+mouse_name:
+        subq.l  #2,sp
+        move.l  2(sp),(sp)              ; return address below the column word
+        move.w  d0,4(sp)
+        movem.l d1-d4/a0-a1,-(sp)       ; column at 28(sp), row at 30(sp)
+        movea.l mouse_params(pc),a1
+        move.w  MP_SLOT(a1),d1
+        lea     mouse_event(pc),a0
+        move.l  a0,(a4,d1.w)
+        move.w  NAME_SEL(a1),d3
+        move.w  (a4,d3.w),d3
+        move.w  NAME_COLS(a1),d4
+        move.w  (a4,d4.w),d4
+        lea     mouse_sum_x(pc),a0
+        lea     name_used(pc),a1        ; used x, used y, last poll field
+        move.w  mouse_fields(pc),d1
+        move.w  d1,d2
+        sub.w   4(a1),d2
+        move.w  d1,4(a1)
+        cmpi.w  #8,d2
+        bls.s   .fresh
+        move.w  (a0),(a1)               ; first poll on this screen
+        move.w  2(a0),2(a1)
+        bra.s   .done
+.fresh:
+        move.w  (a0),d1
+        sub.w   (a1),d1
+        ext.l   d1
+        divs.w  #NAME_CELL,d1           ; whole cells, toward zero
+        subi.w  #32,d3
+        ext.l   d3
+        divs.w  d4,d3
+        swap    d3                      ; column
+        move.w  d3,d2
+        neg.w   d2                      ; lowest step
+        cmp.w   d2,d1
+        blt.s   .edge
+        move.w  d4,d2
+        subq.w  #1,d2
+        sub.w   d3,d2                   ; highest step
+        cmp.w   d2,d1
+        bgt.s   .edge
+        move.w  d1,d2
+        muls.w  #NAME_CELL,d2
+        add.w   d2,(a1)
+        bra.s   .column
+.edge:
+        move.w  d2,d1
+        move.w  (a0),(a1)               ; at the edge: drop the remainder
+.column:
+        add.w   d1,28(sp)
+        move.w  2(a0),d1
+        sub.w   2(a1),d1
+        ext.l   d1
+        divs.w  #NAME_CELL,d1
+        move.w  d1,d2
+        muls.w  #NAME_CELL,d2
+        add.w   d2,2(a1)
+        add.w   d1,30(sp)               ; the native step clamps rows
+.done:
+        movem.l (sp)+,d1-d4/a0-a1
+        move.l  name_step(pc),-(sp)
+        rts
+
 ; mouse.s parameters: position, rectangle, RAWMOUSE slot, hide counter (A4),
-; native sprite move (H0).
+; native sprite move (H0); then name entry: selected cell, columns (A4),
+; native grid step (H0).
 mouse_params_en:
         dc.w    2696,2728,162,-1160
         dc.l    $3171e
+        dc.w    17716,17706
+        dc.l    $16c66
 mouse_params_de:
         dc.w    2740,2772,206,-1116
         dc.l    $318e0
+        dc.w    17766,17756
+        dc.l    $16d04
+name_step:      dc.l 0
+name_used:      dc.w 0,0,0
+mouse_fields:   dc.w 0                  ; VBL pad reads
 
 ; Raw patch lists (no includes in this build): command, long offset, argument.
 fix_patch_en:
@@ -127,6 +219,9 @@ fix_patch_en:
         dc.w    3                ; PL_PS pad record reset: click release guard
         dc.l    $33de6
         dc.w    mouse_guard-fix_patch_en
+        dc.w    3                ; PL_PS name entry grid poll
+        dc.l    $16ed0
+        dc.w    mouse_name-fix_patch_en
         dc.w    0
 fix_patch_de:
         dc.w    3
@@ -153,6 +248,9 @@ fix_patch_de:
         dc.w    3
         dc.l    $33fa8
         dc.w    mouse_guard-fix_patch_de
+        dc.w    3
+        dc.l    $16f6e
+        dc.w    mouse_name-fix_patch_de
         dc.w    0
 
 ; StoreNV(a1 item name, a2 data, d0 size): as Psygore's S:16b6, but returns

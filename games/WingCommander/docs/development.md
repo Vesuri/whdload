@@ -47,12 +47,12 @@ audit, frame statistics, OCS candidates) call the generators directly with a new
 build against `release/slaves.sha256`, rebuilds both reconstructions (each asserts
 byte identity with the pinned original) and runs `release_check.py`,
 `cd32_fixes_check.py` (the CD32 bunk save, TrainSim key fix and mouse on both languages;
-`--sabotage store-failure|list-stub|mouse-ignored` are its negative controls),
+`--sabotage store-failure|list-stub|mouse-ignored|name-ignored` are its negative controls),
 `ocs_options_check.py` (which also runs the OCS mouse scenario after both install
 paths) and the installer staging check. The live mouse check is separate and bounded:
 
 ```
-python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode]
+python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode] [--name-entry]
 python3 tools/mouse_live_check.py ocs tmp/build/release/WingCommander --output tmp/mouse-live-ocs [--original-mode] [--setup a500]
 ```
 
