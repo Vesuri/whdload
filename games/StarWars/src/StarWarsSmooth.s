@@ -174,7 +174,7 @@ PLSMOOTH403
 	PL_PSS	$771e,SmTickText,2	; jsr $09a8; clr.w -26430(a4): the text pages
 	PL_PSS	$7734,SmPresent2,8	; cmpi.w #1; bge.s; bra.s; jsr $09c0
 	PL_PSS	$393c,SmTickZoom,2	; the title zooming in
-	PL_PSS	$3956,SmPresent4,8	; (paced to 3 by the fix)
+	PL_PSS	$3956,SmPresent2,8	; cmpi.w #1
 	PL_PSS	$398c,SmTickObiWan,2	; the Obi-Wan text scrolling up
 	PL_PSS	$39dc,SmPresent2,8
 	PL_PSS	$42ce,SmTickCrawl,2	; the flight instructions
@@ -786,11 +786,6 @@ SmPresent3c
 SmPresentSelect
 	CALLG	$59e6			; the wave select loop: its cannons and cockpit
 	bra.b	SmPresent3c		; (recorded), then paced as the fix paces it
-SmPresent4
-	moveq	#4,d0			; the title zoom, waiting for 3 (the fix): jsr $09c0
-	moveq	#3,d1
-	move.w	#$09c0,a1
-	bra.b	SmPresent
 SmPresent2
 	moveq	#2,d0			; the attract loops waiting for 1: jsr $09c0
 	moveq	#1,d1

@@ -110,7 +110,6 @@ Always applied (no option): they repair drawing and sound on faster CPUs and lea
 | $0898, $0a9c, $1a7e, $1aae, $990e, $9942, $9a16, $9a4a, $9b3c, $9b76 | `PL_PSS BlitWait` | every BBUSY poll reads DMACONR once first (WHDLoad's `BLITWAIT`); several polled right after BLTSIZE |
 | $1b2c, $1b86, $1c08 | `PL_P`/`PL_PSS` | the CPU plot, horizontal line and screen clear wait for the blitter first: on a 68000 with the nasty blitter the CPU could not reach Chip RAM during a blit |
 | $9918, $9a20, $1c08 | `PL_PS BlitMasks`; `BlitClear` | the game never writes BLTALWM (the line drawer writes BLTAFWM only, $ffff), so its blits ran with what was there: 0 in FS-UAE, what the OS last left under WHDLoad. The shape drawer $9806 copies a shape clipped at the left or right edge (mask and planes) through a buffer at -26258(a4) with the A channel, and the mask's last word came out opaque: at some crosshair x the left cannons cut a black box (columns 32+shift to 47, or 48+shift to 63) into the WAVE 1 text and Death Star of the wave select. Both copies, and the screen clear, now set BLTAFWM and BLTALWM to $ffff. The only other A-channel user, the rectangle fill $0810 (BLTADAT, the requester box at $03f8), now fills its last word as its word count asks. A 100-step crosshair sweep on a1200-030: holes in the Death Star outline in 4 frames with StingRay's slave, none now; a500-1.5m showed none with either |
-| $3958 | `PL_W 3` | the title zoom's wait (`cmpi.w #1,-26430(a4)`) waits for 3 fields of work: a pass took 2 fields on a1200-030, 4 or 5 on a500-1.5m (which never waits at 3, so it is unchanged) |
 | $26f6, $270c | `PL_PSS SelectStart,2`, `SelectEnd,2` | the wave select loop $26f6-$2720 (stars, cannons, until fire or the counter reaches 500) had no wait: a pass took 3 fields on a500-1.5m, 2 on a1200-030, 1 on a1200-060. Now it notes the counter after the swap wait ($26f6, with the `jsr -32670(a4)` after it) and, after the cannons (`jsr $59e6(pc)` at $270c), waits for 2 more before the swap request, so a pass takes 3 (a500-1.5m unchanged: 3, now and then 4). The counter keeps running for the 10 s timeout. The loop enters at $2714 (`bra.s` from $26f4), so the patch stays before it |
 | $9f7c | `PL_PSS AudioWait,10` | the music player counted a 50-pass CPU loop (about 5 lines on a 68000) between starting channel 0 and writing its repeat pointer; now 8 raster lines by the beam (two periods of period 880). FS-UAE's `AUD0LCH HACK` log lines came from it |
 
@@ -135,7 +134,7 @@ fire, as it does between machines in the original.
 | $514a, $516c | `PL_PS SmPauseOn/Off` | the pause key draws "Game Paused" into the front screen: not recorded |
 | $8962, $b55e, $b63a, $d584 | `PL_PSS SmTick*,2` | game tick start: picks smooth or direct mode, starts recording |
 | $897e, $b612, $b65e, $d5a8 | `PL_PSS SmPresent*,8` | replaces the paced wait and the swap call: calls the swap request ($09c0 or $0a10, its flag suppressed) while recording, then draws and queues the frames |
-| $771e/$7734, $393c/$3956, $398c/$39dc, $42ce/$432c | `PL_PSS SmTick*,2`, `SmPresent*,8` | the attract loops (text pages, title zoom, the Obi-Wan text, the flight instructions): `jsr $09a8; clr.w` at the start, the wait for the counter (1, 2, or the zoom's 3) and `jsr $09c0` at the end |
+| $771e/$7734, $393c/$3956, $398c/$39dc, $42ce/$432c | `PL_PSS SmTick*,2`, `SmPresent*,8` | the attract loops (text pages, title zoom, the Obi-Wan text, the flight instructions): `jsr $09a8; clr.w` at the start, the wait for the counter (1 or 2) and `jsr $09c0` at the end |
 | $389a/$38c0, $43b4/$441c | `PL_PSS SmTick*,4`, `SmPresent2,14` | the credits and the scoring page, which keep the counter running: `jsr $09a8; move.w -26430(a4),-n(a5)` at the start, the wait for 1 more and `jsr $09c0` |
 | $26f6/$270c | `PL_PSS SmTickSelect,2`, `SmPresentSelect,2` | the wave select loop, paced as the fix paces it (n = 3); its cannons are drawn (recorded) before the present |
 
@@ -182,9 +181,9 @@ surface and trench with the trainer):
 | a1200-030 | smooth throughout | 2.81 | 2.97 | average about 280 |
 
 The attract on a1200-030, scene by scene (`tmp/scripts/scenes.sh`): the credits, the
-title zoom (n = 4, frames up to about 380 lines: about 3.6 frames a tick), the Obi-Wan
-text, the flight instructions, the scoring page and the text pages all stayed smooth,
-with no late tick and one dropped frame in 2772 ticks. The wave select (frames about
+title zoom (2 frames a tick: 242 in its 121 ticks), the Obi-Wan text, the flight
+instructions, the scoring page and the text pages all stayed smooth, with no late tick
+and one dropped frame in 2273 ticks. The wave select (frames about
 290-380 lines) gets one in-between frame a tick there; a1200-060 changed the stars on
 every field in the zoom and the Obi-Wan text.
 
