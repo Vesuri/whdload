@@ -53,13 +53,14 @@
  Its left button works as fire: it clicks, skips and continues sequences, and
  fires the guns in flight. On CD32 it also moves the selection box when you
  enter your name. The joystick, CD32 pad and keys work as before.
- In flight the mouse steers like a stick held off centre: move it right to
- turn right and towards you to pull the nose up; the further from centre, the
- faster the turn, and the ship keeps turning until you move it back. The PC
- version's mouse pointer shows the stick position in the front view, behind
- the cockpit, from the gunsight to the sides of the canopy; it appears when
- you move the mouse and hides after 10 seconds without mouse movement. Using
- the joystick or keys to steer re-centres it.
+ In flight the mouse moves the PC version's pointer over the front view,
+ behind the cockpit, and the pointer steers like a stick held off centre:
+ move it right of the gunsight to turn right and below it to pull the nose
+ up; the further from the gunsight, the faster the turn, and the ship keeps
+ turning until you move it back. It reaches the sides and top of the canopy
+ and goes down out of sight behind the instruments. It appears when you move
+ the mouse and hides after 10 seconds without mouse movement. Using the
+ joystick or keys to steer re-centres it.
  On CD32, saving a pilot in the barracks also saves the Training Simulator high
  scores, as Bed_N.hi beside the Bed_N save, and loading that pilot restores
  them. Saves without this file still load, with the game's usual scores.

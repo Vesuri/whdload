@@ -23,7 +23,7 @@ import argparse, ctypes as C, hashlib, json, re, struct
 from pathlib import Path
 from c2p_check import u, ck, P, I, Q, Z
 from runtime_buffers import load as load_slave
-from mouse_model import APERTURE, POINTER, KEY, pointer_at, cockpit, lines
+from mouse_model import APERTURE, POINTER, KEY, Pointer, cockpit
 
 u.uc_emu_stop.argtypes = [P]; u.uc_emu_stop.restype = I
 
@@ -405,7 +405,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         m = Machine(code, blob, cfg, {}, os=True)
         a4 = m.a4
         m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
-        mask_size = 55*44
+        mask_size = 200*44
         assert m.allocs == [(12+mask_size, 0x10000), (44, 0x10002)], m.allocs
         m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
         assert len(m.allocs) == 2, 'pointer allocated twice'
@@ -428,10 +428,11 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         m.call(SLAVE+sy['mouse_scan'], struct.pack('>IIBB', SURFACE, SURFACE+0x800, KEY, 0))
         assert m.read(SURFACE, 4) == struct.pack('>I', SURFACE+0xa00), 'native scan not run with its arguments'
         if name == 'fixed':
-            assert struct.unpack('>h', m.read(SLAVE+sy['mask_top'], 2))[0] == 62-27
+            # The key rows, 10-114.
+            assert struct.unpack('>hh', m.read(SLAVE+sy['mask_top'], 4)) == (10, 105)
             mask = m.read(ANY+12, mask_size)
-            for r in range(55):
-                y = 62-27+r
+            for r in range(105):
+                y = 10+r
                 row = mask[44*r:44*r+44]
                 want = bytes([0])+bytes(sum((cockpit(8*b+i, y) == KEY) << (7-i) for i in range(8)) for b in range(40))+bytes(3)
                 assert row == want, (y, row.hex())
@@ -456,9 +457,17 @@ def steer_cases(cfg, psy, fixed, blob, sy):
             m.call(mc['controller'], b'')
             return struct.unpack('>hh', m.read(a4+mc['ramp'], 4)), [x[:2] for x in m.moves[before:]]
 
-        def at(stick):
-            px, py = pointer_at(stick)
-            return [(px-5, py-4)]
+        # The pointer as the model moves it: two counts a pixel.
+        ptr = Pointer()
+
+        def ev(dx, dy):
+            event(dx, dy); ptr.move(dx, dy)
+
+        def want():
+            return ptr.ramps(), [ptr.sprite()]
+
+        def img():
+            return [(x, x) for x in ptr.lines()]
 
         def image():
             return [struct.unpack('>HH', m.read(CHIP+4+4*r, 4)) for r in range(9)]
@@ -470,90 +479,97 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         # No motion: the native ramps step and decay as before.
         assert steer((5, -3)) == ((3, -1), [])
         assert steer((0, 0), (0, 1, 0, 0, 0))[0] == (0, 1)
-        event(32, 0); tick()
+        ev(160, 0); tick()
         if name == 'psygore':
             assert steer((0, 0))[0] == (0, 0), 'control steered by the mouse'
             assert m.sprites == [] and bplcon4(0, 5) == 0x0011
             out[name] = 'native'
             m.close(); continue
         assert struct.unpack('>I', m.read(a4+mc['slot'], 4))[0] == SLAVE+sy['mouse_event']
-        assert steer((0, 0)) == ((0, 4), at((32, 0))), 'mouse right: yaw right'
+        # 80 pixels right, half way to the aperture's right edge: half yaw.
+        assert ptr.at() == (239, 62) and steer((0, 0)) == want() == ((0, 4), [(234, 58)]), 'mouse right: yaw right'
         # The first showing takes sprite 7 and binds the image; the odd
         # sprites' colour bank is 192 in both lists, the rest of BPLCON4 kept.
         assert m.sprites == [(ANY, 7)] and m.changes == [(ANY, CHIP)]
         assert struct.unpack('>h', m.read(ANY+4, 2))[0] == 9
         assert (bplcon4(0, 5), bplcon4(1, 300)) == (0x001c, 0x00ac)
-        assert image() == [(x, x) for x in lines((32, 0))], image()
-        event(0, 16); tick()
-        assert steer() == ((-2, 4), at((32, 16))), 'mouse down: pitch up (stick back)'
-        assert image() == [(x, x) for x in lines((32, 16))]
+        assert image() == img(), image()
+        # Down as far as right: 26 pixels, two counts a pixel on both axes.
+        ev(0, 52); tick()
+        assert ptr.at() == (239, 88) and steer() == want() and want()[0] == (-3, 4), 'mouse down: pitch up (stick back)'
+        assert image() == img()
         assert len(m.sprites) == 1 and len(m.changes) == 1
         # Held still off centre: the ramps hold, the ship keeps turning.
-        tick(); assert steer() == ((-2, 4), [])
-        # Proportional, with a dead zone of under one step, to full deflection:
-        # the aperture's right edge and 23 pixels down.
-        event(-25, -11); tick(); assert steer()[0] == (0, 0)
-        event(1000, 1000); tick(); assert steer() == ((-9, 9), [(319-5, 62+23-4)])
-        assert image() == [(x, x) for x in lines((72, 72))]
-        event(-144, -144); tick(); assert steer() == ((9, -9), [(0-5, 62-23-4)])
-        assert image() == [(x, x) for x in lines((-72, -72))]
+        tick(); assert steer() == (want()[0], [])
+        # Proportional, with a dead zone of under one step.
+        ev(-150, -40); tick(); assert steer() == want() and want()[0] == (0, 0)
+        # Full deflection at the limits: the aperture's right edge and
+        # REACH_BELOW under its last row, hidden there; its left and top edges.
+        ev(1000, 1000); tick(); assert steer() == want() == ((-9, 9), [(319-5, 114+13-4)])
+        assert image() == img() == [(0, 0)]*9
+        ev(-2000, -2000); tick(); assert steer() == want() == ((9, -9), [(0-5, 10-4)])
+        assert image() == img() and image() != [(0, 0)]*9
         # Pixels over the cockpit are left out (the solid ones beside the centre).
-        event(72, 72); tick(); steer()
-        assert image() == [(x, x) for x in lines((0, 0))] and image()[0][0] != POINTER[0]
-        event(-80, 0); tick(); assert steer()[0] == (0, -9)
+        ev(318, 104); tick(); steer()
+        assert ptr.at() == (159, 62) and image() == img() and image()[0][0] != POINTER[0]
+        ev(-160, 0); tick(); assert steer() == want() and want()[0] == (0, -4)
         out['motion'] = 'pass'
         # A new copper list is found again; a list without BPLCON4 is left alone.
         new = COPPER+0x1800
         m.write(new, struct.pack('>HHHHHH', 0x0100, 0x0211, 0x010c, 0x0011, 0xffff, 0xfffe))
         m.write(COPPER+4, struct.pack('>I', new))
         m.write(lists[1], struct.pack('>HH', 0xffff, 0xfffe))
-        event(1, 0); tick(); steer()
+        ev(1, 0); tick(); steer()
         assert struct.unpack('>H', m.read(new+6, 2))[0] == 0x001c
         out['colour_bank'] = 'pass'
         # The stick or keys steer: re-centred, pointer hidden, native ramps.
         tick(); assert steer((0, -9), (0, 1, 0, 0, 0)) == ((0, 1), []) and not shown()
+        ptr.centre()
         tick(); assert steer((0, 0)) == ((0, 0), []), 'not re-centred'
-        event(-8, 0); tick(); assert steer() == ((0, -1), at((-8, 0))) and shown()
+        ev(-80, 0); tick(); assert steer() == want() and want()[0] == (0, -2) and shown()
         # The modifier routes the stick to throttle and roll: the mouse still steers.
-        event(8, 8); tick()
-        assert steer(flags=(1, 0, 0, 0, 1)) == ((-1, 0), at((0, 8)))
+        ev(80, 80); tick()
+        assert steer(flags=(1, 0, 0, 0, 1)) == want() and want()[0] == (-5, 0)
         out['stick'] = 'pass'
         # Other cockpit views: steering, no pointer; the external view: neither.
-        event(40, 0); tick()
+        ev(160, 0); tick()
         r, moves = steer(view=1)
-        assert r == (-1, 5) and moves == [] and not shown()
-        tick(); assert steer(view=0)[1] == at((40, 8))
+        assert r == ptr.ramps() == (-5, 4) and moves == [] and not shown()
+        tick(); assert steer(view=0)[1] == [ptr.sprite()]
         tick(); assert steer((3, 3), view=8) == ((1, 1), []) and not shown()
+        ptr.centre()
         tick(); assert steer((0, 0))[0] == (0, 0), 'not re-centred after the external view'
         out['views'] = 'pass'
         # Idle: the pointer hides after 500 fields without motion (at the 501st) while the
         # ship keeps turning, and shows again on the next motion.
-        event(24, 0); tick(); steer()
+        ev(160, 0); tick(); steer()
         for _ in range(500):
-            tick(); assert steer() == ((0, 3), [])
+            tick(); assert steer() == ((0, 4), [])
         assert shown()
         tick(); assert not shown(), 'idle pointer not hidden'
-        tick(); assert steer() == ((0, 3), []) and not shown(), 'idle pointer shown again'
-        event(1, 0); tick(); assert steer() == ((0, 3), at((25, 0))), 'pointer not shown on motion'
+        tick(); assert steer() == ((0, 4), []) and not shown(), 'idle pointer shown again'
+        ev(1, 0); tick(); assert steer() == want(), 'pointer not shown on motion'
         out['idle'] = 'pass'
         # VBL: hides the pointer once the controller stops.
-        event(16, 0); tick(); steer()
+        ev(16, 0); tick(); steer()
         tick(25); assert shown()
         tick(); assert not shown(), 'pointer not hidden after the controller stopped'
         tick(25)        # a new flight after a gap: re-centred
         event(16, 0); tick(); assert steer((0, 0))[0] == (0, 0)
-        event(16, 0); tick(); assert steer()[0] == (0, 2)
+        ptr.centre()
+        ev(160, 0); tick(); assert steer()[0] == ptr.ramps() == (0, 4)
         assert len(m.sprites) == 1 and len(m.changes) == 1, 'sprite taken or bound again'
         out['hide'] = 'pass'
         m.close()
         # Sprite 7 taken: no pointer, asked once; the mouse still steers.
         m = Machine(code, blob, cfg, {}, os=True)
         m.sprite_free = False
+        m.write(m.a4+mc['aperture'], struct.pack('>6h', *APERTURE))
         m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
         for _ in range(100):
             m.call(SLAVE+sy['mouse_vbl'], b'')
         for _ in range(2):
-            m.write(EVENT, struct.pack('>IBBHHhh', 0, 2, 0, 0xff, 0x8000, 32, 0))
+            m.write(EVENT, struct.pack('>IBBHHhh', 0, 2, 0, 0xff, 0x8000, 160, 0))
             m.call(SLAVE+sy['mouse_event'], b'', [(4, EVENT)])
             m.call(SLAVE+sy['mouse_vbl'], b'')
             m.write(m.a4+mc['flags'], bytes(5)); m.write(m.a4+mc['view'], bytes(2))
@@ -573,7 +589,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         for _ in range(100):
             m.call(SLAVE+sy['mouse_vbl'], b'')
         for case in ('native', 'pointer'):
-            m.write(EVENT, struct.pack('>IBBHHhh', 0, 2, 0, 0xff, 0x8000, 24, -24))
+            m.write(EVENT, struct.pack('>IBBHHhh', 0, 2, 0, 0xff, 0x8000, 160, -52))
             m.call(SLAVE+sy['mouse_event'], b'', [(4, EVENT)])
             m.call(SLAVE+sy['mouse_vbl'], b'')
             m.write(STACK-4, struct.pack('>I', STOP))
@@ -587,7 +603,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
             # d2/d3 carry the ramps; the controller restores them on return.
             assert all(m.reg(r) == v for r, v in vals.items() if case == 'native' or r not in (11, 12)), case
             ramps = struct.unpack('>hh', m.read(a4+mc['ramp'], 4))
-            assert ramps == ((7, -3) if case == 'native' else (3, 3)), (case, ramps)
+            assert ramps == ((7, -3) if case == 'native' else Pointer().move(160, -52).ramps()), (case, ramps)
         assert len(m.moves) == 1 and m.changes == [(ANY, CHIP)]
         # The scan hook keeps d2-d7/a2-a6 and the stack, and passes the scan its arguments.
         m.write(SURFACE, struct.pack('>I', SURFACE+0x100)); m.write(SURFACE+24, struct.pack('>4h', 0, 0, 319, 199))
@@ -685,7 +701,7 @@ def main():
             at = blob.index(bytes.fromhex('d36f001c'), sy['mouse_name'])
             blob[at:at+4] = bytes.fromhex('4e714e71')
         elif a.sabotage == 'steer-ignored':  # the yaw ramp never takes the stick position
-            at = blob.index(bytes.fromhex('3601'), sy['mouse_steer'])
+            at = blob.index(bytes.fromhex('3600'), sy['mouse_steer'])   # move.w d0,d3
             blob[at:at+2] = bytes.fromhex('4e71')
         elif a.sabotage == 'mask-ignored':  # the pointer drawn over the cockpit too
             at = blob.index(bytes.fromhex('c052'), sy['stick_show'])

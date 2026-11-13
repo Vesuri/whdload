@@ -59,10 +59,11 @@ python3 tools/mouse_live_check.py ocs tmp/build/release/WingCommander --output t
 ```
 
 `--flight` continues into the simulator flight that starts the Vega campaign
-(OCS moves the pointer onto Vega first), moves the mouse in four steps and reads
-the pitch and yaw ramps, the stick, the aperture block, sprite 7's position and
+(OCS moves the pointer onto Vega first), moves the mouse in five steps (right,
+down, to both corner limits, along the top) and reads the pitch and yaw ramps,
+the pointer offset, the stick, the aperture block, sprite 7's position and
 image and (CD32) both flight copper lists' BPLCON4 at the controller's ramp
-store after each. It checks the position and image against
+store after each. It checks the pointer, stick and image against
 `tools/mouse_model.py` and each image pixel in the screenshot `flight-*.png`,
 in the pointer colour (playfield origin (74, 92), two screen pixels a pixel).
 

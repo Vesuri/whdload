@@ -24,7 +24,7 @@ import wc_run
 from amigaxdev import barto
 from ocs_reconstruct import ROOT, new_output
 from variants import get
-from mouse_model import POINTER, pointer_at
+from mouse_model import POINTER, Pointer
 from PIL import Image
 
 # Per game: A4 offsets of the room pointer position, the pointer SimpleSprite
@@ -145,10 +145,10 @@ def main():
         return dict(columns=width, start=start, moved=moved, picked=code)
 
     def flight():
-        # The simulator flight: the controller's ramp stores (the slave's
-        # mouse_steer). Mouse right and down: yaw right, pitch up (stick back),
-        # in proportion; the pointer (sprite 7, the slave's image) moves the
-        # same way over the cockpit aperture, behind the cockpit.
+        # The flight: the controller's ramp stores (the slave's mouse_steer).
+        # The pointer (sprite 7, the slave's image) moves with the mouse, two
+        # counts a pixel, behind the cockpit; mouse right and down: yaw right,
+        # pitch up (stick back), in proportion to its place.
         site, ramp, view, aperture, copper = game['flight']
         if ocs:
             sym = json.loads((a.build/'build.json').read_text())['symbols']
@@ -164,6 +164,7 @@ def main():
             ss, image = var('stick_ss', 'int'), var('stick_image', 'int')
             row = dict(pitch=number(f'*(short*){a4+ramp:#x}'), yaw=number(f'*(short*){a4+ramp+2:#x}'),
                        view=number(f'*(short*){a4+view:#x}'), stick=(var('stick_x'), var('stick_y')),
+                       pointer=(var('stick_ptr'), number(f'*(short*){sb+sym["stick_ptr"]+2:#x}')),
                        aperture=[number(f'*(short*){a4+aperture+2*i:#x}') for i in range(6)],
                        sprite=(number(f'*(short*){ss+6:#x}'), number(f'*(short*){ss+8:#x}')),
                        number=number(f'*(short*){ss+10:#x}'), control=number(f'*(int*){image:#x}'),
@@ -182,7 +183,7 @@ def main():
             return drawn, all(image.getpixel((74+2*px, 92+2*py)) == colour for px, py in drawn)
         rows = [dict(motion=(0, 0), **state())]
         shot('flight-before')
-        for dx, dy, n in ((4, 0, 8), (0, 4, 4), (4, 4, 30), (-12, -12, 16)):
+        for dx, dy, n in ((8, 0, 20), (0, 4, 13), (40, 40, 30), (-40, -40, 60), (8, 0, 55)):
             for _ in range(n):
                 cmd(f'monitor mouse {dx} {dy}'); cmd('monitor fields 1')
             cmd('monitor fields 4')
@@ -191,25 +192,35 @@ def main():
             drawn, ok = pixels(rows[-1], f'flight-{len(rows)-1}')
             rows[-1].update(drawn=len(drawn), on_screen=ok)
         # The world tick's ramps can lag the pointer by a call. Right: yaw +;
-        # down: pitch - (stick back); full deflection +-9.
+        # down: pitch - (stick back); full deflection +-9 at the limits.
         r = rows
         assert r[0]['view'] == 0 and r[0]['control'] == 0 and r[1]['yaw'] > 0 and r[1]['pitch'] == 0 and r[2]['pitch'] < 0, r
         assert (r[3]['pitch'], r[3]['yaw']) == (-9, 9) and (r[4]['pitch'], r[4]['yaw']) == (9, -9), r
-        assert [x['stick'] for x in r[1:]] == [(32, 0), (32, 16), (72, 72), (-72, -72)], r
+        ptr = Pointer(tuple(r[1]['aperture']))
         for x in r[1:]:
-            # Sprite 7, shown at the stick's place in the aperture; its lines
-            # are the PC pointer's, in colour 3 (both planes), less the
-            # pixels over the cockpit, and they are on screen in its colour.
-            px, py = pointer_at(x['stick'], x['aperture'])
-            assert x['number'] == 7 and x['control'] != 0 and x['sprite'] == (px-5, py-4), x
+            # Sprite 7 where the model's pointer is; its lines are the PC
+            # pointer's, in colour 3 (both planes), less the pixels over the
+            # cockpit, and they are on screen in its colour.
+            ptr.move(*x['motion'])
+            assert x['pointer'] == (ptr.x, ptr.y) and x['stick'] == ptr.stick(), (x, ptr.x, ptr.y)
+            assert x['number'] == 7 and x['control'] != 0 and x['sprite'] == ptr.sprite(), x
             assert all(v >> 16 == v & 0xffff and v >> 16 & ~POINTER[i] == 0 for i, v in enumerate(x['lines'])), x
-            assert x['drawn'] > 0 and x['on_screen'], x
+            assert x['on_screen'], x
             if copper:
                 assert all(v & 0x0f == 12 for v in x['bplcon4']), x
-        # On the aperture's edges, the half of the pointer outside it is over
-        # the cockpit: the right half at full right, the left half at full left.
-        assert all(v >> 16 & 0x0780 == 0 for v in r[3]['lines']), r[3]
+        # Half way right, then as far down: the same pixels on both axes.
+        w, h, cx, cy, left, top = r[1]['aperture']
+        assert r[1]['sprite'] == (cx+80-5, cy-4) and r[2]['sprite'] == (cx+80-5, cy+26-4), r
+        assert r[1]['drawn'] > 0 and r[2]['drawn'] > 0, r
+        # Bottom right: under the aperture's last row, wholly behind the cockpit.
+        # Top left: the aperture's corner; the parts outside it are over the
+        # cockpit (all of it in the Hornet, behind the canopy strut). Then right
+        # along the top edge, where its lower half shows under the canopy frame.
+        assert r[3]['sprite'] == (left+w-1-5, top+h-1+13-4) and r[3]['drawn'] == 0, r[3]
+        assert r[4]['sprite'] == (left-5, top-4), r[4]
         assert all(v >> 16 & 0xf000 == 0 for v in r[4]['lines']), r[4]
+        assert r[5]['sprite'][1] == top-4 and r[5]['sprite'][0] > cx and r[5]['drawn'] > 0, r[5]
+        assert all(v == 0 for x in r[4:] for v in x['lines'][:4]), r[4:]
         return rows
 
     rows = {}

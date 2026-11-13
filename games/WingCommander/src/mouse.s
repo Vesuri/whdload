@@ -9,16 +9,17 @@
 ; the pointer is not hidden. The variant supplies the left button as port-1
 ; fire and calls mouse_init with its parameter table and game H0 base.
 ;
-; Mouse flight: a virtual stick. The flight controller's ramp stores call
-; mouse_steer, which adds the mouse motion since its last call to a stick
-; position and sets the pitch and yaw ramps in proportion to it, as a held
-; stick does; the ship keeps turning while the mouse is held off centre. The
-; pointer, the PC version's 9x9 one, shows that position in the forward view:
-; from the gunsight, which is the centre of the cockpit aperture, to the
-; aperture's left and right edges and 23 pixels up or down. It is sprite 7
-; with its own images, behind the cockpit: the two calls of the native
-; aperture scan also copy the cockpit's transparent pixels near the gunsight
-; into a mask, and the pointer image keeps only the pixels over them.
+; Mouse flight: a pointer that is a virtual stick. The flight controller's
+; ramp stores call mouse_steer, which moves the pointer by the mouse motion
+; since its last call, two counts a pixel as in the rooms, and sets the pitch
+; and yaw ramps in proportion to its place, as a held stick does; the ship
+; keeps turning while the pointer is off centre. From the gunsight, the centre
+; of the cockpit aperture, it reaches the aperture's left, right and top edges
+; at full deflection, and REACH_BELOW pixels under its last row, where the
+; cockpit hides it. The pointer, the PC version's 9x9 one, shows in the
+; forward view. It is sprite 7 with its own images, behind the cockpit: the
+; two calls of the native aperture scan also copy the cockpit's transparent
+; pixels into a mask, and the pointer image keeps only the pixels over them.
 ; Sprite 7's colour 3 is colour 31, white on OCS; on CD32 the slave moves the
 ; odd sprites' colour bank in the flight copper lists to 192, which makes it
 ; colour 207, the PC pointer's own (243,255,235).
@@ -39,18 +40,16 @@ MP_APERTURE = 18                ; A4 offset: aperture width, height, centre x, y
 MP_COPPER = 20                  ; A4 offset: the two flight copper lists (0: no colour bank)
 MP_SCAN = 22                    ; H0 offset: native aperture scan (long)
 
-STICK_RANGE = 72                ; mouse counts from centre to full deflection
-STICK_STEP = 8                  ; counts per ramp step: ramps reach +-9
+STICK_RANGE = 72                ; stick units from centre to full deflection
+STICK_STEP = 8                  ; stick units per ramp step: ramps reach +-9
 FLIGHT_GAP = 50                 ; fields without a controller call: a new flight
 HIDE_GAP = 25                   ; fields without one before the pointer hides
 IDLE_GAP = 500                  ; fields without motion before it hides (10 s PAL)
-REACH_Y = 23                    ; pointer pixels from the gunsight at full pitch
+REACH_BELOW = 13                ; pointer limit under the aperture: one pointer height
 POINTER_SPRITE = 7              ; odd: its colour bank leaves sprites 0-6 alone
 SPRITE_BANK = 12                ; odd sprites' colours from 192: sprite 7 colour 3 is 207
-MASK_REACH = REACH_Y+4          ; mask rows from the gunsight row, either side
-MASK_ROWS = 2*MASK_REACH+1
 MASK_STRIDE = 44                ; bytes per mask row: a pad byte, 40, three pad bytes
-MASK_SIZE = MASK_ROWS*MASK_STRIDE
+MASK_SIZE = 200*MASK_STRIDE     ; the aperture's rows at most
 SS_SIZE = 12                    ; SimpleSprite: posctldata.l, height, x, y, num
 
 ; a0 = parameter table, d0 = game H0 base.
@@ -259,30 +258,44 @@ mouse_steer:
         tst.l   (a4,d1.w)
         bne.w   .centre                 ; the stick or keys steer
 .mouse:
-        move.w  d0,d5
-        or.w    d4,d5
+        move.w  d0,d6
+        or.w    d4,d6                   ; moved at all
         beq.s   .still
         move.w  #1,ST_USED(a2)
         move.w  mouse_fields(pc),ST_MOVED(a2)
 .still:
         tst.w   ST_USED(a2)
         beq.w   .store                  ; not used this flight: native ramps
-        move.w  (a2),d1
-        bsr.w   .add
-        move.w  d1,(a2)
-        ext.l   d1
-        divs.w  #STICK_STEP,d1
-        move.w  d1,d3
-        move.w  d0,d6                   ; x moved
-        move.w  2(a2),d1
+        move.w  MP_APERTURE(a1),d1
+        lea     (a4,d1.w),a0            ; width, height, centre x, y, left, top
+        move.w  4(a0),d5
+        sub.w   8(a0),d5                ; left reach: centre - left
+        move.w  8(a0),d7
+        add.w   (a0),d7
+        subq.w  #1,d7
+        sub.w   4(a0),d7                ; right reach: right - centre
+        move.w  ST_PTR(a2),d1
+        bsr.w   .axis
+        move.w  d1,ST_PTR(a2)
+        move.w  d0,(a2)
+        ext.l   d0
+        divs.w  #STICK_STEP,d0
+        move.w  d0,d3                   ; yaw
+        move.w  6(a0),d5
+        sub.w   10(a0),d5               ; up reach: centre - top
+        move.w  10(a0),d7
+        add.w   2(a0),d7
+        addi.w  #REACH_BELOW-1,d7
+        sub.w   6(a0),d7                ; down reach: bottom + REACH_BELOW - centre
+        move.w  ST_PTR+2(a2),d1
         move.w  d4,d0
-        bsr.w   .add
-        move.w  d1,2(a2)
-        ext.l   d1
-        divs.w  #STICK_STEP,d1
-        neg.w   d1
-        move.w  d1,d2
-        or.w    d4,d6                   ; moved at all
+        bsr.w   .axis
+        move.w  d1,ST_PTR+2(a2)
+        move.w  d0,2(a2)
+        ext.l   d0
+        divs.w  #STICK_STEP,d0
+        neg.w   d0
+        move.w  d0,d2                   ; pitch
         move.w  MP_VIEW(a1),d1
         tst.w   (a4,d1.w)
         bne.s   .hide                   ; the pointer is for the forward view
@@ -299,6 +312,7 @@ mouse_steer:
         bra.s   .store
 .centre:
         clr.l   (a2)
+        clr.l   ST_PTR(a2)
         clr.w   ST_USED(a2)
 .hide:
         bsr.w   stick_hide
@@ -310,17 +324,40 @@ mouse_steer:
         movem.l (sp)+,d0-d1/d4-d7/a0-a3/a5-a6
         addq.l  #2,(sp)                 ; past the displaced store's last word
         rts
-; d1 = stick + d0, clamped to +-STICK_RANGE.
-.add:
+; d1 = pointer offset (half pixels) + d0, clamped to -2*d5..2*d7 (the reaches
+; in pixels, at least 1 each); d0 = the stick, STICK_RANGE at either limit,
+; towards zero. Uses d5/d7.
+.axis:
         add.w   d0,d1
-        cmpi.w  #-STICK_RANGE,d1
+        moveq   #1,d0
+        cmp.w   d0,d5
+        bge.s   .r5
+        move.w  d0,d5
+.r5:
+        cmp.w   d0,d7
+        bge.s   .r7
+        move.w  d0,d7
+.r7:
+        add.w   d5,d5
+        add.w   d7,d7
+        move.w  d5,d0
+        neg.w   d0
+        cmp.w   d0,d1
         bge.s   .low
-        moveq   #-STICK_RANGE,d1
+        move.w  d0,d1
 .low:
-        cmpi.w  #STICK_RANGE,d1
+        cmp.w   d7,d1
         ble.s   .high
-        moveq   #STICK_RANGE,d1
+        move.w  d7,d1
 .high:
+        move.w  d1,d0
+        muls.w  #STICK_RANGE,d0
+        tst.w   d1
+        bmi.s   .left
+        divs.w  d7,d0
+        rts
+.left:
+        divs.w  d5,d0
         rts
 
 ; From the variant's VBL hook, every field: counts fields and hides a shown
@@ -362,7 +399,7 @@ stick_hide:
         movem.l (sp)+,d0/a0
         rts
 
-; Show the flight pointer at the stick position (from mouse_steer, a4 = game
+; Show the flight pointer at its position (from mouse_steer, a4 = game
 ; A4). The first showing allocates sprite 7 and binds the image, still blank;
 ; without the sprite there is no pointer. Keeps every register.
 stick_show:
@@ -391,30 +428,17 @@ stick_show:
         jsr     -420(a6)                ; ChangeSprite
 .owned:
         bsr.w   stick_bank
-        ; From the aperture centre to its left or right edge, and REACH_Y
-        ; pixels up or down, at full deflection.
+        ; The gunsight plus the pointer offset.
         movea.l mouse_params(pc),a1
         move.w  MP_APERTURE(a1),d0
         lea     (a4,d0.w),a0            ; width, height, centre x, y, left, top
-        lea     stick_x(pc),a2
-        move.w  4(a0),d4
-        move.w  d4,d1
-        sub.w   8(a0),d1                ; centre - left
-        move.w  (a2),d0
-        bmi.s   .reach
-        move.w  8(a0),d1
-        add.w   (a0),d1
-        subq.w  #1,d1
-        sub.w   d4,d1                   ; right - centre
-.reach:
-        muls.w  d1,d0
-        divs.w  #STICK_RANGE,d0
-        add.w   d0,d4                   ; pointer centre x
-        move.w  2(a2),d0
-        muls.w  #REACH_Y,d0
-        divs.w  #STICK_RANGE,d0
-        move.w  6(a0),d5
-        add.w   d0,d5                   ; pointer centre y
+        lea     stick_ptr(pc),a2
+        move.w  (a2)+,d4
+        asr.w   #1,d4
+        add.w   4(a0),d4                ; pointer centre x
+        move.w  (a2),d5
+        asr.w   #1,d5
+        add.w   6(a0),d5                ; pointer centre y
         tst.w   d4
         bpl.s   .xlow
         moveq   #0,d4
@@ -447,7 +471,7 @@ stick_show:
         moveq   #POINTER_H-1,d2
 .line:
         moveq   #0,d0
-        cmpi.w  #MASK_ROWS,d6
+        cmp.w   mask_rows(pc),d6
         bhs.s   .put                    ; outside the mask rows: hidden
         move.w  d6,d1
         mulu.w  #MASK_STRIDE,d1
@@ -531,11 +555,10 @@ stick_bank:
 ; Replaces both calls of the native cockpit aperture scan (a 6-byte jsr; on
 ; the stack the surface, the span output and the transparent key byte; a4 =
 ; game A4). Before the scan, which redirects the surface's aperture rows to
-; new scratch rows, copies the key pixels of the rows within MASK_REACH of the
-; aperture's centre row into the pointer mask: a bit is set where the view
-; shows through. The centre row is the native one: halfway between the first
-; and the last rows with a key pixel. Then runs the scan with the caller's
-; stack. Keeps d2-d7/a2-a6 as a C call.
+; new scratch rows, copies the key pixels of the rows from the first to the
+; last with a key pixel into the pointer mask: a bit is set where the view
+; shows through. Then runs the scan with the caller's stack. Keeps d2-d7/a2-a6
+; as a C call.
 mouse_scan:
         movem.l d0-d7/a0-a3,-(sp)       ; arguments from 52(sp)
         move.l  stick_ss(pc),d0
@@ -562,26 +585,18 @@ mouse_scan:
         subq.w  #1,d7
         bra.s   .last
 .none:
-        move.w  #1000,d6                ; every pointer line outside the mask
-        lea     mask_top(pc),a0
-        move.w  d6,(a0)
+        lea     mask_rows(pc),a0        ; every pointer line outside the mask
+        clr.w   (a0)
         bra.w   .native
 .bottom:
-        addq.w  #1,d7
-        sub.w   d6,d7
-        lsr.w   #1,d7
-        add.w   d7,d6                   ; centre row
-        subi.w  #MASK_REACH,d6          ; first mask row
         lea     mask_top(pc),a0
-        move.w  d6,(a0)
-        moveq   #MASK_ROWS-1,d7
+        move.w  d6,(a0)+
+        sub.w   d6,d7                   ; rows - 1
+        move.w  d7,(a0)
+        addq.w  #1,(a0)                 ; mask_rows
 .row:
         movea.l a1,a3
         moveq   #40-1,d2
-        cmp.w   26(a2),d6
-        blt.s   .clear
-        cmp.w   30(a2),d6
-        bgt.s   .clear
         movea.l (a2),a0
         move.w  d6,d0
         lsl.w   #2,d0
@@ -620,10 +635,6 @@ mouse_scan:
         dbf     d5,.bpixel
         move.b  d4,(a3)+
         dbf     d2,.bbyte
-        bra.s   .next
-.clear:
-        clr.b   (a3)+
-        dbf     d2,.clear
 .next:
         lea     MASK_STRIDE(a1),a1
         addq.w  #1,d6
@@ -664,6 +675,7 @@ ST_FIELD = 8
 ST_USED = 10
 ST_SHOWN = 12
 ST_MOVED = 14
+ST_PTR = 16                     ; pointer offset from the gunsight, half pixels: x.w, y.w
 
         cnop    0,4
 mouse_a4:       dc.l 0
@@ -677,15 +689,17 @@ mouse_active:   dc.w 0
 mouse_sum_x:    dc.w 0                  ; counts, wrapping; mouse_sum_y follows
 mouse_sum_y:    dc.w 0
 mouse_fields:   dc.w 0                  ; VBL fields (mouse_vbl)
-stick_x:        dc.w 0                  ; counts from centre; stick_y follows
+stick_x:        dc.w 0                  ; stick units from centre (+-72); stick_y follows
 stick_y:        dc.w 0
 stick_last:     dc.w 0,0                ; mouse_sum_x/y at the last call
 stick_field:    dc.w 0                  ; mouse_fields at the last call
 stick_used:     dc.w 0                  ; the mouse has steered this flight
 stick_shown:    dc.w 0                  ; the pointer is on screen
 stick_moved:    dc.w 0                  ; mouse_fields at the last motion
+stick_ptr:      dc.w 0,0                ; pointer offset from the gunsight, half pixels
 stick_owned:    dc.w 0                  ; sprite 7: 0 not yet, 1 ours, -1 taken
 mask_top:       dc.w 0                  ; screen row of the mask's first row
+mask_rows:      dc.w 0                  ; mask rows (0: no aperture)
         cnop    0,4
 stick_image:    dc.l 0                  ; Chip pointer image, 0 without one
 stick_ss:       dc.l 0                  ; SimpleSprite, then the mask
