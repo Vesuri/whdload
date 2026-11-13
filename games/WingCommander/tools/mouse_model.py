@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Expected mouse flight pointer for the checks (src/mouse.s): the pointer
-moves with the mouse, two counts a pixel, within its limits around the
-gunsight; the stick and the ramps follow from its place. Also a synthetic
-cockpit and the masked image lines."""
+moves with the mouse, two counts a pixel, anywhere on the screen from the
+gunsight; the stick and the ramps follow from its place in the PC version's
+steps. Also a synthetic cockpit and the masked image lines."""
 
 APERTURE = (320, 105, 159, 62, 0, 10)      # width, height, centre x, y, left, top (Nav-1)
 POINTER = (0x1c00, 0x6b00, 0x4900, 0x8080, 0xeb80, 0x8080, 0x4900, 0x6b00, 0x1c00)
 KEY = 17
-STICK_RANGE = 72
-REACH_BELOW = 13        # pixels past the aperture's last row: the pointer one height under it
+STICK_LEVEL = 9         # stick units per PC step
+STEPS_X = (10, 37, 52, 57, 62)     # WC.EXE: a step more from each distance
+STEPS_Y = (5, 18, 27, 35, 38)
+SCREEN = (319, 199)
 
 
 def toward_zero(a, b):
@@ -16,10 +18,16 @@ def toward_zero(a, b):
     return q if a >= 0 else -q
 
 
-def limits(ap=APERTURE):
-    """Pixels from the gunsight to the pointer's left, right, top and bottom limits."""
-    w, h, cx, cy, x0, y0 = ap
-    return tuple(max(v, 1) for v in (cx-x0, x0+w-1-cx, cy-y0, y0+h-1+REACH_BELOW-cy))
+def level(pixel, centre, first, last, steps):
+    """The PC's stick step for a pointer pixel: 8 within 4 pixels of the
+    aperture's edges, else the steps reached by the distance from the centre."""
+    if pixel-4 <= first:
+        return -8
+    if pixel+4 >= last:
+        return 8
+    d = pixel-centre
+    n = sum(1 for t in steps if abs(d) >= t)
+    return n if d >= 0 else -n
 
 
 class Pointer:
@@ -29,9 +37,9 @@ class Pointer:
         self.ap, self.x, self.y = ap, 0, 0
 
     def move(self, dx, dy):
-        left, right, up, down = limits(self.ap)
-        self.x = min(max(self.x+dx, -2*left), 2*right)
-        self.y = min(max(self.y+dy, -2*up), 2*down)
+        cx, cy = self.ap[2], self.ap[3]
+        self.x = min(max(self.x+dx, -2*cx), 2*(SCREEN[0]-cx)+1)
+        self.y = min(max(self.y+dy, -2*cy), 2*(SCREEN[1]-cy)+1)
         return self
 
     def centre(self):
@@ -39,9 +47,10 @@ class Pointer:
         return self
 
     def stick(self):
-        left, right, up, down = limits(self.ap)
-        return (toward_zero(self.x*STICK_RANGE, 2*(right if self.x >= 0 else left)),
-                toward_zero(self.y*STICK_RANGE, 2*(down if self.y >= 0 else up)))
+        w, h, cx, cy, x0, y0 = self.ap
+        px, py = self.at()
+        return (STICK_LEVEL*level(px, cx, x0, x0+w-1, STEPS_X),
+                STICK_LEVEL*level(py, cy, y0, y0+h-1, STEPS_Y))
 
     def ramps(self):
         """(pitch, yaw): mouse right is yaw +, mouse down pitch - (stick back)."""
@@ -51,7 +60,7 @@ class Pointer:
     def at(self):
         """The pointer's centre pixel."""
         cx, cy = self.ap[2], self.ap[3]
-        return min(max(cx+(self.x >> 1), 0), 319), min(max(cy+(self.y >> 1), 0), 199)
+        return cx+(self.x >> 1), cy+(self.y >> 1)
 
     def sprite(self):
         """MoveSprite's position: sprite pixel 0 is at x+1."""

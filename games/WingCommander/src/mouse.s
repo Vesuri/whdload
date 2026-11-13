@@ -9,14 +9,18 @@
 ; the pointer is not hidden. The variant supplies the left button as port-1
 ; fire and calls mouse_init with its parameter table and game H0 base.
 ;
-; Mouse flight: a pointer that is a virtual stick. The flight controller's
+; Mouse flight: the PC version's pointer and stick. The flight controller's
 ; ramp stores call mouse_steer, which moves the pointer by the mouse motion
-; since its last call, two counts a pixel as in the rooms, and sets the pitch
-; and yaw ramps in proportion to its place, as a held stick does; the ship
-; keeps turning while the pointer is off centre. From the gunsight, the centre
-; of the cockpit aperture, it reaches the aperture's left, right and top edges
-; at full deflection, and REACH_BELOW pixels under its last row, where the
-; cockpit hides it. The pointer, the PC version's 9x9 one, shows in the
+; since its last call, two counts a pixel as in the rooms (and as the PC's
+; default mouse driver), anywhere on the screen. It starts on the gunsight,
+; the centre of the cockpit aperture, and the pitch and yaw ramps follow from
+; its place as the PC sets its stick: its distance from the gunsight on each
+; axis, in the PC's steps, gives 0 to 5 steps, and within 4 pixels of the
+; aperture's edges or past them full deflection; the ship keeps turning while
+; the pointer is off centre. (The PC measures from the middle of a window
+; that it places at the screen's top left; here it is the aperture, so that
+; the gunsight is the centre in the cockpit and in the Training Simulator.)
+; The pointer, the PC version's 9x9 one, shows in the
 ; forward view. It is sprite 7 with its own images, behind the cockpit: the
 ; two calls of the native aperture scan also copy the cockpit's transparent
 ; pixels into a mask, and the pointer image keeps only the pixels over them.
@@ -40,12 +44,11 @@ MP_APERTURE = 18                ; A4 offset: aperture width, height, centre x, y
 MP_COPPER = 20                  ; A4 offset: the two flight copper lists (0: no colour bank)
 MP_SCAN = 22                    ; H0 offset: native aperture scan (long)
 
-STICK_RANGE = 72                ; stick units from centre to full deflection
+STICK_LEVEL = 9                 ; stick units per PC step: steps 1-5 and 8 give ramps 1-5 and 9
 STICK_STEP = 8                  ; stick units per ramp step: ramps reach +-9
 FLIGHT_GAP = 50                 ; fields without a controller call: a new flight
 HIDE_GAP = 25                   ; fields without one before the pointer hides
 IDLE_GAP = 500                  ; fields without motion before it hides (10 s PAL)
-REACH_BELOW = 13                ; pointer limit under the aperture: one pointer height
 POINTER_SPRITE = 7              ; odd: its colour bank leaves sprites 0-6 alone
 SPRITE_BANK = 12                ; odd sprites' colours from 192: sprite 7 colour 3 is 207
 MASK_STRIDE = 44                ; bytes per mask row: a pad byte, 40, three pad bytes
@@ -268,12 +271,14 @@ mouse_steer:
         beq.w   .store                  ; not used this flight: native ramps
         move.w  MP_APERTURE(a1),d1
         lea     (a4,d1.w),a0            ; width, height, centre x, y, left, top
-        move.w  4(a0),d5
-        sub.w   8(a0),d5                ; left reach: centre - left
-        move.w  8(a0),d7
-        add.w   (a0),d7
-        subq.w  #1,d7
-        sub.w   4(a0),d7                ; right reach: right - centre
+        movea.w d4,a6                   ; y motion
+        move.w  4(a0),d5                ; x: centre, the screen's last column,
+        move.w  #319,d7
+        move.w  8(a0),d4                ; the aperture's first and last
+        movea.w d4,a5
+        adda.w  (a0),a5
+        subq.w  #1,a5
+        lea     steps_x(pc),a3
         move.w  ST_PTR(a2),d1
         bsr.w   .axis
         move.w  d1,ST_PTR(a2)
@@ -281,14 +286,15 @@ mouse_steer:
         ext.l   d0
         divs.w  #STICK_STEP,d0
         move.w  d0,d3                   ; yaw
-        move.w  6(a0),d5
-        sub.w   10(a0),d5               ; up reach: centre - top
-        move.w  10(a0),d7
-        add.w   2(a0),d7
-        addi.w  #REACH_BELOW-1,d7
-        sub.w   6(a0),d7                ; down reach: bottom + REACH_BELOW - centre
+        move.w  6(a0),d5                ; y: centre, the screen's last row,
+        move.w  #199,d7
+        move.w  10(a0),d4               ; the aperture's first and last
+        movea.w d4,a5
+        adda.w  2(a0),a5
+        subq.w  #1,a5
+        lea     steps_y(pc),a3
         move.w  ST_PTR+2(a2),d1
-        move.w  d4,d0
+        move.w  a6,d0
         bsr.w   .axis
         move.w  d1,ST_PTR+2(a2)
         move.w  d0,2(a2)
@@ -324,41 +330,66 @@ mouse_steer:
         movem.l (sp)+,d0-d1/d4-d7/a0-a3/a5-a6
         addq.l  #2,(sp)                 ; past the displaced store's last word
         rts
-; d1 = pointer offset (half pixels) + d0, clamped to -2*d5..2*d7 (the reaches
-; in pixels, at least 1 each); d0 = the stick, STICK_RANGE at either limit,
-; towards zero. Uses d5/d7.
+; One axis, as the PC version: d1 = pointer offset from the centre d5 in half
+; pixels, + d0, clamped so that the pointer stays on screen pixels 0..d7.
+; d0 = the stick: STICK_LEVEL times the step of the pointer's distance from
+; the centre in table a3, or 8 steps within 4 pixels of the aperture's first
+; pixel d4 or last a5 (the PC's edge rule; past them too). Uses d4/d7/a3.
 .axis:
         add.w   d0,d1
-        moveq   #1,d0
-        cmp.w   d0,d5
-        bge.s   .r5
-        move.w  d0,d5
-.r5:
-        cmp.w   d0,d7
-        bge.s   .r7
-        move.w  d0,d7
-.r7:
-        add.w   d5,d5
-        add.w   d7,d7
         move.w  d5,d0
-        neg.w   d0
+        add.w   d0,d0
+        neg.w   d0                      ; -2 * centre: pixel 0
         cmp.w   d0,d1
         bge.s   .low
         move.w  d0,d1
 .low:
-        cmp.w   d7,d1
+        move.w  d7,d0
+        sub.w   d5,d0
+        add.w   d0,d0
+        addq.w  #1,d0                   ; the screen's last pixel
+        cmp.w   d0,d1
         ble.s   .high
-        move.w  d7,d1
+        move.w  d0,d1
 .high:
         move.w  d1,d0
-        muls.w  #STICK_RANGE,d0
-        tst.w   d1
-        bmi.s   .left
-        divs.w  d7,d0
+        asr.w   #1,d0
+        add.w   d5,d0                   ; the pointer's pixel
+        move.w  d0,d7
+        subq.w  #4,d7
+        cmp.w   d4,d7
+        bgt.s   .first
+        move.w  #-8*STICK_LEVEL,d0
         rts
-.left:
-        divs.w  d5,d0
+.first:
+        addq.w  #8,d7
+        cmp.w   a5,d7
+        blt.s   .last
+        move.w  #8*STICK_LEVEL,d0
         rts
+.last:
+        sub.w   d5,d0                   ; pixels from the centre
+        move.w  d0,d7
+        bpl.s   .abs
+        neg.w   d7
+.abs:
+        moveq   #0,d4
+.step:
+        cmp.w   (a3)+,d7
+        blt.s   .stepped
+        addq.w  #1,d4
+        bra.s   .step
+.stepped:
+        mulu.w  #STICK_LEVEL,d4
+        tst.w   d0
+        bpl.s   .right
+        neg.w   d4
+.right:
+        move.w  d4,d0
+        rts
+; The PC version's steps (WC.EXE data): a step more from each distance.
+steps_x:        dc.w 10,37,52,57,62,$7fff
+steps_y:        dc.w 5,18,27,35,38,$7fff
 
 ; From the variant's VBL hook, every field: counts fields and hides a shown
 ; flight pointer once the controller has stopped (pause, map, flight over) or
@@ -689,7 +720,7 @@ mouse_active:   dc.w 0
 mouse_sum_x:    dc.w 0                  ; counts, wrapping; mouse_sum_y follows
 mouse_sum_y:    dc.w 0
 mouse_fields:   dc.w 0                  ; VBL fields (mouse_vbl)
-stick_x:        dc.w 0                  ; stick units from centre (+-72); stick_y follows
+stick_x:        dc.w 0                  ; stick units (+-8 steps); stick_y follows
 stick_y:        dc.w 0
 stick_last:     dc.w 0,0                ; mouse_sum_x/y at the last call
 stick_field:    dc.w 0                  ; mouse_fields at the last call

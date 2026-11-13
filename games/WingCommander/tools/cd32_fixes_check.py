@@ -486,33 +486,39 @@ def steer_cases(cfg, psy, fixed, blob, sy):
             out[name] = 'native'
             m.close(); continue
         assert struct.unpack('>I', m.read(a4+mc['slot'], 4))[0] == SLAVE+sy['mouse_event']
-        # 80 pixels right, half way to the aperture's right edge: half yaw.
-        assert ptr.at() == (239, 62) and steer((0, 0)) == want() == ((0, 4), [(234, 58)]), 'mouse right: yaw right'
+        # 80 pixels right, past the PC's last step (62) but not at the edge: 5 steps.
+        assert ptr.at() == (239, 62) and steer((0, 0)) == want() == ((0, 5), [(234, 58)]), 'mouse right: yaw right'
         # The first showing takes sprite 7 and binds the image; the odd
         # sprites' colour bank is 192 in both lists, the rest of BPLCON4 kept.
         assert m.sprites == [(ANY, 7)] and m.changes == [(ANY, CHIP)]
         assert struct.unpack('>h', m.read(ANY+4, 2))[0] == 9
         assert (bplcon4(0, 5), bplcon4(1, 300)) == (0x001c, 0x00ac)
         assert image() == img(), image()
-        # Down as far as right: 26 pixels, two counts a pixel on both axes.
+        # Down 26 pixels, two counts a pixel on both axes: past steps 5 and 18.
         ev(0, 52); tick()
-        assert ptr.at() == (239, 88) and steer() == want() and want()[0] == (-3, 4), 'mouse down: pitch up (stick back)'
+        assert ptr.at() == (239, 88) and steer() == want() and want()[0] == (-2, 5), 'mouse down: pitch up (stick back)'
         assert image() == img()
         assert len(m.sprites) == 1 and len(m.changes) == 1
         # Held still off centre: the ramps hold, the ship keeps turning.
         tick(); assert steer() == (want()[0], [])
-        # Proportional, with a dead zone of under one step.
-        ev(-150, -40); tick(); assert steer() == want() and want()[0] == (0, 0)
-        # Full deflection at the limits: the aperture's right edge and
-        # REACH_BELOW under its last row, hidden there; its left and top edges.
-        ev(1000, 1000); tick(); assert steer() == want() == ((-9, 9), [(319-5, 114+13-4)])
+        # The PC's dead zone: under 10 pixels across and 5 up or down.
+        ev(-150, -44); tick(); assert ptr.at() == (164, 66) and steer() == want() and want()[0] == (0, 0)
+        ev(0, 2); tick(); assert steer() == want() and want()[0] == (-1, 0)
+        # The screen's corners: full deflection (the PC's edge rule), hidden
+        # below the cockpit and above the canopy frame.
+        ev(1000, 1000); tick(); assert steer() == want() == ((-9, 9), [(319-5, 199-4)])
         assert image() == img() == [(0, 0)]*9
-        ev(-2000, -2000); tick(); assert steer() == want() == ((9, -9), [(0-5, 10-4)])
+        ev(-2000, -2000); tick(); assert steer() == want() == ((9, -9), [(0-5, 0-4)])
+        assert image() == img() == [(0, 0)]*9
+        # Full deflection within 4 pixels of the aperture's edge, shown there.
+        ev(0, 28); tick(); assert ptr.at() == (0, 14) and steer() == want() and want()[0] == (9, -9)
         assert image() == img() and image() != [(0, 0)]*9
+        ev(8, 2); tick(); assert ptr.at() == (4, 15) and steer() == want() and want()[0] == (5, -9)
+        ev(2, 0); tick(); assert ptr.at() == (5, 15) and steer() == want() and want()[0] == (5, -5)
         # Pixels over the cockpit are left out (the solid ones beside the centre).
-        ev(318, 104); tick(); steer()
+        ev(308, 94); tick(); steer()
         assert ptr.at() == (159, 62) and image() == img() and image()[0][0] != POINTER[0]
-        ev(-160, 0); tick(); assert steer() == want() and want()[0] == (0, -4)
+        ev(-160, 0); tick(); assert steer() == want() and want()[0] == (0, -5)
         out['motion'] = 'pass'
         # A new copper list is found again; a list without BPLCON4 is left alone.
         new = COPPER+0x1800
@@ -534,7 +540,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         # Other cockpit views: steering, no pointer; the external view: neither.
         ev(160, 0); tick()
         r, moves = steer(view=1)
-        assert r == ptr.ramps() == (-5, 4) and moves == [] and not shown()
+        assert r == ptr.ramps() == (-5, 5) and moves == [] and not shown()
         tick(); assert steer(view=0)[1] == [ptr.sprite()]
         tick(); assert steer((3, 3), view=8) == ((1, 1), []) and not shown()
         ptr.centre()
@@ -544,10 +550,10 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         # ship keeps turning, and shows again on the next motion.
         ev(160, 0); tick(); steer()
         for _ in range(500):
-            tick(); assert steer() == ((0, 4), [])
+            tick(); assert steer() == ((0, 5), [])
         assert shown()
         tick(); assert not shown(), 'idle pointer not hidden'
-        tick(); assert steer() == ((0, 4), []) and not shown(), 'idle pointer shown again'
+        tick(); assert steer() == ((0, 5), []) and not shown(), 'idle pointer shown again'
         ev(1, 0); tick(); assert steer() == want(), 'pointer not shown on motion'
         out['idle'] = 'pass'
         # VBL: hides the pointer once the controller stops.
@@ -557,7 +563,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         tick(25)        # a new flight after a gap: re-centred
         event(16, 0); tick(); assert steer((0, 0))[0] == (0, 0)
         ptr.centre()
-        ev(160, 0); tick(); assert steer()[0] == ptr.ramps() == (0, 4)
+        ev(160, 0); tick(); assert steer()[0] == ptr.ramps() == (0, 5)
         assert len(m.sprites) == 1 and len(m.changes) == 1, 'sprite taken or bound again'
         out['hide'] = 'pass'
         m.close()
@@ -575,7 +581,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
             m.write(m.a4+mc['flags'], bytes(5)); m.write(m.a4+mc['view'], bytes(2))
             m.call(mc['controller'], b'')
         assert m.sprites == [(ANY, 7)] and m.changes == [] and m.moves == []
-        assert struct.unpack('>hh', m.read(m.a4+mc['ramp'], 4)) == (0, 4)   # the first call starts the flight
+        assert struct.unpack('>hh', m.read(m.a4+mc['ramp'], 4)) == (0, 5)   # the first call starts the flight
         out['sprite_taken'] = 'pass'
         m.close()
         # The hook keeps every register but the ramps it stores, on the native

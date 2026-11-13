@@ -920,9 +920,10 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   See [mouse](internals.md#mouse-in-rooms-and-menus-both-release-builds-every-mode).
 - **Mouse flight: done in both release builds, every mode (2026-11-13).** The
   mouse moves the PC version's pointer in the front view, two counts a pixel
-  on both axes, behind the cockpit, from the gunsight to the aperture's sides
-  and top and 13 pixels under its last row, out of sight; its place is a
-  virtual stick that sets the pitch and yaw ramps in proportion. On CD32 it
+  on both axes, behind the cockpit, from the gunsight over the whole screen,
+  as on the PC; its place sets the pitch and yaw ramps in the PC version's
+  steps (from WC.EXE and a DOSBox probe), measured from the gunsight rather
+  than the PC's misplaced window middle (the user's choice). On CD32 it
   is in the PC colour 207 through the odd sprites' colour bank, on OCS white
   (colour 31). It appears when the mouse moves and hides
   after 10 seconds without motion (user requests, 2026-11-13).
@@ -931,8 +932,6 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   For live results see
   [mouse flight](internals.md#mouse-flight-both-release-builds-every-mode).
   Left open:
-  - The PC pointer's bottom limit is hidden under the instruments; this one
-    is the user's choice, wholly hidden and some way below.
   - OCS mission palettes are not observed live (only the simulator's); the
     game loads 16 colours there, leaving 16-31 to the sprites.
   - Other ships' cockpits (Rapier, Scimitar, Raptor) are not checked live.

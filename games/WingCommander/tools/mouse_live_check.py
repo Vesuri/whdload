@@ -148,7 +148,7 @@ def main():
         # The flight: the controller's ramp stores (the slave's mouse_steer).
         # The pointer (sprite 7, the slave's image) moves with the mouse, two
         # counts a pixel, behind the cockpit; mouse right and down: yaw right,
-        # pitch up (stick back), in proportion to its place.
+        # pitch up (stick back), in the PC version's steps from its place.
         site, ramp, view, aperture, copper = game['flight']
         if ocs:
             sym = json.loads((a.build/'build.json').read_text())['symbols']
@@ -183,7 +183,8 @@ def main():
             return drawn, all(image.getpixel((74+2*px, 92+2*py)) == colour for px, py in drawn)
         rows = [dict(motion=(0, 0), **state())]
         shot('flight-before')
-        for dx, dy, n in ((8, 0, 20), (0, 4, 13), (40, 40, 30), (-40, -40, 60), (8, 0, 55)):
+        top = rows[0]['aperture'][5]
+        for dx, dy, n in ((8, 0, 20), (0, 4, 13), (40, 40, 30), (-40, -40, 60), (8, 0, 55), (0, 2, top+4)):
             for _ in range(n):
                 cmd(f'monitor mouse {dx} {dy}'); cmd('monitor fields 1')
             cmd('monitor fields 4')
@@ -208,19 +209,19 @@ def main():
             assert x['on_screen'], x
             if copper:
                 assert all(v & 0x0f == 12 for v in x['bplcon4']), x
-        # Half way right, then as far down: the same pixels on both axes.
+        # 80 pixels right, then 26 down: the same counts a pixel on both axes.
         w, h, cx, cy, left, top = r[1]['aperture']
         assert r[1]['sprite'] == (cx+80-5, cy-4) and r[2]['sprite'] == (cx+80-5, cy+26-4), r
         assert r[1]['drawn'] > 0 and r[2]['drawn'] > 0, r
-        # Bottom right: under the aperture's last row, wholly behind the cockpit.
-        # Top left: the aperture's corner; the parts outside it are over the
-        # cockpit (all of it in the Hornet, behind the canopy strut). Then right
-        # along the top edge, where its lower half shows under the canopy frame.
-        assert r[3]['sprite'] == (left+w-1-5, top+h-1+13-4) and r[3]['drawn'] == 0, r[3]
-        assert r[4]['sprite'] == (left-5, top-4), r[4]
-        assert all(v >> 16 & 0xf000 == 0 for v in r[4]['lines']), r[4]
-        assert r[5]['sprite'][1] == top-4 and r[5]['sprite'][0] > cx and r[5]['drawn'] > 0, r[5]
-        assert all(v == 0 for x in r[4:] for v in x['lines'][:4]), r[4:]
+        # The screen's corners, as on the PC: bottom right behind the
+        # instruments, top left above the canopy frame, both wholly hidden;
+        # then right along the top row, still hidden, and down to 4 pixels
+        # below the aperture's top, where it shows at full pitch (the PC's
+        # edge rule).
+        assert r[3]['sprite'] == (319-5, 199-4) and r[3]['drawn'] == 0, r[3]
+        assert r[4]['sprite'] == (0-5, 0-4) and r[4]['drawn'] == 0, r[4]
+        assert r[5]['sprite'] == (220-5, 0-4) and r[5]['drawn'] == 0, r[5]
+        assert r[6]['sprite'] == (220-5, top) and r[6]['drawn'] > 0 and r[6]['pitch'] == 9, r[6]
         return rows
 
     rows = {}
