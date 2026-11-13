@@ -184,6 +184,12 @@ $a6aa, and the dots' wrap marks at $a640 and $a666.
   before, 15 to 85 lines a tick missed their pair). The dots that moved more than 40
   pixels were the wrapped ones, drawn in place, and objects near the camera growing in
   perspective.
+- **Other buffers.** Ops recorded while the drawing buffer is not the tick's back buffer
+  (the front buffer, or another page the game keeps from tick to tick: the flight
+  instructions type their text into one and copy it to the screen) are drawn there. They are replayed
+  exactly, never interpolated, so in-between frames add nothing to the page. Before,
+  each typed letter's strokes were drawn there moving from the previous letter's and
+  stayed, as fragments over the text.
 - **Pacing.** The counter -26430(a4) runs free. Frame j of a tick is for field B + j;
   each frame is drawn for the first field it can still make, judged by the beam and the
   last frame's drawing time r, so a slow frame skips the in-between frame after it. An

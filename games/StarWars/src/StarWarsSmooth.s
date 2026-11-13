@@ -1408,6 +1408,8 @@ SmRender
 	move.l	-26446(a4),d5		; front buffer
 	move.l	sv_cur(a3),a2
 	move.l	sv_prev(a3),a6
+	lea	SmRBuf(pc),a0
+	clr.b	(a0)
 .loop	cmp.l	sv_ptr(a3),a2
 	bhs.b	.done
 	moveq	#0,d0
@@ -1507,7 +1509,9 @@ SmRender
 	move.l	12(a2),-25800(a4)
 	rts
 
-.buf	move.l	12(a2),d0
+.buf	lea	SmRBuf(pc),a0		; another buffer than the frame's: drawn exactly
+	move.l	12(a2),d0
+	sne	(a0)
 	bne.b	.b1
 	move.l	d4,d0
 	bra.b	.bs
@@ -1525,6 +1529,8 @@ SmRender
 	move.l	8(a2),4(a0)
 	cmp.w	SmV+sv_n(pc),d6
 	bhs.b	.cx
+	btst	#0,SmRBuf(pc)
+	bne.b	.cx
 	move.w	12(a2),d0
 	bmi.b	.cx
 	movem.l	d1-d3/d7/a0-a1,-(a7)
@@ -1570,6 +1576,8 @@ SmRender
 ;----------------------------------------------------------------------------
 
 SmCode	dc.l	0			; the code hunk (PL_GA)
+SmRBuf	dc.b	0			; SmRender: drawing into another buffer than
+	even				; the frame's (a page kept from tick to tick)
 SmTags	dc.l	WHDLTAG_CUSTOM2_GET,0
 	dc.l	0			; TAG_DONE
 	dc.l	"SWSM"			; the harness finds SmV behind this
