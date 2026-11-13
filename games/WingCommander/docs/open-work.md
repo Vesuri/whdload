@@ -864,23 +864,21 @@ only the mouse has been run live. It covers the three pinned executables only; t
 two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files.
 
 - **CD32 bunk save (slave bug; English and German): fixed in the release build,
-  native check passes, live check pending.** Psygore's StoreNV replacement
+  native check passes; the user reports it working in play (2026-11-13).** Psygore's StoreNV replacement
   returned 1, so the game cleared the new save's bunk until the slots were
   reloaded. The release slave now applies a second patch list in every mode. It
   returns 0, replaces the stubbed GetNVList with a real `Bed_N` file
   enumeration, and restores the NOPed failure branch. See
   [the fix](internals.md#cd32-bunk-save-psygores-storenv-return-value).
-  `make check` runs `tools/cd32_fixes_check.py`. Still to do: live, the pilot
-  must appear at once, survive a restart, and overwrite and erase correctly in
-  English and German. The stashed save/load length guard below (wrong-sized
+  `make check` runs `tools/cd32_fixes_check.py`. Not separately recorded:
+  restart, overwrite and erase in English and German. The stashed save/load length guard below (wrong-sized
   files) is still separate. OCS is unaffected.
 - **TrainSim keyboard selection (game bug; all three): fixed in both release
-  builds, every mode (user decision, 2026-11-13); native checks pass, live check
-  pending.** Keys `1`–`4` passed -1 to the fly-off animation, which then read and
+  builds, every mode (user decision, 2026-11-13); native checks pass and the
+  user reports it working in play (2026-11-13).** Keys `1`–`4` passed -1 to the fly-off animation, which then read and
   wrote outside its tables. The call now passes the stored choice (`3f04` →
   `3f12` at `O:179e2`, `E:1827e`, `G:18338`); see
-  [the fix](internals.md#trainsim-enemy-selection-by-keyboard). Still to do live:
-  keys and clicks give the same animation, and Escape is unchanged. Not covered:
+  [the fix](internals.md#trainsim-enemy-selection-by-keyboard). Not covered:
   the OCS revisions `116d` and `262d`, whose files are missing.
 - **Persistent TrainSim high scores (feature).** Neither save record holds the
   table (OCS `OD:bbcc`, six 6-byte entries). Save it per slot beside the save and
@@ -899,8 +897,8 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   - The sprite moves every field, except in OCS original mode: the native
     renderer holds Forbid+Disable across field boundaries, so the motion
     arrives in bursts there, as the stick pointer does.
-  - Still to do live: the bar, barracks and TrainSim rooms, German, and a user
-    play-test.
+  - The user reports the mouse working in play (2026-11-13). Not separately
+    recorded: the bar, barracks and TrainSim rooms; German is not yet live-checked.
   - Unchanged: key-only waits such as the nav map and name entry, and the right
     button.
 

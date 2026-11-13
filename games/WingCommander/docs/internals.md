@@ -8552,7 +8552,8 @@ Live results (deterministic warp, PAL, 2026-11-13):
 - **All five runs:** the first click selects.
 
 Not yet checked live: the bar, barracks and TrainSim rooms (they use the same
-routine), German, and real hardware.
+routine), German, and real hardware. The user reports the mouse working in play
+(2026-11-13).
 
 ### Flight steering input
 
