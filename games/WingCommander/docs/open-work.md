@@ -898,10 +898,11 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
     renderer holds Forbid+Disable across field boundaries, so the motion
     arrives in bursts there, as the stick pointer does.
   - CD32 name entry: the mouse also moves the selection box over the
-    character grid, a cell per 18 counts (live-checked in English).
+    character grid, a cell per 18 counts (live-checked in English and German).
     The OCS name entry is keyboard only.
+  - CD32 German passes the same live check (intro, menu, name entry).
   - The user reports the mouse working in play (2026-11-13). Not separately
-    recorded: the bar, barracks and TrainSim rooms; German is not yet live-checked.
+    recorded: the bar, barracks and TrainSim rooms.
   - Unchanged: key-only waits such as the nav map, and the right button.
 
   See [mouse](internals.md#mouse-in-rooms-and-menus-both-release-builds-every-mode).

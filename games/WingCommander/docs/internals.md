@@ -8571,9 +8571,14 @@ Live results (deterministic warp, PAL, 2026-11-13):
 - **CD32 name entry (enhanced, `a1200-030`):** the box moves exactly two
   columns and two rows (8-column grid, from column 1, row 4 to 3, 6), and the
   click enters "S".
+- **CD32 German (`--german`, `CUSTOM1=1`, `a1200-030`):** the same intro,
+  menu and name entry results ("NACHNAME: S"). Its checkpoints map the English
+  ones by matching code (`G:18a44`, `1fcbe`, `2026c`, `2031c`, `2032e`, name
+  loop `G:17064`, poll result `G:1706e`); German A4 offsets are the English
+  ones +44 (field clock −208, pointer sprite −1112).
 
 Not yet checked live: the bar, barracks and TrainSim rooms (they use the same
-routine), German, and real hardware. The user reports the mouse working in play
+routine) and real hardware. The user reports the mouse working in play
 (2026-11-13).
 
 ### Flight steering input

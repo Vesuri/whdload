@@ -52,7 +52,7 @@ byte identity with the pinned original) and runs `release_check.py`,
 paths) and the installer staging check. The live mouse check is separate and bounded:
 
 ```
-python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode] [--name-entry]
+python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode] [--name-entry] [--german]
 python3 tools/mouse_live_check.py ocs tmp/build/release/WingCommander --output tmp/mouse-live-ocs [--original-mode] [--setup a500]
 ```
 

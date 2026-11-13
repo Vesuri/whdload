@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded live mouse check on a release build (English).
+"""Bounded live mouse check on a release build (English; CD32 also German).
 
 The left mouse button (port-0 button, JOY1_FIRE_BUTTON) replaces the Esc
 presses that skip the intro in modal_live_check.py. At the start menu the
@@ -21,19 +21,44 @@ from pathlib import Path
 import _amigaxdev  # noqa: F401
 import wc_run
 from amigaxdev import barto
-from ocs_reconstruct import new_output
+from ocs_reconstruct import ROOT, new_output
 from variants import get
 
 # Per game: A4 offsets of the room pointer position, the pointer SimpleSprite
 # (x at +6) and the field clock; H0 intro waits (wait, done), menu (ready,
 # accepted); name entry (input loop, poll result) and its A4 selected cell and
-# columns.
+# columns. German CD32 addresses map the English ones by matching code.
 GAMES = {
     'ocs': dict(pointer=(0x19c, -2150), field=-0x800, intro=((0x180c4, 0x1edde), (0x180c4, 0x1f396)),
                 menu=(0x1f43c, 0x1f44e)),
     'cd32': dict(pointer=(0xa88, -1156), field=-252, intro=((0x1898a, 0x1fbba), (0x1898a, 0x20164)),
                  menu=(0x20214, 0x20226), name=(0x16fc6, 0x16fd0, 17716, 17706)),
+    'cd32-de': dict(pointer=(2740, -1112), field=-208, intro=((0x18a44, 0x1fcbe), (0x18a44, 0x2026c)),
+                    menu=(0x2031c, 0x2032e), name=(0x17064, 0x1706e, 17766, 17756)),
 }
+GERMAN = 'tmp/game/WingCommanderCD32/data/wing.german'
+GERMAN_SIZES = (0x36064, 0xfdd4, 4, 0x15a4)
+
+
+def locate_german(memory):
+    """The live German hunks: the copy whose name entry poll holds the slave's
+    hook (PRELOAD copies are unpatched)."""
+    from variant_runtime import segment_chain
+    code = (ROOT/GERMAN).read_bytes()[0x2c:0x2c+GERMAN_SIZES[0]]
+    signature = code[0x16d04:0x16d60]          # native grid step, no relocations
+    found = []
+    at = memory.find(signature)
+    while at >= 0:
+        offset = at-0x16d04
+        if offset >= 8 and memory[offset+0x16f6e:offset+0x16f70] == b'\x4e\xb9':
+            try:
+                found.append({'hunks': segment_chain(memory, 0x200000, 0x200000+offset, GERMAN_SIZES)})
+            except ValueError:
+                pass
+        at = memory.find(signature, at+1)
+    if len(found) != 1:
+        raise ValueError(f'expected one patched German segment chain; found {len(found)}')
+    return found[0]
 
 
 def main():
@@ -44,10 +69,13 @@ def main():
     p.add_argument('--original-mode', action='store_true', help='CUSTOM5 original behaviour')
     p.add_argument('--setup', default='a1200-030', help='AMIGA_SETUP (OCS also a500: 68000, 4 MiB Fast)')
     p.add_argument('--name-entry', action='store_true', help='CD32: also the TrainSim name entry grid')
+    p.add_argument('--german', action='store_true', help='CD32: the German executable (CUSTOM1=1)')
     a = p.parse_args()
     if a.name_entry and a.variant != 'cd32':
         p.error('--name-entry: the OCS name entry is keyboard only')
-    game = GAMES[a.variant]
+    if a.german and a.variant != 'cd32':
+        p.error('--german: the OCS release supports English only')
+    game = GAMES['cd32-de' if a.german else a.variant]
     out = new_output(a.output); out.mkdir(parents=True)
     v = get(a.variant); ocs = a.variant == 'ocs'
     if ocs:
@@ -58,6 +86,9 @@ def main():
         from cd32_runtime import locate
         slave = a.build/'WingCommanderCD32.Slave'
         whd = 'CUSTOM5=1 DCACHE' if a.original_mode else 'CUSTOM5=0 DCACHE'
+        if a.german:
+            whd = 'CUSTOM1=1 '+whd
+            locate = locate_german
     length = 0x400000 if ocs else 0x800000
     env = wc_run.run_env(out, variant=a.variant, SLAVE=str(slave.resolve()),
                          WARP='1', NTSC='0', WINDOW='front', JOY0='none', JOY1='none',
@@ -201,7 +232,7 @@ def main():
         rows['menu_selected_by_click'] = True
         if a.name_entry:
             rows['name_entry'] = name_entry()
-        (out/'report.json').write_text(json.dumps(dict(complete=True, variant=a.variant, original_mode=a.original_mode, setup=a.setup,
+        (out/'report.json').write_text(json.dumps(dict(complete=True, variant=a.variant, german=a.german, original_mode=a.original_mode, setup=a.setup,
             slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(), **rows), indent=2)+'\n')
         print(json.dumps(dict(complete=True, sprite_steps=steps)))
     finally:
