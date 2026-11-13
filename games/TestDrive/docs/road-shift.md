@@ -60,5 +60,5 @@ projections against the independent model (`downhill.json`). The earlier
 `downhill` launch used an unsigned AmigaDOS numeric option and is diagnostic
 only. Hardware testing remains deferred.
 
-Builds and archives stay version 2.0b (13.10.2026). Preserve pre-fix release
+Builds and archives stay version 2.0b (13.11.2026). Preserve pre-fix release
 packages and the original 1.4/1.5b hardware overlay A/B bundle. Local commits only.

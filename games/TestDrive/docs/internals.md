@@ -301,3 +301,11 @@ hook is installed; the root/h4 patch inventory is unchanged. The existing
 root $434/$444 corrections already enable priority during gameplay, so phase-9
 measured gains are attributed to IRQ suppression. `phase9.md` has the paired
 FPS table, native-helper evidence, normal C2-off/on checks and their limits.
+
+## Drawing rate (CUSTOM2)
+
+C2 shortens the blitter waits (root $D5E, NOPs at root $DB6, $E08, $F8E and $11D8, and
+`blit_plot_wait` at h4 $1D8C) and adds a third screen buffer for the Road Drawer
+(`buffers.s`: h4 $B88 hold, $AEA buffer index, $C0A swap, $3AE4 gear lever, $4238/$4246
+cluster cache, $240A/$2450 steering-wheel image). `draw-rate.md` has the design, the
+per-buffer state, the measurements and the checks.

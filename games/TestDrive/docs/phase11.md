@@ -1,7 +1,7 @@
 # Phase 11: local release regression
 
 The retained 1.8b development snapshot passes local release regression.
-The consolidated release is 2.0b (13.10.2026); see `release-2.0b.md`.
+The consolidated release is 2.0b (13.11.2026); see `release-2.0b.md`.
 The version names, hashes and paths below describe the immutable regression snapshot. Real A1200/68040 results remain explicitly
 deferred; no push or PR is authorized. The original phase-6 hardware A/B pair
 remains in `tmp/dist/overlay-cache-ab/`.

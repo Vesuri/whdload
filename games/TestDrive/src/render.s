@@ -69,6 +69,15 @@ render_patches:
     include "render-patches.i"
     PL_END
 
+; h4 $01d8c, the road walker's CPU pixel plot (h4 $0097e/$009c2 set and clear
+; bits in the drawing buffer). The clear, fill, copy and shape routines no
+; longer wait for their last blit, so wait here before the CPU writes, as the
+; walker's other plot does at h4 $03a3a. a6 is the custom base, as there.
+blit_plot_wait:
+    jsr -32688(a4)            ; root $00d44 blitter wait
+    move.w #16,-29854(a4)     ; displaced: select plane 4
+    rts
+
 render_reset:
     lea render_heading_state(pc),a0
     move.w #-1,(a0)

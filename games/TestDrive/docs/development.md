@@ -31,7 +31,7 @@ the repository's (`game.conf`): vasm with the shared WHDLoad includes, the share
 bridges and `AMIGA_SHARE/ndk/Include_I`; `make check` proves the release build still gives
 `release/slaves.sha256`, compiles every tool and runs the static checks that need no
 captures (`GAME_CHECKS` in `game.sh`). No build date is embedded: the slave's
-`$VER` string carries the fixed release date, `2.0b (13.10.2026)`, which also names the
+`$VER` string carries the fixed release date, `2.0b (13.11.2026)`, which also names the
 release archive. `manifest/baseline-source.commit` pins
 the original 1.4 source; `manifest/overlay-reference.commit` pins TD2's helper source.
 
@@ -224,7 +224,7 @@ The original 1.4/1.5b hardware A/B bundle remains unchanged.
 
 ## Local release (phase 11)
 
-The 2.0b (13.10.2026) release beta exposes Enhanced framerate. The installer's three icons
+The 2.0b (13.11.2026) release beta exposes Enhanced framerate. The installer's three icons
 (Normal and both GlowIcons) and the preinstalled launch icon enable C2. `phase11.md` records full local regression and exact normal/VERIFY
 hashes. All five cars, timing, event paths, renderer assertions/models/budgets,
 three CPU presets, WHDLoad 19.2/20.0 and native quit pass. Matched normal-demo

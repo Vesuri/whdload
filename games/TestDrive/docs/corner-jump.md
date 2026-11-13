@@ -89,7 +89,7 @@ cost samples remain historical evidence, not current universal claims.
 
 ## Release
 
-Version remains 2.0b (13.10.2026). Current normal slave is
+Version remains 2.0b (13.11.2026). Current normal slave is
 `tmp/dist/2.0b/TestDrive.slave`; exact checksums are in its manifest and SHA256SUMS.
 Previous packages are preserved under `tmp/dist/2.0b-before-corner-fix/` and
 `tmp/release-2.0b/package-before-corner-fix/`. The overlay-only real-hardware

@@ -78,7 +78,7 @@ Normal slave SHA-256:
 `b71fb4bd9df47de79f6ac70c2a31c98e92031283ac3c27843d9b01defb7bf4f1`.
 Commits: `7786a9d` (bend response), `8103c64` (close traffic), local only.
 Previous release is retained in `tmp/dist/2.0b-before-handling-collision-fix/`.
-Version remains 2.0b (13.10.2026); ReadMe history is concise and player-facing.
+Version remains 2.0b (13.11.2026); ReadMe history is concise and player-facing.
 The original hardware overlay A/B pair remains unchanged. Hardware testing stays
 deferred; NTSC is unvalidated. Diagnostic sessions use separate runtime directories; the interactive release was
 subsequently relaunched with the current slave.

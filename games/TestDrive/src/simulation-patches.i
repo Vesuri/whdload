@@ -100,4 +100,23 @@
     PL_PS $07f94,sim_visual_edge_capture
     ; SIM_RANGE h4 07fd6 6 C2 sim_bank_pose
     PL_PS $07fd6,sim_bank_pose
+    ; SIM_RANGE h4 01d8c 6 C2 blit_plot_wait
+    PL_PS $01d8c,blit_plot_wait
+    ; Triple buffering (buffers.s).
+    ; SIM_RANGE h4 00b88 14 C2 tb_hold
+    PL_PSS $00b88,tb_hold,8
+    ; SIM_RANGE h4 00aea 22 C2 tb_index
+    PL_PSS $00aea,tb_index,16
+    ; SIM_RANGE h4 00c0a 14 C2 tb_swap
+    PL_PSS $00c0a,tb_swap,8
+    ; SIM_RANGE h4 03ae4 16 C2 tb_lever
+    PL_PSS $03ae4,tb_lever,10
+    ; SIM_RANGE h4 04238 8 C2 tb_gauge_reset
+    PL_PSS $04238,tb_gauge_reset,2
+    ; SIM_RANGE h4 04246 14 C2 tb_gauge
+    PL_PSS $04246,tb_gauge,8
+    ; SIM_RANGE h4 0240a 8 C2 tb_wheel_in
+    PL_PSS $0240a,tb_wheel_in,2
+    ; SIM_RANGE h4 02450 14 C2 tb_wheel_out
+    PL_PSS $02450,tb_wheel_out,8
     PL_ENDIF

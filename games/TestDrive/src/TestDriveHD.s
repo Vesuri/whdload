@@ -67,7 +67,7 @@ slv_keyexit	= $5D	; num '*'
 ;============================================================================
 
 DECL_VERSION:MACRO
-	dc.b	"2.0b (13.10.2026)"
+	dc.b	"2.0b (13.11.2026)"
 	ENDM
 	dc.b	"$","VER: slave "
 	DECL_VERSION
@@ -226,6 +226,19 @@ _patchlist_1:
     PL_L $05318,$9BD84E71
     PL_W $05334,$4240
     PL_NOP $05336,4
+    ; SIM_RANGE root 00d5c 4 C2 blit_idle_reads
+    PL_W $00d5e,2             ; blitter wait: two idle DMACONR reads, not ten
+    ; Every blitter user waits before programming the blitter, so the clear,
+    ; fill, plane copy and shape routines need not wait for their last blit.
+    ; The one CPU plot without its own wait gets one (h4 $01d8c).
+    ; SIM_RANGE root 00db6 2 C2 nop
+    PL_NOP $00db6,2
+    ; SIM_RANGE root 00e08 4 C2 nop
+    PL_NOP $00e08,4
+    ; SIM_RANGE root 00f8e 4 C2 nop
+    PL_NOP $00f8e,4
+    ; SIM_RANGE root 011d8 4 C2 nop
+    PL_NOP $011d8,4
     IFD VERIFY
     PL_ELSE
     PL_IFC3
@@ -663,6 +676,7 @@ instrument_limit: dc.w 7000
 
 	include "simulation.s"
 	include "render.s"
+	include "buffers.s"
 	IFD VERIFY
 	include "simulation-verify.s"
 	ENDC

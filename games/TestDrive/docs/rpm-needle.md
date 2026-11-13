@@ -1,6 +1,6 @@
 # Analogue rev counter display
 
-Current 2.0b (13.10.2026) prevents the analogue needle from wrapping around the
+Current 2.0b (13.11.2026) prevents the analogue needle from wrapping around the
 dial when over-revving, in either framerate mode. Display limits match the last
 numbered marks in the original dashboard artwork: Porsche 7000, Ferrari 10000,
 Lotus 7000, Countach 9000 RPM. The digital Corvette keeps its original path.

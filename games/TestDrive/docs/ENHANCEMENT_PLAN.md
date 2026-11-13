@@ -61,7 +61,7 @@ Known differences that change the design:
   not the standalone Test Drive 2 repository's `whdload/`. Diff the two before copying a
   routine.
 
-Release numbering: all work after JOTD 1.4 belongs to **2.0b (13.10.2026)**.
+Release numbering: all work after JOTD 1.4 belongs to **2.0b (13.11.2026)**.
 References below to 1.5b–1.8b identify retained, unpublished development test
 snapshots only; they are not separate releases. Their evidence and the deferred
 hardware A/B binaries remain unchanged.
@@ -492,7 +492,7 @@ unvalidated. Phase 11 records full release regression and packaging.
 
 ## Phase 11: regression, release and contribution — complete locally
 
-Release 2.0b (13.10.2026) consolidates all enhancements since JOTD 1.4.
+Release 2.0b (13.11.2026) consolidates all enhancements since JOTD 1.4.
 The local release regression passes. Real A1200/68040
 play-testing remains deferred by the user. No push or PR is authorized; fork and
 upstream publication remain a separate follow-up.
@@ -603,7 +603,7 @@ impulse from the visual pose. Vehicle motion, grip, collisions, road curvature
 and skid effects keep their existing paths. C2=0 retains original behaviour;
 the VERIFY original-arithmetic drawing oracle also retains the native pose.
 Local `docs/steer-reversal.md` records native keyboard reproduction and the
-isolated visual regression. This remains part of 2.0b (13.10.2026).
+isolated visual regression. This remains part of 2.0b (13.11.2026).
 
 Curvature rounding at h4:$7F5A now uses original five-field units before scaling
 back to the current step with a private carry. Previously the two-field step
@@ -639,7 +639,7 @@ initial and one completion interrupt, with no negative-count interrupt loop.
 on the 68040. Local `docs/audio-repeat.md` records the evidence and limitations.
 The user confirms that the sample-repeat bug is fixed in the 2.0b release on
 the a1200-040 emulator with caches and enhancements enabled. This remains part
-of 2.0b (13.10.2026); real hardware testing stays deferred.
+of 2.0b (13.11.2026); real hardware testing stays deferred.
 
 The 2.0b cleanup removes obsolete visual-RNG read hooks at h4:$1EEE/$1F00/
 $1F10/$1F76 and their helpers: enhanced drawing always bypasses those spawning

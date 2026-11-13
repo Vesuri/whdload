@@ -1,12 +1,13 @@
 # Test Drive open work
 
-Phases 1–11 are complete within the authorized local scope. Current 2.0b (13.10.2026) is a
+Phases 1–11 are complete within the authorized local scope. Current 2.0b (13.11.2026) is a
 PAL emulator beta with fixed-time simulation, blitter interrupt suppression and
 fractional rendering and the road-jump correction (`road-shift.md`) and analogue needle limit
 (`rpm-needle.md`), steering-reversal visual correction (`steer-reversal.md`),
-restored bend response and visible close traffic (`handling-collision.md`), and
+restored bend response and visible close traffic (`handling-collision.md`),
 continuous cornering scenery (`corner-jump.md`, including its measured cost exception),
-and the opening-music sample repeat fix (`audio-repeat.md`). `phase11.md` records full release regression and verified
+the opening-music sample repeat fix (`audio-repeat.md`), and shorter blitter waits
+and triple buffering for the drawer (`draw-rate.md`). `phase11.md` records full release regression and verified
 local regression evidence; `release-2.0b.md` describes the release archive (`make dist`).
 
 Upstream merged this work (PR #28, Vesuri:testdrive at e3c38acc) into jotd666/whdload_slaves
@@ -17,12 +18,13 @@ from the original archive), but JOTD has not released it, so the release is made
 1. Phase 12: transfer reusable engine/overlay findings to AmigaXDev docs and
    update its project index.
 2. Deferred hardware follow-up: play-test the 2.0b release candidate on the real
-   A1200/68040. Also preserve and test the isolated overlay-cache A/B pair:
+   A1200/68040, including the two-read blitter wait and triple buffering
+   (`draw-rate.md`). Also preserve and test the isolated overlay-cache A/B pair:
    fixed 1.5b versus rebuilt repository 1.4 in `tmp/dist/overlay-cache-ab/` and its
    zip. Include a player race and native quit; record CPU/cache/MMU and WHDLoad
    settings. Public archives contain 1.3, not a shipped 1.4 baseline.
-3. Release: `make dist` gives the installer archive, `TestDriveEnhanced-2.0b-20261013.lha`
-   ("Test Drive Enhanced 2.0b (13.10.2026)"); publishing it is a separate step
+3. Release: `make dist` gives the installer archive, `TestDriveEnhanced-2.0b-20261113.lha`
+   ("Test Drive Enhanced 2.0b (13.11.2026)"); publishing it is a separate step
    (the repository's `docs/releasing.md`).
 4. NTSC timing is unvalidated; do not extend PAL acceptance claims to it.
 5. Investigate the intermittent post-crash steering-dot displacement report.

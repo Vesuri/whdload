@@ -1,4 +1,4 @@
-# Current release: 2.0b (13.10.2026)
+# Current release: 2.0b (13.11.2026)
 
 All post-JOTD 1.4 work is one release. ReadMe has a concise, player-facing
 2.0b history entry. The 1.5b–1.8b names in earlier phase reports identify
@@ -39,7 +39,7 @@ change display code, apart from the separately verified audio interrupt fix. The
 report applies only to the preserved pre-fix 2.0b baseline. The full phase-11
 regression remains evidence for unchanged simulation/features, complemented by
 the targeted road-fix regression and 68040 smoke checks. The fixed release date
-is in the ReadMe and the slave's `$VER: slave 2.0b (13.10.2026)`; the reproducible build
+is in the ReadMe and the slave's `$VER: slave 2.0b (13.11.2026)`; the reproducible build
 omits build dates. The slaves with the date differ from the 2.0b builds above (12772
 bytes) only in that string: removing the date from `DECL_VERSION` gives them back.
 
@@ -83,7 +83,7 @@ The previous cornering-only release and package stage are preserved as
 
 Documentation cleanup is committed as `ec72d8a`; dead-code cleanup is
 `e3c38ac`. The ReadMe contains one
-2.0b (13.10.2026) entry covering user-visible changes only; it distinguishes
+2.0b (13.11.2026) entry covering user-visible changes only; it distinguishes
 the optional framerate mode from fixes that apply with either setting.
 The WHDLoad 20 template-based Install is unchanged. Source header/plan notes
 and Windows makefile line endings are cleaned up; the full branch diff passes

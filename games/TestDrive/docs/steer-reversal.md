@@ -53,7 +53,7 @@ variants byte-identically; archives pass membership, extraction and LHa checks.
 Current normal slave SHA-256:
 `f014802ec2ba56561bbc2ffdb12c525f7c7fb7294039d284f3f4ab149c012941`.
 Previous release is retained at `tmp/dist/2.0b-before-steering-fix/`. The isolated
-1.4/1.5b overlay hardware pair is unchanged. Version remains 2.0b (13.10.2026).
+1.4/1.5b overlay hardware pair is unchanged. Version remains 2.0b (13.11.2026).
 Hardware testing is deferred, NTSC unvalidated, and nothing is pushed/published.
 The user's existing emulator session is not restarted by these diagnostics.
 
