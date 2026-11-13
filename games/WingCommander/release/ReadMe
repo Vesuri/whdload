@@ -53,22 +53,19 @@
  Its left button works as fire: it clicks, skips and continues sequences, and
  fires the guns in flight. On CD32 it also moves the selection box when you
  enter your name. The joystick, CD32 pad and keys work as before.
- In flight the mouse moves the PC version's pointer over the front view,
- behind the cockpit, and the pointer steers like a stick held off centre, as
- in the PC version: move it right of the gunsight to turn right and below it
- to pull the nose up; the further from the gunsight, the faster the turn, in
- the PC version's steps, with full speed near the edges of the view, and the
- ship keeps turning until you move it back. It moves over the whole screen,
- out of sight behind the canopy frame and the instruments. It appears when
- you move the mouse and hides after 10 seconds without mouse movement. Using
- the joystick or keys to steer re-centres it.
+ In flight the mouse steers as in the PC version: move the pointer right of
+ the gunsight to turn right and below it to pull the nose up. The further it
+ is from the gunsight, the faster the turn, and the ship keeps turning until
+ you move it back. The pointer appears when you move the mouse and hides after
+ 10 seconds without mouse movement. Using the joystick or keys to steer
+ re-centres it.
  On CD32, saving a pilot in the barracks also saves the Training Simulator high
  scores, as Bed_N.hi beside the Bed_N save, and loading that pilot restores
  them. Saves without this file still load, with the game's usual scores.
  The installed icon enables enhanced mode and DCACHE by default. NOCACHE can
- be used to disable caching. On CD32 the enhancements work in English and
- German. Enhanced OCS supports English SPS #1657 only; German disks use
- original behaviour.
+ be used to disable caching. On CD32 every 2.0b change works in English and
+ German. On disks, the 2.0b changes apply to the English SPS #1657 version;
+ other disk versions keep the 1.0 behaviour.
 
  CUSTOM1: 0 = English, 1 = German.
  CUSTOM2: 0 = cheats off, 1 = cheat mode, 2 = invincible cheat mode.
@@ -92,7 +89,7 @@
  behaviour, regardless of this option. Slow expansion RAM does not qualify.
 
  CD32 CUSTOM5:
-   0 or unset = Enhanced (English and German).
+   0 or unset = Enhanced.
    1 = Psygore normal        2 = Psygore unlimited
    3 = Psygore relaxed       4 = Psygore slow
  Original simulation and rendering remain available with modes 1-4.
@@ -102,14 +99,15 @@
  History:
  --------
  Version 2.0b (13.11.2026) by Vesuri:
+ - CD32 edition: every change works in English and German. Disk edition: the
+   changes apply to the English SPS #1657 version; other disk versions keep
+   the 1.0 behaviour.
  - Optional enhanced framerate with smoother flight, cameras and ship effects.
  - Consistent game speed on faster processors and smoother cinematic movement.
  - Retimed intro, room, briefing, launch, landing, death and funeral animations.
  - Improved projectile appearance and asteroid/mine hit detection.
- - Waypoint markers stay visible in front of nebulae in every mode (disk
-   edition: English only).
+ - Waypoint markers stay visible in front of nebulae in every mode.
  - More responsive room controls with limited cursor speed.
- - CD32 edition: the enhancements work in German too.
  - CD32 edition: a saved pilot appears in the bunk at once, not only after the
    next reload (thanks hexaae!).
  - Choosing a Training Simulator opponent with keys 1-4 shows the right ship
@@ -119,8 +117,7 @@
  - Mouse control of the room and menu pointer, and on CD32 of the name entry
    box; the left mouse button works as fire. The first click after entering a
    screen is no longer ignored (thanks hexaae!).
- - Mouse flight: the mouse steers as in the PC version, with its pointer
-   behind the cockpit (thanks hexaae!).
+ - Mouse flight: the mouse steers as in the PC version (thanks hexaae!).
  - Disk edition: faster arithmetic and collision checks in every mode, including
    the Amiga 500, without changing game behaviour.
  - Enhanced mode and caches enabled in newly installed icons; original modes
