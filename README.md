@@ -33,7 +33,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Robinson's Requiem Enhanced | CFou! | not yet released |
 | Star Wars Enhanced | StingRay | not yet released |
 | Stellar 7 Enhanced | Psygore | [2.0b (07.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Stellar7Enhanced-2.0b-20261107) |
-| Test Drive Enhanced | JOTD | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/TestDriveEnhanced-2.0b-20261013) |
+| Test Drive Enhanced | JOTD | [2.0b (13.11.2026)](https://github.com/Vesuri/whdload/releases/tag/TestDriveEnhanced-2.0b-20261113) |
 | Test Drive II Enhanced | JOTD | released upstream as JOTD's 2.1 (11.10.2026) |
 | TFX Enhanced | JOTD | not yet released; merged upstream, not released there |
 | Their Finest Hour Enhanced | Psygore | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/TheirFinestHourEnhanced-2.0b-20261013) |
