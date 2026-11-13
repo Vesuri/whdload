@@ -121,6 +121,8 @@ def cd32_main(argv):
                     lines.append('\tdc.b '+','.join(f'${b:02x}' for b in code[pos+2:pos+size]))
             elif pos == 0x14da and a.ceiling and a.ceiling.startswith('drawing'):
                 lines.append('\tbsr.w drawing_patchseg')
+            elif pos == 0x14da and a.release:
+                lines.append('\tbsr.w release_patchseg')
             elif pos == 0x14da and a.timing:
                 lines.append('\tbsr.w timing_patchseg')
             elif pos == 0x14da and a.verify:

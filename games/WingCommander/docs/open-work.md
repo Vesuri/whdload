@@ -863,13 +863,17 @@ in [input, saves and TrainSim](internals.md#input-devices-bunk-saves-and-trainsi
 none of it has been run live. It covers the three pinned executables only; the
 two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files.
 
-- **CD32 bunk save (slave bug; English and German).** Psygore's StoreNV
-  replacement returns 1, so the game clears the new save's bunk until the slots
-  are reloaded. Fix: return 0; replace the stubbed GetNVList with one that clears
-  the presence array and marks each existing `Bed_N` file; restore the NOPed
-  failure branch. Check new, overwritten and deleted saves natively, then live:
-  the pilot must appear at once and survive a restart. Review it together with
-  the stashed save/load length guard above. OCS is unaffected.
+- **CD32 bunk save (slave bug; English and German): fixed in the release build,
+  native check passes, live check pending.** Psygore's StoreNV replacement
+  returned 1, so the game cleared the new save's bunk until the slots were
+  reloaded. The release slave now applies a second patch list in every mode. It
+  returns 0, replaces the stubbed GetNVList with a real `Bed_N` file
+  enumeration, and restores the NOPed failure branch. See
+  [the fix](internals.md#cd32-bunk-save-psygores-storenv-return-value).
+  `make check` runs `tools/bunk_save_check.py`. Still to do: live, the pilot
+  must appear at once, survive a restart, and overwrite and erase correctly in
+  English and German. The stashed save/load length guard below (wrong-sized
+  files) is still separate. OCS is unaffected.
 - **TrainSim keyboard selection (game bug; all three).** Keys `1`–`4` pass -1 to
   the fly-off animation, which then reads and writes outside its tables. Fix: one
   word per executable, `move.w d4,-(sp)` → `move.w (a2),-(sp)` (`3f04` → `3f12`)

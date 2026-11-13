@@ -46,7 +46,9 @@ audit, frame statistics, OCS candidates) call the generators directly with a new
 `--output` below `tmp/`, as the sections below show. `make check` checks the release
 build against `release/slaves.sha256`, rebuilds both reconstructions (each asserts
 byte identity with the pinned original) and runs `release_check.py`,
-`ocs_options_check.py` and the installer staging check.
+`bunk_save_check.py` (the CD32 bunk save on both languages; `--sabotage
+store-failure|list-stub` are its negative controls), `ocs_options_check.py` and the
+installer staging check.
 
 `make run` boots the release build (common/run.sh, the repository's `docs/running.md`):
 CD32 on `a1200-fast` with `WHD_ARGS` defaulting to `CUSTOM5=0 DCACHE`, OCS

@@ -8503,7 +8503,28 @@ the file was written; the pilot appears only when all slots are next reloaded
 from file (`E:275ac`, called at `E:26f6e`). The NOP hides the failure message.
 If the return value is corrected alone, the post-save check at `E:2764a`–`2769e`
 compares the uninitialised arrays and can delete the new save and re-store
-another slot, so the enumeration needs a real replacement as well. OCS is not
+another slot, so the enumeration needs a real replacement as well.
+
+**Fix (CD32 release build, every mode and both languages).** The PatchSeg seam
+`S:14da` calls `release_patchseg` (`src/release.s`). After Psygore's list it
+applies a second list for the selected language:
+- PL_PS at the StoreNV site to `bunk_store`, which is his SaveFile that returns 0.
+- PL_P at the GetNVList wrapper to `bunk_list_en`/`_de`. It clears `count` flags,
+  builds each name the way `E:313e0` does (prefix pointer `-1328(a4)`, German
+  `-1284(a4)`), and sets the flag when resload_GetFileSize is nonzero.
+- PL_W `6604` at the failure branch.
+
+The save path then returns success, keeps the name, and finds no evicted slot.
+`tools/bunk_save_check.py` runs the game's own slot save (`E:275de`, `G:277a0`)
+natively on both pinned executables, with WHDLoad's file calls modelled. Psygore's
+list alone reproduces the cleared name. The fixed list passes these cases:
+- a new save, an overwrite, a first save and a full set of slots;
+- deletion of an emptied slot;
+- enumeration with counts 0, 8 and 12.
+
+Each case checks results, files and preserved registers. Its two sabotage
+controls (return 1, stubbed list) fail. Not yet run live. Loading still accepts
+a file of any size, as in Psygore's slave. OCS is not
 affected: `O:266fe` writes all eight slots to `SAVEGAME.WLD` through the game's
 own file code (`O:31a60`, 7,152 bytes), and every bunk action ends with the
 rebuild `O:25e14`/`252ba`.
