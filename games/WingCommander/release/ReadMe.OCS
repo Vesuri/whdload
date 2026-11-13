@@ -53,6 +53,9 @@
  Its left button works as fire: it clicks, skips and continues sequences, and
  fires the guns in flight. On CD32 it also moves the selection box when you
  enter your name. The joystick, CD32 pad and keys work as before.
+ On CD32, saving a pilot in the barracks also saves the Training Simulator high
+ scores, as Bed_N.hi beside the Bed_N save, and loading that pilot restores
+ them. Saves without this file still load, with the game's usual scores.
  The installed icon enables enhanced mode and DCACHE by default. NOCACHE can
  be used to disable caching. On CD32 the enhancements work in English and
  German. Enhanced OCS supports English SPS #1657 only; German disks use
@@ -101,6 +104,7 @@
  - CD32 edition: a saved pilot appears in the bunk at once, not only after the
    next reload.
  - Choosing a Training Simulator opponent with keys 1-4 shows the right ship.
+ - CD32 edition: Training Simulator high scores are kept with each saved pilot.
  - Mouse control of the room and menu pointer, and on CD32 of the name entry
    box; the left mouse button works as fire. The first click after entering a
    screen is no longer ignored.

@@ -11,7 +11,10 @@ return success and enumerate existing Bed_N files. TrainSim: the fly-off call
 must receive the key choice; the unfixed list passes -1. Mouse: the native room routine
 runs from after its input call to its sprite move with the slave's position
 hook, the RAWMOUSE callback moves the native sprite, the room exit stops it and
-the VBL pad read adds the left button as fire. Game bytes stay in tmp/.
+the VBL pad read adds the left button as fire. High scores: a pilot save also
+writes the six-entry table to Bed_N.hi, and the game's own pilot restore
+(E:26874, G:26a20) loads it back only when it is valid; without it the table is
+unchanged. Game bytes stay in tmp/.
 """
 import argparse, ctypes as C, hashlib, json, re, struct
 from pathlib import Path
@@ -27,6 +30,7 @@ GAMES = {
                     psygore=0x15e6, fix='fix_patch_en', save=0x275de, a4=0x7ffe,
                     app=-1332, prefix=-1328, name=-1296,
                     sites=dict(store=0x31498, list=0x314b0, branch=0x276b0), trainsim=0x1827e, flyoff=0x17d06,
+                    scores=dict(site=0x268be, restore=0x26874, table=17664, stubs=(0x6, 0x2543c)),
                     mouse=dict(room=0x273fc, exit=0x27362, pad=0x33e78, guard=0x33de6, reset=0x33ddc, entry=0x2737c, move=0x27418,
                                leave=0x2735a, left=0x27368, pos=2696, rect=2728, flags=18116,
                                slot=162, hide=-1160, image=-1164, gfx=-778, params='mouse_params_en',
@@ -36,6 +40,7 @@ GAMES = {
                    psygore=0x1cf4, fix='fix_patch_de', save=0x277a0, a4=0x7ffe,
                    app=-1288, prefix=-1284, name=-1252,
                    sites=dict(store=0x3165a, list=0x31672, branch=0x27872), trainsim=0x18338, flyoff=0x17db6,
+                   scores=dict(site=0x26a6a, restore=0x26a20, table=17714, stubs=(0x6, 0x255bc)),
                    mouse=dict(room=0x275be, exit=0x27524, pad=0x3403a, guard=0x33fa8, reset=0x33f9e, entry=0x2753e, move=0x275da,
                               leave=0x2751c, left=0x2752a, pos=2740, rect=2772, flags=18166,
                               slot=206, hide=-1116, image=-1120, gfx=-734, params='mouse_params_de',
@@ -124,8 +129,9 @@ class Machine:
                 self.files[f] = self.read(self.reg(2), n); self.reg(9, 0)
             elif name == 'DeleteFile':
                 f = self.string(self.reg(1)); self.files.pop(f, None); self.reg(9, -1 & 0xffffffff)
-            else:
-                f = self.string(self.reg(1))
+            else:                                       # LoadFile: whole file to a1
+                f = self.string(self.reg(1)); data = self.files[f]
+                self.write(self.reg(2), data); self.reg(9, len(data))
             self.calls.append((name, f))
         self.cb = C.CFUNCTYPE(None, P, Q, C.c_uint32, P)(hook)
         handle = Z(); ck(u.uc_hook_add(self.h, C.byref(handle), 4, self.cb, None, RES, RES+255))
@@ -166,8 +172,12 @@ class Machine:
     def close(self): ck(u.uc_close(self.h))
 
 
+TABLE = bytes.fromhex('0300 00004e20 0800 00003a98 0b00 00002ee0 0100 00001f40 0d00 00000fa0 0500 00000064'.replace(' ', ''))
+
+
 def save(cfg, code, blob, files, slot, name):
     m = Machine(code, blob, cfg, files)
+    m.write(m.a4+cfg['scores']['table'], TABLE)
     records = bytearray(8*116)
     for n in range(8):
         records[n*116:n*116+116] = bytes([0x41+n])+bytes([n])*115
@@ -180,6 +190,30 @@ def save(cfg, code, blob, files, slot, name):
         assert m.reg(r) == v, f'register {r} not preserved'
     after = m.read(SLOTS, 8*116); calls = m.calls; m.close()
     return result, after, calls
+
+
+def restore(cfg, code, blob, files, slot, table):
+    """The game's pilot restore for bed slot (d2, as its caller leaves it);
+    returns the table afterwards and the file calls."""
+    sc = cfg['scores']
+    code = bytearray(code)
+    for stub in sc['stubs']:
+        code[stub:stub+2] = b'\x4e\x75'
+    m = Machine(code, blob, cfg, files)
+    m.write(m.a4+sc['table'], table)
+    m.write(m.a4-32716, b'\0\0')
+    m.write(SLOTS, bytes(range(116)))
+    # d2 the bed; d3-d7, a2, a3, a5 and a6 must survive (a4 is checked by call).
+    keep = [(12, 0x33333333), (13, 0x44444444), (14, 0x55555555), (15, 0x66666666),
+            (16, 0x77777777), (3, 0x22222222), (4, 0x23232323), (6, 0x25252525), (7, 0x26262626)]
+    m.call(sc['restore'], struct.pack('>III', SLOTS, SLOTS+0x400, SLOTS+0x800), [(11, slot)]+keep)
+    assert m.reg(11) == slot, 'd2 not preserved'
+    for r, v in keep:
+        assert m.reg(r) == v, f'register {r} not preserved'
+    assert m.read(m.a4-32716, 2) == b'\0\1', 'replaced store missing'
+    assert m.read(SLOTS+0x800, 64) == bytes(range(2, 66)), 'record copy changed'
+    after = m.read(m.a4+sc['table'], 36); calls = m.calls; m.close()
+    return after, calls
 
 
 def nvlist(cfg, code, blob, files, count):
@@ -363,7 +397,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path)
     p.add_argument('--output', required=True, type=Path)
-    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored'),
+    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored'),
                    help='negative control: the check must fail')
     a = p.parse_args()
     out = a.output.resolve()
@@ -387,6 +421,9 @@ def main():
         elif a.sabotage == 'name-ignored':  # name entry drops the mouse's column steps
             at = blob.index(bytes.fromhex('d36f001c'), sy['mouse_name'])
             blob[at:at+4] = bytes.fromhex('4e714e71')
+        elif a.sabotage == 'scores-ignored':  # restore never copies the table file
+            at = blob.index(bytes.fromhex('32d8'), sy['scores_load'])
+            blob[at:at+2] = bytes.fromhex('4e71')
         else:                               # Psygore's PL_R
             blob[sy['bunk_list']:sy['bunk_list']+4] = bytes.fromhex('4cdf0c04')
             blob[sy['bunk_list']+4:sy['bunk_list']+6] = bytes.fromhex('4e75')
@@ -405,8 +442,13 @@ def main():
         fixed = bytearray(psy); fixlog = []
         apply(blob, sy[cfg['fix']], fixed, fixlog)
         mc = cfg['mouse']
+        sc = cfg['scores']
         assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']),
-                          (3, mc['room']), (3, mc['exit']), (3, mc['pad']), (3, mc['guard']), (3, mc['name'])], fixlog
+                          (3, mc['room']), (3, mc['exit']), (3, mc['pad']), (3, mc['guard']), (3, mc['name']),
+                          (3, sc['site'])], fixlog
+        assert original[sc['site']:sc['site']+6] == bytes.fromhex('397c00018034')
+        assert original[sc['restore']:sc['restore']+4] == bytes.fromhex('48e70030')
+        assert all(original[x:x+2] == b'\x4e\xb9' for x in (sc['site']-12, sc['site']-6))
         assert original[mc['name']:mc['name']+4] == bytes.fromhex('3f004eba')
         assert original[mc['reset']:mc['guard']+8] == bytes.fromhex('224870094259 51c8fffc 317cffff0012 4e75'.replace(' ', ''))
         assert original[mc['room']:mc['room']+8] == struct.pack('>HhHh', 0x3942, mc['pos'], 0x3943, mc['pos']+2)
@@ -419,7 +461,7 @@ def main():
         assert original[t:t+4] == bytes.fromhex('3f04486c') and original[t+6:t+8] == bytes.fromhex('4eba')
         assert fixed[t:t+2] == bytes.fromhex('3f12') and fixed[t+2:t+8] == original[t+2:t+8]
         changed = [i for i in range(len(psy)) if psy[i] != fixed[i]]
-        assert all(any(x <= i < x+6 for x in list(s.values())+[mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name']]) or t <= i < t+2
+        assert all(any(x <= i < x+6 for x in list(s.values())+[mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], sc['site']]) or t <= i < t+2
                    for i in changed)
         cases = {}
         # Negative control: Psygore's list writes the file but clears the name.
@@ -441,7 +483,9 @@ def main():
             for n, data in before.items():
                 if n != f'Bed_{slot}':
                     assert files[n] == data, (case, n, 'other save changed')
-            assert set(files) == set(before) | {f'Bed_{slot}'}
+            # The pilot's table is saved beside the record.
+            assert files[f'Bed_{slot}.hi'] == TABLE, (case, 'table not saved')
+            assert set(files) == set(before) | {f'Bed_{slot}', f'Bed_{slot}.hi'}
             assert not any(c[0] in ('DeleteFile', 'unexpected') for c in calls), (case, calls)
             sizes = [c[1] for c in calls if c[0] == 'GetFileSize']
             assert sizes == [f'Bed_{n}' for n in range(8)]*2, sizes
@@ -450,7 +494,30 @@ def main():
         files = {'Bed_2': b'\2'*116, 'Bed_4': b'\4'*116}
         r, after, calls = save(cfg, fixed, blob, files, 2, 0)
         assert 'Bed_2' not in files and files['Bed_4'] == b'\4'*116 and r == 1
+        assert not any(n.endswith('.hi') for n in files), files
         cases['delete'] = dict(result=r, files=sorted(files))
+        # Pilot restore: a valid table file replaces the table; a missing,
+        # wrong-sized or invalid one leaves the game's table as it was.
+        seeded = bytes.fromhex('0200 00003a98 0600 00002ee0 0a00 00001f40 0400 00000fa0 0c00 000007d0 0800 00000000'.replace(' ', ''))
+        def bad(i, value):
+            b = bytearray(TABLE); b[i:i+len(value)] = value; return bytes(b)
+        tables = dict(valid=(TABLE, TABLE), absent=(None, seeded), short=(TABLE[:30], seeded), long=(TABLE+b'\0\0', seeded),
+                      id_range=(bad(12, b'\x0e'), seeded), repeated=(bad(12, b'\x03'), seeded),
+                      negative=(bad(32, b'\xff\xff\xff\xff'), seeded), unsorted=(bad(8, b'\x00\x00\x60\x00'), seeded),
+                      unused=(bad(30, b'\xff'), bad(30, b'\xff')))
+        for case, (content, want) in tables.items():
+            for slot in (0, 3, 10):
+                files = {f'Bed_{slot}': b'X'*116, 'Bed_1.hi': seeded[::-1]}
+                if content is not None:
+                    files[f'Bed_{slot}.hi'] = content
+                got, calls = restore(cfg, fixed, blob, files, slot, seeded)
+                assert got == want, (case, slot, got.hex())
+                assert calls[0] == ('GetFileSize', f'Bed_{slot}.hi'), calls
+                assert all(c[0] in ('GetFileSize', 'LoadFile') for c in calls), calls
+            # Psygore's list: the restore leaves the table alone.
+            got, calls = restore(cfg, psy, blob, files, slot, seeded)
+            assert got == seeded and calls == []
+        cases['scores'] = sorted(tables)
         # Enumeration alone: flags only below count, two-digit names, rest untouched.
         files = {'Bed_0': b'x', 'Bed_3': b'x', 'Bed_7': b'x', 'Bed_10': b'x', 'Bed_12': b'x', 'Bed_x': b'x'}
         flags, calls = nvlist(cfg, fixed, blob, files, 8)

@@ -889,10 +889,13 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   `3f12` at `O:179e2`, `E:1827e`, `G:18338`); see
   [the fix](internals.md#trainsim-enemy-selection-by-keyboard). Not covered:
   the OCS revisions `116d` and `262d`, whose files are missing.
-- **Persistent TrainSim high scores (feature).** Neither save record holds the
-  table (OCS `OD:bbcc`, six 6-byte entries). Save it per slot beside the save and
-  restore it on load. First locate the CD32 table, find when the game resets it,
-  and confirm that its pilot indices refer to the loaded campaign.
+- **Persistent TrainSim high scores (feature): CD32 done in the release build,
+  every mode and both languages; native checks pass, not yet run live.** The
+  table (A4+17664) is saved to `Bed_N.hi` with each bed save and restored when
+  that pilot is loaded; without a valid file the game behaves as before. Its
+  player entry names the current pilot, so the table belongs with the bed. See
+  [high scores](internals.md#trainsim-high-scores-and-save-records). OCS remains:
+  its table (`OD:bbcc`) is not in `SAVEGAME.WLD`'s eight slots.
 - **Mouse pointer in rooms and menus: done in both release builds, every mode
   (2026-11-13).**
   - Port-0 mouse motion moves the room pointer sprite through the input

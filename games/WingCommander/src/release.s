@@ -95,6 +95,11 @@ release_limit:
 ; - Mouse in name entry. The TrainSim top-score name entry moves a selection
 ;   box over a character grid by stick edges; whole cells of mouse motion now
 ;   move it too.
+; - TrainSim high scores. The game keeps its six-entry table only in memory,
+;   seeded at boot and for a new game; its player entry (id 8) names the
+;   current pilot. Saving a pilot also writes the table to Bed_N.hi beside
+;   Bed_N; loading the pilot restores it when that file is valid. Without one,
+;   the table stays as the game left it. Bed_N itself is unchanged.
 ; German now runs the English paths with German addresses: enhanced as 3 and
 ; Psygore's modes as 0, which adds only the waypoint marker order.
 release_patchseg:
@@ -252,7 +257,7 @@ mouse_fields:   dc.w 0                  ; VBL pad reads
 fix_patch_en:
         dc.w    3                ; PL_PS StoreNV's lowlevel call
         dc.l    $31498
-        dc.w    bunk_store-fix_patch_en
+        dc.w    bunk_store_en-fix_patch_en
         dc.w    2                ; PL_P GetNVList wrapper
         dc.l    $314b0
         dc.w    bunk_list_en-fix_patch_en
@@ -277,11 +282,14 @@ fix_patch_en:
         dc.w    3                ; PL_PS name entry grid poll
         dc.l    $16ed0
         dc.w    mouse_name-fix_patch_en
+        dc.w    3                ; PL_PS pilot restore: its last store
+        dc.l    $268be
+        dc.w    scores_load_en-fix_patch_en
         dc.w    0
 fix_patch_de:
         dc.w    3
         dc.l    $3165a
-        dc.w    bunk_store-fix_patch_de
+        dc.w    bunk_store_de-fix_patch_de
         dc.w    2
         dc.l    $31672
         dc.w    bunk_list_de-fix_patch_de
@@ -306,22 +314,167 @@ fix_patch_de:
         dc.w    3
         dc.l    $16f6e
         dc.w    mouse_name-fix_patch_de
+        dc.w    3
+        dc.l    $26a6a
+        dc.w    scores_load_de-fix_patch_de
         dc.w    0
 
 ; StoreNV(a1 item name, a2 data, d0 size): as Psygore's S:16b6, but returns
-; 0 (success). resload_SaveFile does not return on failure.
+; 0 (success). resload_SaveFile does not return on failure. A pilot record
+; (116 bytes, first byte set; erasing clears it) also saves the high-score
+; table to the item name plus ".hi". d1 is free here: the A4 table offset.
+SCORES_SIZE = 36                 ; six entries: id byte, pad byte, score long
+BED_SIZE = 116
+bunk_store_en:
+        move.w  #17664,d1
+        bra.s   bunk_store
+bunk_store_de:
+        move.w  #17714,d1
 bunk_store:
+        movem.l d0-d1/a1-a2,-(sp)
         movea.l a1,a0
         movea.l a2,a1
         movea.l slave+$121e(pc),a2
         jsr     12(a2)           ; resload_SaveFile
+        movem.l (sp)+,d0-d1/a1-a2
+        cmpi.l  #BED_SIZE,d0
+        bne.s   .done
+        tst.b   (a2)
+        beq.s   .done
+        lea     -32(sp),sp
+        movea.l a1,a0
+        movea.l sp,a1
+        moveq   #32-5,d0         ; room for ".hi" and the terminator
+.copy:
+        move.b  (a0)+,(a1)+
+        dbeq    d0,.copy
+        bne.s   .skip            ; overlong name: no table file
+        subq.l  #1,a1
+        bsr.w   scores_suffix
+        movea.l sp,a0
+        lea     (a4,d1.w),a1
+        moveq   #SCORES_SIZE,d0
+        movea.l slave+$121e(pc),a2
+        jsr     12(a2)           ; resload_SaveFile
+.skip:
+        lea     32(sp),sp
+.done:
         moveq   #0,d0
         addi.l  #$c,(sp)         ; continue at the wrapper's register restore
         rts
 
+; a1 at a name's terminator: append ".hi".
+scores_suffix:
+        move.b  #'.',(a1)+
+        move.b  #'h',(a1)+
+        move.b  #'i',(a1)+
+        clr.b   (a1)
+        rts
+
+; a3 item prefix, d2 bed, a1 32-byte buffer: the game's item name (prefix,
+; tens digit when nonzero, units digit). Returns a1 at the terminator and
+; Z clear when the prefix does not fit. d0/d1/a0 scratch.
+bed_name:
+        movea.l a3,a0
+        moveq   #32-8,d1         ; two digits, ".hi" and the terminator
+.copy:
+        move.b  (a0)+,(a1)+
+        dbeq    d1,.copy
+        bne.s   .done
+        subq.l  #1,a1
+        moveq   #0,d0
+        move.w  d2,d0
+        divu.w  #10,d0
+        tst.b   d0
+        beq.s   .units
+        addi.b  #'0',d0
+        move.b  d0,(a1)+
+.units:
+        swap    d0
+        addi.b  #'0',d0
+        move.b  d0,(a1)+
+        clr.b   (a1)
+        moveq   #0,d0            ; Z set: name built
+.done:
+        rts
+
+; Pilot restore (E:26874's last store, d2 still the caller's bed): restore the
+; bed's saved table when Bed_N.hi exists, is the table's size and holds valid
+; entries. Every register is preserved.
+scores_load_en:
+        move.w  #1,-32716(a4)    ; the replaced store
+        movem.l d0-d3/a0-a3,-(sp)
+        movea.l -1328(a4),a3     ; item prefix "Bed_"
+        move.w  #17664,d3
+        bra.s   scores_load
+scores_load_de:
+        move.w  #1,-32716(a4)
+        movem.l d0-d3/a0-a3,-(sp)
+        movea.l -1284(a4),a3
+        move.w  #17714,d3
+scores_load:
+        lea     -32-SCORES_SIZE(sp),sp
+        movea.l sp,a1
+        bsr.s   bed_name
+        bne.s   .done
+        bsr.s   scores_suffix
+        movea.l sp,a0
+        movea.l slave+$121e(pc),a2
+        jsr     36(a2)           ; resload_GetFileSize
+        cmpi.l  #SCORES_SIZE,d0
+        bne.s   .done
+        movea.l sp,a0
+        lea     32(sp),a1
+        jsr     8(a2)            ; resload_LoadFile
+        lea     32(sp),a0
+        bsr.s   scores_valid
+        bne.s   .done
+        lea     32(sp),a0
+        lea     (a4,d3.w),a1
+        moveq   #SCORES_SIZE/2-1,d0
+.copy:
+        move.w  (a0)+,(a1)+
+        dbra    d0,.copy
+.done:
+        lea     32+SCORES_SIZE(sp),sp
+        movem.l (sp)+,d0-d3/a0-a3
+        rts
+
+; a0 table: Z set when every id is 0-13 (crew and named pilots, 8 the
+; player) or $ff (unused), no id repeats, and scores are nonnegative and in
+; the game's descending order. d0/d1/d2/a1 scratch.
+scores_valid:
+        moveq   #5,d2
+        moveq   #-1,d1           ; ids seen, as bits (cleared when seen)
+.entry:
+        moveq   #0,d0
+        move.b  (a0),d0
+        cmpi.b  #$ff,d0
+        beq.s   .score
+        cmpi.b  #13,d0
+        bhi.s   .bad
+        bclr    d0,d1
+        beq.s   .bad             ; repeated id
+.score:
+        tst.l   2(a0)
+        bmi.s   .bad
+        tst.w   d2
+        beq.s   .next
+        move.l  2(a0),d0
+        cmp.l   8(a0),d0
+        blt.s   .bad
+.next:
+        addq.l  #6,a0
+        dbra    d2,.entry
+        moveq   #0,d0
+        rts
+.bad:
+        moveq   #1,d0
+        rts
+
 ; GetNVList wrapper (array.l, count.w on the stack). Clears count flags and
-; sets a flag for each Bed_N file that exists, named as the game names items
-; (prefix, tens digit when nonzero, units digit). Preserves d2-d7/a2-a7.
+; sets a flag for each Bed_N file that exists, named as the game names items.
+; Preserves d2-d7/a2-a7.
 bunk_list_en:
         movem.l d2/a2-a3,-(sp)
         movea.l -1328(a4),a3     ; item prefix "Bed_"
@@ -337,26 +490,9 @@ bunk_list:
         bhs.s   .done
         movea.l 32+12+4(sp),a0
         clr.b   (a0,d2.w)
-        movea.l a3,a0
         movea.l sp,a1
-        moveq   #32-4,d1         ; room for two digits and the terminator
-.copy:
-        move.b  (a0)+,(a1)+
-        dbeq    d1,.copy
+        bsr.w   bed_name
         bne.s   .done            ; overlong prefix: report nothing present
-        subq.l  #1,a1
-        moveq   #0,d0
-        move.w  d2,d0
-        divu.w  #10,d0
-        tst.b   d0
-        beq.s   .units
-        addi.b  #'0',d0
-        move.b  d0,(a1)+
-.units:
-        swap    d0
-        addi.b  #'0',d0
-        move.b  d0,(a1)+
-        clr.b   (a1)
         movea.l sp,a0
         movea.l slave+$121e(pc),a2
         jsr     36(a2)           ; resload_GetFileSize

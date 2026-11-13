@@ -8676,7 +8676,23 @@ their files are missing.
 The OCS high-score table at `OD:bbcc` holds six 6-byte entries: a pilot-index
 word and a score longword (display loop `O:16dfe`; lowest score read from
 `OD:bbec`). It ends at `OD:bbf0`, where the saved campaign block begins, and
-neither version saves it. The CD32 table has not been located.
+the OCS save does not include it.
+
+The CD32 table is at A4+17664 (German +17714), `D:c4fe`: six entries of an id
+byte, an unused byte and a score longword, in descending score order. Ids 0-8 name
+roster entries (`-20174(a4)`, 28 bytes each, name at +14); 9-13 name pilots from
+the pointer table at `-30172(a4)`; `$ff` is unused (`E:16a70`). Id 8 is the
+player, and its name is whatever pilot is current. The table is never saved:
+- `E:169d0` seeds it with five random crew scores and the player's 0. It runs at
+  boot and from `E:152ea`, Start Vega Campaign, through `E:25eca`.
+- `E:16986` enters the player's score (sort `E:1688a`), from the simulator
+  result `E:17522` and from `E:16a92`. `E:16a92` runs from `E:157ee` during the
+  campaign and raises other pilots' scores.
+- Loading a bed (`E:26874`) does not touch it.
+
+The first simulator run after Start Vega Campaign belongs to the new pilot: its
+top-score name entry (`E:173e2`) writes the name and callsign at `13174(a4)`,
+part of the bed record, and into roster entry 8.
 
 | Record | Contents |
 |---|---|
@@ -8684,6 +8700,35 @@ neither version saves it. The CD32 table has not been located.
 | CD32, 116 bytes (`E:268cc`) | flag; +2: 64 bytes from `D:b374`; +66: 50 bytes from `D:90fa`; the caller also passes `D:9b8c`, which is not read |
 
 Whether the shorter CD32 record loses campaign state that OCS keeps is unknown.
+
+**CD32 persistence (release build, every mode, both languages).** A bed save
+writes the table beside the bed record, and loading that pilot restores it:
+- `bunk_store` (the StoreNV patch) saves the 36 bytes to the item name plus
+  `.hi` when the item is a 116-byte bed record whose first byte is set. Erasing
+  clears that byte and deletes the record, so no table is written.
+- At `E:268be` (G `26a6a`), the last store of the pilot restore `E:26874`
+  (single caller `E:26d0a`, bed in d2), `scores_load` reads `Bed_<d2>.hi`. It
+  replaces the table only when the file is 36 bytes and valid: ids 0-13 or
+  `$ff`, no repeats, scores nonnegative and descending.
+- Without a valid file the table stays as the game left it, as in the original.
+  The `Bed_N` record and its format are unchanged, so saves move freely between
+  this and older slaves. An older slave ignores `Bed_N.hi`. The bed list
+  matches only the exact `Bed_N` names, so the extra file is never taken for a
+  bed.
+- Erasing a bed leaves an existing `Bed_N.hi`. It is read only when a pilot is
+  loaded from that bed, and the next save there overwrites it.
+
+`cd32_fixes_check.py` runs the game's slot save and pilot restore on both
+executables:
+- Every save case writes the table file, and an erased slot writes none.
+- A valid file replaces the table. Absent, short, long, out-of-range,
+  repeated-id, negative and unsorted files leave it unchanged.
+- Restore preserves every register, keeps the replaced store and copies the
+  record unchanged.
+- Psygore's list alone never touches the file.
+- `--sabotage scores-ignored` fails.
+Not yet run live. The name `Bed_N.hi` is ours: neither the game nor Psygore's
+slave has a high-score file. It pairs the table with the game's own item name.
 
 ## German CD32 enhancements
 
