@@ -81,7 +81,7 @@ The original reconstruction remains available as the rollback/control.
 “Checked” below means the bounded emulator/native-CPU gate, not hardware certification.
 The A500 enhancement measurements describe the earlier ungated experiments; the
 public candidate always runs original behaviour on 68000/68010, with only the
-bit-exact E1 shortcuts and waypoint marker order. E2 campaign
+bit-exact E1 shortcuts, waypoint marker order and TrainSim key fix. E2 campaign
 coverage belongs to those acceptance binaries, not a repeated full campaign on
 the new public-option binary.
 

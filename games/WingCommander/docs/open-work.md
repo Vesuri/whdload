@@ -853,7 +853,7 @@ behaviour, save/load and nonvolatile storage, options in the slave, the ReadMe, 
 release archive per AmigaXDev's playbook. Final play-test by the user on real hardware
 if available.
 
-#### Reported defects and mouse control (static findings; not implemented)
+#### Reported defects and mouse control (static findings)
 
 A user who developed a separate slave reported a delayed bunk save, a TrainSim
 selection fault with number keys, non-persistent TrainSim high scores and missing
@@ -870,16 +870,18 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   returns 0, replaces the stubbed GetNVList with a real `Bed_N` file
   enumeration, and restores the NOPed failure branch. See
   [the fix](internals.md#cd32-bunk-save-psygores-storenv-return-value).
-  `make check` runs `tools/bunk_save_check.py`. Still to do: live, the pilot
+  `make check` runs `tools/cd32_fixes_check.py`. Still to do: live, the pilot
   must appear at once, survive a restart, and overwrite and erase correctly in
   English and German. The stashed save/load length guard below (wrong-sized
   files) is still separate. OCS is unaffected.
-- **TrainSim keyboard selection (game bug; all three).** Keys `1`–`4` pass -1 to
-  the fly-off animation, which then reads and writes outside its tables. Fix: one
-  word per executable, `move.w d4,-(sp)` → `move.w (a2),-(sp)` (`3f04` → `3f12`)
-  at `O:179e2`, `E:1827e`, `G:18338`. Check that keys and clicks give the same
-  animation and that Escape is unchanged. Pending decision: apply it in original
-  modes too.
+- **TrainSim keyboard selection (game bug; all three): fixed in both release
+  builds, every mode (user decision, 2026-11-13); native checks pass, live check
+  pending.** Keys `1`–`4` passed -1 to the fly-off animation, which then read and
+  wrote outside its tables. The call now passes the stored choice (`3f04` →
+  `3f12` at `O:179e2`, `E:1827e`, `G:18338`); see
+  [the fix](internals.md#trainsim-enemy-selection-by-keyboard). Still to do live:
+  keys and clicks give the same animation, and Escape is unchanged. Not covered:
+  the OCS revisions `116d` and `262d`, whose files are missing.
 - **Persistent TrainSim high scores (feature).** Neither save record holds the
   table (OCS `OD:bbcc`, six 6-byte entries). Save it per slot beside the save and
   restore it on load. First locate the CD32 table, find when the game resets it,

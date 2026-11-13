@@ -6923,8 +6923,9 @@ the enabled option, CPU flags identifying 68020+ and an Exec memory header with
 FAST set, CHIP clear and a nonempty physical Zorro II Fast or high-Fast bank.
 68000/68010, slow-only and unverified memory configurations never install the
 clock, prediction, input, converter or publication hooks. Every path installs
-the four bit-exact E1 arithmetic/collision hooks (see below) and the two
-[waypoint marker order](#waypoint-marker-layering) hooks.
+the four bit-exact E1 arithmetic/collision hooks (see below), the two
+[waypoint marker order](#waypoint-marker-layering) hooks and the
+[TrainSim key fix](#trainsim-enemy-selection-by-keyboard).
 
 Public slave hunk offsets: the existing `OS:$11c6` detour (file `$11e6`) calls
 startup at `$14a8` (file `$14c8`); the new gate is `$16b0` (file `$16d0`).
@@ -8515,7 +8516,7 @@ applies a second list for the selected language:
 - PL_W `6604` at the failure branch.
 
 The save path then returns success, keeps the name, and finds no evicted slot.
-`tools/bunk_save_check.py` runs the game's own slot save (`E:275de`, `G:277a0`)
+`tools/cd32_fixes_check.py` runs the game's own slot save (`E:275de`, `G:277a0`)
 natively on both pinned executables, with WHDLoad's file calls modelled. Psygore's
 list alone reproduces the cleared name. The fixed list passes these cases:
 - a new save, an overwrite, a first save and a full set of slots;
@@ -8541,6 +8542,24 @@ callee `O:17498`/`E:17d06`). With -1 it reads the ship-position table at index
 -1 (`-30042(a4)` - 4), decrements a stack word below its four-entry array and
 draws ship image -1. Other digits are ignored by the key switch
 (`O:179b4`/`E:18250`/`G:1830a`).
+
+**Fix (both release builds, every mode).** The call passes `(a2)` instead:
+`move.w d4,-(sp)` → `move.w (a2),-(sp)` (`3f04` → `3f12`). On the pointer path
+`(a2)` already equals `d4`, and Escape skips the call. Where it is installed:
+- **CD32:** as a PL_W in each language's fix list (`src/release.s`, after
+  Psygore's list).
+- **OCS (English `00e8`):** as `word_fixes` in both install paths
+  (`tools/ocs_memory_build.py` `WORDS`). It checks its own six bytes
+  `3f04 486c 3d60` and is skipped alone if they differ.
+
+How it is checked:
+- `tools/cd32_fixes_check.py` runs from the call site to the animation entry.
+  Psygore's list passes -1 for every key; the fix passes the key's choice.
+- `tools/ocs_options_check.py` checks the word in enhanced and original mode,
+  and checks that a damaged site is left untouched.
+
+Not yet run live. The OCS revisions `116d` and `262d` are not covered because
+their files are missing.
 
 ### TrainSim high scores and save records
 

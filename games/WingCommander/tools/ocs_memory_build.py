@@ -29,6 +29,9 @@ NATIVE={'OCS_CHIP_ALLOC':0x33b60,'OCS_REGISTER':0x33c8e,
 EXACT=('ocs_multiply','ocs_distance_ratio','ocs_radius','ocs_collision_pair')
 # Installed on every path: bit-exact E1 shortcuts and the waypoint marker order.
 ALWAYS=EXACT+('waypoint_early','waypoint_scene')
+# Game-bug word fixes, public builds, every mode: (offset, guarded bytes, word).
+# TrainSim keys 1-4: the fly-off animation gets the stored choice (a2), not d4.
+WORDS=((0x179e2,'3f04486c3d60','3f12'),)
 HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x324c0,'display_create_checked',0x4ef9),
        (0x31e1e,'ocs_source_allocate',0x4eb9),
@@ -402,7 +405,18 @@ exact_hooks_done:
  bsr.w slave+$ee8
  bra.w install_done
 '''
-        text=text.replace('display_create_checked:',exact+'\ndisplay_create_checked:',1)
+        # Each word fix checks its own six bytes and is skipped alone on a mismatch.
+        words='\nword_fixes:\n'
+        for off,guard,value in WORDS:
+            words+=(f' movea.l d6,a5\n adda.l #${off:x},a5\n cmpi.l #${guard[:8]},(a5)\n'
+                    f' bne.s .skip{off:x}\n cmpi.w #${guard[8:]},4(a5)\n bne.s .skip{off:x}\n'
+                    f' move.w #${value},(a5)\n.skip{off:x}:\n')
+        words+=' rts\n'
+        require('exact_hooks_done:\n bsr.w slave+$ee8' in exact,'original install end missing')
+        exact=exact.replace('exact_hooks_done:\n bsr.w slave+$ee8','exact_hooks_done:\n bsr.w word_fixes\n bsr.w slave+$ee8',1)
+        require(text.count(' bsr.w slave+$ee8\ninstall_done:')==1,'enhanced install end missing')
+        text=text.replace(' bsr.w slave+$ee8\ninstall_done:',' bsr.w word_fixes\n bsr.w slave+$ee8\ninstall_done:',1)
+        text=text.replace('display_create_checked:',exact+words+'\ndisplay_create_checked:',1)
         # Keep option code/data in PC-relative range of the startup seam.
         config=original[32+0xf81:].split(b'\0',1)[0].rstrip(b';')
         config+=b';C5:B:Enhanced framerate (68020+Fast RAM);\0'
@@ -478,7 +492,7 @@ exact_hooks_done:
     (out/'WingCommander.Slave').write_bytes(blob)
     report=dict(variant='ocs',candidate=True,backend=option,bytes=len(blob),
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
-                public_option=public,opening=public,
+                public_option=public,opening=public,word_fixes=[list(w) for w in WORDS] if public else [],
                 version='2.0b' if public else None, release_date='19.10.2026' if public else None,
                 expansion_bytes=0x100000 if public else 0xf0000,
                 game_pool_bytes=0xc0000 if public else 0xb0000,

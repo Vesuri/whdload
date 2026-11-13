@@ -44,6 +44,11 @@ def check(build, mutation=None):
     from ocs_memory_build import ALWAYS
     exact=[h for h in meta['hooks'] if h[1] in ALWAYS]
     require(len(exact)==len(ALWAYS),'always-on hooks missing from build')
+    from ocs_memory_build import WORDS
+    words=[(at,guard,value) for at,guard,value in meta['word_fixes']]
+    require(words==[list(w) for w in WORDS] or words==[tuple(w) for w in WORDS],'word fixes missing from build')
+    game=(ROOT/'tmp/game/WingCommander/data/Wing.english').read_bytes()
+    for at,guard,value in words:require(game[44+at:50+at]==bytes.fromhex(guard),'word fix guard does not match the pinned game')
     banks=((0x500000,4,'z2-fast'),(0x1000000,4,'high-fast'),
            (0xc00000,4,'slow-labelled-fast'),(0x80000,2,'chip'),
            (0x500000,0,'unmapped'),(0x500000,6,'chip-and-fast'),
@@ -57,7 +62,8 @@ def check(build, mutation=None):
                     # A damaged enhancement-only site must only be examined
                     # when enabled. A damaged exact site makes original mode
                     # fall back to the untouched game instead of aborting.
-                    for corrupt in (False,'enhanced','exact'):
+                    # A damaged word-fix site skips only that fix.
+                    for corrupt in (False,'enhanced','exact','word'):
                         c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english')
                         events=[]
                         try:
@@ -79,27 +85,33 @@ def check(build, mutation=None):
                                 events.append('abort');c.reg(18,STOP);ck(u.uc_emu_stop(c.h))
                             c.intercept(0x190034,control)
                             c.intercept(0x190074,patch);c.intercept(0x190020,flush);c.intercept(0x190000,abort)
-                            off=meta['hooks'][0][0] if corrupt!='exact' else exact[0][0]
+                            off={'exact':exact[0][0],'word':words[0][0]+2}.get(corrupt,meta['hooks'][0][0])
                             if corrupt:c.write(CODE+off,bytes([c.get(CODE+off,1)^1]))
+                            fatal=corrupt in ('enhanced','exact')
                             before=c.read(CODE,0x358c8)
                             opening_before=c.read(STARTUP,0x1d94)
                             regs={r:0x12340000+r for r in list(range(1,8))+list(range(9,17))}
                             regs.update({3:0x190000,4:slave+revision,16:(CODE-4)//4})
                             c.run(slave-CODE+sy['install'],registers=regs)
                             require(events[0]=='patch','original PatchSeg omitted')
-                            if enabled and corrupt:
+                            if enabled and fatal:
                                 require(events[-1]=='abort' and 'flush' not in events,'damaged enhanced site accepted')
                                 require(c.read(CODE,0x358c8)==before,'partial installation before rejection')
                             elif enabled:
                                 require(events[-1]=='flush','missing enhancement flush')
                                 for at,label,opcode in meta['hooks']:
                                     require(c.get(CODE+at,2)==opcode and c.get(CODE+at+2,4)==slave+sy[label],'missing enhanced hook')
+                                for at,guard,value in words:
+                                    require(c.read(CODE+at,2)==(before[at:at+2] if corrupt=='word' else bytes.fromhex(value)),'word fix state')
                             elif revision==0x1302 and corrupt!='exact':
-                                # Original mode: only the E1 shortcuts and waypoint marker order.
+                                # Original mode: only the E1 shortcuts, waypoint marker order and word fixes.
                                 after=bytearray(c.read(CODE,0x358c8))
                                 for at,label,opcode in exact:
                                     require(after[at:at+6]==word(opcode)+long(slave+sy[label]),'missing exact hook')
                                     after[at:at+6]=before[at:at+6]
+                                for at,guard,value in words:
+                                    require(after[at:at+2]==(before[at:at+2] if corrupt=='word' else bytes.fromhex(value)),'word fix state')
+                                    after[at:at+2]=before[at:at+2]
                                 require(bytes(after)==before and c.read(STARTUP,0x1d94)==opening_before,'original mode modified game')
                                 require(events[-1]=='flush' and 'abort' not in events,'original mode enhanced')
                                 for pos in meta['fixups']:
@@ -110,7 +122,7 @@ def check(build, mutation=None):
                                 require('flush' not in events and 'abort' not in events,'original mode enhanced')
                                 for pos in meta['fixups']:
                                     require(c.read(slave+pos,4)==payload[pos:pos+4],'original mode relocated payload')
-                            if not (enabled and corrupt):
+                            if not (enabled and fatal):
                                 expected=dict(regs);expected.update({1:regs[4],2:regs[16]})
                                 require(all(c.reg(r)==v for r,v in expected.items()),'startup register ABI changed')
                             results.append(dict(bank=bank,flags=flags,option=option,revision=revision,corrupt=corrupt,enhanced=enabled,events=events))

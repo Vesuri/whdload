@@ -36,19 +36,22 @@ release_limit:
         bsr.w   slave+$17b8
         rts
 
-; Psygore's NV storage is files: StoreNV returned 1 (failure) after a
-; successful resload_SaveFile and GetNVList returned without filling its
-; presence array, so the game cleared a saved bunk until the next reload.
-; This second list, applied after his, returns success, lists the existing
-; Bed_N files and restores the save-failure branch he NOPed. All modes.
+; Fixes applied in every mode by a second list after Psygore's:
+; - Bunk save. His NV storage is files: StoreNV returned 1 (failure) after a
+;   successful resload_SaveFile and GetNVList returned without filling its
+;   presence array, so the game cleared a saved bunk until the next reload.
+;   Return success, list the existing Bed_N files and restore the
+;   save-failure branch he NOPed.
+; - TrainSim keys 1-4 (game bug). The fly-off animation is passed the pointer
+;   choice d4, still -1 after a key; pass the stored choice (a2) instead.
 release_patchseg:
         bsr.w   timing_patchseg
         movem.l d0-d1/a0-a1,-(sp)
-        lea     bunk_patch_en(pc),a0
+        lea     fix_patch_en(pc),a0
         move.l  slave+$1de4(pc),d0
         subq.l  #1,d0
         bne.s   .english
-        lea     bunk_patch_de(pc),a0
+        lea     fix_patch_de(pc),a0
 .english:
         movea.l d7,a1
         jsr     116(a2)          ; resload_PatchSeg
@@ -56,27 +59,33 @@ release_patchseg:
         rts
 
 ; Raw patch lists (no includes in this build): command, long offset, argument.
-bunk_patch_en:
+fix_patch_en:
         dc.w    3                ; PL_PS StoreNV's lowlevel call
         dc.l    $31498
-        dc.w    bunk_store-bunk_patch_en
+        dc.w    bunk_store-fix_patch_en
         dc.w    2                ; PL_P GetNVList wrapper
         dc.l    $314b0
-        dc.w    bunk_list_en-bunk_patch_en
+        dc.w    bunk_list_en-fix_patch_en
         dc.w    7                ; PL_W bne.s: save failure branch
         dc.l    $276b0
         dc.w    $6604
+        dc.w    7                ; PL_W move.w (a2),-(sp): TrainSim choice
+        dc.l    $1827e
+        dc.w    $3f12
         dc.w    0
-bunk_patch_de:
+fix_patch_de:
         dc.w    3
         dc.l    $3165a
-        dc.w    bunk_store-bunk_patch_de
+        dc.w    bunk_store-fix_patch_de
         dc.w    2
         dc.l    $31672
-        dc.w    bunk_list_de-bunk_patch_de
+        dc.w    bunk_list_de-fix_patch_de
         dc.w    7
         dc.l    $27872
         dc.w    $6604
+        dc.w    7
+        dc.l    $18338
+        dc.w    $3f12
         dc.w    0
 
 ; StoreNV(a1 item name, a2 data, d0 size): as Psygore's S:16b6, but returns

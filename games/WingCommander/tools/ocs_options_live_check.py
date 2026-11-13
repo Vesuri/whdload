@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check public original-mode captures against relocated original hook bytes.
-The bit-exact E1 sites must instead hold their always-on hooks."""
+The bit-exact E1 sites must instead hold their always-on hooks, and the
+game-bug word fixes their fixed words."""
 import argparse
 import json
 from pathlib import Path
@@ -35,7 +36,11 @@ def check(build, run, corrupt=False):
     require(len(exact)==len(ALWAYS),'always-on hooks missing from build')
     for off,(op,label) in exact.items():
         expected[off:off+6]=op.to_bytes(2,'big')+(r['slave']+b['symbols'][label]).to_bytes(4,'big')
+    # Game-bug word fixes are also installed in every mode.
+    for off,_,value in b.get('word_fixes',[]):
+        expected[off:off+2]=bytes.fromhex(value)
     windows=[(off,6) for off,_,_ in b['hooks']]
+    windows += [(off,2) for off,_,_ in b.get('word_fixes',[])]
     windows += [(off,2) for off in (*NOPS,*PREDICTION_NOPS)]
     windows += [(off,width) for off,width,_,_ in MODALS]
     checks=0

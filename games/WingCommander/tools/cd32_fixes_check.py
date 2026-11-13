@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Native CD32 bunk save check: the game's own slot save (E:275de, G:277a0)
+"""Native check of the CD32 release fixes on both languages.
+
+Bunk save: the game's own slot save (E:275de, G:277a0)
 runs on the pinned executables after the slave's patch lists are applied, with
 WHDLoad's file calls modelled by a file dictionary.
 
 Psygore's list alone is the negative control: the save is written but the
 slot's name is cleared. The release build's extra list must keep the name,
-return success and enumerate existing Bed_N files. Game bytes stay in tmp/.
+return success and enumerate existing Bed_N files. TrainSim: the fly-off call
+must receive the key choice; the unfixed list passes -1. Game bytes stay in tmp/.
 """
 import argparse, ctypes as C, hashlib, json, re, struct
 from pathlib import Path
@@ -18,14 +21,14 @@ ROOT = Path(__file__).resolve().parents[1]
 GAMES = {
     'english': dict(path='tmp/game/WingCommanderCD32/data/wing.english',
                     sha='093505483aed4c9dbd1b97484c3336e92fdb156be9c15a67ed0199bd4dade657',
-                    psygore=0x15e6, fix='bunk_patch_en', save=0x275de, a4=0x7ffe,
+                    psygore=0x15e6, fix='fix_patch_en', save=0x275de, a4=0x7ffe,
                     app=-1332, prefix=-1328, name=-1296,
-                    sites=dict(store=0x31498, list=0x314b0, branch=0x276b0)),
+                    sites=dict(store=0x31498, list=0x314b0, branch=0x276b0), trainsim=0x1827e, flyoff=0x17d06),
     'german': dict(path='tmp/game/WingCommanderCD32/data/wing.german',
                    sha='2047da69f2c83803675921afd86204747609a5c59dd3e7f67d954d785677dabe',
-                   psygore=0x1cf4, fix='bunk_patch_de', save=0x277a0, a4=0x7ffe,
+                   psygore=0x1cf4, fix='fix_patch_de', save=0x277a0, a4=0x7ffe,
                    app=-1288, prefix=-1284, name=-1252,
-                   sites=dict(store=0x3165a, list=0x31672, branch=0x27872)),
+                   sites=dict(store=0x3165a, list=0x31672, branch=0x27872), trainsim=0x18338, flyoff=0x17db6),
 }
 SLAVE = 0x200000          # slave payload
 RES = 0x280000            # resload jump table, each entry an RTS
@@ -165,6 +168,21 @@ def nvlist(cfg, code, blob, files, count):
     return out, calls
 
 
+def flyoff_choice(cfg, code, blob, choice, pointer):
+    """Run from the fly-off call site to the animation's entry; return its
+    choice argument."""
+    m = Machine(code, blob, cfg, {})
+    m.write(SLOTS, struct.pack('>h', choice))
+    m.reg(3, SLOTS); m.reg(13, pointer & 0xffffffff)
+    m.reg(8, STACK); m.reg(5, m.a4)
+    ck(u.uc_emu_start(m.h, cfg['trainsim'], cfg['flyoff'], 0, 1000))
+    assert m.reg(18) == cfg['flyoff']
+    sp = m.reg(8)
+    arg = struct.unpack('>h', m.read(sp+8, 2))[0]
+    m.close()
+    return arg
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path)
@@ -202,10 +220,15 @@ def main():
         assert (0xb, s['branch']) in log and (1, s['list']) in log and (3, s['store']) in log
         fixed = bytearray(psy); fixlog = []
         apply(blob, sy[cfg['fix']], fixed, fixlog)
-        assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch'])], fixlog
+        assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim'])], fixlog
         assert fixed[s['branch']:s['branch']+2] == bytes.fromhex('6604')
+        # TrainSim: move.w d4,-(sp) -> move.w (a2),-(sp), before pea/jsr fly-off.
+        t = cfg['trainsim']
+        assert original[t:t+4] == bytes.fromhex('3f04486c') and original[t+6:t+8] == bytes.fromhex('4eba')
+        assert fixed[t:t+2] == bytes.fromhex('3f12') and fixed[t+2:t+8] == original[t+2:t+8]
         changed = [i for i in range(len(psy)) if psy[i] != fixed[i]]
-        assert all(any(x <= i < x+6 for x in s.values()) for i in changed)
+        assert all(any(x <= i < x+6 for x in s.values()) or t <= i < t+2
+                   for i in changed)
         cases = {}
         # Negative control: Psygore's list writes the file but clears the name.
         files = {'Bed_0': b'\0'*116, 'Bed_5': b'\5'*116}
@@ -246,6 +269,13 @@ def main():
         flags, calls = nvlist(cfg, fixed, blob, files, 0)
         assert flags == b'\x5a'*32 and calls == []
         cases['enumeration'] = 'pass'
+        # TrainSim: keys 1-4 store 0-3 in (a2) and leave the pointer result -1;
+        # a pointer choice stores the same value in both.
+        for k in range(4):
+            assert flyoff_choice(cfg, psy, blob, k, -1) == -1, 'control did not show the bug'
+            assert flyoff_choice(cfg, fixed, blob, k, -1) == k
+            assert flyoff_choice(cfg, fixed, blob, k, k) == k
+        cases['trainsim'] = 'pass'
         report[lang] = cases
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(dict(sha256=meta['sha256'], games=report), indent=2)+'\n')

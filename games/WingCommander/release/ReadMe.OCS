@@ -93,6 +93,7 @@
  - More responsive room controls with limited cursor speed.
  - CD32 edition: a saved pilot appears in the bunk at once, not only after the
    next reload.
+ - Choosing a Training Simulator opponent with keys 1-4 shows the right ship.
  - Disk edition: faster arithmetic and collision checks in every mode, including
    the Amiga 500, without changing game behaviour.
  - Enhanced mode and caches enabled in newly installed icons; original modes
