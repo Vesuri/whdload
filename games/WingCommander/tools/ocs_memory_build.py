@@ -456,7 +456,7 @@ ocs_mouse_params:
         config=original[32+0xf81:].split(b'\0',1)[0].rstrip(b';')
         config+=b';C5:B:Enhanced framerate (68020+Fast RAM);\0'
         options=(ROOT/'src/ocs_options.s').read_text()
-        options+='\nocs_public_info: dc.b "2.0b (19.10.2026)",10,"Original slave: Psygore",10,"Enhancements: Vesuri",0\nocs_public_version: dc.b "$VER: WingCommander 2.0b (19.10.2026)",0\n even\n'
+        options+='\nocs_public_info: dc.b "2.0b (13.11.2026)",10,"Original slave: Psygore",10,"Enhancements: Vesuri",0\nocs_public_version: dc.b "$VER: WingCommander 2.0b (13.11.2026)",0\n even\n'
         options+='\nocs_public_config: dc.b '+','.join(str(x) for x in config)+'\n even\n'
         text=text.replace('display_create_checked:',options+'\ndisplay_create_checked:',1)
     if public:
@@ -529,7 +529,7 @@ ocs_mouse_params:
                 sha256=hashlib.sha256(blob).hexdigest(),symbols=sy,fixups=fixes,hooks=list(hooks),exit_probe=exit_probe,changed=changed,history_bytes=128000 if changed!='off' else 0,
                 public_option=public,opening=public,word_fixes=[list(w) for w in WORDS] if public else [],
                 mouse=[[off,label] for off,label,_ in MOUSE] if public else [],
-                version='2.0b' if public else None, release_date='19.10.2026' if public else None,
+                version='2.0b' if public else None, release_date='13.11.2026' if public else None,
                 expansion_bytes=0x100000 if public else 0xf0000,
                 game_pool_bytes=0xc0000 if public else 0xb0000,
                 workspace='native combined Chip allocation retained for fallback',

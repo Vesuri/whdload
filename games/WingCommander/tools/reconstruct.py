@@ -244,7 +244,7 @@ def cd32_main(argv):
         report.update(drawing_entries=[0x2efe8,0x31cd6],drawing_word=len(built)-4,drawing_installs=len(built)-8)
     if a.release:
         (out/'ReadMe').write_bytes((ROOT/'release/ReadMe').read_bytes())
-        report['release_date']='19.10.2026'
+        report['release_date']='13.11.2026'
         report['runtime_workspace_bytes']=len(built)-symbols['runtime_workspace']
         report['initialized_bytes']=symbols['runtime_workspace']
     (out/'build.json').write_text(json.dumps(report,indent=2)+'\n')
