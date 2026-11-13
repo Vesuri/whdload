@@ -456,7 +456,7 @@ ocs_mouse_params:
         config=original[32+0xf81:].split(b'\0',1)[0].rstrip(b';')
         config+=b';C5:B:Enhanced framerate (68020+Fast RAM);\0'
         options=(ROOT/'src/ocs_options.s').read_text()
-        options+='\nocs_public_info: dc.b "2.0b (19.10.2026)",10,"Original slave: Psygore",10,"Improvements: Vesuri",0\nocs_public_version: dc.b "$VER: WingCommander 2.0b (19.10.2026)",0\n even\n'
+        options+='\nocs_public_info: dc.b "2.0b (19.10.2026)",10,"Original slave: Psygore",10,"Enhancements: Vesuri",0\nocs_public_version: dc.b "$VER: WingCommander 2.0b (19.10.2026)",0\n even\n'
         options+='\nocs_public_config: dc.b '+','.join(str(x) for x in config)+'\n even\n'
         text=text.replace('display_create_checked:',options+'\ndisplay_create_checked:',1)
     if public:
