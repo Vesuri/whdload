@@ -10,10 +10,14 @@ from ocs_clock_check import SLAVE
 from ocs_reconstruct import new_output,require
 
 
-def check(build,variant,model):
- c,sy=machine(build,variant,model);ocs=variant=='ocs';a4=DATA+0x7ffe
- early,late,draw=(0x30e,0x322,0x2e6) if ocs else (0x30c,0x320,0x2e4)
- marker,scene=(0x34e0,0x28548) if ocs else (0x3766,0x294d4)
+def check(build,variant,model,german=False):
+ c,sy=machine(build,variant,model,german);ocs=variant=='ocs';a4=DATA+0x7ffe
+ if german:
+  import german_map
+  m=german_map.get();X=m.code;A=m.a4
+ else:X=A=lambda n:n
+ early,late,draw=(0x30e,0x322,0x2e6) if ocs else map(X,(0x30c,0x320,0x2e4))
+ marker,scene=(0x34e0,0x28548) if ocs else map(X,(0x3766,0x294d4))
  active=SLAVE+sy['ocs_clock_active' if ocs else 'timing_active']
  events=[];bitmap=[];state={'sensor':5,'z':25600}
  # OCS test setup installs candidate hooks; explicitly restore native calls
@@ -31,20 +35,20 @@ def check(build,variant,model):
  def transform():
   c.write(c.get(c.reg(8)+8,4),struct.pack('>iii',0,0,state['z']));c.return_call()
  try:
-  for off in ((0x15d1c,0x322e0,0x9618,0x363e,0x2ba2c) if ocs else (0x15fb4,0x31cd6,0x98a2,0x38c4)):
+  for off in ((0x15d1c,0x322e0,0x9618,0x363e,0x2ba2c) if ocs else map(X,(0x15fb4,0x31cd6,0x98a2,0x38c4))):
    c.intercept(CODE+off,noop)
   c.intercept(CODE+scene,scene_sink)
   if ocs:c.intercept(CODE+0x2bab4,raster)
-  c.intercept(CODE+(0x1e0a if ocs else 0x2092),lambda:c.return_call(state['sensor']))
-  c.intercept(CODE+(0x2b930 if ocs else 0x2c8bc),lambda:c.return_call(25600))
-  c.intercept(CODE+(0x2abfa if ocs else 0x2bb86),transform)
-  c.intercept(CODE+(0x2f9a6 if ocs else 0x2efe8),sink)
+  c.intercept(CODE+(0x1e0a if ocs else X(0x2092)),lambda:c.return_call(state['sensor']))
+  c.intercept(CODE+(0x2b930 if ocs else X(0x2c8bc)),lambda:c.return_call(25600))
+  c.intercept(CODE+(0x2abfa if ocs else X(0x2bb86)),transform)
+  c.intercept(CODE+(0x2f9a6 if ocs else X(0x2efe8)),sink)
   # Forward camera fixture; actual native marker eligibility and projection
   # remain executing. The camera transform and bitmap are boundary stubs.
   for off,value in ((-4184 if ocs else -4314,160),(-4182 if ocs else -4312,64),
                     (-4188 if ocs else -4318,320),(0x1304 if ocs else 0x1b76,1),
                     (-18320 if ocs else -18282,0),(-32600 if ocs else -32630,0)):
-   c.write(a4+off,word(value))
+   c.write(a4+(off if ocs else A(off)),word(value))
   rows=[]
   for patched,enabled in ((False,False),(True,False),(True,True)):
    for off in (early,late):c.write(CODE+off,saved[off])
@@ -55,11 +59,11 @@ def check(build,variant,model):
     for sensor,z in ((5,25600),(0,25600),(5,-25600)):
      for scene_arg in (0,1):
       state.update(sensor=sensor,z=z,scene_arg=scene_arg);events.clear();bitmap.clear()
-      c.write(active,word(enabled));c.write(a4+(-18318 if ocs else -18280),word(view))
-      c.write(a4+(0x904 if ocs else 0x1176),long(scene_arg))
-      c.write(a4+(-32592 if ocs else -32624),word(1))
-      c.write(a4+(-32590 if ocs else -32622),word(1))
-      before=c.read(DATA,0xf5b8 if ocs else 0xfda0)
+      c.write(active,word(enabled));c.write(a4+(-18318 if ocs else A(-18280)),word(view))
+      c.write(a4+(0x904 if ocs else A(0x1176)),long(scene_arg))
+      c.write(a4+(-32592 if ocs else A(-32624)),word(1))
+      c.write(a4+(-32590 if ocs else A(-32622)),word(1))
+      before=c.read(DATA,0xf5b8 if ocs else 0xfdd4 if german else 0xfda0)
       c.run(draw)
       visible=view in (0,4) and sensor==5 and z>0
       # The reorder is independent of the flight clock: every patched mode.
@@ -67,11 +71,11 @@ def check(build,variant,model):
       require(events==want,(patched,enabled,view,sensor,z,events,want))
       require(c.reg(8)==STACK+4 and c.reg(9)==1,'flight return ABI')
       # Only native draw_count changes in this isolated native composition.
-      after=bytearray(c.read(DATA,len(before)));count=0x7ffe+(2272 if ocs else 4434)
+      after=bytearray(c.read(DATA,len(before)));count=0x7ffe+(2272 if ocs else A(4434))
       after[count:count+2]=before[count:count+2]
       require(bytes(after)==before,'marker moved gameplay data')
       rows.append((patched,enabled,view,sensor,z,scene_arg))
-  return dict(model=model,cases=len(rows),original_marker_before_world=True,
+  return dict(model=model,german=german,cases=len(rows),original_marker_before_world=True,
               patched_marker_after_world_any_clock=True,native_visibility_retained=True,
               scene_argument_retained=True,gameplay_data_unchanged=True)
  finally:c.close()
@@ -79,9 +83,12 @@ def check(build,variant,model):
 
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('variant',choices=('ocs','cd32'))
- p.add_argument('build',type=Path);p.add_argument('--output',required=True);a=p.parse_args()
+ p.add_argument('build',type=Path);p.add_argument('--output',required=True)
+ p.add_argument('--german',action='store_true',help='CD32 release build: the German executable')
+ a=p.parse_args()
+ if a.german and a.variant!='cd32':p.error('--german: CD32 only')
  out=new_output(a.output);out.mkdir(parents=True)
- rows=[check(a.build,a.variant,m) for m in ((1,2) if a.variant=='ocs' else (2,4))]
+ rows=[check(a.build,a.variant,m,a.german) for m in ((1,2) if a.variant=='ocs' else (2,4))]
  (out/'report.json').write_text(json.dumps(dict(complete=True,variant=a.variant,results=rows),indent=2)+'\n')
  print(rows)
 if __name__=='__main__':main()

@@ -13,6 +13,7 @@ the selection box over the character grid with the mouse and clicks a
 character. Screenshots and reports stay in the capture directory under tmp/.
 """
 import argparse
+import functools
 import hashlib
 import json
 import re
@@ -36,31 +37,6 @@ GAMES = {
     'cd32-de': dict(pointer=(2740, -1112), field=-208, intro=((0x18a44, 0x1fcbe), (0x18a44, 0x2026c)),
                     menu=(0x2031c, 0x2032e), name=(0x17064, 0x1706e, 17766, 17756)),
 }
-GERMAN = 'tmp/game/WingCommanderCD32/data/wing.german'
-GERMAN_SIZES = (0x36064, 0xfdd4, 4, 0x15a4)
-
-
-def locate_german(memory):
-    """The live German hunks: the copy whose name entry poll holds the slave's
-    hook (PRELOAD copies are unpatched)."""
-    from variant_runtime import segment_chain
-    code = (ROOT/GERMAN).read_bytes()[0x2c:0x2c+GERMAN_SIZES[0]]
-    signature = code[0x16d04:0x16d60]          # native grid step, no relocations
-    found = []
-    at = memory.find(signature)
-    while at >= 0:
-        offset = at-0x16d04
-        if offset >= 8 and memory[offset+0x16f6e:offset+0x16f70] == b'\x4e\xb9':
-            try:
-                found.append({'hunks': segment_chain(memory, 0x200000, 0x200000+offset, GERMAN_SIZES)})
-            except ValueError:
-                pass
-        at = memory.find(signature, at+1)
-    if len(found) != 1:
-        raise ValueError(f'expected one patched German segment chain; found {len(found)}')
-    return found[0]
-
-
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('variant', choices=('ocs', 'cd32'))
@@ -88,7 +64,7 @@ def main():
         whd = 'CUSTOM5=1 DCACHE' if a.original_mode else 'CUSTOM5=0 DCACHE'
         if a.german:
             whd = 'CUSTOM1=1 '+whd
-            locate = locate_german
+            locate = functools.partial(locate, german=True)
     length = 0x400000 if ocs else 0x800000
     env = wc_run.run_env(out, variant=a.variant, SLAVE=str(slave.resolve()),
                          WARP='1', NTSC='0', WINDOW='front', JOY0='none', JOY1='none',
@@ -232,6 +208,17 @@ def main():
         rows['menu_selected_by_click'] = True
         if a.name_entry:
             rows['name_entry'] = name_entry()
+            # The language's enhanced (or original) modes were selected, and
+            # the enhanced flight clock ran the simulator flight.
+            sy = {n: int(o, 16) for o, n in re.findall(r'^([0-9A-F]{8}) (\S+)$', (a.build/'slave.lst').read_text(), re.M)}
+            sb = layout['slave']
+            state = dict(german=number(f'*(short*){sb+sy["release_german"]:#x}'),
+                         mode=number(f'*(int*){sb+0x1de4:#x}'),
+                         completed=number(f'*(int*){sb+sy["timing_completed"]:#x}'))
+            rows['slave_state'] = state
+            assert state['german'] == (a.german and (1 if a.original_mode else 2)), state
+            assert state['mode'] == (0 if a.original_mode else 3), state
+            assert (state['completed'] > 0) != a.original_mode, state
         (out/'report.json').write_text(json.dumps(dict(complete=True, variant=a.variant, german=a.german, original_mode=a.original_mode, setup=a.setup,
             slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(), **rows), indent=2)+'\n')
         print(json.dumps(dict(complete=True, sprite_steps=steps)))

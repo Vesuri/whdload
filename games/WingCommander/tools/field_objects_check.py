@@ -10,13 +10,17 @@ from variants import get
 from timing_scene_check import trunc
 
 
-def machine(build,variant,model):
+def machine(build,variant,model,german=False):
+ """German (CD32 release builds): wing.german with the slave's German words."""
  if variant=='ocs':
   c,sy,_,_=setup(build,model)
  else:
-  c=Native(ROOT/get(variant).GAME,model=model,variant=variant)
+  if german:
+   import german_map
+   c=Native(ROOT/german_map.GERMAN[0],model=model,variant=variant,game_sha=german_map.GERMAN[1])
+  else:c=Native(ROOT/get(variant).GAME,model=model,variant=variant)
   sy={n:int(o,16) for o,n in re.findall(r'^([0-9A-F]{8}) (\S+)$',(build/'slave.lst').read_text(),re.M)}
-  c.write(SLAVE,(build/'payload.bin').read_bytes());c.write(SLAVE+sy['timing_game'],long(CODE))
+  c.write(SLAVE,(build/('german.bin' if german else 'payload.bin')).read_bytes());c.write(SLAVE+sy['timing_game'],long(CODE))
  return c,sy
 
 
