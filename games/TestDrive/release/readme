@@ -50,9 +50,6 @@
  version 2.0b (13.11.2026) done by Vesuri:
  - Optional Enhanced framerate for smoother driving, scenery and traffic,
    with more consistent race timing and average-speed scoring.
- - Faster drawing with Enhanced framerate on A1200 and faster Amigas.
- - Fixed sideways road and scenery jumps, including through bends.
- - Restored steering response through bends.
  - Fixed nearby vehicles disappearing before a collision.
  - Fixed the rev counter needle wrapping around when over-revving.
  - Fixed repeated drum hits in the opening music.
