@@ -18,9 +18,11 @@ the fixes alone (`internals.md`, the end of "Enhanced framerate").
 
 ## Next
 
-- Play-test enhanced framerate through all three phases on a1200-030 and a1200-060: look
-  for pairing glitches (short diagonal fragments seen in surface and trench captures, not
-  yet confirmed as glitches rather than geometry), at the HUD strip and at the pause key.
+- Play-test enhanced framerate through all three phases on a1200-030 and a1200-060: the
+  surface's dots, towers and bases are keyed by identity now (`internals.md`, "Ground
+  dots"); other ops still pair by draw order, so look for the same kind of jump wherever
+  a loop's objects come and go (space stars, trench), at the HUD strip and at the pause
+  key. `tools/starwars.py recdump` and `tmp/scripts/paireval.py` measure a scene's pairs.
 - The Obi-Wan text and the flight instructions scroll by plane copies, which move per
   tick in enhanced framerate: interpolate the copy's position.
 - Cheaper frames: a1200-fast draws about 1.7 frames a tick (frames 380-540 lines), and

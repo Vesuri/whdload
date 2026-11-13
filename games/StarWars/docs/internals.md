@@ -144,12 +144,26 @@ The loops that keep the counter running (phase 8 on) note it at a direct tick's 
 Run-time hooks, installed with `jmp` when a tick records and taken out (the saved bytes
 put back, the cache flushed) in direct mode: colour $1840, line $19ae, plot $1b2c, shape
 $9806, rectangle $0810, plane copy $0a1c, clear $1c08, swap wait $09a8, TIE fighter draw
-$839c (keys its ops by the fighter), and the swap flag store $09fa.
+$839c (keys its ops by the fighter), surface object draw $a982 (keys a tower's or a
+base's lines by its record), the ground dots ($1e6c, $1ea6, $a67e), and the swap flag
+store $09fa.
 
 - **Pairing.** An op is keyed by the code address that called the primitive, and for TIE
-  fighters by the fighter. It is paired with the next op of the same key in the previous
-  recording, within 64 ops. Unpaired ops, and ops that moved more than 40 pixels (respawns,
-  stars wrapping round), are drawn where they are now.
+  fighters and the surface's towers and bases by the object (the low word of its record).
+  It is paired with the next op of the same key in the previous recording, within 64 ops.
+  Unpaired ops, and ops that moved more than 40 pixels (respawns, stars wrapping round),
+  are drawn where they are now.
+- **Ground dots.** The surface's dots are a table of 25 entries (-25758(a4), z and x of
+  two points each) sorted by depth, which $1dda projects into six points per entry and
+  plots at $1ea6. When the nearest entry passes, $a67e shifts the table down one entry
+  and adds a far one, so by draw order every dot paired with the next one along after a
+  shift, within 40 pixels often enough to slide across. Their ops are keyed by identity
+  instead: (entry index + shifts counted at $a67e) * 8 + point, flagged (`OPF_ID`), and
+  interpolated however far they moved. Over seven wave 3 surface ticks
+  (`tools/starwars.py recdump`, `tmp/scripts/paireval.py`) the 532 dots paired changed
+  velocity by more than 12 pixels only in the tick the view turned, all alike; before,
+  most dots were not interpolated (moved more than 40) and 16 of the 22 that were
+  jumped. Pairing by the nearest op instead was tried and paired dots worse (126 of 231).
 - **Pacing.** The counter -26430(a4) runs free. Frame j of a tick is for field B + j;
   each frame is drawn for the first field it can still make, judged by the beam and the
   last frame's drawing time r, so a slow frame skips the in-between frame after it. An
@@ -179,6 +193,10 @@ surface and trench with the trainer):
 | a1200 | direct from the attract | 1 | as the default | direct tick work about 470 mean |
 | a1200-fast | smooth (1 % of ticks late by a field) | 1.68 | 2.97 | average 380-540; 3499 in-between frames dropped |
 | a1200-030 | smooth throughout | 2.81 | 2.97 | average about 280 |
+
+Wave 3 on a1200-030 (`tmp/scripts/wave3.sh`: space, the surface with towers, the trench),
+5 to 35 s after the start: 2.50 frames a tick, 11 late ticks and 63 dropped frames in
+2868 ticks; the build before the dot and object keys: 2.53, 14 and 80 in 2799.
 
 The attract on a1200-030, scene by scene (`tmp/scripts/scenes.sh`): the credits, the
 title zoom (2 frames a tick: 242 in its 121 ticks), the Obi-Wan text, the flight

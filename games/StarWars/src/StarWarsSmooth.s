@@ -10,8 +10,9 @@
 ; its sounds run as they did; only the pictures between two ticks are new.
 ;
 ; Pairing: each line, plot and shape is keyed by the code address that drew it (and,
-; for TIE fighters, by the fighter), and paired with the next op of the same key in
-; the previous recording. Unpaired ops, and ops whose coordinates moved more than
+; for TIE fighters and the surface's towers and bases, by the object; the ground dots by
+; their own identity), and paired with the next op of the same key in the previous
+; recording. Unpaired ops, and ops whose coordinates moved more than
 ; SM_T pixels (a respawn, a star wrapping round), are drawn where they are now.
 ;
 ; Pacing: in smooth mode the counter -26430(a4) runs free (one count per field).
@@ -64,6 +65,8 @@ SM_HOLD		= 50			; direct ticks at least, before trying
 ;   STATE  +4 -26412(a4).l (origin x, y), +8 -26398(a4).l (y max, min),
 ;          +12 -25800(a4).l (x min, max)
 ;   BUF    +12 the drawing buffer: 0 back, 1 front, else the address
+OPF_ID		= 6			; flags: the key is the object's own identity
+					; (the ground dots), interpolated however far
 OP_NOP		= 0
 OP_COLOR	= 1
 OP_LINE		= 2
@@ -454,8 +457,12 @@ SmHookTab
 	dc.w	$09a8,SmWaitSwap-SmHookTab	; link a5,#0; jsr $0c3a(pc)
 	dc.w	$839c,SmTie-SmHookTab		; link a5,#0; movem.l d4/a2-a3,-(sp)
 	dc.w	$09fa,SmReq-SmHookTab		; move.w #-1,-26448(a4) in $09c0
+	dc.w	$a982,SmSurf-SmHookTab		; link a5,#-20; movem.l d4-d7/a2,-(sp)
+	dc.w	$1e6c,SmDots-SmHookTab		; move.w d0,d6; movea.l -26262(a4),a2
+	dc.w	$1ea6,SmDot-SmHookTab		; jsr $1b2c(pc); addq.w #4,sp
+	dc.w	$a67e,SmDotShift-SmHookTab	; lea -25758(a4),a3; lea 8(a3),a2
 	dc.w	0
-SM_HOOKS	= 10
+SM_HOOKS	= 14
 SmHookSave	ds.b	SM_HOOKS*6
 
 ; d0: 1 install the hooks (jmp, saving the bytes the first time), 0 restore the bytes
@@ -762,6 +769,71 @@ SmTie
 .draw	link	a5,#0
 	movem.l	d4/a2-a3,-(a7)
 	GOTOG	$83a4
+
+; $a982 draws a surface object (a tower, a base; the points, the object record on the
+; stack): its lines get the object's key (the low word of its record), as SmTie
+SmSurf
+	move.w	SmV+sv_obj(pc),-(a7)
+	move.l	10(a7),a0
+	move.w	a0,d0
+	lea	SmV+sv_obj(pc),a0
+	move.w	d0,(a0)
+	move.l	10(a7),-(a7)		; the object
+	move.l	10(a7),-(a7)		; the points
+	bsr.b	.draw
+	addq.l	#8,a7
+	lea	SmV+sv_obj(pc),a0
+	move.w	(a7)+,(a0)
+	rts
+.draw	link	a5,#-20
+	movem.l	d4-d7/a2,-(a7)
+	GOTOG	$a98a
+
+; The ground dots ($1dda): a table of 25 entries (-25758(a4)) sorted by depth, each two
+; points that $1dda projects into six, plotted at $1ea6 with d6 counting down. When the
+; nearest entry passes, $a67e shifts the table down one entry and adds a far one, so by
+; draw order every dot then paired with the next one along. A dot's key is its entry's
+; index plus the shifts so far, times 8, plus its point (0-5).
+SmDots
+	lea	SmDotN(pc),a2		; $1e6c: the points to plot, less one
+	move.w	d0,(a2)
+	move.w	d0,d6
+	move.l	-26262(a4),a2
+	GOTOG	$1e72
+SmDotShift
+	lea	SmDotSh(pc),a3		; $a67e: the table shifts
+	addq.w	#1,(a3)
+	lea	-25758(a4),a3
+	lea	8(a3),a2
+	GOTOG	$a686
+SmDot
+	btst	#0,SmV+sv_rec(pc)	; $1ea6: plot the dot (x, y on the stack)
+	beq.b	.run
+	movem.l	d0-d1/a0-a1,-(a7)
+	bsr	SmNew
+	beq.b	.x
+	move.b	#OP_PLOT,(a0)
+	move.b	#1<<OPF_ID,1(a0)
+	moveq	#0,d0
+	move.w	SmDotN(pc),d0
+	sub.w	d6,d0			; the point's index
+	divu	#6,d0
+	move.l	d0,d1
+	swap	d1			; its point in the entry
+	add.w	SmDotSh(pc),d0
+	lsl.w	#3,d0
+	or.w	d1,d0
+	move.w	d0,2(a0)
+	move.l	16(a7),4(a0)
+.x	movem.l	(a7)+,d0-d1/a0-a1
+	addq.l	#4,a7
+	GOTOG	$1eac
+.run	pea	.ret(pc)
+	GOTOG	$1b2c
+.ret	addq.l	#4,a7
+	GOTOG	$1eac
+SmDotN	dc.w	0
+SmDotSh	dc.w	0
 
 ;----------------------------------------------------------------------------
 ; Presenting: replaces each loop's wait for three fields and its swap
@@ -1308,6 +1380,8 @@ SmRender
 	move.w	12(a2),d0
 	bmi.b	.cx
 	movem.l	d1-d3/d7/a0-a1,-(a7)
+	btst	#OPF_ID,1(a2)		; an identity: however far
+	bne.b	.id
 	ext.l	d0
 	lsl.l	#4,d0
 	lea	4(a6,d0.l),a1		; the paired op's coordinates
@@ -1322,7 +1396,7 @@ SmRender
 .pos	cmp.l	#SM_T,d0
 	bgt.b	.snap
 	dbf	d3,.chk
-	movem.l	(a7),d1-d3/d7/a0-a1
+.id	movem.l	(a7),d1-d3/d7/a0-a1
 	move.w	12(a2),d0
 	ext.l	d0
 	lsl.l	#4,d0

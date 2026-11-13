@@ -20,6 +20,11 @@
     python3 tools/starwars.py mem EXPR LEN FILE
                                              LEN bytes at EXPR (gdb syntax, `A4`, `CODE`)
                                              to FILE
+    python3 tools/starwars.py recdump PREFIX [N]
+                                             VERIFY build: at the next N (1) SmRender
+                                             entries, the current and the previous
+                                             recording (pairs filled) to PREFIXkk.cur,
+                                             PREFIXkk.prev and sv_ok, a tick apart
     python3 tools/starwars.py reach OFF      run until code-hunk offset OFF (hex), stay stopped
     python3 tools/starwars.py sweep DX DY N PREFIX [SKIP]
                                              N times: move the mouse by DX, DY, run SKIP
@@ -214,6 +219,45 @@ def pc(server, g, rest):
     return f'pc {where} stack {" ".join(rets[:10])}'
 
 
+def _lst(name):
+    import re
+    lst = Path(__file__).resolve().parents[1] / 'tmp/build/verify/StarWars.lst'
+    m = re.search(rb'^' + name.encode() + rb' +00:([0-9A-F]+)', lst.read_bytes(), re.M)
+    return int(m.group(1), 16)
+
+
+def recdump(server, g, rest):
+    import os
+    import struct
+    prefix, *n = rest.split()
+    code, a4 = _bases(g)
+    slv = _slave_base(g, code)
+    sv = slv + _lst('SmV')
+    g.cmd('delete')
+    g.cmd(f'break *{slv + _lst("SmRender")}')
+    out = []
+    last = None
+    k = 0
+    while k < (int(n[0]) if n else 1):
+        r = g.cmd('continue', timeout=600)
+        if 'Breakpoint' not in r:
+            out.append('stopped')
+            break
+        cur, prev, ptr, _, pend = struct.unpack('>5I', _read(g, sv + 4, 20))
+        ok = _read(g, sv + 61, 1)[0]
+        if cur == last:
+            continue                    # another frame of the same tick
+        last = cur
+        for suf, a, b in (('cur', cur, ptr), ('prev', prev, pend)):
+            path = os.path.abspath(f'{prefix}{k:02d}.{suf}')
+            g.cmd(f'dump binary memory {path} {a} {max(a, b)}', timeout=120)
+        out.append(f'{k}: ops {(ptr - cur) // 16} prev {(pend - prev) // 16} ok {ok}')
+        k += 1
+    g.cmd('delete')
+    g.cont()
+    return '\n'.join(out)
+
+
 def reach(server, g, rest):
     code, _ = _bases(g)
     g.cmd('delete')
@@ -272,6 +316,6 @@ server = game_server('starwars', commands={'base': base, 'hits': hits, 'fire': f
                                            'seq': seq, 'code': code,
                                            'mouse': mouse, 'sweep': sweep,
                                            'reach': reach, 'pc': pc,
-                                           'mem': mem})
+                                           'mem': mem, 'recdump': recdump})
 if __name__ == '__main__':
     server.main(sys.argv[1:])
