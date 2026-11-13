@@ -31,8 +31,15 @@ vasm call defines `game_build BUILD OUT` in `game.sh`, leaving `OUT/<Variant>.Sl
 
 These follow AmigaXDev's WHDLoad playbook §10; the playbook has the reasons.
 
-- Gate every change behind a `CUSTOMn` option declared in `slv_config`. With it off, the
-  original bytes are untouched, and a check proves it.
+- The default (every option off) is the original game's experience, working correctly on
+  every machine the slave supports. Bug fixes are therefore always on, with no option:
+  broken drawing, sound or timing on faster CPUs (blitter waits, self-modifying code under
+  caches, CPU-timed DMA waits), crashes, and the like. A fix keeps the original's behaviour
+  where the original worked; say in `docs/internals.md` what it repairs.
+- Gate every enhancement (a higher frame rate, changed game speed, trainers, anything a
+  player would notice beyond the repair) behind a `CUSTOMn` option declared in
+  `slv_config`. With it off, the bytes it would change are the fixed default's, and a
+  check proves it.
 - Instruments (fixtures, RNG pinning, unit tests) are in the VERIFY build only.
 - Declare the lowest `slv_Version` the slave really needs.
 - The release version is the slave's `DECL_VERSION`/`$VER` string (`2.0b`), not
