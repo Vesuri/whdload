@@ -3442,7 +3442,6 @@ still rejects until its native hooks/ABIs are implemented in later work.
 
 ```sh
 . ../../common/env.sh
-python3 tools/shared_cpu_check.py --output tmp/b2-cpu
 for mode in release timing render native; do
   args=()
   if [ "$mode" != native ]; then args=("--$mode"); fi
@@ -3462,16 +3461,6 @@ using the isolated `git archive` recipe in the B1 section (with that commit and
 fresh directory names), and pass that reference prefix to `variant_check.py`.
 The locator inputs can likewise be regenerated using their original documented
 routes. Never substitute a mutated/game-derived fixture into a source directory.
-
-`shared_cpu_check.py` assembles all 13 audited units under four conditional
-profiles with explicit fixture-only external placeholders. It then executes
-actual scheduler/scaling/translation routines, flag/address/call contracts and
-publication/recorder wrappers on CPU models. The report lists the placeholder
-boundaries; they are not an OCS linker implementation. The 68000 flag routine is
-also tested in user mode on later CPUs. Original accelerated instructions supply
-an independent operand/flag differential, while Python integer and elapsed-time
-ledgers supply the arithmetic/clock oracle. Deliberate ISA, flag and arithmetic
-failures prove those checks reject. No guest time or performance is measured.
 
 For later OCS integration, `shared_cpu.unit(root, name, '68000')` emits an audited
 unit and `shared_cpu.preamble(root, '68000')` supplies its macros once per image.

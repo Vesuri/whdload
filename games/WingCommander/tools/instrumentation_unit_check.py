@@ -3,14 +3,29 @@
 import argparse
 import ctypes as C
 import json
+import os
+import re
+import subprocess
 from pathlib import Path
 import struct
 from c2p_check import CPU, BASE, STACK, STOP, u, ck, P, I, Q, Z, reference
-from shared_cpu_check import assemble
 from recorder_source import source, ROOT
 from frame_schema import encode_frames, decode_frames, encode_display, decode_display, display_order
 from native_validation import state, dma_regions, chunky_pixels, planar_pixels
 from variants import get
+
+
+def assemble(out, name, source, cpu):
+    path = out / (name + '.s')
+    path.write_text(source)
+    cmd = [os.environ['VASM'], '-m'+cpu, '-spaces', '-no-opt', '-Fbin',
+           '-L', str(out/(name+'.lst')), '-o', str(out/(name+'.bin')), str(path)]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode: raise ValueError(result.stdout + result.stderr)
+    blob = (out/(name+'.bin')).read_bytes()
+    symbols = {n:int(v,16) for v,n in re.findall(r'^([0-9A-F]{8}) (\S+)$', (out/(name+'.lst')).read_text(), re.M)}
+    return blob, symbols
+
 
 DATA, BUFFER = 0x40000, 0xa0000
 
