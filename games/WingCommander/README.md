@@ -63,9 +63,10 @@ See the [C6 gate](docs/internals.md#p13c6-measured-changed-block-conversion), th
 
 **Phase 11b is in progress; C1–C3 and the C4 steady-flight gate are complete.**
 The public-option candidate uses `CUSTOM1` for language and `CUSTOM5=0` for
-enhanced English flight without Psygore's frame cap. Values 1–4 retain Psygore's
-normal/unlimited/relaxed/slow modes. German default and other nonflight scenes retain normal pacing. The enhanced
-English ship/title and asteroid intro uses the flight 10 Hz clock and extrapolation. See the [candidate ReadMe](release/ReadMe).
+enhanced flight without Psygore's frame cap, in English and, on CD32, German
+([German CD32 enhancements](docs/internals.md#german-cd32-enhancements)). Values 1–4 retain Psygore's
+normal/unlimited/relaxed/slow modes. Other nonflight scenes retain normal pacing. The enhanced
+ship/title and asteroid intro uses the flight 10 Hz clock and extrapolation. See the [candidate ReadMe](release/ReadMe).
 Enhanced flight queues completed pictures for early vertical blank and waits
 only before reusing a pending display buffer. The scoped PAL gates reach 49.92
 pictures/s on both tested models; the 040 core remains uncalibrated against hardware.

@@ -7894,18 +7894,22 @@ H0 `030e` (file `033a`) → `34e0` (file `350c`), then `0322` (file `034e`)
 renderer at CD32 H0 `38b2` (file `38de`), OCS H0 `362c` (file `3658`).
 The user's CD32 screenshots show the nebula obscuring this white symbol.
 
-`waypoint_overlay.s` defers the early marker call in every English mode,
-including Psygore's modes and the OCS original path. The scene wrapper forwards the native word argument, completes
+`waypoint_overlay.s` defers the early marker call in every CD32 mode (English
+and German, including Psygore's modes) and in every English OCS mode, including
+the original path. The scene wrapper forwards the native word argument, completes
 world drawing, then calls the unchanged marker routine while preserving the
 scene's register results. OCS retains its existing scene preparation versus
 sort/raster selection. Marker eligibility, camera projection, image frame,
 clipping and cockpit/HUD composition remain native. Only the drawing order
 changes, so it is not behind the enhancements toggle.
 
-CD32 English Psygore's modes (`CUSTOM1=0` after option translation) install only
+CD32 Psygore's modes (`CUSTOM1=0` after option translation) install only
 these two hooks from `timing_patchseg`, after checking both absolute calls and
 their relocated targets; a changed site keeps the original order and game. The
-German executable remains unpatched. The OCS original path installs them with
+German executable gets the same hooks at its own sites
+([German CD32 enhancements](#german-cd32-enhancements)): the German run of
+`waypoint_check.py --german` passes the same 216 CD32 cases, and the German game
+with the English slave words fails it. The OCS original path installs them with
 the always-on E1 hooks under the same guard-or-keep-original rule. With the
 clock inactive, OCS reaches the native scene through `ocs_clock_scene_draw`'s
 existing native branch.
@@ -8680,3 +8684,59 @@ neither version saves it. The CD32 table has not been located.
 | CD32, 116 bytes (`E:268cc`) | flag; +2: 64 bytes from `D:b374`; +66: 50 bytes from `D:90fa`; the caller also passes `D:9b8c`, which is not read |
 
 Whether the shorter CD32 record loses campaign state that OCS keeps is unknown.
+
+## German CD32 enhancements
+
+`wing.german` is the English program rebuilt with German text: hunk 0 is
+`0x36064` bytes (English `0x35ea4`), the data hunk `0xfdd4` allocated
+(`0xfda0`), and hunk 3 differs only in the opening code. Code moves in runs; data
+moves piecewise, so A4 offsets shift by 0, −4, −6, +14, +30, +44 or +50 depending
+on the range. Psygore's slave already patches both languages (`S:15d0`/`S:1cde`
+prefixes, the common lists); only the enhancements and the waypoint order were
+English.
+
+**The map (`tools/german_map.py`).** The two hunk-0 and hunk-3 instruction
+streams are aligned with difflib on capstone output, masking only address operands
+(branch targets, PC-relative and A4 displacements, relocated longs). Matched
+instructions give code offsets and A4 shift votes. An offset in an unmatched
+stretch is resolved only from a call target every matched caller agrees on, and
+only when the next four instructions have the same masked shapes, or from bytes
+just before a matched run that are byte-identical and unrelocated. An A4 offset
+without its own vote takes its neighbours' shift only when both agree. Anything
+else raises, so a German address is never guessed. The result is cached in
+`tmp/german-map.json`, keyed by both executables' SHA-256.
+
+**Sources.** The CD32 enhanced modules name every game address: `E_<hex>` hunk-0
+and `E3_<hex>` hunk-3 offsets, `D_<hex>` data offsets, `A_<dec>`/`AX_<hex>` A4
+offsets (`m` for negative, keeping the written radix) and `W_<hex>` native words.
+Generators emit them through `german_map.Symbols`. English equates are the names'
+own values, so the English slave is unchanged; `german_map.english()` turns the
+names back into literals for the OCS adapters and shared checks that parse these
+sources. Blocks the slave copies or compares whole (scene ranges, funeral state)
+must have one uniform German shift (`check_blocks`).
+
+**Build.** `reconstruct.py` assembles the release twice, with English and with
+German equates. Every label must land at the same offset, so the two payloads
+differ only in words. Those words in `S:1e0c` up to the table form
+`german_fixups` (offset word, German word; zero ends it), placed after the code and
+before `runtime_workspace`. A second pass with the table in place must reproduce
+it exactly. The release has 1273 fixups from 992 symbols; `build.json` `german`
+records the counts.
+
+**Runtime.** `release_setcpu` validates the options, then for `CUSTOM1=1` writes
+the table into the slave and calls FlushCache before anything else runs.
+`release_german` is 2 for enhanced and 1 for Psygore's modes. Psygore's loader
+(`S:142a`) selects `wing.german` only when `$1de4` is 1, so enhanced German
+keeps 1 there for the loader. `release_patchseg` then writes 3 (enhanced) or 0
+(Psygore's modes: only the waypoint hooks) before `timing_patchseg`, and picks the
+German fix lists. The enhanced patches check every German site and operand just as
+they do in English.
+
+**Checks.** `release_check.py` asserts the shipped table equals the differing
+words of the German pass, and that after `release_setcpu` the fixup words hold
+German for `CUSTOM1=1` and English otherwise, across all option cases.
+`waypoint_check.py --german` executes the German flight dispatcher and marker.
+`mouse_live_check.py --german --name-entry` boots German enhanced through the
+intro, menu, a TrainSim flight and name entry, and reads the slave state:
+`release_german` 2, mode 3, and 136 completed flight-clock ticks (English
+enhanced: 0, 3, 136; German `--original-mode`: 1, 0, 0).

@@ -54,8 +54,9 @@
  fires the guns in flight. On CD32 it also moves the selection box when you
  enter your name. The joystick, CD32 pad and keys work as before.
  The installed icon enables enhanced mode and DCACHE by default. NOCACHE can
- be used to disable caching. Enhancements currently support English only;
- German uses original behaviour. Enhanced OCS supports SPS #1657 only.
+ be used to disable caching. On CD32 the enhancements work in English and
+ German. Enhanced OCS supports English SPS #1657 only; German disks use
+ original behaviour.
 
  CUSTOM1: 0 = English, 1 = German.
  CUSTOM2: 0 = cheats off, 1 = cheat mode, 2 = invincible cheat mode.
@@ -79,7 +80,7 @@
  behaviour, regardless of this option. Slow expansion RAM does not qualify.
 
  CD32 CUSTOM5:
-   0 or unset = Enhanced (English); German uses Psygore normal.
+   0 or unset = Enhanced (English and German).
    1 = Psygore normal        2 = Psygore unlimited
    3 = Psygore relaxed       4 = Psygore slow
  Original simulation and rendering remain available with modes 1-4.
@@ -93,8 +94,10 @@
  - Consistent game speed on faster processors and smoother cinematic movement.
  - Retimed intro, room, briefing, launch, landing, death and funeral animations.
  - Improved projectile appearance and asteroid/mine hit detection.
- - Waypoint markers stay visible in front of nebulae in every English mode.
+ - Waypoint markers stay visible in front of nebulae in every mode (disk
+   edition: English only).
  - More responsive room controls with limited cursor speed.
+ - CD32 edition: the enhancements work in German too.
  - CD32 edition: a saved pilot appears in the bunk at once, not only after the
    next reload.
  - Choosing a Training Simulator opponent with keys 1-4 shows the right ship.

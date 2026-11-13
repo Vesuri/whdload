@@ -2,6 +2,15 @@
 
 ## Current state
 
+The CD32 enhancements and waypoint order now work in German too (`CUSTOM1=1`).
+The slave carries a table of 1273 German words, built by assembling the release
+again with German addresses from a checked code/data map, and applies it at
+start. A German enhanced live boot completes a TrainSim flight on the enhanced
+clock, and the waypoint order passes its native German check. The per-scene live
+checks (launch, cinematic, modal, opening) still run English only; German relies
+on the map's checks. A user play-test in German is pending. See
+[German CD32 enhancements](internals.md#german-cd32-enhancements).
+
 The OCS public slave now runs E1's bit-exact arithmetic and collision shortcuts
 in every mode, including 68000 original mode. On the A500 model, original-mode
 credits rise from 5.79 to 6.19 pictures/s and held fire from 5.39 to 5.59.
@@ -106,10 +115,10 @@ polling is capped at 25 Hz, preserving clicks for the native room loop. Hover
 titles are cached during input and repainted after every room composition,
 honouring the native transparent background instead of filling the strip black.
 See [modal clocks](internals.md#simulator-and-room-animation-clocks).
-Every English mode now draws the waypoint marker after the world scene in both
-variants, including Psygore's modes, preventing nebulae and other world bitmaps
-from covering it. Native visibility/projection rules remain unchanged; the
-German CD32 executable keeps the original order. See
+Every CD32 mode (English and German) and every English OCS mode now draws the
+waypoint marker after the world scene, including Psygore's modes, preventing
+nebulae and other world bitmaps from covering it. Native visibility/projection
+rules remain unchanged. See
 [waypoint layering](internals.md#waypoint-marker-layering).
 The exterior launch uses 50/3 Hz and the cockpit tunnel retains 10 Hz timing
 with intermediate rendering; the tunnel shares world extrapolation with the intro.
@@ -723,8 +732,8 @@ display wait (6–7 ms of idle per frame).
 - **B1 — complete.** Remove the limiter call from both enhanced renderers and make the mode a
   `Custom5` choice (user, 2026-10-13): 0 enhanced (default; WHDLoad's unset value),
   1–4 Psygore normal/unlimited/relaxed/slow (his 0–3, shifted; his blitter option is
-  dropped). `Custom1` selects only the language. German with 0 falls back to Psygore
-  normal until the German port exists. The clocked ship/title and asteroid intro
+  dropped). `Custom1` selects only the language. German with 0 is enhanced too
+  ([German CD32 enhancements](internals.md#german-cd32-enhancements)). The clocked ship/title and asteroid intro
   now also bypasses the limiter; remaining scenes keep normal pacing. The ReadMe states both and the
   changed numbering. Psygore's modes stay for now.
   Native option/pacing/output gates and the required frame-rate reports pass;

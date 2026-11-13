@@ -48,6 +48,7 @@ build against `release/slaves.sha256`, rebuilds both reconstructions (each asser
 byte identity with the pinned original) and runs `release_check.py`,
 `cd32_fixes_check.py` (the CD32 bunk save, TrainSim key fix and mouse on both languages;
 `--sabotage store-failure|list-stub|mouse-ignored|name-ignored` are its negative controls),
+`waypoint_check.py` on CD32 English and German,
 `ocs_options_check.py` (which also runs the OCS mouse scenario after both install
 paths) and the installer staging check. The live mouse check is separate and bounded:
 
@@ -55,6 +56,12 @@ paths) and the installer staging check. The live mouse check is separate and bou
 python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode] [--name-entry] [--german]
 python3 tools/mouse_live_check.py ocs tmp/build/release/WingCommander --output tmp/mouse-live-ocs [--original-mode] [--setup a500]
 ```
+
+The CD32 `--name-entry` run also asserts the slave state after the flight: the
+language's mode, and that the enhanced flight clock ran (none in
+`--original-mode`). The German release build depends on `tools/german_map.py`,
+which needs `wing.german` and `wing.english` from the CD32 install in
+`tmp/game/WingCommanderCD32/data/`.
 
 `make run` boots the release build (common/run.sh, the repository's `docs/running.md`):
 CD32 on `a1200-fast` with `WHD_ARGS` defaulting to `CUSTOM5=0 DCACHE`, OCS
