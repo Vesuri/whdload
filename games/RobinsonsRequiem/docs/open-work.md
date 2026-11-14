@@ -16,8 +16,8 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 
 Next, in order:
 
-1. The ECS plan in `docs/performance.md`, "Plan", from its step 2 (the sky); step 1 is
-   done.
+1. The ECS plan in `docs/performance.md`, "Plan", from its step 3 (the column set-up);
+   steps 1 and 2 are done.
 2. The AGA game in heavier scenes than the jungle walk (more trees and objects):
    `tools/rr_passes.py` shows whether the frames keep the 8 fields. The frame pacing
    takes MAIN round twice per frame instead of three times: check that what runs on every

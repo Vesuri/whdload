@@ -5,7 +5,9 @@ Self time per function, the N largest (default 16): every PC is charged to the n
 target at or below it in its START hunk, so a function's figure includes the loops and jump
 tables placed after its entry. The call targets are the run's own: aprof's call records, or
 the entries a Barto trace's reduction pushed (its call stacks themselves do not hold in the
-ECS game, whose interrupts run on another stack). PCs outside START are grouped by 4 KB.
+ECS game, whose interrupts run on another stack). PCs in the slave go to its nearest global
+label at or below them (slave_symbols: profile builds), other PCs outside START are grouped
+by 4 KB.
 ms/frame is per frame drawn in the window (run.json `frames`), 20 ms per PAL field.
 
 aprof runs (OUT/window.prof) add the time in the AGA game's waits (WAITS, SLAVE_WAITS) and the
@@ -43,22 +45,29 @@ WAITS = {'cap wait': (1, 0x49ee, 0x49f6), 'copper wait': (0, 0x13c0, 0x13ca),
 SLAVE_WAITS = {'pacing wait': ('_pacewait', '_pacedone')}
 
 
-def slave_waits(run):
-    """SLAVE_WAITS as absolute ranges, from the build's listing while it is still the slave
-    the run used (run.json's slave address and slave_sha256)."""
+def slave_symbols(run):
+    """The slave's global labels at their absolute addresses, from the build's listing while
+    it is still the slave the run used (run.json's slave address and slave_sha256); {} for
+    other runs."""
     env = run['env']
     lst = ROOT / 'tmp/build' / env['BUILD'] / f"{env['VARIANT']}.lst"
     slave = lst.with_suffix('.Slave')
-    if 'slave' not in run or not lst.exists() or not slave.exists() \
+    if not int(run.get('slave', '0'), 16) or not lst.exists() or not slave.exists() \
             or hashlib.sha256(slave.read_bytes()).hexdigest() != run['slave_sha256']:
         return {}
+    base = int(run['slave'], 16)
     syms = {}
     for line in lst.read_text(encoding='latin1').splitlines():
         f = line.split()
         if len(f) == 2 and f[1].startswith('00:'):
-            syms[f[0]] = int(f[1][3:], 16)
-    base = int(run['slave'], 16)
-    return {w: (base + syms[a], base + syms[b]) for w, (a, b) in SLAVE_WAITS.items()
+            syms[f[0]] = base + int(f[1][3:], 16)
+    return syms
+
+
+def slave_waits(run):
+    """SLAVE_WAITS as absolute ranges."""
+    syms = slave_symbols(run)
+    return {w: (syms[a], syms[b]) for w, (a, b) in SLAVE_WAITS.items()
             if a in syms and b in syms}
 
 
@@ -67,6 +76,12 @@ class Hunks:
         self.bases = [int(x, 16) for x in run['hunks']]
         self.sizes = SIZES[run['env']['VARIANT']]
         self.starts = collections.defaultdict(set)
+        syms = slave_symbols(run)
+        self.labels = sorted((a, n) for n, a in syms.items())
+        if self.labels:     # the slave's code: its hunk, a little shorter than the file
+            env = run['env']
+            slave = ROOT / 'tmp/build' / env['BUILD'] / f"{env['VARIANT']}.Slave"
+            self.slave_end = int(run['slave'], 16) + slave.stat().st_size
 
     def where(self, pc):
         for i, (b, s) in enumerate(zip(self.bases, self.sizes)):
@@ -80,6 +95,9 @@ class Hunks:
     def function(self, pc):
         h, o = self.where(pc)
         if h is None:
+            if self.labels and int(self.labels[0][0]) <= pc < self.slave_end:
+                i = bisect.bisect_right(self.labels, (pc, '\uffff')) - 1
+                return 'slave', self.labels[i][1]
             return None, pc & ~0xfff
         s = sorted(self.starts[h])
         i = bisect.bisect_right(s, o) - 1
@@ -88,6 +106,8 @@ class Hunks:
     @staticmethod
     def name(key):
         h, o = key
+        if h == 'slave':
+            return o
         return f'h{h}+${o:05x}' if h is not None else f'${o:06x}'
 
 
@@ -160,7 +180,8 @@ def report(out, n):
         per_field = total / len(r.fields)
         gaps = [(b - a) / per_field for a, b in zip(pos, pos[1:])]
         if gaps:
-            print(f'  fields per frame: {min(gaps):.1f} to {max(gaps):.1f}')
+            print(f'  fields per frame: {min(gaps):.1f} to {max(gaps):.1f}, mean '
+                  f'{sum(gaps) / len(gaps):.2f} ({20 * sum(gaps) / len(gaps):.1f} ms)')
         print(f'  {"function":12} {"share":>6} {"ms/frame":>8} {"insns/frame":>11}')
         for k, c in self_t.most_common(n):
             print(f'  {hk.name(k):12} {c / total * 100:5.1f}% {c * ms:8.1f} '

@@ -261,7 +261,12 @@ _bootdos        lea     (_saveregs,pc),a0
             add.l   a1,a1
             add.l   a1,a1
             bsr _hunks
+   IFD PROFILE
+            pea     slv_base(pc)        ; for tools/rr_prof.py and rr_report.py
+            move.l  (a7)+,PROFILE_SLAVE.w
+   ENDC
             bsr _c2ppatch
+            bsr _skypatch
 
 	move.w	#$7fff,$dff09A
 	move.w	#$e028,$dff09A
@@ -765,6 +770,8 @@ _hunks
 _hunk1          dc.l    0
 _hunk2          dc.l    0
 
+PROFILE_SLAVE   = $110                  ; profile builds: the slave's address (user vector 68)
+
 **********************************************
 ; The chunky-to-planar conversion (src/c2p000.s): hunk 2 +$1a5e, START's loop, starts with
 ; move.w d6,a4 / move.w a4,d6 (checked first, with the routine's end at +$1b98 and the
@@ -792,3 +799,44 @@ _c2ppatch
 _c2pmod         dc.l    0
 
         INCLUDE c2p000.s
+
+**********************************************
+; The sky copy (src/sky000.s): hunk 1 +$c8b8-$c8e7, START's row loop, becomes jsr _skyrows
+; and bra.w +$c8e8, after a check of its bytes (with the address of <hunk 1 +$d454> at
+; +$c8c8).
+
+_skypatch
+        move.l  _hunk1(pc),a0
+        move.l  a0,a1
+        add.l   #$c8b8,a1               ; offsets above $7fff: no lea
+        lea     _skyold(pc),a2
+        moveq   #0,d1
+.cmp    cmp.w   #$10,d1                 ; +$c8c8: the address
+        beq     .addr
+        move.w  (a2),d2
+        cmp.w   (a1,d1.w),d2
+        bne     .no
+        bra     .next
+.addr   move.l  a0,d2
+        add.l   #$d454,d2
+        cmp.l   (a1,d1.w),d2
+        bne     .no
+        addq.w  #2,d1
+        addq.l  #2,a2
+.next   addq.w  #2,d1
+        addq.l  #2,a2
+        cmp.w   #48,d1
+        blo     .cmp
+        move.w  #$4eb9,(a1)
+        pea     _skyrows(pc)
+        move.l  (a7)+,2(a1)
+        move.l  #$60000028,6(a1)        ; bra.w +$c8e8
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+
+_skyold dc.w    $4a40,$6d00,$000a,$3600,$32d8,$51cb,$fffc,$3639
+        dc.w    $0000,$d454,$e24b,$9640,$5543,$6d00,$000a,$90c1
+        dc.w    $32d8,$51cb,$fffc,$d2c5,$d8c1,$204c,$51cf,$ffd2
+
+        INCLUDE sky000.s

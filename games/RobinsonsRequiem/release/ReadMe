@@ -63,6 +63,7 @@
    (6.25 per second on PAL) instead of every 9 to 12
  ECS:
  - Faster chunky-to-planar conversion
+ - Faster sky drawing
 
  version 1.2 (29.03.13) done by CFou!:
  - First two bitplanes memory allocation fixed for fast memory support (AGA)

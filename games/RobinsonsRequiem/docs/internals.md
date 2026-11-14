@@ -131,6 +131,12 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    longwords packed into one longword of nibbles, then four exchanges into the four plane
    words. `tools/rr_ecsc2pcheck.py` checks it against START's loop byte for byte under
    Unicorn.
+2. **The sky copy by longwords** (`_skypatch`, `src/sky000.s`): hunk 1 `+$c8b8`-`+$c8e7`
+   [`$101b0`], START's row loop copying the sky into the chunky view a word at a time,
+   checked byte for byte (with the address of `<hunk 1 +$d454>` at `+$c8c8`), becomes
+   `jsr _skyrows` and `bra.w +$c8e8`. `_skyrows` copies the same two segments a row by
+   jumping into an unrolled run of `move.l (a0)+,(a1)+`. `tools/rr_skycheck.py ecs` checks
+   it against START's loop under Unicorn.
 
 ## Memory (AGA)
 

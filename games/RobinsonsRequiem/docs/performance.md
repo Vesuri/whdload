@@ -153,13 +153,17 @@ for chip memory: where data sits does not matter here (INFERRED).
 The chunky bytes carry a dither: an even pixel takes its byte's high nibble, an odd one its
 low nibble (INFERRED from the conversion loop).
 
-The plan's steps as they are done (below), frames in the window and the time per frame,
-each the `developer` build of the step's commit under Barto:
+The plan's steps as they are done (below): frames in the window, the mean interval between
+them (`tools/rr_report.py`, from the Barto trace's frame marks; finer than the frame count)
+and the time per frame of the functions the plan works on, each the step's commit under
+Barto (the `developer` build for v1.2 and step 1, then `profile`, the same code with the
+slave's address recorded so that the report names the slave's routines):
 
-| Step | Frames | Conversion | Column set-up `+$bee2` | Spans `+$9d54` | Sky `+$c73c` |
-|---|---|---|---|---|---|
-| v1.2 | 15 (666.7 ms) | 182.6 ms | 128.2 ms | 103.7 ms | 27.5 ms |
-| 1: a merge chunky-to-planar | 17 (588.2 ms) | 138.9 ms | 121.4 ms | 94.0 ms | 25.8 ms |
+| Step | Frames | Mean interval | Conversion | Column set-up `+$bee2` | Spans `+$9d54` | Sky `+$c73c` |
+|---|---|---|---|---|---|---|
+| v1.2 | 15 | 649.5 ms | 182.6 ms | 128.2 ms | 103.7 ms | 27.5 ms |
+| 1: a merge chunky-to-planar | 17 | 596.3 ms | 138.9 ms | 121.4 ms | 94.0 ms | 25.8 ms |
+| 2: the sky by unrolled longwords | 17 | 578.2 ms | 143.3 ms | 122.6 ms | 95.9 ms | 13.9 ms |
 
 The functions other than the step's own change between the rows with the view (the walk
 goes further with more frames).
@@ -265,7 +269,12 @@ ECS, from 666.7 ms (1.5 fps), far from both caps on a 7 MHz 68000:
    not the 18-22 estimated. `tools/rr_ecsc2pcheck.py`: 3,000 random rectangles
    byte-identical to START's loop; the walk's first screenshot is pixel-identical to
    v1.2's. Measured: the conversion 182.6 → 138.9 ms, 15 → 17 frames (588.2 ms).
-2. **Sky** by blitter, or `movem.l`: up to 27 ms. About 540 ms.
+2. **The sky by unrolled longwords** (done, `docs/internals.md`, "ECS improvements"): the
+   row loop (hunk 1 `+$c8b8`) copies a word at a time with `move.w (a0)+,(a1)+` and `dbf`,
+   22 cycles a word; a jump into 80 unrolled `move.l (a0)+,(a1)+` takes 10.
+   `tools/rr_skycheck.py ecs`: 2,000 random cases identical to START's loop. Measured: the
+   sky 25.8 → 13.9 ms per frame, the mean frame interval 596.3 → 578.2 ms (17 frames
+   either way).
 3. **Column set-up** (hunk 1 `+$bee2`): variables in registers, divisions by reciprocal
    table: 30-50 ms. About 500 ms.
 4. **Span set-up and clipping** (hunk 1 `+$9d54`-`+$a4ff`; the fills are unrolled
@@ -283,8 +292,8 @@ BUILD=profile APROF=1 FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
     python3 tools/rr_prof.py tmp/prof/base-aprof
 # AGA, the setup's core: frames only
 BUILD=profile FSUAE=$FSUAE_ARM python3 tools/rr_prof.py tmp/prof/base-arm
-# ECS
-VARIANT=RobinsonsRequiem SETUP=custom BUILD=developer BARTO=1 python3 tools/rr_prof.py tmp/prof/ecs-base
+# ECS (v1.2's figures: BUILD=developer at commit a8bb6fbe)
+VARIANT=RobinsonsRequiem SETUP=custom BUILD=profile BARTO=1 python3 tools/rr_prof.py tmp/prof/ecs
 python3 tools/rr_report.py tmp/prof/base-aprof
 # the AGA game's drawing passes and frame intervals (gdb breakpoints, no profile)
 BUILD=profile FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
@@ -292,8 +301,9 @@ BUILD=profile FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
 # the AGA conversion and sky copy against START's loops (after make unpack)
 python3 tools/rr_c2pcheck.py 2000
 python3 tools/rr_skycheck.py 2000
-# the ECS conversion against START's loop
+# the ECS conversion and sky copy against START's loops
 python3 tools/rr_ecsc2pcheck.py 3000
+python3 tools/rr_skycheck.py ecs 2000
 ```
 
 The `profile` build is the current source, every step done so far; v1.2's figures are the
