@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 START = ROOT / 'tmp/game/RobinsonsRequiemAGA/data-aga/START'
 UC_ARCH_M68K, UC_MODE_BIG_ENDIAN = 7, 1 << 30
-UC_CTL_CPU_MODEL, UC_CPU_M68K_M68020 = 7, 2
+UC_CTL_CPU_MODEL, UC_CPU_M68K_M68000, UC_CPU_M68K_M68020 = 7, 1, 2
 REG_A0, REG_D0, REG_SR, REG_PC = 1, 9, 17, 18
 MEM = 0x800000
 CODE_NEW, SENTINEL, STUB, STACK = 0x700000, 0x7F0000, 0x7E0000, 0x7D0000
@@ -33,9 +33,9 @@ ROWLEN, BPL = 80, 16000
 LOOP, MODC, MODP = 0x2e84, 0x2db2, 0x2db4
 
 
-def hunk(which=2):
+def hunk(which=2, path=START):
     """START's hunk `which`, as loaded (relocations into the hunk itself are offsets from 0)."""
-    d = START.read_bytes()
+    d = Path(path).read_bytes()
     p = 0
 
     def word():
@@ -85,7 +85,7 @@ def assemble():
 
 
 class Machine:
-    def __init__(self):
+    def __init__(self, cpu=UC_CPU_M68K_M68020):
         lib = Path(os.environ.get('AMIGA_UNICORN', Path.home() / '.local/share/amiga/unicorn'))
         uc = self.uc = ctypes.CDLL(str(lib / 'lib/libunicorn.2.dylib'))
         uc.uc_reg_write.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
@@ -102,7 +102,7 @@ class Machine:
         h = self.h = ctypes.c_void_p()
         assert uc.uc_open(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, ctypes.byref(h)) == 0
         assert uc.uc_ctl(h, UC_CTL_CPU_MODEL | (1 << 26) | (1 << 30),
-                         ctypes.c_int(UC_CPU_M68K_M68020)) == 0
+                         ctypes.c_int(cpu)) == 0
         assert uc.uc_mem_map(h, 0, MEM, 7) == 0
 
     def write(self, addr, data):

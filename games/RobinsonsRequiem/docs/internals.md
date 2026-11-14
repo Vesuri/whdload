@@ -119,6 +119,19 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    and the address, the cap for the wait at `+$49ee`) becomes `jsr _capwait`, which gives
    0 after a pacing wait. All three are checked first.
 
+## ECS improvements
+
+The changes after v1.2, in the order of `docs/performance.md`'s plan:
+
+1. **The chunky-to-planar conversion** (`_c2ppatch`, `src/c2p000.s`): hunk 2 `+$1a5e`
+   [`$1606e`], the start of START's row loop, `move.w d6,a4 / move.w a4,d6` (`3846 3c0c`,
+   checked first with the routine's end `+$1b98`, `movem.l (sp)+,d0-a6`, and the address
+   of the chunky modulo `<hunk 2 +$46>` at `+$1b8c`), becomes `jmp _c2p000`. It converts
+   the same rectangle into the same planes a longword at a time: each pair of chunky
+   longwords packed into one longword of nibbles, then four exchanges into the four plane
+   words. `tools/rr_ecsc2pcheck.py` checks it against START's loop byte for byte under
+   Unicorn.
+
 ## Memory (AGA)
 
 START divides memory itself (hunk 0 `+$162`-`+$290`); the hunk 1 variables:

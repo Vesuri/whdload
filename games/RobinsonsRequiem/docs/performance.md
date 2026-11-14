@@ -153,6 +153,17 @@ for chip memory: where data sits does not matter here (INFERRED).
 The chunky bytes carry a dither: an even pixel takes its byte's high nibble, an odd one its
 low nibble (INFERRED from the conversion loop).
 
+The plan's steps as they are done (below), frames in the window and the time per frame,
+each the `developer` build of the step's commit under Barto:
+
+| Step | Frames | Conversion | Column set-up `+$bee2` | Spans `+$9d54` | Sky `+$c73c` |
+|---|---|---|---|---|---|
+| v1.2 | 15 (666.7 ms) | 182.6 ms | 128.2 ms | 103.7 ms | 27.5 ms |
+| 1: a merge chunky-to-planar | 17 (588.2 ms) | 138.9 ms | 121.4 ms | 94.0 ms | 25.8 ms |
+
+The functions other than the step's own change between the rows with the view (the walk
+goes further with more frames).
+
 ## Pain points
 
 AGA, a1200-030:
@@ -170,7 +181,7 @@ AGA, a1200-030:
 
 ECS, A500:
 
-1. **Chunky-to-planar: 183 ms** (27%), an `add`/`addx` shifter at 41 cycles per pixel.
+1. **Chunky-to-planar: 183 ms** (27%), an `add`/`addx` shifter at 40 cycles per pixel.
 2. **Landscape: 300 ms** (45%): column set-up 128 ms, spans 104 ms, fills 68 ms.
 3. **Objects 46 ms, sky 28 ms**, beam wait 8 ms. Memory and the blitter are idle.
 
@@ -244,19 +255,16 @@ fields while the drawing pass ends before the object is next due.
 
 ECS, from 666.7 ms (1.5 fps), far from both caps on a 7 MHz 68000:
 
-1. **Chunky-to-planar** (hunk 2 `+$19a2`, loop `+$1a62`): a merge (Kalms c5) 4-plane
-   conversion. The game's loop shifts one bit at a time with `add`/`addx`, 41 cycles per
-   pixel; a merge conversion swaps bit groups a longword at a time, about 18-22 cycles per
-   pixel on the 68000: 183 → about 85 ms. Kalms' `c2p1x1_4_c5_gen` is the model but not a
-   drop-in: it wants a pixel per byte in the low nibble, whole-screen chunky and planes at
-   one spacing. The game packs its dither into the chunky bytes (an even pixel is the high
-   nibble of its byte, an odd one the low nibble of the next, `+$1a66`-`+$1a84`), so a mask
-   (`$f00ff00f`) and shift replace Kalms' first merge stage; it converts a rectangle in
-   16-pixel steps with a run-time modulo (`+$1a20`, `+$1a3e`) and writes two plane
-   pointers, each with a second plane at +16000, from one of two tables (`+$d459` picks
-   the buffer). Validate the planes byte for byte against the original loop. Later, if the
-   CPU is still the limit: the blitter (idle, 68.5% of slots free) can take the last merge
-   pass in parallel while the CPU runs from fast memory. About 570 ms.
+1. **A merge chunky-to-planar** (done, `docs/internals.md`, "ECS improvements"): the
+   game's loop (hunk 2 `+$1a62`) shifts one bit at a time with `add`/`addx`, about 40
+   cycles a pixel. The chunky bytes carry the dither (pixel 4n+j is the high nibble of its
+   byte for an even j, the low one for an odd j), so a merge conversion cannot start from
+   packed nibbles as Kalms' `c2p1x1_4_c5_gen` does: each pair of chunky longwords is first
+   packed into one (a 4-bit exchange and a byte select, about 11 cycles a pixel), then four
+   exchanges (8, 1, 16 and 2 bits) give the plane words; about 32 cycles a pixel in all,
+   not the 18-22 estimated. `tools/rr_ecsc2pcheck.py`: 3,000 random rectangles
+   byte-identical to START's loop; the walk's first screenshot is pixel-identical to
+   v1.2's. Measured: the conversion 182.6 → 138.9 ms, 15 → 17 frames (588.2 ms).
 2. **Sky** by blitter, or `movem.l`: up to 27 ms. About 540 ms.
 3. **Column set-up** (hunk 1 `+$bee2`): variables in registers, divisions by reciprocal
    table: 30-50 ms. About 500 ms.
@@ -284,6 +292,8 @@ BUILD=profile FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
 # the AGA conversion and sky copy against START's loops (after make unpack)
 python3 tools/rr_c2pcheck.py 2000
 python3 tools/rr_skycheck.py 2000
+# the ECS conversion against START's loop
+python3 tools/rr_ecsc2pcheck.py 3000
 ```
 
 The `profile` build is the current source, every step done so far; v1.2's figures are the

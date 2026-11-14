@@ -51,7 +51,8 @@
  or     aminet:dev/misc/whdload#?
  and    aminet:game/patch/
 
- version 2.0b (14.11.2026) done by Vesuri (AGA):
+ version 2.0b (14.11.2026) done by Vesuri:
+ AGA:
  - Uses 1 MB of Fast memory for the game's objects (WHDLoad 20 or newer); with
    the tooltype MemConfig=1 it runs in 256 KB of Fast memory as version 1.2 did
  - The CPU caches are on also without WHDLoad's MMU (68030)
@@ -60,6 +61,8 @@
  - Faster sky drawing
  - Walking, the 3D view keeps the game's own pace: a new frame every 8 fields
    (6.25 per second on PAL) instead of every 9 to 12
+ ECS:
+ - Faster chunky-to-planar conversion
 
  version 1.2 (29.03.13) done by CFou!:
  - First two bitplanes memory allocation fixed for fast memory support (AGA)

@@ -257,6 +257,12 @@ _bootdos        lea     (_saveregs,pc),a0
             bsr _directstart
    ENDC
 
+            move.l  d7,a1
+            add.l   a1,a1
+            add.l   a1,a1
+            bsr _hunks
+            bsr _c2ppatch
+
 	move.w	#$7fff,$dff09A
 	move.w	#$e028,$dff09A
 
@@ -739,3 +745,50 @@ _wait_jump      dc.w    $6d,4
         EVEN
 
   ENDC
+
+**********************************************
+; The game's hunks 1 and 2 (a1: the segment list, hunk 0's link).
+
+_hunks
+        move.l  (a1),d0
+        lsl.l   #2,d0
+        move.l  d0,a0                   ; hunk 1's link
+        addq.l  #4,d0
+        lea     _hunk1(pc),a2
+        move.l  d0,(a2)
+        move.l  (a0),d0
+        lsl.l   #2,d0
+        addq.l  #4,d0
+        move.l  d0,4(a2)                ; _hunk2
+        rts
+
+_hunk1          dc.l    0
+_hunk2          dc.l    0
+
+**********************************************
+; The chunky-to-planar conversion (src/c2p000.s): hunk 2 +$1a5e, START's loop, starts with
+; move.w d6,a4 / move.w a4,d6 (checked first, with the routine's end at +$1b98 and the
+; chunky modulo's address at +$1b8c), which becomes jmp _c2p000.
+
+_c2ppatch
+        move.l  _hunk2(pc),a0
+        lea     $1a5e(a0),a1
+        cmp.l   #$38463c0c,(a1)
+        bne     .no
+        cmp.l   #$4cdf7fff,$1b98(a0)
+        bne     .no
+        lea     $46(a0),a2
+        cmp.l   $1b8c(a0),a2
+        bne     .no
+        lea     _c2pmod(pc),a3
+        move.l  a2,(a3)
+        move.w  #$4ef9,(a1)
+        pea     _c2p000(pc)
+        move.l  (a7)+,2(a1)
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+
+_c2pmod         dc.l    0
+
+        INCLUDE c2p000.s
