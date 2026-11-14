@@ -24,8 +24,8 @@ runs SETTLE fields. The window then runs with keypad 9 down:
     else      plain `monitor fields`
 
 Before and after the window it saves screenshots (start.png, end.png) and reads the frame
-counter into OUT/run.json, with the hunk bases, the build's slave hash and the machine
-options.
+counter into OUT/run.json, with the hunk bases, the slave's address (PROFILE_SLAVE) and
+hash and the machine options.
 """
 import hashlib
 import json
@@ -49,6 +49,7 @@ from rr import find_hunk0, layout  # noqa: E402
 
 # The profile build's frame counter (src/, PROFILE_FRAMES): frames drawn since boot.
 PROFILE_FRAMES = 0x10c
+PROFILE_SLAVE = 0x110       # and the slave's address
 # Hunk 0: the beam wait before each buffer swap, entered once per presented frame.
 FRAME_MARK = {'RobinsonsRequiemAGA': 0x13ce, 'RobinsonsRequiem': 0xcac}
 # START's variables read with the counters: (hunk, offset, bytes). The frame wait (AGA hunk 1
@@ -223,6 +224,7 @@ def main():
                     slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(),
                     avion_name=name.split(b'\0')[0].decode('latin1'), avion_field=found_at,
                     window=[w0, w1], hunks=[hex(b) for b in bases], counters=[c0, c1],
+                    slave=hex(int.from_bytes(s.read(PROFILE_SLAVE, 4), 'big')),
                     host_seconds=round(time.time() - t0))
         (s.out / 'run.json').write_text(json.dumps(info, indent=1) + '\n')
         print(json.dumps(info, indent=1))

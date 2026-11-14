@@ -10,7 +10,9 @@ offsets (`docs/internals.md`).
 `tools/rr_prof.py OUT` boots a developer-type build (`docs/development.md`, "Straight into
 the game"), stops at the open of `avion.DO`/`.CO`, runs 150 fields, then holds keypad 9
 (forward and to the right) for 500 fields, 10 s PAL, under `WARP=1 DETERMINISTIC=1`.
-`tools/rr_report.py OUT` prints the tables below from its output.
+`tools/rr_report.py OUT` prints the tables below from its output; `tools/rr_passes.py OUT`
+runs the same workload under gdb breakpoints for the AGA game's drawing passes and frame
+intervals.
 
 - The game draws no frame while the player stands still (`KEY=none`: 0 frames in 500
   fields), so walking is the workload. Movement depends on the frame rate (INFERRED: after
@@ -30,19 +32,29 @@ Both games hold each frame to at least 3 fields: the frame wait (AGA hunk 1 `+$4
 `+$30ac`) loops until the VBL's field count reaches MAIN's cap, hunk 1 `+$ee6a` (ECS
 `+$d4c0`), which is 3 in game in both.
 
-The AGA game's 3D frames are bounded further by the script object that triggers them
-(measured in this walk, `tmp`-only `period.py` logging hunk 1 `+$258c`). MAIN runs each
-object once the VBL count passes the object's last run plus its period (hunk 1
-`+$257e`-`+$2590`: next run `-62(a6)`, period `-58(a6)`); this object's period is 7, so a
-3D frame comes at most every 8 fields: **160 ms, 6.25 fps, is the ceiling in this walk**
-(62 frames in the window). A main-loop pass takes at least 3 fields (the cap) and the object
-runs only at a pass's start, so a frame lands on the 8 fields only when the drawing pass
-takes at most 5 fields (100 ms); between 5 and 8 fields the next pass starts before the
-object is due and idles a whole 3-field pass (frames every 8 to 11 fields). Movement is
-per frame (INFERRED from the compass: NW after 36 frames, SE after 51), so the period sets
-the game's speed and stays. Frame counts therefore saturate near 57-62; `tools/rr_report.py`
-also gives the busy time per frame, the frame time without the three waits (the cap wait,
-the copper-interrupt wait at a 3D pass's start, the beam wait), which keeps falling.
+The AGA game's 3D frames are bounded further by the object the view follows (measured in
+this walk, `tmp`-only `period.py` logging hunk 1 `+$258c`; the view redraws when that
+object has moved, hunk 1 `+$48b8`). MAIN runs the due objects, then the frame routine
+(hunk 1 `+$49b2`: after a swap the copper-interrupt wait for the next field, the cap wait,
+the drawing, the swap), and again; an object is due once the VBL count passes its last run
+plus its period (hunk 1 `+$257e`-`+$2590`: next run `-62(a6)`, period `-58(a6)`). This
+object's period is 7, so a 3D frame comes at most every 8 fields: **160 ms, 6.25 fps, is
+the ceiling in this walk** (62.5 frames in the window). Movement is per frame (INFERRED
+from the compass: NW after 36 frames, SE after 51), so the period sets the game's speed
+and stays.
+
+Without the frame pacing (plan, step 6) MAIN sees the object due only between frame
+routines: at the drawing pass's end, at the next pass's (the view copied into the other
+buffer, a field later), then a cap apart. A frame landed on the 8 fields only when one of
+those fell in the field the object came due, which depends on the field the drawing pass
+ended in, not on its speed: `tools/rr_passes.py` (gdb breakpoints, the VBL count and the
+beam's line) gave frames every 9 fields, now and then 10, for drawing passes of 2.0 to
+3.1 fields on the setup's core, and every 6 to 12 fields, 8.9 on average, for 3.4 to 5.8
+fields on the aprof core, where a pass ending in its fourth field put the next frame 10
+fields on. So frame counts saturated near 53-57 while the work fell; `tools/rr_report.py`
+also gives the busy time per frame, the frame time without the waits (the cap wait, the
+copper-interrupt wait at a 3D pass's start, the beam wait, the pacing wait), which keeps
+falling.
 
 ## AGA game, a1200-030
 
@@ -81,6 +93,12 @@ the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 | 4: Kalms' 68030 chunky-to-planar | 57 (175.4 ms) | 111.3 ms | 53 |
 | 5: no beam wait (not kept) | 57 (175.4 ms) | 113.5 ms | |
 | 6a: the sky copy by longwords | 57 (175.4 ms) | 108.8 ms | 53 |
+| 6b: frame pacing | 62 (161.3 ms) | 108.4 ms | 62 |
+
+After step 6 every frame interval is 8 fields on both cores (`tools/rr_passes.py`, 240
+events: 36 frames on the aprof core with drawing passes of 3.3 to 6.5 fields, 28 on the
+setup's core with 2.1 to 4.1). The busy time per frame stays (108.8 → 108.4 ms); the
+pacing wait, 31.5 ms per frame, takes most of the cap wait's place (57.6 → 12.1 ms).
 
 From step 3 on the frame counts are near the object period's ceiling: step 3's frames
 alternate a drawing pass of about 7 fields with an idle 3-field pass (33.1 ms per frame in
@@ -147,7 +165,8 @@ AGA, a1200-030:
 4. **Landscape loop and spans: 67-136 ms**, most of it chip waits until the data moves.
 5. **Waits: 5.3 ms beam wait** before each swap, 4.2 ms in the cap wait.
 6. **The ceiling is 6.25 fps here**, not the cap's 16.7: the object that triggers the 3D
-   frames runs every 8 fields at most (above).
+   frames runs every 8 fields at most, and MAIN, a cap apart, often sees it a pass late
+   (above).
 
 ECS, A500:
 
@@ -193,11 +212,11 @@ AGA, from 277.8 ms (3.6 fps):
    `+$9aa6`), 7.3 ms per frame, and the rest grew from 111.3 to 113.5 ms; 57 frames either
    way. The beam wait ends at line 256, about a millisecond before the field does, so it
    never costs a pass a field.
-6. **The drawing pass within 5 fields** in this walk (100 ms), so every frame lands on the
-   object's 8 fields. The drawing pass, from the pass's start after the cap wait (hunk 1
-   `+$49f6`) to the swap (`+$4b30`), took 3.44 to 5.75 fields on the aprof core after step 4
-   (`tmp`-only `passes.py`, gdb breakpoints and the VBL count with the beam's line), 2.0
-   to 3.1 on the setup's core, whose chip accesses cost less.
+6. **Every frame on the object's 8 fields** (done). The drawing pass, from the pass's
+   start after the cap wait (hunk 1 `+$49f6`) to the swap (`+$4b30`), took 3.44 to 5.75
+   fields on the aprof core after step 4 (`tools/rr_passes.py`), 2.0 to 3.1 on the
+   setup's core, whose chip accesses cost less; the frames came every 6 to 12 fields and
+   every 9 or 10 (above, "Workload and instruments").
    1. **The sky copy by longwords** (done, `docs/internals.md`, "AGA improvements"): the
       sky 8.5 → 4.1 ms per frame, busy 111.3 → 108.8 ms; the drawing pass 3.23 to 5.69
       fields on the aprof core, the setup's core unchanged.
@@ -207,11 +226,21 @@ AGA, from 277.8 ms (3.6 fps):
       `+$92dc` moves the blocks above a freed one down and lowers every table pointer above
       it, with no upper bound), so a block cannot live in fast memory, and the scripts
       write the map (`+$3b2c`-`+$3b4e`, `+$3b82`), so a fast copy would go stale.
+   3. **Frame pacing** (done, `docs/internals.md`, "AGA improvements"): when a pass ends
+      and the followed object comes due within the cap, the frame routine waits for it,
+      so that MAIN runs it when it is due, and the next pass, which draws its frame, skips
+      its cap wait. 62 frames on both cores, every interval 8 fields, with drawing passes
+      of up to 6.5 fields: the frame starts when the object has run, so the pass has
+      nearly the whole 8 fields. MAIN now goes round twice per frame instead of three
+      times (the idle pass before the object came due is gone), the rate of a machine
+      whose drawing pass takes a little over 4 fields; the objects that run on every pass
+      (period 0) run that much less often per second (not checked: what they do).
 
 Stop there: at 8 fields per frame the object's period holds every frame, and nothing faster
 shows. Beyond it is a different project: a shorter period changes the game's speed
 (movement per frame, INFERRED) and needs a fixed-time simulation first. Check step 6
-against heavier scenes (more trees and objects) than this walk.
+against heavier scenes (more trees and objects) than this walk: the pacing keeps the 8
+fields while the drawing pass ends before the object is next due.
 
 ECS, from 666.7 ms (1.5 fps), far from both caps on a 7 MHz 68000:
 
@@ -249,6 +278,9 @@ BUILD=profile FSUAE=$FSUAE_ARM python3 tools/rr_prof.py tmp/prof/base-arm
 # ECS
 VARIANT=RobinsonsRequiem SETUP=custom BUILD=developer BARTO=1 python3 tools/rr_prof.py tmp/prof/ecs-base
 python3 tools/rr_report.py tmp/prof/base-aprof
+# the AGA game's drawing passes and frame intervals (gdb breakpoints, no profile)
+BUILD=profile FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
+    python3 tools/rr_passes.py tmp/prof/passes
 # the AGA conversion and sky copy against START's loops (after make unpack)
 python3 tools/rr_c2pcheck.py 2000
 python3 tools/rr_skycheck.py 2000

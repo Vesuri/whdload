@@ -302,6 +302,7 @@ _cont
             bsr _fastblocks
             bsr _c2ppatch
             bsr _skypatch
+            bsr _pacepatch
 
         ;call
                 move.l  d7,a1
@@ -783,13 +784,15 @@ _menu_jump      dc.w    $97,4
 
 **********************************************
 ; Profile builds: count the frames the game draws in PROFILE_FRAMES (a longword in user
-; vector 67, after the $106 jump), for tools/rr_prof.py. The chunky-to-planar entry, hunk 2
+; vector 67, after the $106 jump) and keep the slave's address in PROFILE_SLAVE (vector 68),
+; for tools/rr_prof.py. The chunky-to-planar entry, hunk 2
 ; +$2db8, calls the conversion loop once per frame through jsr <hunk 2 +$2e84> at +$2e78;
 ; that call goes through _framehook instead.
 
   IFD PROFILE
 
 PROFILE_FRAMES  = $10c
+PROFILE_SLAVE   = $110
 
 _framecount
         move.l  (a1),d0                 ; hunk 1
@@ -809,6 +812,8 @@ _framecount
         pea     _framehook(pc)
         move.l  (a7)+,$2e7a(a0)
         clr.l   PROFILE_FRAMES.w
+        pea     slv_base(pc)
+        move.l  (a7)+,PROFILE_SLAVE.w
         move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
@@ -1042,3 +1047,124 @@ _skypatch
 .oldend
 
         INCLUDE sky030.s
+
+**********************************************
+; Frame pacing (docs/performance.md, "Workload and instruments" and plan step 6). MAIN
+; runs the due script objects, then the frame routine (hunk 1 +$49b2: copper-interrupt and
+; cap waits, drawing, swap), and again; an object is due once the VBL count (+$ee6c) passes
+; its next run (-62(a6)), the VBL count at its last run plus its period (-58(a6)). The 3D
+; view redraws when the object it follows (MAIN's object table +$ed6c at the view's +96,
+; hunk 1 +$48b8) has moved; that object's period is 7, so its frames could come every 8
+; fields, but MAIN only sees it due when it comes round, a cap (+$ee6a, 3 fields) after
+; the last pass started: a pass that ends a field or two before the object is due puts its
+; frame a pass later (frames every 9 to 12 fields). In 3D mode (+$ee03) the frame routine,
+; when it ends, waits for the followed object if it has a period and is due within the
+; cap, so that MAIN sees it due when it is: the pass that would have idled through a cap
+; before it is not run. The pass after that wait, the one that draws the object's frame,
+; skips its cap wait: the frame starts when the object has run instead of up to 2 fields
+; later.
+; - hunk 1 +$4b8e jsr +$a3a6 (the view's drawing) becomes jsr _view (the view's object)
+; - +$4b54 movem.l (sp)+,d0-a6 and rts (the frame routine's end) become jmp _passend
+; - +$49e8 move.b <+$ee6a>,d0 (the cap, for the wait at +$49ee) becomes jsr _capwait
+
+_pacepatch
+        move.l  _hunk1(pc),a0
+        move.l  a0,a1
+        add.l   #$4b8e,a1
+        cmp.w   #$4eb9,(a1)
+        bne     .no
+        move.l  a0,d0
+        add.l   #$a3a6,d0
+        cmp.l   2(a1),d0
+        bne     .no
+        lea     _viewdraw(pc),a2
+        move.l  d0,(a2)
+        move.l  a0,a3
+        add.l   #$4b54,a3
+        cmp.l   #$4cdf7fff,(a3)
+        bne     .no
+        cmp.w   #$4e75,4(a3)
+        bne     .no
+        move.l  a0,a4
+        add.l   #$49e8,a4
+        cmp.w   #$1039,(a4)
+        bne     .no
+        move.l  a0,d0
+        add.l   #$ee6a,d0
+        cmp.l   2(a4),d0
+        bne     .no
+        lea     _cap(pc),a2
+        move.l  d0,(a2)
+        move.w  #$4eb9,(a4)
+        pea     _capwait(pc)
+        move.l  (a7)+,2(a4)
+        pea     _view(pc)
+        move.l  (a7)+,2(a1)
+        move.w  #$4ef9,(a3)
+        pea     _passend(pc)
+        move.l  (a7)+,2(a3)
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+
+_view   move.l  a0,-(a7)
+        lea     _viewobj(pc),a0
+        move.l  a2,(a0)
+        move.l  (a7)+,a0
+        move.l  _viewdraw(pc),-(a7)
+        rts
+
+_passend
+        movem.l (a7)+,d0-a6
+        movem.l d0-d1/a0-a1,-(a7)
+        move.l  _viewobj(pc),d0
+        beq     _pacedone
+        move.l  d0,a1
+        move.l  _hunk1(pc),a0
+        add.l   #$ee00,a0
+        tst.b   3(a0)                   ; +$ee03: 3D
+        beq     _pacedone
+        move.w  96(a1),d0               ; the followed object
+        bmi     _pacedone
+        move.l  $6c-$100(a0),a1         ; +$ed6c, MAIN's object table
+        move.l  (a1,d0.w),d0
+        beq     _pacedone
+        move.l  d0,a1
+        tst.w   -58(a1)                 ; its period
+        beq     _pacedone
+        move.l  -62(a1),d0              ; next run: due when the count passes it
+        sub.l   $6c(a0),d0              ; fields until due, less one
+        bmi     _pacedone
+        moveq   #0,d1
+        move.b  $6a(a0),d1              ; the cap
+        cmp.l   d1,d0
+        bhs     _pacedone
+        move.l  -62(a1),d0
+_pacewait
+        cmp.l   $6c(a0),d0
+        bhs     _pacewait
+        lea     _paced(pc),a1
+        st      (a1)
+_pacedone
+        movem.l (a7)+,d0-d1/a0-a1
+        rts
+
+; d0.b the cap for the wait at +$49ee, none (0) after a pacing wait; as START's move.b,
+; the rest of d0 kept
+_capwait
+        clr.b   d0
+        move.l  a0,-(a7)
+        lea     _paced(pc),a0
+        tst.b   (a0)
+        sf      (a0)
+        bne     .out
+        move.l  _cap(pc),a0
+        move.b  (a0),d0
+.out    move.l  (a7)+,a0
+        rts
+
+_viewdraw       dc.l    0
+_viewobj        dc.l    0
+_cap            dc.l    0
+_paced          dc.b    0
+        even

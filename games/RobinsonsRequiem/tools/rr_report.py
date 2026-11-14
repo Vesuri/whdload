@@ -8,7 +8,7 @@ the entries a Barto trace's reduction pushed (its call stacks themselves do not 
 ECS game, whose interrupts run on another stack). PCs outside START are grouped by 4 KB.
 ms/frame is per frame drawn in the window (run.json `frames`), 20 ms per PAL field.
 
-aprof runs (OUT/window.prof) add the time in the AGA game's three waits (WAITS) and the
+aprof runs (OUT/window.prof) add the time in the AGA game's waits (WAITS, SLAVE_WAITS) and the
 rest, busy, per frame drawn; and chip memory: each function's share of time in chip
 accesses and its accesses per frame, and in total the chunky-to-planar loop's accesses (AGA
 hunk 2 +$2e84: byte reads of the chunky buffer, byte writes to the eight planes) against
@@ -17,10 +17,12 @@ docs/performance.md has the runs this reports on.
 """
 import bisect
 import collections
+import hashlib
 import json
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _amigaxdev  # noqa: F401,E402
 from amigaxdev import aprof  # noqa: E402
@@ -37,6 +39,27 @@ C2P_WRITES = (0x2f52, 0x2f56, 0x2f58, 0x2f5c, 0x2f5e, 0x2f62, 0x2f64, 0x2f68,
 # of a 3D pass, the beam wait before the swap
 WAITS = {'cap wait': (1, 0x49ee, 0x49f6), 'copper wait': (0, 0x13c0, 0x13ca),
          'beam wait': (0, 0x13ce, 0x13de)}
+# and the slave's, between two of its labels (src/): the frame pacing's wait
+SLAVE_WAITS = {'pacing wait': ('_pacewait', '_pacedone')}
+
+
+def slave_waits(run):
+    """SLAVE_WAITS as absolute ranges, from the build's listing while it is still the slave
+    the run used (run.json's slave address and slave_sha256)."""
+    env = run['env']
+    lst = ROOT / 'tmp/build' / env['BUILD'] / f"{env['VARIANT']}.lst"
+    slave = lst.with_suffix('.Slave')
+    if 'slave' not in run or not lst.exists() or not slave.exists() \
+            or hashlib.sha256(slave.read_bytes()).hexdigest() != run['slave_sha256']:
+        return {}
+    syms = {}
+    for line in lst.read_text(encoding='latin1').splitlines():
+        f = line.split()
+        if len(f) == 2 and f[1].startswith('00:'):
+            syms[f[0]] = int(f[1][3:], 16)
+    base = int(run['slave'], 16)
+    return {w: (base + syms[a], base + syms[b]) for w, (a, b) in SLAVE_WAITS.items()
+            if a in syms and b in syms}
 
 
 class Hunks:
@@ -116,6 +139,8 @@ def report(out, n):
             waits = {w: sum(v[0] for pc, v in pcs.items()
                             if hk.bases[h] + a <= pc < hk.bases[h] + b)
                      for w, (h, a, b) in WAITS.items()}
+            waits.update({w: sum(v[0] for pc, v in pcs.items() if a <= pc < b)
+                          for w, (a, b) in slave_waits(run).items()})
             print('  waits ' + ', '.join(f'{w} {u * ms:.1f}' for w, u in waits.items())
                   + f' ms; busy {(total - sum(waits.values())) * ms:.1f} ms/frame')
             for what, offs in (('c2p plane writes', C2P_WRITES), ('c2p chunky reads', C2P_READS)):

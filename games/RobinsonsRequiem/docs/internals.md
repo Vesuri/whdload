@@ -108,6 +108,16 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    same segments (the sky wraps around at its row's end) with aligned longword reads, two
    words a chip access. `tools/rr_skycheck.py` checks it against START's loop under
    Unicorn, the view and the registers the code after `+$e292` reads.
+6. **Frame pacing** (`_pacepatch`, `docs/performance.md`, "Workload and instruments" and
+   step 6): in 3D mode (hunk 1 `+$ee03`), when the frame routine ends and the object the
+   view follows (MAIN's object table `+$ed6c` at the view's `+96`) has a period and comes
+   due within the cap (`+$ee6a`), the slave waits until the VBL count passes its next run;
+   the next pass, which draws its frame, skips the cap wait. Hunk 1 `+$4b8e` [`$903a`]
+   `jsr +$a3a6` (the view's drawing) becomes `jsr _view`, which notes the view's object;
+   `+$4b54` [`$9000`] `movem.l (sp)+,d0-a6` and `rts` (`4cdf 7fff 4e75`, the frame
+   routine's end) become `jmp _passend`; `+$49e8` [`$8e94`] `move.b <+$ee6a>,d0` (`1039`
+   and the address, the cap for the wait at `+$49ee`) becomes `jsr _capwait`, which gives
+   0 after a pacing wait. All three are checked first.
 
 ## Memory (AGA)
 
