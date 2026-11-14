@@ -54,24 +54,26 @@ MEMF_LARGEST)` - 50,000, none under 100,000) and then discards it unconditionall
 `+$196`, `move.l #0,<hunk 1 +$f4>`), so MAIN, every object's variables and every resource
 come from the chip pool. The slave's ExpMem is 256 KB.
 
-Price of each change, frames in the window (`game.conf` measurement builds, never released;
-the setup's core is the user's: `FSUAE=$FSUAE_ARM`, MMU model on):
+The plan's steps as they are done (below), frames in the window, each the `profile` build
+of the step's commit; the setup's core is the user's (`FSUAE=$FSUAE_ARM`, MMU model on):
 
-| Build | Change | aprof core | Setup's core |
-|---|---|---|---|
-| `profile` | none | 36 (277.8 ms) | 37 |
-| `pfast` | ExpMem 2 MB | 35 | 37 |
-| `pcache` | `CACHECHIPDATA`: caches on without the MMU | 39 | 55 |
-| `pboth` | both | 40 | 54 |
-| `profile` + `WHD_ARGS=MMU` | WHDLoad's MMU: caches on | | 55 |
-| `ppool` | ExpMem 2 MB, the fast pool kept (`EXP_FASTPOOL`: `bra.s` over `+$196`) | 48 (208.3 ms) | 51 |
-| `ppoolc` | `ppool` + `CACHECHIPDATA` | 51 (196.1 ms) | 58 |
+| Step | aprof core | Setup's core |
+|---|---|---|
+| v1.2 | 36 (277.8 ms) | 37 |
+| 1: fast pool, 1 MB ExpMem | 48 (208.3 ms) | 51 |
+
+Measured before the steps, with measurement switches since removed (commit `a01d9f08`):
+a 2 MB ExpMem alone 35 and 37 (nothing moves to fast memory without the pool); the caches
+alone (`CACHECHIPDATA`, `pcache`) 39 and 55, with the setup's core's data-cache emulation
+off 43; both without the pool 40 and 54; v1.2 under WHDLoad's MMU (`WHD_ARGS=MMU`, caches
+on) 55 on the setup's core; the pool with a 2 MB ExpMem 48 and 51, and with the caches
+51 (196.1 ms) and 58.
 
 The setup's core gains more from the caches because its data cache also caches chip
 memory: with that cache's emulation off, `pcache` gives 43. Accelerator boards do not cache
 chip memory, and the aprof core does not either (INFERRED: the aprof core is the closer one).
 
-`ppoolc`, 196.1 ms per frame: chip accesses 120.2 ms (168,000), the rest 75.8 ms.
+The pool and the caches (`ppoolc` at `a01d9f08`), 196.1 ms per frame: chip accesses 120.2 ms (168,000), the rest 75.8 ms.
 
 | Function | ms/frame | In chip accesses |
 |---|---|---|
@@ -84,7 +86,7 @@ chip memory, and the aprof core does not either (INFERRED: the aprof core is the
 
 Still in chip with the pool kept: the chunky buffer, the height-map row table, the shade
 tables, the map data and the objects' graphics, all loaded or allocated from the chip pool
-(the `ppool` run's addresses); MAIN's frame and the renderer's variables moved to fast.
+(the pool run's addresses); MAIN's frame and the renderer's variables moved to fast.
 Of the 120.2 ms, the plane writes (19.1 ms) must stay in chip; the other 101.1 ms are
 accesses to memory only the CPU uses.
 
@@ -134,8 +136,8 @@ are DERIVED from the tables above.
 
 AGA, from 277.8 ms (3.6 fps):
 
-1. **Keep the fast pool and give it room**: branch over hunk 0 `+$196` (as `EXP_FASTPOOL`)
-   and a 2 MB ExpMem. Measured: 208.3 ms, 4.8 fps (setup's core 37 → 51 frames).
+1. **Keep the fast pool and give it room** (done): branch over hunk 0 `+$196` and a 1 MB
+   ExpMem. Measured: 208.3 ms, 4.8 fps (setup's core 37 → 51 frames).
 2. **Caches on**: `CACHECHIPDATA` instead of `CACHE`; the game uses no blitter, so the
    write-through chip data stays coherent (INFERRED). Measured: 196.1 ms, 5.1 fps (setup's
    core 58 frames).
@@ -198,8 +200,11 @@ detail and window settings), not code.
 BUILD=profile APROF=1 FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
     python3 tools/rr_prof.py tmp/prof/base-aprof
 # AGA, the setup's core: frames only
-BUILD=ppoolc FSUAE=$FSUAE_ARM python3 tools/rr_prof.py tmp/prof/ppoolc-arm
+BUILD=profile FSUAE=$FSUAE_ARM python3 tools/rr_prof.py tmp/prof/base-arm
 # ECS
 VARIANT=RobinsonsRequiem SETUP=custom BUILD=developer BARTO=1 python3 tools/rr_prof.py tmp/prof/ecs-base
 python3 tools/rr_report.py tmp/prof/base-aprof
 ```
+
+The `profile` build is the current source, every step done so far; v1.2's figures are the
+`profile` build at commit `a8bb6fbe`.

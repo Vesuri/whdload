@@ -42,12 +42,11 @@ PRESTIGE_CRACK
 ;============================================================================
 
 CHIPMEMSIZE     = $1A0000
-; EXP_FASTMEM (measurement builds only, docs/performance.md): another ExpMem size.
-        IFD EXP_FASTMEM
-FASTMEMSIZE     = EXP_FASTMEM
-        ELSE
-FASTMEMSIZE     = $40000
-        ENDC
+; 1 MB of fast memory besides the Kickstart, for START's fast pool (_fastpool). MemConfig=1
+; (slv_MemConfig) is CFou!'s v1.2 layout, 256 KB: the pool is then left out and the game
+; runs from chip memory as before.
+FASTMEMSIZE     = $100000
+FASTMEMSIZE_V12 = $40000
 NUMDRIVES       = 1
 WPDRIVES        = %1111
 
@@ -81,7 +80,7 @@ STACKSIZE      = 6000
 
 ;============================================================================
 
-slv_Version     = 17
+slv_Version     = 20
 slv_Flags       = WHDLF_NoError|WHDLF_Examine|WHDLF_ReqAGA|WHDLF_ClearMem
 slv_keyexit     = $59   ;F10
 
@@ -101,14 +100,16 @@ slv_keyexit     = $59   ;F10
 slv_CurrentDir  dc.b    "data-aga",0
 slv_name        dc.b    "Robinson Requiem AGA",0
 slv_copy        dc.b    "Silmarils",0
-slv_info        dc.b    "Coded By CFou!",10
-                dc.b    "Version 1.2  "
+slv_info        dc.b    "Coded By CFou!, improved by Vesuri",10
+                dc.b    "Version 2.0b (14.11.2026) "
         IFD BARFLY
                 INCBIN  "T:date"
         ENDC
                 dc.b    0
 slv_config	dc.b	0
         EVEN
+slv_MemConfig   dc.l    CHIPMEMSIZE,KICKSIZE+FASTMEMSIZE_V12
+                dc.l    0
 
 
 ;********************************************************
@@ -294,12 +295,10 @@ _cont
             add.l   a1,a1
             bsr _framecount
    ENDC
-   IFD EXP_FASTPOOL
             move.l  d7,a1
             add.l   a1,a1
             add.l   a1,a1
             bsr _fastpool
-   ENDC
 
         ;call
                 move.l  d7,a1
@@ -821,14 +820,17 @@ _c2p    dc.l    0
   ENDC
 
 **********************************************
-; EXP_FASTPOOL (measurement builds only): START sizes a fast-memory pool (hunk 0 +$162,
-; AvailMem(MEMF_FAST|MEMF_LARGEST) - 50000, none under 100000) and then discards it with
-; move.l #0,<hunk 1 +$f4> at hunk 0 +$196; everything then comes from the chip pool. Branch
-; over that store.
-
-  IFD EXP_FASTPOOL
+; START sizes a fast-memory pool (hunk 0 +$162, AvailMem(MEMF_FAST|MEMF_LARGEST) - 50000,
+; none under 100000) and then discards it with move.l #0,<hunk 1 +$f4> at hunk 0 +$196, so
+; everything comes from the chip pool. With the 1 MB ExpMem, branch over that store: MAIN's
+; object table and the objects' variables then live in fast memory (hunk 1 +$8c7c,
+; docs/internals.md). Not with MemConfig=1's 256 KB.
 
 _fastpool
+        move.l  _expmemsize(pc),d0
+        sub.l   _kicksize(pc),d0
+        cmp.l   #FASTMEMSIZE,d0
+        blo     .no
         lea     4(a1),a0                ; hunk 0
         cmp.l   #$23fc0000,$196(a0)
         bne     .no
@@ -838,6 +840,4 @@ _fastpool
         move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
-
-  ENDC
 

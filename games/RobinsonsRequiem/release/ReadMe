@@ -14,7 +14,8 @@
  WHDLoad package.
 
  The installed program requires 1.0 MB ChipMem and 0.8 MB OtherMem for ECS version
-                            and 1.7 MB ChipMem and 0.8 MB OtherMem for AGA version
+                            and 1.7 MB ChipMem and 1.5 MB OtherMem for AGA version
+ (AGA with the tooltype MemConfig=1: 1.7 MB ChipMem and 0.8 MB OtherMem)
 
  It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
 
@@ -49,6 +50,10 @@
         http://www.whdload.de/
  or     aminet:dev/misc/whdload#?
  and    aminet:game/patch/
+
+ version 2.0b (14.11.2026) done by Vesuri (AGA):
+ - Uses 1 MB of Fast memory for the game's objects (WHDLoad 20 or newer); with
+   the tooltype MemConfig=1 it runs in 256 KB of Fast memory as version 1.2 did
 
  version 1.2 (29.03.13) done by CFou!:
  - First two bitplanes memory allocation fixed for fast memory support (AGA)
