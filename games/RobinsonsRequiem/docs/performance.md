@@ -128,6 +128,7 @@ the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 | 6b: frame pacing (replaced by step 7) | 62 (161.3 ms) | 108.4 ms | 62 |
 | 7: the world on the cap's grid | 55 (181.8 ms) | 110.0 ms | 55 |
 | 8: the camera between the player's runs | 80 (125.0 ms) | 94.8 ms | 126 |
+| 9: the other moving objects between their runs | 80 (125.0 ms) | 94.9 ms | 126 |
 
 After step 6 every frame interval is 8 fields on both cores (`tools/rr_passes.py`, 240
 events: 36 frames on the aprof core with drawing passes of 3.3 to 6.5 fields, 28 on the
@@ -355,9 +356,18 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
    screenshots pixel-identical to step 7's; with interpolation the last frame (after the key
    is let go) is too. Extrapolation not tried; the pointer's picking in a staged frame not
    checked.
-9. **The other moving objects between their runs**: their 3D elements (`+$4792` moves them
-   by their object's difference at each run) staged the same way for the drawing (`human`
-   here); their animation frames stay per run. Check with a moving creature in view.
+9. **The other moving objects between their runs** (done, `docs/internals.md`, "AGA
+   improvements"): their 3D elements (`+$4792` moves them by their object's difference at
+   each run) staged the same way for the drawing (`human` here); their animation frames
+   stay per run. While the camera stays, frames for the staging only when a staged element
+   is on screen; otherwise the game's own redraw of a moved element's region. Measured in
+   the jungle start, where no creature comes into view (screenshots of a full turn): at
+   each drawing `human`'s element lies between its last two positions as alpha gives
+   (its 8-unit steps every 12 fields drawn 6, 4 and 2 units back), and at each frame
+   routine it is back on the object's own (gdb, 120 events turning); standing, no frame is
+   drawn (`tools/rr_passes.py KEY=none`: 40 passes every 3 fields, none drawing); turning,
+   the frames and busy time are step 8's. A creature moving on screen is not checked: no
+   scene with one is at hand.
 10. **The drawing pass again**: it now sets the frame rate, up to the cap. The function
    table above predates steps 3 to 6: profile the current build and work down it (the
    landscape `+$d88c`, the spans `+$b7ca`, the map and shade-table reads in chip, about

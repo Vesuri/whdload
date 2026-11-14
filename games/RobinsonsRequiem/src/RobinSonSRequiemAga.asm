@@ -1065,6 +1065,7 @@ _skypatch
 ; - +$49e8 move.b <+$ee6a>,d0 (the cap, for the wait at +$49ee) becomes jsr _capwait
 ; and, for plan step 8 (below), when it checks:
 ; - +$4b8e jsr +$a3a6 (the 3D view's drawing) becomes jsr _view
+; - +$4880 movea.l <+$ed86>,a1 (an object's elements moved) becomes jsr _emove (step 9)
 
 _worldpatch
         move.l  _hunk1(pc),a0
@@ -1134,6 +1135,30 @@ _worldpatch
         move.w  d1,(a1)
         pea     _capwait(pc)
         move.l  (a7)+,2(a1)
+        move.l  a0,a3                   ; plan step 9, when it checks and its table
+        add.l   #$4880,a3               ; is allocated
+        cmp.w   #$2279,(a3)
+        bne     .noelem
+        move.l  a0,d0
+        add.l   #$ed86,d0
+        cmp.l   2(a3),d0
+        bne     .noelem
+        move.l  d0,W_ELEM(a2)
+        move.l  a0,d0
+        add.l   #$edb8,d0
+        move.l  d0,W_PREVH(a2)
+        movem.l d1/a0-a1/a6,-(a7)
+        move.l  #ESLOTS*ESIZE,d0
+        move.l  #$10001,d1              ; MEMF_PUBLIC|MEMF_CLEAR
+        move.l  4.w,a6
+        jsr     _LVOAllocMem(a6)
+        movem.l (a7)+,d1/a0-a1/a6
+        move.l  d0,W_ETAB(a2)
+        beq     .noelem
+        move.w  #$4eb9,(a3)
+        pea     _emove(pc)
+        move.l  (a7)+,2(a3)
+.noelem
         move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
@@ -1345,7 +1370,10 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         tst.b   I_STAGED(a3)
         bne     .need
         moveq   #0,d4
-.need   moveq   #0,d6                   ; d6 a frame only for the staging
+.need   bsr     _eplan                  ; the other moving objects (step 9)
+        beq     .eno
+        st      d4
+.eno    moveq   #0,d6                   ; d6 a frame only for the staging
         tst.b   (a2)
         bmi     .set
         tst.b   d4
@@ -1363,8 +1391,10 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         st      I_DRAWN(a3)
         tst.w   d3
         sne     I_STAGED(a3)
+        bsr     _eapply
         move.l  _wvars+W_DRAW(pc),a0
         jsr     (a0)
+        bsr     _eundo
         moveq   #0,d5                   ; the camera back
 .back   move.w  (a1,d5.w),d0
         move.w  I_SAVE(a3,d5.w),(a2,d0.w)
@@ -1497,6 +1527,301 @@ _isample
         neg.w   d0
 .abs1   rts
 
+**********************************************
+; The other moving objects between their runs (docs/performance.md, plan step 9). After an
+; object's run +$4792 moves its 3D elements (+$ed86's table, chained from -24(a6) through
+; +4) by the pose's difference and sets their heading (+36) to the object's (+40): hunk 1
+; +$4880 movea.l <+$ed86>,a1, reached only when the object moved or turned (d4-d6 the
+; position's step, d7 the heading, +$edb8 the heading before the run), becomes jsr _emove,
+; which keeps the step, the world count and the interval (as _isample's) for up to ESLOTS
+; objects. _view stages them for the drawing (_eplan, _eapply, _eundo): each element moved
+; back by step x (1 - alpha), its heading too where it is the object's, and put back after
+; it. While the camera stays, a frame is drawn for the staging only when a staged element's
+; screen box (+12/+14, size +40/+42, +16 negative when not projected) meets the view's
+; (+14/+16, size +18/+20); the game's own redraw of a moved element's region (+$4be8,
+; +$5094) stays for the rest. A slot's object is looked up in MAIN's object table at each
+; drawing, so a freed object is dropped. No interpolation across a jump (as _isample's).
+
+ESLOTS  equ     8
+ESIZE   equ     36
+; a slot: +0 the object (0 free), +4 W of the move, +8 the interval, +12/14/16 the position's
+; step, +18 the heading's, +20 the heading after it, +22 staged in the last frame drawn,
+; +24/26/28/30 the offsets (position, heading), +32 the staged heading
+
+; at +$4880: a6 the object, d4-d6 the step, d7 the heading; a1 START's element table out
+_emove  move.l  _wvars+W_ELEM(pc),a1
+        move.l  (a1),a1
+        movem.l d0-d3/a0/a2-a3,-(a7)
+        lea     _wvars(pc),a0
+        tst.b   W_ON(a0)
+        beq     .out
+        move.l  W_ETAB(a0),d0
+        beq     .out
+        tst.w   -24(a6)
+        beq     .out
+        move.l  d0,a3
+        move.l  W_PREVH(a0),a2
+        move.w  d7,d3
+        sub.w   (a2),d3                 ; the heading's step, the short way round
+        cmp.w   #180,d3
+        ble     .h1
+        sub.w   #360,d3
+.h1     cmp.w   #-180,d3
+        bge     .h2
+        add.w   #360,d3
+.h2     moveq   #0,d2                   ; d2 a jump
+        move.w  d4,d0
+        bsr     .big
+        move.w  d5,d0
+        bsr     .big
+        move.w  d6,d0
+        bsr     .big
+        move.w  d3,d0
+        bpl     .h3
+        neg.w   d0
+.h3     cmp.w   #45,d0
+        shi     d0
+        or.b    d0,d2
+        sub.l   a2,a2                   ; a2 the object's slot, a1 kept: a free one
+        moveq   #ESLOTS-1,d1
+.find   cmp.l   (a3),a6
+        beq     .found
+        tst.l   (a3)
+        bne     .nf
+        move.l  a2,d0
+        bne     .nf
+        move.l  a3,a2
+.nf     lea     ESIZE(a3),a3
+        dbf     d1,.find
+        tst.b   d2
+        bne     .out
+        move.l  a2,d0
+        beq     .out                    ; no room: drawn as moved
+        move.l  d0,a3
+        clr.w   22(a3)
+        move.l  W_W(a0),d0
+        bsr     .grid
+        move.l  d1,d0
+        bra     .set
+.found  tst.b   d2
+        beq     .again
+        clr.l   (a3)                    ; a jump: as moved, and put back if it was staged
+        bra     .out
+.again  move.l  W_W(a0),d0
+        sub.l   4(a3),d0                ; since the last move, at most the grid
+        bsr     .grid
+        tst.l   d0
+        ble     .g
+        cmp.l   d1,d0
+        bls     .set
+.g      move.l  d1,d0
+.set    move.l  a6,(a3)
+        move.l  W_W(a0),4(a3)
+        move.l  d0,8(a3)
+        movem.w d4-d6,12(a3)
+        move.w  d3,18(a3)
+        move.w  d7,20(a3)
+.out    movem.l (a7)+,d0-d3/a0/a2-a3
+        rts
+; d0 a step: d2 set when it is a jump
+.big    tst.w   d0
+        bpl     .b1
+        neg.w   d0
+.b1     cmp.w   #I_JUMP,d0
+        shi     d0
+        or.b    d0,d2
+        rts
+; d1 the object's period on the cap's grid (a0 _wvars, a6 the object)
+.grid   movem.l d0/a1,-(a7)
+        move.l  W_CAP(a0),a1
+        moveq   #0,d0
+        move.b  (a1),d0
+        bne     .g1
+        moveq   #1,d0
+.g1     moveq   #0,d1
+        move.w  -58(a6),d1
+        addq.l  #1,d1
+        add.l   d0,d1
+        subq.l  #1,d1
+        divu.w  d0,d1
+        mulu.w  d0,d1
+        movem.l (a7)+,d0/a1
+        rts
+
+; a2 the view: the slots' offsets for this drawing; d0.b set when a frame is needed for
+; them (a staged element in view, or the last frame drawn staged and the move now done)
+_eplan  movem.l d1-d7/a0-a1/a3-a4,-(a7)
+        moveq   #0,d0
+        lea     _wvars(pc),a0
+        move.l  W_ETAB(a0),d1
+        beq     .out
+        move.l  d1,a3
+        move.l  W_ELEM(a0),a1
+        move.l  (a1),a1
+        moveq   #ESLOTS-1,d7
+.slot   move.l  (a3),d1
+        beq     .next
+        bsr     _elive
+        bne     .free
+        clr.l   24(a3)
+        clr.l   28(a3)
+        clr.w   32(a3)
+        tst.b   W_ON(a0)
+        beq     .done
+        move.l  W_W(a0),d5
+        sub.l   4(a3),d5                ; alpha's numerator
+        move.l  8(a3),d6
+        cmp.l   d6,d5
+        bhs     .done
+        moveq   #0,d3                   ; any offset
+        moveq   #0,d2
+.off    move.w  12(a3,d2.w),d1
+        move.w  d1,d4
+        muls.w  d5,d4
+        divs.w  d6,d4
+        sub.w   d1,d4                   ; step x alpha - step
+        move.w  d4,24(a3,d2.w)
+        or.w    d4,d3
+        addq.w  #2,d2
+        cmp.w   #8,d2
+        blo     .off
+        tst.w   d3
+        beq     .done
+        bsr     _evis
+        beq     .next
+        st      d0
+        bra     .next
+.done   tst.b   22(a3)                  ; the move done: a last frame if it was staged
+        beq     .free
+        bsr     _evis
+        beq     .free
+        st      d0
+        bra     .next
+.free   clr.l   (a3)
+.next   lea     ESIZE(a3),a3
+        dbf     d7,.slot
+.out    movem.l (a7)+,d1-d7/a0-a1/a3-a4
+        tst.b   d0
+        rts
+
+; a3 a slot (its object live): Z clear when one of its elements' screen box meets the view's
+; (a2), a1 START's element table
+_evis   movem.l d0-d5/a4,-(a7)
+        move.l  (a3),a4
+        move.w  -24(a4),d1
+.el     beq     .no
+        tst.w   16(a1,d1.w)
+        bmi     .nx
+        move.w  12(a1,d1.w),d2          ; x
+        move.w  d2,d3
+        add.w   40(a1,d1.w),d3
+        move.w  14(a2),d4
+        cmp.w   d4,d3
+        blt     .nx
+        add.w   18(a2),d4
+        cmp.w   d4,d2
+        bgt     .nx
+        move.w  14(a1,d1.w),d2          ; y
+        move.w  d2,d3
+        add.w   42(a1,d1.w),d3
+        move.w  16(a2),d4
+        cmp.w   d4,d3
+        blt     .nx
+        add.w   20(a2),d4
+        cmp.w   d4,d2
+        bgt     .nx
+        moveq   #1,d0
+        bra     .ret
+.nx     move.w  4(a1,d1.w),d1
+        bra     .el
+.no     moveq   #0,d0
+.ret    movem.l (a7)+,d0-d5/a4
+        rts
+
+; d1 an object frame: Z set when it is in MAIN's object table
+_elive  movem.l d0/a0,-(a7)
+        move.l  _wvars+W_OBJTAB(pc),a0
+        move.l  (a0),a0
+        moveq   #0,d0
+.e      cmp.l   (a0,d0.w),d1
+        beq     .ret
+        move.w  4(a0,d0.w),d0
+        bne     .e
+        moveq   #1,d0                   ; Z clear
+.ret    movem.l (a7)+,d0/a0
+        rts
+
+; the offsets in (d0 0) or out (d0 1) for the slots _eplan gave offsets
+_eapply moveq   #0,d0
+        bra     _estage
+_eundo  moveq   #1,d0
+_estage movem.l d0-d7/a0-a1/a3-a4,-(a7)
+        lea     _wvars(pc),a0
+        move.l  W_ETAB(a0),d1
+        beq     .out
+        move.l  d1,a3
+        move.l  W_ELEM(a0),a1
+        move.l  (a1),a1
+        moveq   #ESLOTS-1,d7
+.slot   tst.l   (a3)
+        beq     .next
+        movem.w 24(a3),d2-d5            ; the offsets
+        move.w  d2,d6
+        or.w    d3,d6
+        or.w    d4,d6
+        or.w    d5,d6
+        bne     .some
+        tst.b   d0                      ; none: after the drawing, a done move's slot freed
+        beq     .clr
+        move.l  W_W(a0),d6
+        sub.l   4(a3),d6
+        cmp.l   8(a3),d6
+        blo     .next
+        clr.l   (a3)
+        bra     .next
+.clr    sf      22(a3)
+        bra     .next
+.some   tst.b   d0
+        bne     .neg
+        st      22(a3)
+        move.w  20(a3),d6               ; the staged heading
+        add.w   d5,d6
+        cmp.w   #360,d6
+        ble     .n1
+        sub.w   #360,d6
+.n1     cmp.w   #-360,d6
+        bge     .n2
+        add.w   #360,d6
+.n2     move.w  d6,32(a3)
+        bra     .walk
+.neg    neg.w   d2
+        neg.w   d3
+        neg.w   d4
+.walk   move.l  (a3),a4
+        move.w  -24(a4),d1
+.el     beq     .next
+        add.w   d2,22(a1,d1.w)
+        add.w   d3,24(a1,d1.w)
+        add.w   d4,26(a1,d1.w)
+        tst.w   d5
+        beq     .nx
+        move.w  36(a1,d1.w),d6
+        tst.b   d0
+        bne     .hb
+        cmp.w   20(a3),d6
+        bne     .nx
+        move.w  32(a3),36(a1,d1.w)
+        bra     .nx
+.hb     cmp.w   32(a3),d6
+        bne     .nx
+        move.w  20(a3),36(a1,d1.w)
+.nx     move.w  4(a1,d1.w),d1
+        bra     .el
+.next   lea     ESIZE(a3),a3
+        dbf     d7,.slot
+.out    movem.l (a7)+,d0-d7/a0-a1/a3-a4
+        rts
+
 _ivars
 _iview          dc.l    0               ; the view
 _iobj           dc.l    0               ; the object it follows
@@ -1539,6 +1864,9 @@ _wframe         dc.l    0               ; +$49b2
 _wobjtab        dc.l    0               ; +$ed6c
 _wdraw          dc.l    0               ; +$a3a6
 _wflags         dc.l    0               ; +$eef5
+_welem          dc.l    0               ; +$ed86
+_wprevh         dc.l    0               ; +$edb8
+_wetab          dc.l    0               ; step 9's slots (allocated)
 _wcatch         dc.b    0               ; catch-up passes in a row
 _won            dc.b    0               ; W in use
         even
@@ -1551,5 +1879,8 @@ W_FRAME equ     _wframe-_wvars
 W_OBJTAB equ    _wobjtab-_wvars
 W_DRAW  equ     _wdraw-_wvars
 W_FLAGS equ     _wflags-_wvars
+W_ELEM  equ     _welem-_wvars
+W_PREVH equ     _wprevh-_wvars
+W_ETAB  equ     _wetab-_wvars
 W_CATCH equ     _wcatch-_wvars
 W_ON    equ     _won-_wvars

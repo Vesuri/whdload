@@ -145,6 +145,23 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    walking runs, or an angle over 45 degrees), for a new view or followed object, or out of
    3D mode. The test define `INTERP_OFF` holds alpha at 1.
 
+8. **The other moving objects between their runs** (`_emove`, `_eplan`, `_eapply`,
+   `_eundo`, part of `_worldpatch`; `docs/performance.md`, plan step 9): hunk 1 `+$4880`
+   [`$8d2c`] `movea.l <+$ed86>,a1` (`2279` and the address, checked first; `+$4792`
+   reaches it only when the object moved or turned, with the position's step in d4-d6 and
+   the new heading in d7, the old one at `+$edb8`) becomes `jsr _emove`, which keeps the
+   step, the world count and the interval (as for the camera) for up to eight objects in a
+   table allocated at install (none: no patch). For each drawing `_view` stages those
+   objects' 3D elements (chained from the object's `-24` through `+4`): each moved back by
+   step x (1 - alpha), its heading (`+36`) too where it is the object's, and put back after
+   the drawing. While the camera stays, a frame is drawn for the staging only when a staged
+   element's screen box (`+12`/`+14`, size `+40`/`+42`, `+16` negative when not
+   projected) meets the view's (`+14`/`+16`, size `+18`/`+20`); otherwise the game's own
+   redraw of a moved element's region stays (the unchanged path `+$4be8`, `+$5094` → `jsr
+   +$a5b6`). Each slot's object is looked up in MAIN's object table at each drawing, so a
+   freed object is dropped. No interpolation across a jump (as for the camera: `human`'s
+   178-degree turns in the jungle are drawn as the game draws them).
+
 ## ECS improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan:

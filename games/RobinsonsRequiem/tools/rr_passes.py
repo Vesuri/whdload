@@ -7,7 +7,7 @@ instead of a profile: the frame routine's entry (+$49b2, P), the pass's start af
 cap wait (+$49f6, p), the 3D view's drawing (+$a478, D), the swap (+$4b30, S) and the
 list's start (+$251a with d5 0, L: every pass, a catch-up pass since plan step 7 an L
 without a P), each event with the VBL count (+$ee6c) and the beam's line. KEY=hex the raw
-key held (default 3f, keypad 9; 3e walks). A D event also has the view's camera, as the
+key held (default 3f, keypad 9; 3e walks; none for no key). A D event also has the view's camera, as the
 drawing sees it (a2's +22/24/26 and +52/54/56). EVENTS events (default 240) after
 50 fields of walking. Prints the drawing passes in fields (a D pass's p to its S, with the
 line as a fraction of 313), the frame intervals (D to D, in fields), the frames per 500
@@ -53,7 +53,8 @@ def main():
         s.cmd('delete')
         s.fields(150)
         h1 = hunks(s, base)[1]
-        s.cmd(f'monitor key {key} 1')
+        if key != 'none':
+            s.cmd(f'monitor key {key} 1')
         s.fields(50)
         marks = {h1 + o: m for o, m in MARKS.items()}
         for a in marks:
@@ -75,7 +76,8 @@ def main():
             else:
                 ev.append((m, vbl, line))
         s.cmd('delete')
-        s.cmd(f'monitor key {key} 0')
+        if key != 'none':
+            s.cmd(f'monitor key {key} 0')
     finally:
         s.quit()
     t0 = ev[0][1]
