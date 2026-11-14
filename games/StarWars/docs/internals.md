@@ -154,7 +154,13 @@ marks at $a640 and $a666, and the trench's rib shifts counted at $bb88.
   fighters by the fighter (the low word of its record). It is paired with the next op of
   the same key in the previous recording, within 64 ops (not counting the ops keyed by
   identity, below, which have their own cursor). Unpaired ops, and ops that moved more
-  than 40 pixels (respawns, stars wrapping round), are drawn where they are now.
+  than 40 pixels (respawns, stars wrapping round), are drawn where they are now. The
+  ground dots' wrap mark (+8 of a dot's op) is tested only for dots: a plain plot leaves
+  +8 as the slot's last op left it, and once that was not 0 (after a game over, from
+  the game before) every space star was drawn where it was, at the tick rate, while
+  the fighters were interpolated. With the test kept to dots, 30 star plots of the
+  in-between frames after a game over (`tmp/scripts/plotlerp.sh`, a1200-030) were all
+  interpolated but the 5 that moved more than 40.
 - **Towers and bases.** $b0bc draws the object table (-26080(a4), 14 bytes: z, x, type at
   +6, the map cell at +10), which $a7a8 rebuilds each tick from the map rows in view, near
   row first and each row outward from a column that changes as the view steers. Neither

@@ -1753,6 +1753,7 @@ SmRender
 .pos	cmp.l	#SM_T,d0
 	bgt.b	.snap
 	dbf	d3,.chk
+	bra.b	.id2			; (a plain plot's +8 is not written)
 .id	cmp.b	#OP_PLOT,(a2)		; a ground dot that wrapped round
 	bne.b	.id2
 	tst.w	8(a2)
