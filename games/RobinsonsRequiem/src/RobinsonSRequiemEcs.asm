@@ -250,6 +250,13 @@ _bootdos        lea     (_saveregs,pc),a0
    ENDC
 ;******************** PRESTIGE_CRACKFIN
 
+   IFD DEVELOPER
+            move.l  d7,a1
+            add.l   a1,a1
+            add.l   a1,a1
+            bsr _directstart
+   ENDC
+
 	move.w	#$7fff,$dff09A
 	move.w	#$e028,$dff09A
 
@@ -596,3 +603,139 @@ lbL00008E
 _saveadrhunk1
        dc.l    0
        ENDC
+
+
+**********************************************
+; Development builds: boot straight into the game, as the AGA slave's _directstart does
+; (docs/internals.md, "Direct start"). START's open wrapper (hunk 0 +$1af0) is entered with
+; a3 on the name inside the MAIN script op that loads the file and a6 on MAIN's variables;
+; at the loads of logo and init3d the hook changes MAIN's branches, checked byte for byte:
+; - after "logo.AO": a branch over the logo to the load of the pointer (souris, slot 2, which
+;   the 3D set-up needs), and one after it over the flags and the intro to the path an Esc's
+;   branch takes, with MAIN's language byte ($e68) set to English;
+; - after "init3d.AO": the options menu's load, its object and the wait for it are branched
+;   over.
+
+  IFD DEVELOPER
+
+_directstart
+        lea     4(a1),a0                ; hunk 0
+        cmp.l   #$61986100,$1af0(a0)    ; bsr.s $1a8a / bsr.w $fe
+        bne     .no
+        cmp.w   #$e60a,$1af4(a0)
+        bne     .no
+        lea     $1a8a(a0),a1
+        lea     _open1(pc),a2
+        move.l  a1,(a2)
+        lea     $fe(a0),a1
+        move.l  a1,4(a2)
+        move.w  #$4eb9,$1af0(a0)
+        pea     _openhook(pc)
+        move.l  (a7)+,$1af2(a0)
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+
+_openhook
+        movem.l d0/a0-a2,-(a7)
+        lea     _logo(pc),a1
+        bsr     _match
+        bne     .init3d
+        lea     _logo_at(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _logo_to(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _souris_at(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _logo_jump(pc),a1
+        bsr     _write
+        lea     _souris_jump(pc),a1
+        bsr     _write
+        move.b  #1,$e68(a6)             ; English
+        bra     .done
+.init3d lea     _init3d(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _prefs_at(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _menu_at(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _wait_at(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _menu_to(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _prefs_jump(pc),a1
+        bsr     _write
+        lea     _menu_jump(pc),a1
+        bsr     _write
+        lea     _wait_jump(pc),a1
+        bsr     _write
+.done   movem.l (a7)+,d0/a0-a2
+        pea     .r1(pc)                 ; the two calls the hook replaced
+        move.l  _open1(pc),-(a7)
+        rts
+.r1     pea     .r2(pc)
+        move.l  _open2(pc),-(a7)
+        rts
+.r2     rts
+
+; a1: dc.w offset from a3, length; bytes. Z set when they are at a3+offset.
+_match  move.l  a3,a0
+        add.w   (a1)+,a0
+        move.w  (a1)+,d0
+        subq.w  #1,d0
+.m      cmpm.b  (a0)+,(a1)+
+        dbne    d0,.m
+        rts
+
+; a1: dc.w offset from a3, length; bytes: written at a3+offset.
+_write  move.l  a3,a0
+        add.w   (a1)+,a0
+        move.w  (a1)+,d0
+        subq.w  #1,d0
+.w      move.b  (a1)+,(a0)+
+        dbf     d0,.w
+        rts
+
+_open1          dc.l    0
+_open2          dc.l    0
+
+; offsets from the name in MAIN's load op (a3)
+_logo           dc.w    0,8
+                dc.b    "logo.AO",0
+_logo_at        dc.w    8,6                     ; create the logo object
+                dc.b    $40,$00,$01,$08,$39,$20
+_logo_to        dc.w    $47b,5                  ; after the intro: where an Esc's branch (+$46d) lands
+                dc.b    $a1,$96,$00,$00,$42
+_souris_at      dc.w    $6c,16                  ; load the pointer into slot 2, language := none
+                dc.b    $45,$00,$02,"souris.AO",0,$1e,$00,$ff
+_logo_jump      dc.w    8,4                     ; over the logo to the pointer's load
+                dc.b    $0a,$00,$00,$60
+_souris_jump    dc.w    $79,4                   ; over the flags and the intro
+                dc.b    $0a,$00,$03,$fe
+_init3d         dc.w    0,10
+                dc.b    "init3d.AO",0
+_prefs_at       dc.w    $32,12                  ; load the menu
+                dc.b    $45,$00,$54,"prefs.AO",0
+_menu_at        dc.w    $55,10                  ; create the menu object, four yields
+                dc.b    $40,$00,$54,$08,$39,$20,$42,$42,$42,$42
+_wait_at        dc.w    $6d,7                   ; wait for the menu's end
+                dc.b    $94,$00,$54,$08,$39,$20,$42
+_menu_to        dc.w    $9f,3                   ; free the menu's slots
+                dc.b    $3d,$00,$54
+_prefs_jump     dc.w    $32,4
+                dc.b    $0a,$00,$00,$08
+_menu_jump      dc.w    $55,4
+                dc.b    $0a,$00,$00,$06
+_wait_jump      dc.w    $6d,4
+                dc.b    $0a,$00,$00,$2e
+        EVEN
+
+  ENDC

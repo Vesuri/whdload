@@ -1,8 +1,8 @@
 # Open work
 
-No improvement work has been done yet. The AGA developer build boots straight into the
-game with detail and window at HIGH, and `tools/rr.py ingame` drives any build there through
-the intro and menu (`docs/development.md`). The game is on the repository layout with CFou!'s v1.2
+No improvement work has been done yet. Both developer builds boot straight into the game
+(the AGA one with detail and window at HIGH), and `tools/rr.py ingame` drives any AGA build
+there through the intro and menu (`docs/development.md`). The game is on the repository layout with CFou!'s v1.2
 slave source unchanged except for two include lines (`docs/development.md`); both variants
 build with vasm and boot to the title screen on their default machines.
 

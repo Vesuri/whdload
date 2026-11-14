@@ -9,20 +9,21 @@
 The run options of common/run.sh apply to serve through the environment (VARIANT=
 RobinsonsRequiemAGA, SLAVE=original, SETUP=a1200-030, WARP=1 WINDOW=none, ...).
 
-Game commands (AGA game only):
+Game commands (`opens` and `ingame direct` both versions, the rest the AGA game only):
 
     opens            log every file the game opens (Open, Lock) to .run/open.bin, lock.bin;
-                     per call also the registers and stack (ctx.bin) and MAIN's variables
-                     $3800-$38ff (glob.bin)
+                     per call also the registers and stack (ctx.bin) and, AGA, MAIN's
+                     variables $3800-$38ff (glob.bin)
     ingame [low|menu|direct]
                      from boot to the jungle start: English, the intro skipped with Esc, level
                      of detail and 3D window set to HIGH (`low` keeps both LOW), Start;
                      `menu` stops at the options menu; `direct` only waits for the game, for
-                     the developer build (BUILD=developer), which needs no input
+                     the developer builds (BUILD=developer), which need no input
     point X Y        move the pointer to (X, Y) of a `shot` (754x576), from the top-left corner
     click            press and release the left mouse button
     key RAW          press and release raw key RAW (hex), e.g. 45 for Esc
 """
+import os
 import re
 import sys
 import time
@@ -33,15 +34,28 @@ import _amigaxdev  # noqa: F401,E402
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
 from game_server import game_server  # noqa: E402
 
-# START (AGA), code hunk 0: the open wrapper's first instructions (+$2546) and the calls in it.
-# The game's name buffer is passed in d1 to dos.library Open (+$255e, MODE_READWRITE; +$267e,
-# MODE_NEWFILE) and Lock (+$2590).
+# START, code hunk 0: the open wrapper's first instructions (HUNK0_SIG at SIG_OFFSET) and the
+# calls in it. The game's name buffer is passed in d1 to dos.library Open (`open`,
+# MODE_READWRITE; `new`, MODE_NEWFILE) and Lock (`lock`). Both versions have the same wrapper
+# at other offsets; the server's VARIANT (common/run.sh's, the ECS game by default) picks one.
 HUNK0_SIG = '0x48e7, 0x60c0, 0x2208, 0x61c8, 0x243c'
-HUNK0_SIG_OFFSET = 0x2546
-HUNK0_SIZE = 0x3a30
-# Hunk 1 +$eda8 points at the script's global bytes (the menu's settings are at +$383a-$383e).
-GLOBALS_PTR = 0xeda8
-CALLS = {'open': 0x255e, 'new': 0x267e, 'lock': 0x2590}
+LAYOUTS = {
+    'RobinsonsRequiemAGA': dict(sig_offset=0x2546, size=0x3a30, search=(0x200000, 0x1000000),
+                                calls={'open': 0x255e, 'new': 0x267e, 'lock': 0x2590},
+                                # hunk 1 +$eda8 points at MAIN's variables (the menu's
+                                # settings are at +$383a-$383e)
+                                globals_ptr=0xeda8, ext='.DO'),
+    # The A500 machine's 2 MB fast memory ends at $400000: gdb's find stops at the first
+    # unreadable byte and then reports no match at all.
+    'RobinsonsRequiem': dict(sig_offset=0x1af6, size=0x2f30, search=(0x200000, 0x3ffff0),
+                             calls={'open': 0x1b0e, 'new': 0x1c32, 'lock': 0x1b44},
+                             globals_ptr=None, ext='.CO'),
+}
+
+
+def layout(variant=None):
+    return LAYOUTS[variant or os.environ.get('VARIANT') or 'RobinsonsRequiem']
+
 
 # Pointer targets in `shot` coordinates (754x576). A mouse count moves the pointer one shot
 # pixel; the pointer is homed to the top-left corner (ORIGIN) before each move.
@@ -89,6 +103,22 @@ def key(g, raw):
     run_fields(g, 3)
 
 
+def find_hunk0(g, variant=None):
+    """START's hunk 0 (the CPU is stopped on return); RuntimeError while it is not loaded."""
+    lay = layout(variant)
+    g.stop()
+    lo, hi = lay['search']
+    out = g.cmd(f'find /h {lo:#x}, {hi:#x}, {HUNK0_SIG}', timeout=120)
+    hits = [int(w, 16) for w in out.split('\n') if re.fullmatch(r'0x[0-9a-f]+', w.strip())]
+    # The PRELOAD copy of the file matches too; the loaded segment is the match whose
+    # segment header (the allocation size, hunk size + 8, at -8) is there.
+    for h in hits:
+        out = g.cmd(f'x/wx {h - lay["sig_offset"] - 8:#x}')
+        if out.split()[-1] == f'{lay["size"] + 8:#010x}':
+            return h - lay['sig_offset']
+    raise RuntimeError('START hunk 0 not loaded yet')
+
+
 class Opens:
     """Breakpoints on the open wrapper that append 32 bytes of the name to one file per call."""
 
@@ -99,24 +129,14 @@ class Opens:
     def arm(self, g):
         if self.armed:
             return
-        g.stop()
-        out = g.cmd(f'find /h 0x200000, 0x1000000, {HUNK0_SIG}', timeout=120)
-        hits = [int(w, 16) for w in out.split('\n') if re.fullmatch(r'0x[0-9a-f]+', w.strip())]
-        # The PRELOAD copy of the file matches too; the loaded segment is the match whose
-        # segment header (the allocation size, hunk size + 8, at -8) is there.
-        base = None
-        for h in hits:
-            out = g.cmd(f'x/wx {h - HUNK0_SIG_OFFSET - 8:#x}')
-            if out.split()[-1] == f'{HUNK0_SIZE + 8:#010x}':
-                base = h - HUNK0_SIG_OFFSET
-        if base is None:
-            raise RuntimeError('START hunk 0 not loaded yet')
+        base = find_hunk0(g)
         out = g.cmd(f'x/wx {base - 4:#x}')
         h1 = int(out.split()[-1], 16) * 4 + 4
-        gp = f'{{unsigned}}{h1 + GLOBALS_PTR:#x}'
+        lay = layout()
+        gp = lay['globals_ptr'] and f'{{unsigned}}{h1 + lay["globals_ptr"]:#x}'
         script = self.dir / 'opens.gdb'
         lines = []
-        for name, off in CALLS.items():
+        for name, off in lay['calls'].items():
             (self.dir / f'{name}.bin').unlink(missing_ok=True)
             # Per call: the name; the registers d0-a7 and 256 bytes of stack (ctx.bin).
             regs = [f'append value {self.dir}/ctx.bin (unsigned int)${r}'
@@ -125,7 +145,8 @@ class Opens:
                       f'append memory {self.dir}/{name}.bin $d1 $d1+32',
                       f'append memory {self.dir}/ctx.bin $d1 $d1+32', *regs,
                       f'append memory {self.dir}/ctx.bin $sp $sp+256',
-                      f'append memory {self.dir}/glob.bin {gp}+0x3800 {gp}+0x3900',
+                      *([f'append memory {self.dir}/glob.bin {gp}+0x3800 {gp}+0x3900'] if gp
+                        else []),
                       'continue', 'end']
         (self.dir / 'ctx.bin').unlink(missing_ok=True)
         (self.dir / 'glob.bin').unlink(missing_ok=True)
@@ -177,17 +198,18 @@ def ingame(server, g, rest):
     o = server.opens
     g.stop()
     t0 = time.time()
-    # Hunk 0 is in memory once the language screen's data loads; wait for the segment.
-    for _ in range(40):
+    # Arm once START's hunk 0 is loaded, stepping the emulator in chunks of 50 fields
+    # (emulated time: under WARP=1 a host-time wait between two searches can run past every
+    # open the developer build makes); avion opens hundreds of fields after the load.
+    for _ in range(60):
         try:
             o.arm(g)
             break
         except RuntimeError:
-            g.cont()
-            time.sleep(0.5)
+            run_fields(g, 50)
     if rest.strip() == 'direct':
         # The developer build boots straight into the game (src/, _directstart).
-        o.wait(g, 'avion.DO', timeout=120)
+        o.wait(g, 'avion' + layout()['ext'], timeout=120)
         run_fields(g, 100)
         g.cont()
         return f'in game after {time.time() - t0:.0f} s'

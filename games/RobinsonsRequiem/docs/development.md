@@ -70,20 +70,22 @@ rebuild would need the 2013 KickEmu, which the shared WHDLoad tree does not keep
 
 ### Straight into the game (developer build)
 
-The AGA developer build boots into the jungle start without input, with level of detail
-and 3D window at HIGH, in about 15 s under `WARP=1` (no logo, flags, intro or options menu;
-English):
+Both developer builds boot into the jungle start without input (no logo, flags, intro or
+options menu; English), the AGA game with level of detail and 3D window at HIGH. Under
+`WARP=1`, `ingame direct` returns about 11 s (AGA, `a1200-030`) and 7 s (ECS) after the
+server is up:
 
 ```sh
 make run BUILD=developer VARIANT=RobinsonsRequiemAGA SETUP=a1200-030
 BUILD=developer VARIANT=RobinsonsRequiemAGA SETUP=a1200-030 WARP=1 python3 tools/rr.py serve &
 python3 tools/rr.py ingame direct   # waits until the game is up
+BUILD=developer WARP=1 python3 tools/rr.py serve &      # the ECS game, on `custom`
 ```
 
-`_directstart` (`IFD DEVELOPER` in the AGA source) changes two branches of the MAIN script
-as it runs; `docs/internals.md`, "Direct start", has what it patches. The release build is
-unchanged by it. The music, sound and difficulty settings are the boot values the menu would
-start from, not `CONFIG.INF`'s.
+`_directstart` (`IFD DEVELOPER` in both sources) changes branches of the MAIN script as it
+runs; `docs/internals.md`, "Direct start", has what it patches. The release builds are
+unchanged by it. The music, sound and difficulty settings, and in the ECS game detail and
+window, are the boot values the menu would start from, not `CONFIG.INF`'s.
 
 ### Through the intro and menu (any build)
 

@@ -111,3 +111,14 @@ MAIN's bytes and writes a branch, offsets from the name (`a3`):
 |---|---|---|
 | `logo.AO` | `+8` `40 0001 0839 38` (create the logo object), `+$603` `96 0000 42` (the path after an Esc in the logo) | `+8` `0a 0005f7`: that path; MAIN's `$e68` = 1 |
 | `init3d.AO` | `+$20` `2f 06 0e68 02` (load the menu by language), `+$5f` `07 00051d`, `+$97` `40 0054 0839 38` (create the menu, wait for it), `+$cc` `3d 0054` (free its slots) | `+$20` `0a 00003b` to `+$5f`; `+$97` `0a 000031` to `+$cc` |
+
+The ECS slave's `_directstart` does the same through hunk 0 `+$1af0` (`bsr.s $1a8a / bsr.w $fe`,
+`6198 6100 e60a`). Its MAIN differs: the options menu is one program (`prefs`), and the logo
+part also loads the pointer, `souris`, into slot 2, which `init3d` creates an object from.
+Branching over that load leaves the object's handle at -1, and `init3d`'s next store through
+it is an address error (hunk 1 `+$6dfa`), so the logo is skipped in two branches:
+
+| Load | Checked | Written |
+|---|---|---|
+| `logo.AO` | `+8` `40 0001 0839 20` (create the logo object), `+$6c` `45 0002 "souris.AO" 00 1e 00 ff` (load the pointer; language := none), `+$47b` `a1 96 0000 42` (where an Esc's branch lands) | `+8` `0a 000060` to `+$6c`; `+$79` `0a 0003fe` to `+$47b`; MAIN's `$e68` = 1 |
+| `init3d.AO` | `+$32` `45 0054 "prefs.AO" 00` (load the menu), `+$55` `40 0054 0839 20 42 42 42 42` (create it, four yields), `+$6d` `94 0054 0839 20 42` (wait for its end), `+$9f` `3d 0054` (free its slots) | `+$32` `0a 000008` to `+$3e`; `+$55` `0a 000006` to `+$5f`; `+$6d` `0a 00002e` to `+$9f` |
