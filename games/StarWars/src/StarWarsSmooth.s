@@ -174,6 +174,7 @@ PLSMOOTH403
 	PL_PSS	$a6aa,SmSurfMove,2	; sub.w d4,-27068(a4); add.w d5,-27066(a4)
 	PL_PS	$a640,SmDotMove		; lea -25758(a4),a2; moveq #51,d6
 	PL_PS	$a666,SmDotWrap		; move.w d7,2(a2); addq.l #4,a2
+	PL_PS	$bb88,SmRibShift	; lea -24914(a4),a0; movea.l a0,a2
 	PL_PSS	$897e,SmPresent3a,8	; the wait (cmpi.w; bge.s; bra.s) and the swap jsr
 	PL_PSS	$b612,SmPresent3b,8
 	PL_PSS	$b65e,SmPresent3a,8
@@ -474,8 +475,11 @@ SmHookTab
 	dc.w	$1e6c,SmDots-SmHookTab		; move.w d0,d6; movea.l -26262(a4),a2
 	dc.w	$1ea6,SmDot-SmHookTab		; jsr $1b2c(pc); addq.w #4,sp
 	dc.w	$a67e,SmDotShift-SmHookTab	; lea -25758(a4),a3; lea 8(a3),a2
+	dc.w	$c562,SmTrRow-SmHookTab		; link a5,#0; movem.l d4-d6,-(sp)
+	dc.w	$d16c,SmRib-SmHookTab		; move.w -25010(a4),d0; neg.w d0
+	dc.w	$d1c0,SmRibEnd-SmHookTab	; cmpi.w #9,-25342(a4)
 	dc.w	0
-SM_HOOKS	= 14
+SM_HOOKS	= 17
 SmHookSave	ds.b	SM_HOOKS*6
 
 ; d0: 1 install the hooks (jmp, saving the bytes the first time), 0 restore the bytes
@@ -813,25 +817,8 @@ SmSurf
 	mulu	#40503,d0
 	swap	d0
 	and.w	#$ffc0,d0		; the line number below
-	lea	SmSurfK(pc),a0
-	move.w	d0,(a0)+
-	clr.w	(a0)+			; SmSurfN
-	st	(a0)			; SmSurfOn
-	btst	#0,SmV+sv_rec(pc)
-	beq.b	.go
-	move.l	SmV+sv_end(pc),a0	; in the recording's object list: the key and
-	move.w	(a0),d1			; where its ops start (SmPair finds it there)
-	cmp.w	#SM_OBJS,d1
-	bhs.b	.go
-	addq.w	#1,(a0)+
-	lsl.w	#2,d1
-	add.w	d1,a0
-	move.w	d0,(a0)+
-	move.l	SmV+sv_ptr(pc),d0
-	sub.l	SmV+sv_cur(pc),d0
-	lsr.l	#4,d0
-	move.w	d0,(a0)
-.go	move.l	8(a7),-(a7)		; the object
+	bsr.b	SmObj
+	move.l	8(a7),-(a7)		; the object
 	move.l	8(a7),-(a7)		; the points
 	bsr.b	.draw
 	addq.l	#8,a7
@@ -841,10 +828,92 @@ SmSurf
 .draw	link	a5,#-20
 	movem.l	d4-d7/a2,-(a7)
 	GOTOG	$a98a
+
+; d0.w: an object's key (the low 6 bits 0: they number its lines). Its lines are keyed
+; by it from here on, flagged OPF_ID, until SmSurfOn is cleared; a recording tick notes
+; the key and where its ops start in the recording's object list (SmPair finds the
+; object there). Clobbers d0, d1, a0.
+SmObj
+	lea	SmSurfK(pc),a0
+	move.w	d0,(a0)+
+	clr.w	(a0)+			; SmSurfN
+	st	(a0)			; SmSurfOn
+	btst	#0,SmV+sv_rec(pc)
+	beq.b	.x
+	move.l	SmV+sv_end(pc),a0
+	move.w	(a0),d1
+	cmp.w	#SM_OBJS,d1
+	bhs.b	.x
+	addq.w	#1,(a0)+
+	lsl.w	#2,d1
+	add.w	d1,a0
+	move.w	d0,(a0)+
+	move.l	SmV+sv_ptr(pc),d0
+	sub.l	SmV+sv_cur(pc),d0
+	lsr.l	#4,d0
+	move.w	d0,(a0)
+.x	rts
 SmSurfK	dc.w	0
 SmSurfN	dc.w	0
 SmSurfOn	dc.b	0
 	even
+
+; The trench ($cff4) draws its floor ribs (a table of 10 depths, -24916(a4), near
+; first) and then the wall panels of the map rows in view, far to near ($c562, one call
+; a row: the row's map word, the pointer to it at -26528(a4), the rows 1900 apart in
+; -24896(a4)). When the nearest rib passes, $bb88 shifts the rib table down one entry;
+; when the nearest row passes, $bc10 shifts the depths and the map pointer moves on a
+; row. By draw order each rib and each row's panels then paired with the next one
+; along. Keyed by identity instead: a row by its map word's address (bit 15 clear), a
+; rib by its index plus the shifts counted at $bb88 (bit 15 set), 9 bits each (only 6
+; rows and 10 ribs are drawn at once).
+SmTrRow
+	move.w	-26528+2(a4),d0		; $c562: link a5,#0; movem.l d4-d6,-(sp)
+	lsl.w	#5,d0			; (the address is even: the row's number * 64)
+	and.w	#$7fc0,d0
+	bsr.b	SmObj
+	move.w	4(a7),-(a7)		; the map word
+	bsr.b	.draw
+	addq.l	#2,a7
+	lea	SmSurfOn(pc),a0
+	clr.b	(a0)
+	rts
+.draw	link	a5,#0
+	movem.l	d4-d6,-(a7)
+	GOTOG	$c56a
+
+SmRib
+	move.l	a2,d0			; $d16c: move.w -25010(a4),d0; neg.w d0
+	sub.l	a4,d0			; a2: the rib's depth
+	add.w	#24916,d0
+	lsr.w	#1,d0
+	add.w	SmRibSh(pc),d0
+	lsl.w	#6,d0
+	or.w	#$8000,d0
+	bsr.b	SmObj
+	move.w	-25010(a4),d0
+	neg.w	d0
+	GOTOG	$d172
+
+SmRibEnd
+	move.l	SmCode(pc),-(a7)	; $d1c0: cmpi.w #9,-25342(a4) (bge follows)
+	add.l	#$d1c6,(a7)
+	move.l	a0,-(a7)
+	lea	SmSurfOn(pc),a0
+	clr.b	(a0)
+	move.l	(a7)+,a0
+	cmpi.w	#9,-25342(a4)
+	rts
+
+; $bb88, the rib table shifting (lea -24914(a4),a0; movea.l a0,a2). Not a hook (it runs
+; in direct mode too).
+SmRibShift
+	lea	SmRibSh(pc),a0
+	addq.w	#1,(a0)
+	lea	-24914(a4),a0
+	move.l	a0,a2
+	rts
+SmRibSh	dc.w	0
 
 ; $a6aa (the world moving, each tick: sub.w d4,-27068(a4); add.w d5,-27066(a4)): the
 ; movement summed. Not a hook (it runs in direct mode too).
@@ -1329,7 +1398,7 @@ SmPair
 	bne.b	.s
 	btst	#OPF_ID,1(a0)
 	beq.b	.s
-	moveq	#-1,d0			; a surface object's line: its own cursor (a6)
+	moveq	#-1,d0			; an object's line (SmObj): its own cursor (a6)
 	move.l	a6,a5
 	moveq	#$3f,d2
 	and.w	d1,d2
@@ -1363,7 +1432,13 @@ SmPair
 	bmi.b	.none
 	cmp.l	(a5),d1
 	beq.b	.hit
-.s2	lea	SM_OPSZ(a5),a5
+.s2	tst.b	d0
+	bmi.b	.s3
+	btst	#OPF_ID,1(a5)		; a plain op's window counts only plain ops:
+	beq.b	.s3			; objects drawn between them (keyed by
+	lea	SM_OPSZ(a5),a5		; identity, their own cursor) do not push
+	bra.b	.s			; its pair out of reach
+.s3	lea	SM_OPSZ(a5),a5
 	dbf	d3,.s
 	bra.b	.none
 .hit	cmp.b	#OP_SHAPE,d0

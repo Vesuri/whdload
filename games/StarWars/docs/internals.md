@@ -145,14 +145,16 @@ Run-time hooks, installed with `jmp` when a tick records and taken out (the save
 put back, the cache flushed) in direct mode: colour $1840, line $19ae, plot $1b2c, shape
 $9806, rectangle $0810, plane copy $0a1c, clear $1c08, swap wait $09a8, TIE fighter draw
 $839c (keys its ops by the fighter), surface object draw $a982 (keys a tower's or a
-base's lines by its world position), the ground dots ($1e6c, $1ea6, $a67e), and the swap
-flag store $09fa. Static (CUSTOM2, also in direct mode): the world's movement summed at
-$a6aa, and the dots' wrap marks at $a640 and $a666.
+base's lines by its world position), the ground dots ($1e6c, $1ea6, $a67e), the trench's
+wall rows $c562 and floor ribs ($d16c, $d1c0), and the swap flag store $09fa. Static
+(CUSTOM2, also in direct mode): the world's movement summed at $a6aa, the dots' wrap
+marks at $a640 and $a666, and the trench's rib shifts counted at $bb88.
 
 - **Pairing.** An op is keyed by the code address that called the primitive, and for TIE
   fighters by the fighter (the low word of its record). It is paired with the next op of
-  the same key in the previous recording, within 64 ops. Unpaired ops, and ops that moved
-  more than 40 pixels (respawns, stars wrapping round), are drawn where they are now.
+  the same key in the previous recording, within 64 ops (not counting the ops keyed by
+  identity, below, which have their own cursor). Unpaired ops, and ops that moved more
+  than 40 pixels (respawns, stars wrapping round), are drawn where they are now.
 - **Towers and bases.** $b0bc draws the object table (-26080(a4), 14 bytes: z, x, type at
   +6, the map cell at +10), which $a7a8 rebuilds each tick from the map rows in view, near
   row first and each row outward from a column that changes as the view steers. Neither
@@ -165,6 +167,23 @@ $a6aa, and the dots' wrap marks at $a640 and $a666.
   objects: the key and the index of the object's first op). The pairing finds an object's
   first line through the previous recording's list, then pairs its other lines in order
   from there, with a cursor of their own.
+- **Trench walls and ribs.** $cff4 draws the trench: the floor ribs, a table of 10
+  depths (-24916(a4), near first), then the wall panels of the map rows in view, far to
+  near, one $c562 call a row (the map word; the pointer to it at -26528(a4); the rows'
+  depths, 1900 apart, at -24896(a4); panels only for the 6 nearest). When the nearest rib
+  passes, $bb88 shifts the rib table down an entry; when the nearest row passes, $bc10
+  shifts the depths and the map pointer moves on a row. By draw order each rib and each
+  row's panels then paired with the next one along, and the near panels moved more than
+  40 pixels and were drawn in place. A row's lines are keyed by its map word's address
+  (bit 15 clear), a rib's by its index plus the shifts counted at $bb88 (bit 15 set), 9
+  bits each, the low 6 bits numbering the lines, flagged `OPF_ID` and found through the
+  object list as the surface's objects are. Wave 3 on a1200-030
+  (`tmp/scripts/trdump.sh`, `tmp/scripts/trmotion.py`), 12 trench ticks: every wall and
+  rib line drawn the tick before paired with itself, and the only unpaired lines were a
+  new far row and new far ribs. The lines that changed velocity by more than 12 pixels (16
+  a tick at most) were the nearest row and rib leaving past the camera, growing as 1/z.
+  Before, in 5 of 11 ticks 16 to 32 panel lines were drawn in place, and up to 32 a tick
+  changed velocity by more than 12 pixels.
 - **Ground dots.** The surface's dots are a table of 25 entries (-25758(a4), z and x of
   two points each) sorted by depth, which $1dda projects into six points per entry and
   plots at $1ea6. When the nearest entry passes, $a67e shifts the table down one entry
@@ -221,9 +240,12 @@ surface and trench with the trainer):
 | a1200-030 | smooth throughout | 2.81 | 2.97 | average about 280 |
 
 Wave 3 on a1200-030 (`tmp/scripts/wave3.sh`: space, the surface with towers, the trench),
-5 to 35 s after the start: 2.47 frames a tick, 9 late ticks and 90 dropped frames in
-3251 ticks; the build before the world-position keys, in the same run: 2.50, 15 and 87
-in 3447.
+5 to 35 s after the start, three runs each (the third two instances at once): 2.47 frames
+a tick, 12, 17 and 20 late ticks and 113, 95 and 109 dropped frames in about 2900 ticks;
+the build before the trench keys: 2.45, 6, 3 and 18, 98, 94 and 95. The late ticks vary
+with the host's load more than between the builds. The trench alone, its first 12 s
+(`tmp/scripts/trperf.sh`): 2.70 frames a tick for both, 2 late ticks each, 19 and 16
+dropped frames, and the same frame drawing times.
 
 The attract on a1200-030, scene by scene (`tmp/scripts/scenes.sh`): the credits, the
 title zoom (2 frames a tick: 242 in its 121 ticks), the Obi-Wan text, the flight
