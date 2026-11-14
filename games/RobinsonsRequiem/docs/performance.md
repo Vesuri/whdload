@@ -28,7 +28,21 @@ the game"), stops at the open of `avion.DO`/`.CO`, runs 150 fields, then holds k
 
 Both games hold each frame to at least 3 fields: the frame wait (AGA hunk 1 `+$49e8`, ECS
 `+$30ac`) loops until the VBL's field count reaches MAIN's cap, hunk 1 `+$ee6a` (ECS
-`+$d4c0`), which is 3 in game in both. **60 ms per frame, 16.7 fps, is the ceiling.**
+`+$d4c0`), which is 3 in game in both.
+
+The AGA game's 3D frames are bounded further by the script object that triggers them
+(measured in this walk, `tmp`-only `period.py` logging hunk 1 `+$258c`). MAIN runs each
+object once the VBL count passes the object's last run plus its period (hunk 1
+`+$257e`-`+$2590`: next run `-62(a6)`, period `-58(a6)`); this object's period is 7, so a
+3D frame comes at most every 8 fields: **160 ms, 6.25 fps, is the ceiling in this walk**
+(62 frames in the window). A main-loop pass takes at least 3 fields (the cap) and the object
+runs only at a pass's start, so a frame lands on the 8 fields only when the drawing pass
+takes at most 5 fields (100 ms); between 5 and 8 fields the next pass starts before the
+object is due and idles a whole 3-field pass (frames every 8 to 11 fields). Movement is
+per frame (INFERRED from the compass: NW after 36 frames, SE after 51), so the period sets
+the game's speed and stays. Frame counts therefore saturate near 57-62; `tools/rr_report.py`
+also gives the busy time per frame, the frame time without the three waits (the cap wait,
+the copper-interrupt wait at a 3D pass's start, the beam wait), which keeps falling.
 
 ## AGA game, a1200-030
 
@@ -54,14 +68,20 @@ MEMF_LARGEST)` - 50,000, none under 100,000) and then discards it unconditionall
 `+$196`, `move.l #0,<hunk 1 +$f4>`), so MAIN, every object's variables and every resource
 come from the chip pool. The slave's ExpMem is 256 KB.
 
-The plan's steps as they are done (below), frames in the window, each the `profile` build
-of the step's commit; the setup's core is the user's (`FSUAE=$FSUAE_ARM`, MMU model on):
+The plan's steps as they are done (below), frames in the window and the busy time per
+frame on the aprof core, each the `profile` build of the step's commit; the setup's core is
+the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 
-| Step | aprof core | Setup's core |
-|---|---|---|
-| v1.2 | 36 (277.8 ms) | 37 |
-| 1: fast pool, 1 MB ExpMem | 48 (208.3 ms) | 51 |
-| 2: caches on | 51 (196.1 ms) | 56 |
+| Step | aprof core | Busy per frame | Setup's core |
+|---|---|---|---|
+| v1.2 | 36 (277.8 ms) | 267.8 ms | 37 |
+| 1: fast pool, 1 MB ExpMem | 48 (208.3 ms) | 198.5 ms | 51 |
+| 2: caches on | 51 (196.1 ms) | 185.9 ms | 56 |
+| 3: the 3D view's buffers in fast memory | 57 (175.4 ms) | 132.7 ms | 55 |
+
+From step 3 on the frame counts are near the object period's ceiling: step 3's frames
+alternate a drawing pass of about 7 fields with an idle 3-field pass (33.1 ms per frame in
+the cap wait), and the setup's core, faster at every step, shows no gain.
 
 Measured before the steps, with measurement switches since removed (commit `a01d9f08`):
 a 2 MB ExpMem alone 35 and 37 (nothing moves to fast memory without the pool); the caches
@@ -123,6 +143,8 @@ AGA, a1200-030:
 3. **Caches off** under WHDLoad's default (no MMU): 12-21 ms on the aprof core.
 4. **Landscape loop and spans: 67-136 ms**, most of it chip waits until the data moves.
 5. **Waits: 5.3 ms beam wait** before each swap, 4.2 ms in the cap wait.
+6. **The ceiling is 6.25 fps here**, not the cap's 16.7: the object that triggers the 3D
+   frames runs every 8 fields at most (above).
 
 ECS, A500:
 
@@ -141,10 +163,11 @@ AGA, from 277.8 ms (3.6 fps):
    ExpMem. Measured: 208.3 ms, 4.8 fps (setup's core 37 → 51 frames).
 2. **Caches on** (done): `CACHECHIPDATA` instead of `CACHE`; the game's one blitter copy
    writes planes the CPU never reads. Measured: 196.1 ms, 5.1 fps (setup's core 56 frames).
-3. **The CPU-only data to fast**: the chunky buffer, height-map rows, shade tables, map data
-   and object graphics from the fast pool (find how START's allocator picks the chip pool for
-   them; bitplanes, copper lists, sprites and samples stay in chip). Up to 101 ms of chip
-   access goes; fast accesses cost some: about 105 ms, 9.5 fps.
+3. **The CPU-only data to fast** (done): the 3D view's chunky buffer and the renderer's
+   tables from the top of the fast pool (`docs/internals.md`, "AGA improvements"). Chip
+   accesses 120.2 → 61.0 ms per frame (18.0 of them the plane writes); busy 185.9 → 132.7
+   ms. The resource heap (map data) and MAIN's 256 KB block (the objects' graphics) stay in
+   chip: the heap also holds the sounds Paula plays (INFERRED: the `.SND` files load there).
 4. **A 68030 chunky-to-planar**: Kalms' `c2p1x1_8_c5_030_2` (`$AMIGA_SHARE/kalms-c2p`)
    for the loop at hunk 2 `+$2e84`: 8,064 longword writes instead of 32,256 byte writes,
    the merge in registers. It fits: the game's loop is a plain 8x8 bit transpose, chunky
@@ -156,19 +179,24 @@ AGA, from 277.8 ms (3.6 fps):
    are 4 pointers (`+$2e02`), each with a second plane at +16000, while Kalms writes plane
    n at n x bplsize (16000 is under its 16 KB limit; if the 4 blocks are not 32,000 apart,
    its stores take 4 base registers); and it reads one longword past each row. The
-   conversion goes from about 36 ms (after step 3) to about 10 ms: about 80 ms, 12.5 fps.
-   Validate the planes byte for byte against the original loop.
-5. **No beam wait**: set the bitplane pointers from the VBL (hunk 0 `+$13ce`, `+$13f6`), and
-   wait only when the next conversion would write the shown planes. About 75 ms.
-6. **The landscape loop for the 68030** (hunk 1 `+$d88c`, `+$b7ca`: about 40 ms of CPU
-   work left after step 3) until the heaviest frames are under 60 ms.
+   conversion goes from 36.2 ms (after step 3) to about 10 ms. Validate the planes byte for
+   byte against the original loop.
+5. **No beam wait**: the swap (hunk 0 `+$13e0`) waits for line 256 and rewrites the copper
+   list's plane pointers (`+$13f6`), which sit at the list's start, where the copper reads
+   them at the top of every field. Two small copper lists in chip, the plane pointers and a
+   jump into the game's list behind its own, swapped through COP1LC (taken at the next
+   field) instead: the swap waits for nothing. The beam wait is 6.7 ms per frame after
+   step 3.
+6. **The landscape loop for the 68030** (hunk 1 `+$d88c`, `+$b7ca`) until the drawing pass
+   takes at most 5 fields (100 ms busy) in this walk, so every frame lands on the object's
+   8 fields.
 
-Stop there: at 60 ms the cap holds every frame to 3 fields, and nothing faster shows.
-Beyond it is a different project: lifting the cap changes the game's speed (movement per
-frame, INFERRED) and needs a fixed-time simulation first. Check step 6 against heavier
-scenes (more trees and objects) than this walk.
+Stop there: at 8 fields per frame the object's period holds every frame, and nothing faster
+shows. Beyond it is a different project: a shorter period changes the game's speed
+(movement per frame, INFERRED) and needs a fixed-time simulation first. Check step 6
+against heavier scenes (more trees and objects) than this walk.
 
-ECS, from 666.7 ms (1.5 fps); 60 ms is out of reach on a 7 MHz 68000:
+ECS, from 666.7 ms (1.5 fps), far from both caps on a 7 MHz 68000:
 
 1. **Chunky-to-planar** (hunk 2 `+$19a2`, loop `+$1a62`): a merge (Kalms c5) 4-plane
    conversion. The game's loop shifts one bit at a time with `add`/`addx`, 41 cycles per

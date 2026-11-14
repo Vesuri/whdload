@@ -85,6 +85,15 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    both caches off on the 68030 (CACR `$2000`); `CACHECHIPDATA` turns them on with BaseMem
    write-through. The game's one blitter use (hunk 2 `+$5b6`) copies the shown planes into
    the back planes, which the CPU only writes, so no cached data goes stale.
+3. **The 3D view's buffers in fast memory** (`_fastblocks`): the block allocator's calls for
+   the chunky buffer (hunk 1 `+$a2b2`), the renderer's tables (`+$a2ce`) and a table of
+   longwords (`+$a30e`), each `jsr <hunk 0 +$36ee>` (checked first, with the allocator's
+   and the free's first instructions), become `jsr _fastalloc`: the same blocks, header
+   and handle from the top of the fast pool (hunk 1 `+$100`) down to the objects' frames'
+   end (`+$ed82`), 16-byte aligned; from chip as before when there is no pool or no room.
+   The free, hunk 0 `+$3748` (`48e7 8080 2040`), becomes `jmp _fastfree`, which gives a
+   block back to whichever pool it is the lowest block of. The hunk 2 64,000-byte chunky
+   screens (`+$380e`, `+$38b8`) are left in chip: this walk never allocates them.
 
 ## Memory (AGA)
 

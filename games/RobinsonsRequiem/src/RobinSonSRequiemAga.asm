@@ -296,6 +296,10 @@ _cont
             add.l   a1,a1
             add.l   a1,a1
             bsr _fastpool
+            move.l  d7,a1
+            add.l   a1,a1
+            add.l   a1,a1
+            bsr _fastblocks
 
         ;call
                 move.l  d7,a1
@@ -838,3 +842,138 @@ _fastpool
         jsr     resload_FlushCache(a2)
 .no     rts
 
+**********************************************
+; The renderer's buffers in fast memory. START's block allocator (hunk 0 +$36ee: d0 size ->
+; d0 handle, an entry of the table at hunk 1 +$ef42 whose first longword is the block)
+; takes from the top of the chip pool; the calls for the 3D view's chunky buffer and the
+; renderer's tables go to _fastalloc instead, which takes the same blocks from the top of the fast pool
+; (hunk 1 +$100, its end, which START sets and does not use) down to the end of the objects'
+; frames (hunk 1 +$ed82), or from chip as before when there is no fast pool or no room.
+; _fastfree replaces START's free (hunk 0 +$3748) for both: like it, it gives a block back
+; only when it is the lowest one of its pool.
+
+_fastblocks
+        move.l  (a1),d0
+        lsl.l   #2,d0
+        move.l  d0,a2                   ; hunk 1 - 4
+        move.l  (a2),d0
+        lsl.l   #2,d0
+        addq.l  #4,d0
+        lea     _hunk2(pc),a0
+        move.l  d0,(a0)
+        addq.l  #4,a2
+        lea     _hunk1(pc),a0
+        move.l  a2,(a0)
+        lea     4(a1),a1                ; hunk 0
+        lea     $36ee(a1),a0
+        cmp.l   #$48e74080,(a0)         ; movem.l d1/a0,-(a7)
+        bne     .no
+        lea     _chipalloc(pc),a2
+        move.l  a0,(a2)
+        cmp.l   #$48e78080,$3748(a1)    ; movem.l d0/a0,-(a7) / movea.l d0,a0
+        bne     .no
+        cmp.w   #$2040,$374c(a1)
+        bne     .no
+        lea     _fastsites(pc),a2
+.check  move.w  (a2)+,d0                ; all call sites first
+        bmi     .patch
+        move.w  (a2)+,d1
+        bsr     .site
+        cmp.w   #$4eb9,(a0)
+        bne     .no
+        lea     $36ee(a1),a3
+        cmp.l   2(a0),a3
+        bne     .no
+        bra     .check
+.patch  lea     _fastsites(pc),a2
+.p      move.w  (a2)+,d0
+        bmi     .free
+        move.w  (a2)+,d1
+        bsr     .site
+        pea     _fastalloc(pc)
+        move.l  (a7)+,2(a0)
+        bra     .p
+.free   move.w  #$4ef9,$3748(a1)
+        pea     _fastfree(pc)
+        move.l  (a7)+,$374a(a1)
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+; d0 hunk, d1 offset -> a0
+.site   move.l  a1,a0
+        tst.w   d0
+        beq     .s
+        move.l  _hunk1(pc),a0
+        subq.w  #1,d0
+        beq     .s
+        move.l  _hunk2(pc),a0
+.s      swap    d1
+        clr.w   d1
+        swap    d1
+        add.l   d1,a0                   ; offsets above $7fff: no sign extension
+        rts
+
+; jsr <hunk 0 +$36ee> sites: hunk, offset
+_fastsites
+        dc.w    1,$a2b2                 ; the 3D view's chunky buffer
+        dc.w    1,$a2ce                 ; the renderer's tables, 34,592 bytes
+        dc.w    1,$a30e                 ; a table of longwords
+        dc.w    -1
+
+_fastalloc
+        movem.l d1/a0-a1,-(a7)
+        move.l  _hunk1(pc),a1
+        move.l  $100(a1),d1             ; the lowest fast block, 0 without a pool
+        beq     .chip
+        sub.l   d0,d1
+        subq.l  #8,d1                   ; header
+        and.w   #-16,d1
+        cmp.l   $ed82(a1),d1
+        blo     .chip
+        move.l  d1,a0
+        move.l  $100(a1),d0
+        sub.l   d1,d0
+        move.l  d0,(a0)                 ; header: the distance to the block above
+        move.l  a0,$100(a1)
+        addq.l  #8,a0
+        move.l  a0,d0
+        lea     $ef42(a1),a0
+        moveq   #15,d1
+.find   tst.l   (a0)
+        beq     .got
+        addq.l  #8,a0
+        dbf     d1,.find
+        moveq   #0,d0                   ; no handle: as START, the block stays taken
+        bra     .out
+.got    move.l  d0,(a0)
+        move.l  d0,4(a0)
+        move.l  a0,d0
+.out    movem.l (a7)+,d1/a0-a1
+        rts
+.chip   movem.l (a7)+,d1/a0-a1
+        move.l  _chipalloc(pc),-(a7)
+        rts
+
+_fastfree
+        movem.l d0/a0-a1,-(a7)
+        move.l  d0,a0
+        move.l  4(a0),d0
+        clr.l   (a0)
+        clr.l   4(a0)
+        subq.l  #8,d0                   ; header
+        move.l  _hunk1(pc),a1
+        lea     $100(a1),a0             ; the fast pool's lowest block
+        cmp.l   (a0),d0
+        beq     .back
+        lea     $108(a1),a0             ; the chip pool's
+        cmp.l   (a0),d0
+        bne     .out
+.back   move.l  d0,a1
+        add.l   (a1),d0
+        move.l  d0,(a0)
+.out    movem.l (a7)+,d0/a0-a1
+        rts
+
+_hunk1          dc.l    0
+_hunk2          dc.l    0
+_chipalloc      dc.l    0
