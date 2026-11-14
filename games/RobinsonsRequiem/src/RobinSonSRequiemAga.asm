@@ -270,6 +270,13 @@ _cont
    ENDC
 ;******************** PRESTIGE_CRACKFIN
 
+   IFD DEVELOPER
+            move.l  d7,a1
+            add.l   a1,a1
+            add.l   a1,a1
+            bsr _directstart
+   ENDC
+
         ;call
                 move.l  d7,a1
                 add.l   a1,a1
@@ -616,7 +623,135 @@ lbL00008E
 
   
 
-       ENDC                      
+       ENDC
 
- 
-  
+
+**********************************************
+; Development builds: boot straight into the game. START's open wrapper (hunk 0 +$2540) is
+; entered with a3 on the name inside the MAIN script op that loads the file; at the loads of
+; logo and init3d the hook changes two branches of MAIN, checked byte for byte first:
+; - after "logo.AO": a branch to MAIN's path for an Esc during the logo, which skips the
+;   intro, with MAIN's language byte ($e68) set to English (the flags screen is skipped);
+; - in the block that loads init3d: the options menu's load and its object are branched
+;   over. Level of detail ($383e) and 3D window ($383d) keep their boot value 0, HIGH.
+
+  IFD DEVELOPER
+
+_directstart
+        move.l  (a1),d0                 ; hunk 1
+        lsl.l   #2,d0
+        addq.l  #4,d0
+        add.l   #$eda8,d0               ; -> pointer to MAIN's variables
+        lea     _mainvars(pc),a0
+        move.l  d0,(a0)
+        lea     4(a1),a0                ; hunk 0
+        cmp.l   #$61986100,$2540(a0)    ; bsr.s $24da / bsr.w $294a
+        bne     .no
+        cmp.w   #$0406,$2544(a0)
+        bne     .no
+        lea     $24da(a0),a1
+        lea     _open1(pc),a2
+        move.l  a1,(a2)
+        lea     $294a(a0),a1
+        move.l  a1,4(a2)
+        move.w  #$4eb9,$2540(a0)
+        pea     _openhook(pc)
+        move.l  (a7)+,$2542(a0)
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+
+_openhook
+        movem.l d0/a0-a2,-(a7)
+        lea     _logo(pc),a1
+        bsr     _match
+        bne     .init3d
+        lea     _logo_at(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _logo_to(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _logo_jump(pc),a1
+        bsr     _write
+        move.l  _mainvars(pc),a0
+        move.l  (a0),a0
+        move.b  #1,$e68(a0)             ; English
+        bra     .done
+.init3d lea     _init3d(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _prefs_at(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _prefs_to(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _menu_at(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _menu_to(pc),a1
+        bsr     _match
+        bne     .done
+        lea     _prefs_jump(pc),a1
+        bsr     _write
+        lea     _menu_jump(pc),a1
+        bsr     _write
+.done   movem.l (a7)+,d0/a0-a2
+        pea     .r1(pc)                 ; the two calls the hook replaced
+        move.l  _open1(pc),-(a7)
+        rts
+.r1     pea     .r2(pc)
+        move.l  _open2(pc),-(a7)
+        rts
+.r2     rts
+
+; a1: dc.w offset from a3, length; bytes. Z set when they are at a3+offset.
+_match  move.l  a3,a0
+        add.w   (a1)+,a0
+        move.w  (a1)+,d0
+        subq.w  #1,d0
+.m      cmpm.b  (a0)+,(a1)+
+        dbne    d0,.m
+        rts
+
+; a1: dc.w offset from a3, length; bytes: written at a3+offset.
+_write  move.l  a3,a0
+        add.w   (a1)+,a0
+        move.w  (a1)+,d0
+        subq.w  #1,d0
+.w      move.b  (a1)+,(a0)+
+        dbf     d0,.w
+        rts
+
+_mainvars       dc.l    0
+_open1          dc.l    0
+_open2          dc.l    0
+
+; offsets from the name in MAIN's load op (a3)
+_logo           dc.w    0,8
+                dc.b    "logo.AO",0
+_logo_at        dc.w    8,6                     ; create the logo object
+                dc.b    $40,$00,$01,$08,$39,$38
+_logo_to        dc.w    $603,4                  ; MAIN's path after an Esc in the logo
+                dc.b    $96,$00,$00,$42
+_logo_jump      dc.w    8,4
+                dc.b    $0a,$00,$05,$f7
+_init3d         dc.w    0,10
+                dc.b    "init3d.AO",0
+_prefs_at       dc.w    $20,5                   ; switch on the language: load the menu
+                dc.b    $2f,$06,$0e,$68,$02
+_prefs_to       dc.w    $5f,4
+                dc.b    $07,$00,$05,$1d
+_menu_at        dc.w    $97,6                   ; create the menu object, wait for its end
+                dc.b    $40,$00,$54,$08,$39,$38
+_menu_to        dc.w    $cc,3                   ; free the menu's slots
+                dc.b    $3d,$00,$54
+_prefs_jump     dc.w    $20,4
+                dc.b    $0a,$00,$00,$3b
+_menu_jump      dc.w    $97,4
+                dc.b    $0a,$00,$00,$31
+        EVEN
+
+  ENDC
+

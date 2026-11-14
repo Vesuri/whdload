@@ -2,7 +2,8 @@
 
 What CFou!'s v1.2 slaves do, from their source (`src/`) and the installed executables.
 Offsets are into the game's `START` executable: hunk data offsets, with the file offset in
-brackets. Nothing has been measured yet.
+brackets, and for the AGA game's MAIN script, offsets from a name in it. Nothing has been
+measured yet.
 
 ## How it loads
 
@@ -72,3 +73,41 @@ After `LoadSeg`:
 
 The low-memory jumps at `$100` and `$106` sit in the CPU vector table (user vectors 64 and
 65).
+
+## The script interpreter (AGA)
+
+`START` holds no game logic: it runs bytecode programs, loaded by name and unpacked into
+chip memory. `MAIN.DO` is loaded at boot and holds every phase (logo, language, intro,
+options menu, game set-up, level loads); the other `*.DO` are resources and programs that
+MAIN loads into numbered slots. Each running program is an object with its own bytecode
+pointer (`a3`) and variable frame (`a6`); a frame's bytes are the program's variables.
+
+- Dispatch: hunk 1 `+$25e4` reads an opcode byte and jumps through the word table at
+  `a2` (hunk 1 `+$2142`); `$00`-`$ff`, with a second page behind a prefix.
+- Some opcodes: `06 w`/`07 l24` call (16/24-bit offset from the next op), `08 b`/`0a l24`
+  branch, `11` return, `14 l24` branch when the last expression was 0, `1e`/`1f` evaluate
+  an expression (operand types through the table at `a5`, hunk 1 `+$234e`; `06 w` is a byte
+  variable of the frame) and store it (types through hunk 1 `+$23f8`), `2f` switch,
+  `3d w` free slot, `40 w` create an object from slot `w`, `42` yield a frame, `45 w name`
+  load file `name` (`.AO`, mapped to `.DO`) into slot `w`.
+- The file-open wrapper is hunk 0 `+$2540` (`Open` at `+$255e`, `MODE_NEWFILE` at
+  `+$267e`, `Lock` at `+$2590`); `a3` there points at the name inside the op that loads it.
+- MAIN's frame is `[hunk 1 +$eda8]`. Its language byte is `$e68` (0 French, 1 English,
+  2 German). The options menu (`prefs`, `prefsu`, `prefsd`: one program per language)
+  shows and changes MAIN's `$3838`-`$383f`: difficulty `$383a` (0-2), background sounds
+  `$383b`, 3D window `$383d` and level of detail `$383e` (0 HIGH, 1 LOW). Both are 0 at
+  boot; the menu starts them at LOW. Neither is saved: `CONFIG.INF` is only read.
+- An Esc during the Silmarils logo sets MAIN's `$3928`; MAIN then calls the language
+  screen and skips the intro (`flags` goes straight to `baratin*`, `param`, `init3d`,
+  `prefs*`). Later, Esc ends the running part only.
+
+### Direct start
+
+`_directstart` (developer builds) replaces hunk 0 `+$2540`'s `bsr.s $24da / bsr.w $294a`
+(`6198 6100 0406`) with a `jsr` to a hook that calls both afterwards. At two loads it checks
+MAIN's bytes and writes a branch, offsets from the name (`a3`):
+
+| Load | Checked | Written |
+|---|---|---|
+| `logo.AO` | `+8` `40 0001 0839 38` (create the logo object), `+$603` `96 0000 42` (the path after an Esc in the logo) | `+8` `0a 0005f7`: that path; MAIN's `$e68` = 1 |
+| `init3d.AO` | `+$20` `2f 06 0e68 02` (load the menu by language), `+$5f` `07 00051d`, `+$97` `40 0054 0839 38` (create the menu, wait for it), `+$cc` `3d 0054` (free its slots) | `+$20` `0a 00003b` to `+$5f`; `+$97` `0a 000031` to `+$cc` |

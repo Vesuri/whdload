@@ -68,6 +68,25 @@ rebuild would need the 2013 KickEmu, which the shared WHDLoad tree does not keep
 
 ## Running
 
+### Straight into the game (developer build)
+
+The AGA developer build boots into the jungle start without input, with level of detail
+and 3D window at HIGH, in about 15 s under `WARP=1` (no logo, flags, intro or options menu;
+English):
+
+```sh
+make run BUILD=developer VARIANT=RobinsonsRequiemAGA SETUP=a1200-030
+BUILD=developer VARIANT=RobinsonsRequiemAGA SETUP=a1200-030 WARP=1 python3 tools/rr.py serve &
+python3 tools/rr.py ingame direct   # waits until the game is up
+```
+
+`_directstart` (`IFD DEVELOPER` in the AGA source) changes two branches of the MAIN script
+as it runs; `docs/internals.md`, "Direct start", has what it patches. The release build is
+unchanged by it. The music, sound and difficulty settings are the boot values the menu would
+start from, not `CONFIG.INF`'s.
+
+### Through the intro and menu (any build)
+
 `tools/rr.py` is the gdb-stub server (`python3 tools/rr.py serve` with `VARIANT`, `WARP=1
 WINDOW=none`, ...; its docstring lists the commands). For the AGA game, `ingame` goes from the
 boot to the jungle start in about 20 s under `WARP=1` on `a1200-030`:

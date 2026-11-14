@@ -11,9 +11,14 @@ RobinsonsRequiemAGA, SLAVE=original, SETUP=a1200-030, WARP=1 WINDOW=none, ...).
 
 Game commands (AGA game only):
 
-    opens            log every file the game opens (Open, Lock) to .run/opens.log
-    ingame [low]     from boot to the jungle start: English, the intro skipped with Esc, level
-                     of detail and 3D window set to HIGH (`low` keeps both LOW), Start
+    opens            log every file the game opens (Open, Lock) to .run/open.bin, lock.bin;
+                     per call also the registers and stack (ctx.bin) and MAIN's variables
+                     $3800-$38ff (glob.bin)
+    ingame [low|menu|direct]
+                     from boot to the jungle start: English, the intro skipped with Esc, level
+                     of detail and 3D window set to HIGH (`low` keeps both LOW), Start;
+                     `menu` stops at the options menu; `direct` only waits for the game, for
+                     the developer build (BUILD=developer), which needs no input
     point X Y        move the pointer to (X, Y) of a `shot` (754x576), from the top-left corner
     click            press and release the left mouse button
     key RAW          press and release raw key RAW (hex), e.g. 45 for Esc
@@ -33,6 +38,9 @@ from game_server import game_server  # noqa: E402
 # MODE_NEWFILE) and Lock (+$2590).
 HUNK0_SIG = '0x48e7, 0x60c0, 0x2208, 0x61c8, 0x243c'
 HUNK0_SIG_OFFSET = 0x2546
+HUNK0_SIZE = 0x3a30
+# Hunk 1 +$eda8 points at the script's global bytes (the menu's settings are at +$383a-$383e).
+GLOBALS_PTR = 0xeda8
 CALLS = {'open': 0x255e, 'new': 0x267e, 'lock': 0x2590}
 
 # Pointer targets in `shot` coordinates (754x576). A mouse count moves the pointer one shot
@@ -94,16 +102,34 @@ class Opens:
         g.stop()
         out = g.cmd(f'find /h 0x200000, 0x1000000, {HUNK0_SIG}', timeout=120)
         hits = [int(w, 16) for w in out.split('\n') if re.fullmatch(r'0x[0-9a-f]+', w.strip())]
-        # The PRELOAD copy of the file comes first; the loaded segment is the last match.
-        if not hits:
-            raise RuntimeError('START hunk 0 not found (not loaded yet?): ' + out)
-        base = hits[-1] - HUNK0_SIG_OFFSET
+        # The PRELOAD copy of the file matches too; the loaded segment is the match whose
+        # segment header (the allocation size, hunk size + 8, at -8) is there.
+        base = None
+        for h in hits:
+            out = g.cmd(f'x/wx {h - HUNK0_SIG_OFFSET - 8:#x}')
+            if out.split()[-1] == f'{HUNK0_SIZE + 8:#010x}':
+                base = h - HUNK0_SIG_OFFSET
+        if base is None:
+            raise RuntimeError('START hunk 0 not loaded yet')
+        out = g.cmd(f'x/wx {base - 4:#x}')
+        h1 = int(out.split()[-1], 16) * 4 + 4
+        gp = f'{{unsigned}}{h1 + GLOBALS_PTR:#x}'
         script = self.dir / 'opens.gdb'
         lines = []
         for name, off in CALLS.items():
             (self.dir / f'{name}.bin').unlink(missing_ok=True)
+            # Per call: the name; the registers d0-a7 and 256 bytes of stack (ctx.bin).
+            regs = [f'append value {self.dir}/ctx.bin (unsigned int)${r}'
+                    for r in ('d0 d1 d2 d3 d4 d5 d6 d7 a0 a1 a2 a3 a4 a5 a6 sp').split()]
             lines += [f'break *{base + off:#x}', 'commands', 'silent',
-                      f'append memory {self.dir}/{name}.bin $d1 $d1+32', 'continue', 'end']
+                      f'append memory {self.dir}/{name}.bin $d1 $d1+32',
+                      f'append memory {self.dir}/ctx.bin $d1 $d1+32', *regs,
+                      f'append memory {self.dir}/ctx.bin $sp $sp+256',
+                      f'append memory {self.dir}/glob.bin {gp}+0x3800 {gp}+0x3900',
+                      'continue', 'end']
+        (self.dir / 'ctx.bin').unlink(missing_ok=True)
+        (self.dir / 'glob.bin').unlink(missing_ok=True)
+        (self.dir / 'base.txt').write_text(f'{base:#x}\n')
         script.write_text('\n'.join(lines) + '\n')
         g.cmd(f'source {script}')
         self.armed = True
@@ -159,6 +185,12 @@ def ingame(server, g, rest):
         except RuntimeError:
             g.cont()
             time.sleep(0.5)
+    if rest.strip() == 'direct':
+        # The developer build boots straight into the game (src/, _directstart).
+        o.wait(g, 'avion.DO', timeout=120)
+        run_fields(g, 100)
+        g.cont()
+        return f'in game after {time.time() - t0:.0f} s'
     esc_until(g, o, 'flags.DO')     # Esc ends the Silmarils logo
     run_fields(g, 50)
     point(g, *FLAG_UK)
@@ -169,6 +201,9 @@ def ingame(server, g, rest):
     # the options menu (prefsu) reads CONFIG.INF.
     esc_until(g, o, 'CONFIG.INF')
     run_fields(g, 50)
+    if rest.strip() == 'menu':
+        g.cont()
+        return f'at the options menu after {time.time() - t0:.0f} s'
     if rest.strip() != 'low':
         point(g, *LOD)
         click(g)
