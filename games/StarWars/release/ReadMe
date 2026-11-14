@@ -41,7 +41,8 @@
  - Unlimited Shields trainer (CUSTOM1)
  - Timing fixed (always on)
  - Enhanced framerate: 50 frames a second at the game's own speed (CUSTOM2,
-   SPS 403 only; machines too slow for it play as without it)
+   set in the installed icon; SPS 403 only; machines too slow for it play
+   as without it)
  - Drawing fixed on fast CPUs (SPS 403)
  - NewIcon (created by me)
  - Source code included as usual
@@ -96,7 +97,7 @@
  - CUSTOM2 is now "Enhanced framerate": the game, the wave select and the
    attract scenes drawn at up to 50 frames a second, interpolated, at the
    game's own speed (SPS 403; an A1200 with fast RAM or a faster CPU, a
-   stock A500 or A1200 draws as before)
+   stock A500 or A1200 draws as before); the installed icon sets it
  - 68060: words and strokes no longer missing from the vector text
    (scoring page, wave select)
  - wave select: no black box cut into the WAVE 1 text and the Death Star,

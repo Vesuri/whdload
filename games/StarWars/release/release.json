@@ -9,7 +9,17 @@
       },
       "add": {},
       "remove": [],
-      "source": {"dir": "StarWars_Install/Source", "variants": ["StarWars"]}
+      "tooltypes": {
+        "StarWars_Install/StarWars.newicon": [
+          "CUSTOM2=1"
+        ]
+      },
+      "source": {
+        "dir": "StarWars_Install/Source",
+        "variants": [
+          "StarWars"
+        ]
+      }
     }
   ]
 }
