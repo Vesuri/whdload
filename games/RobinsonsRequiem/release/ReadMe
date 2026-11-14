@@ -57,6 +57,7 @@
  - The CPU caches are on also without WHDLoad's MMU (68030)
  - The 3D view's buffers are in Fast memory
  - Faster chunky-to-planar conversion, based on Mikael Kalms' c2p1x1_8_c5_030_2
+ - Faster sky drawing
 
  version 1.2 (29.03.13) done by CFou!:
  - First two bitplanes memory allocation fixed for fast memory support (AGA)

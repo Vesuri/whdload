@@ -33,8 +33,8 @@ ROWLEN, BPL = 80, 16000
 LOOP, MODC, MODP = 0x2e84, 0x2db2, 0x2db4
 
 
-def hunk2():
-    """START's hunk 2, as loaded (relocations into hunk 2 itself are offsets from 0)."""
+def hunk(which=2):
+    """START's hunk `which`, as loaded (relocations into the hunk itself are offsets from 0)."""
     d = START.read_bytes()
     p = 0
 
@@ -67,7 +67,7 @@ def hunk2():
                 p += 4 * c
         elif t != 0x3f2:
             raise ValueError(f'hunk type {t:#x}')
-    return hunks[2]
+    return hunks[which]
 
 
 def assemble():
@@ -117,13 +117,24 @@ class Machine:
         x = ctypes.c_uint32(v)
         self.uc.uc_reg_write(self.h, r, ctypes.byref(x))
 
-    def call(self, target, regs):
+    def regs(self):
+        """d0-d7, a0-a7"""
+        out = []
+        for i in range(16):
+            x = ctypes.c_uint32()
+            self.uc.uc_reg_read(self.h, (REG_D0 if i < 8 else REG_A0) + i % 8, ctypes.byref(x))
+            out.append(x.value)
+        return out
+
+    def call(self, target, regs, until=None):
+        """Call target with regs (d0-d7, a0-a7) until it returns, or from target to until."""
         self.write(STUB, b'\x4e\xb9' + target.to_bytes(4, 'big')
                    + b'\x4e\xf9' + SENTINEL.to_bytes(4, 'big'))
         self.reg(REG_SR, 0x2700)
         for i, v in enumerate(regs):
             self.reg((REG_D0 if i < 8 else REG_A0) + i % 8, v)
-        err = self.uc.uc_emu_start(self.h, STUB, SENTINEL, 0, 0)
+        begin, end = (STUB, SENTINEL) if until is None else (target, until)
+        err = self.uc.uc_emu_start(self.h, begin, end, 0, 0)
         if err:
             pc = ctypes.c_uint32()
             self.uc.uc_reg_read(self.h, REG_PC, ctypes.byref(pc))
@@ -133,7 +144,7 @@ class Machine:
 def main():
     cases = int(sys.argv[1]) if len(sys.argv) > 1 else 300
     rnd = random.Random(int(sys.argv[2]) if len(sys.argv) > 2 else 1)
-    code, new = hunk2(), assemble()
+    code, new = hunk(2), assemble()
     fast = slow = 0
     for n in range(cases):
         w = 16 * rnd.randrange(1, 21)

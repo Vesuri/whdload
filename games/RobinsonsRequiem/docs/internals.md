@@ -101,6 +101,13 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    are in the slave's reserved block, 2-7 elsewhere) and a row driver with START's
    strides; widths that are not a multiple of 32 pixels go back to START's loop.
    `tools/rr_c2pcheck.py` checks it against START's loop byte for byte under Unicorn.
+5. **The sky copy by longwords** (`_skypatch`, `src/sky030.s`): hunk 1 `+$e262`-`+$e291`
+   [`$1270e`], START's row loop copying the sky (a resource in the chip heap) into the
+   chunky view a word at a time, checked byte for byte (with the address of `<hunk 1
+   +$edfe>` at `+$e272`), becomes `jsr _skyrows` and `bra.w +$e292`. `_skyrows` copies the
+   same segments (the sky wraps around at its row's end) with aligned longword reads, two
+   words a chip access. `tools/rr_skycheck.py` checks it against START's loop under
+   Unicorn, the view and the registers the code after `+$e292` reads.
 
 ## Memory (AGA)
 

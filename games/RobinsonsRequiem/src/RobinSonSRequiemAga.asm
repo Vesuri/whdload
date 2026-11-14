@@ -301,6 +301,7 @@ _cont
             add.l   a1,a1
             bsr _fastblocks
             bsr _c2ppatch
+            bsr _skypatch
 
         ;call
                 move.l  d7,a1
@@ -999,3 +1000,45 @@ _c2ppatch
 .no     rts
 
         INCLUDE c2p030.s
+
+**********************************************
+; The sky copy (src/sky030.s): hunk 1 +$e262-$e291, START's row loop, becomes jsr _skyrows
+; and bra.w +$e292, after a check of its bytes (with the address of <hunk 1 +$edfe> at
+; +$e272). After _fastblocks (_hunk1).
+
+_skypatch
+        move.l  _hunk1(pc),a0
+        move.l  a0,a1
+        add.l   #$e262,a1
+        lea     .old(pc),a2
+        moveq   #(.oldend-.old)/2-1,d0
+        moveq   #0,d1
+.cmp    cmp.w   #$10,d1                 ; +$e272: the address
+        beq     .addr
+        move.w  (a2),d2
+        cmp.w   (a1,d1.w),d2
+        bne     .no
+        addq.w  #2,d1
+        addq.l  #2,a2
+        dbf     d0,.cmp
+        move.w  #$4eb9,(a1)
+        pea     _skyrows(pc)
+        move.l  (a7)+,2(a1)
+        move.l  #$60000028,6(a1)        ; bra.w +$e292
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+.addr   move.l  a0,d2
+        add.l   #$edfe,d2
+        cmp.l   (a1,d1.w),d2
+        bne     .no
+        addq.w  #4,d1
+        addq.l  #4,a2
+        subq.w  #1,d0
+        dbf     d0,.cmp
+        bra     .no
+.old    dc.w    $4a40,$6d00,$000a,$3600,$32d8,$51cb,$fffc,$3639,0,0,$e24b,$9640
+        dc.w    $5543,$6d00,$000a,$90c1,$32d8,$51cb,$fffc,$d2c5,$d8c1,$204c,$51cf,$ffd2
+.oldend
+
+        INCLUDE sky030.s

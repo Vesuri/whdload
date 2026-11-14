@@ -15,7 +15,7 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 Next, in order:
 
 1. The AGA plan in `docs/performance.md`, "Plan", step 6 (the drawing pass within 5
-   fields), measured with `tools/rr_prof.py`.
+   fields) after its sky copy, measured with `tools/rr_prof.py`.
 2. The ECS plan there, from its step 1 (the chunky-to-planar conversion).
 3. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`). The AGA game's objects' frames are in fast

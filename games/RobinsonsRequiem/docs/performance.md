@@ -80,6 +80,7 @@ the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 | 3: the 3D view's buffers in fast memory | 57 (175.4 ms) | 132.7 ms | 55 |
 | 4: Kalms' 68030 chunky-to-planar | 57 (175.4 ms) | 111.3 ms | 53 |
 | 5: no beam wait (not kept) | 57 (175.4 ms) | 113.5 ms | |
+| 6a: the sky copy by longwords | 57 (175.4 ms) | 108.8 ms | 53 |
 
 From step 3 on the frame counts are near the object period's ceiling: step 3's frames
 alternate a drawing pass of about 7 fields with an idle 3-field pass (33.1 ms per frame in
@@ -192,9 +193,20 @@ AGA, from 277.8 ms (3.6 fps):
    `+$9aa6`), 7.3 ms per frame, and the rest grew from 111.3 to 113.5 ms; 57 frames either
    way. The beam wait ends at line 256, about a millisecond before the field does, so it
    never costs a pass a field.
-6. **The landscape loop for the 68030** (hunk 1 `+$d88c`, `+$b7ca`) until the drawing pass
-   takes at most 5 fields (100 ms busy) in this walk, so every frame lands on the object's
-   8 fields.
+6. **The drawing pass within 5 fields** in this walk (100 ms), so every frame lands on the
+   object's 8 fields. The drawing pass, from the pass's start after the cap wait (hunk 1
+   `+$49f6`) to the swap (`+$4b30`), took 3.44 to 5.75 fields on the aprof core after step 4
+   (`tmp`-only `passes.py`, gdb breakpoints and the VBL count with the beam's line), 2.0
+   to 3.1 on the setup's core, whose chip accesses cost less.
+   1. **The sky copy by longwords** (done, `docs/internals.md`, "AGA improvements"): the
+      sky 8.5 → 4.1 ms per frame, busy 111.3 → 108.8 ms; the drawing pass 3.23 to 5.69
+      fields on the aprof core, the setup's core unchanged.
+   2. What is left in chip in the pass is read-only to it but not to the game: the map
+      (hunk 1 `+$da6c`, `+$db1e`, `+$ba7c`-`+$ba92`, about 10 ms) and the shade table
+      (`+$ef3c`, `+$bab6`, 2 ms), both in the resource heap. The heap compacts (hunk 1
+      `+$92dc` moves the blocks above a freed one down and lowers every table pointer above
+      it, with no upper bound), so a block cannot live in fast memory, and the scripts
+      write the map (`+$3b2c`-`+$3b4e`, `+$3b82`), so a fast copy would go stale.
 
 Stop there: at 8 fields per frame the object's period holds every frame, and nothing faster
 shows. Beyond it is a different project: a shorter period changes the game's speed
@@ -237,8 +249,9 @@ BUILD=profile FSUAE=$FSUAE_ARM python3 tools/rr_prof.py tmp/prof/base-arm
 # ECS
 VARIANT=RobinsonsRequiem SETUP=custom BUILD=developer BARTO=1 python3 tools/rr_prof.py tmp/prof/ecs-base
 python3 tools/rr_report.py tmp/prof/base-aprof
-# the AGA conversion against START's loop (after make unpack)
+# the AGA conversion and sky copy against START's loops (after make unpack)
 python3 tools/rr_c2pcheck.py 2000
+python3 tools/rr_skycheck.py 2000
 ```
 
 The `profile` build is the current source, every step done so far; v1.2's figures are the
