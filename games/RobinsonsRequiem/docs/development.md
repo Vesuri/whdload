@@ -69,14 +69,25 @@ rebuild would need the 2013 KickEmu, which the shared WHDLoad tree does not keep
 ## Running
 
 `tools/rr.py` is the gdb-stub server (`python3 tools/rr.py serve` with `VARIANT`, `WARP=1
-WINDOW=none`, ...). Both versions stop at a language screen (three flags) and wait for a
-click; through the server, with the pointer starting top left:
+WINDOW=none`, ...; its docstring lists the commands). For the AGA game, `ingame` goes from the
+boot to the jungle start in about 20 s under `WARP=1` on `a1200-030`:
 
 ```sh
-for i in 1 2 3 4 5 6 7 8; do python3 tools/rr.py gdb monitor mouse 40 25; python3 tools/rr.py gdb monitor fields 3; done
-python3 tools/rr.py gdb monitor input JOY1_FIRE_BUTTON 1; python3 tools/rr.py gdb monitor fields 5
-python3 tools/rr.py gdb monitor input JOY1_FIRE_BUTTON 0
+VARIANT=RobinsonsRequiemAGA SETUP=a1200-030 WARP=1 python3 tools/rr.py serve &
+python3 tools/rr.py ingame          # `ingame low` leaves detail and window at LOW
 ```
 
-puts the pointer on the British flag and selects English; the credits then run and the
-title follows within two minutes of `wait` under `WARP=1` (both variants).
+It logs every file the game opens (breakpoints on `START`'s open wrapper, `opens`) and waits
+on those loads, not on time:
+
+1. Esc until `flags.DO` opens: an Esc during the Silmarils logo also skips the whole intro
+   (the flags then go straight on to `baratinu.DO`, `param.DO`, `init3d.DO`, `prefsu.DO`).
+   Pressed later, Esc ends only the running part: the video (`introag` ... `introj`), then
+   the title (`present`, `musique2`) and the credits (`authors`) one by one.
+2. The British flag, then Esc until the options menu (`prefsu.DO`) reads `CONFIG.INF`.
+3. A click on the laptop (level of detail) and on the monitor (3D window size) turns each
+   from LOW to HIGH; then Start. The game is up once `avion.DO` has loaded.
+
+The pointer moves one shot pixel per mouse count; larger steps than about 10 counts per two
+fields wrap the game's counters, so `point` homes it to the top-left corner in small steps.
+Every boot starts from a fresh `DH1`, so both settings start at LOW.
