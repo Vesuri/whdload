@@ -129,7 +129,11 @@ the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 | 7: the world on the cap's grid | 55 (181.8 ms) | 110.0 ms | 55 |
 | 8: the camera between the player's runs | 80 (125.0 ms) | 94.8 ms | 126 |
 | 9: the other moving objects between their runs | 80 (125.0 ms) | 94.9 ms | 126 |
-| 10a: the wait for the world at the pass's end | 102 (98.0 ms) | 91.0 ms | 151 |
+| 10a: the wait for the world at the pass's end | 101 (99.0 ms) | 92.2 ms | 148 |
+
+Rows 8 and 9 were measured before frames drawn only for the staging re-projected the
+view's elements (step 8); the projection cost 10a 3 frames on the setup's core and 1 on
+the aprof core (151 and 102 frames, busy 91.0 ms, without it).
 
 After step 6 every frame interval is 8 fields on both cores (`tools/rr_passes.py`, 240
 events: 36 frames on the aprof core with drawing passes of 3.3 to 6.5 fields, 28 on the
@@ -355,20 +359,28 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
    about 9.5 units every 3 fields), the objects' intervals unchanged (`tools/rr_objects.py`
    turning and walking), and with `INTERP_OFF` the window's frames (55) and both
    screenshots pixel-identical to step 7's; with interpolation the last frame (after the key
-   is let go) is too. Extrapolation not tried; the pointer's picking in a staged frame not
+   is let go) is too. A frame drawn only for the staging marks the view's elements to be
+   projected again, as `+$4980` does on the game's own changes: the drawing projects an
+   element only when it is marked (state 2), so without this a creature kept its screen
+   position from the game's last change while the camera turned (seen in play, `human`
+   walking up to the player; gdb at each changed drawing turning, `human`'s element was
+   unmarked on 11 of 24 and its screen box unchanged, all 24 marked and moving with the
+   fix). Extrapolation not tried; the pointer's picking in a staged frame not
    checked.
 9. **The other moving objects between their runs** (done, `docs/internals.md`, "AGA
    improvements"): their 3D elements (`+$4792` moves them by their object's difference at
    each run) staged the same way for the drawing (`human` here); their animation frames
    stay per run. While the camera stays, frames for the staging only when a staged element
    is on screen; otherwise the game's own redraw of a moved element's region. Measured in
-   the jungle start, where no creature comes into view (screenshots of a full turn): at
+   the jungle start, where no creature comes into view in the window (`human` patrols
+   some 2,000 units from the standing player, gdb over 2,000 fields): at
    each drawing `human`'s element lies between its last two positions as alpha gives
    (its 8-unit steps every 12 fields drawn 6, 4 and 2 units back), and at each frame
    routine it is back on the object's own (gdb, 120 events turning); standing, no frame is
    drawn (`tools/rr_passes.py KEY=none`: 40 passes every 3 fields, none drawing); turning,
-   the frames and busy time are step 8's. A creature moving on screen is not checked: no
-   scene with one is at hand.
+   the frames and busy time are step 8's. A staged element is projected through step 8's
+   marking of the view's elements. A creature moving on screen is checked only by eye in
+   play (`human` walking up to the player, which showed step 8's missing projection).
 10. **The drawing pass again**: it now sets the frame rate, up to the cap.
    1. **The wait for the world at the pass's end** (done, `docs/internals.md`, "AGA
       improvements"). After step 9 a frame still started on the cap's grid: the wait for W
@@ -382,7 +394,9 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
       walking 48 and 10, 151.8 and 157.6 frames per 500 fields against 131.5 and 121.6) and
       102 on the aprof core (10.2 fps, 98.0 ms; intervals of 4 to 7 fields turning, 5 or 6
       walking), the world wait 0.4 ms per frame, busy 91.0 ms; the objects' intervals the
-      grid's standing, turning and walking (`tools/rr_objects.py`).
+      grid's standing, turning and walking (`tools/rr_objects.py`). With step 8's
+      projection of the view's elements in staged frames: 148 on the setup's core and 101
+      on the aprof core (10.1 fps, 99.0 ms, busy 92.2 ms).
    2. What is left is the drawing, after 10a (aprof core, 102 frames, ms per frame):
 
       | Function | ms/frame | In chip accesses |

@@ -145,7 +145,11 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    scripts and `+$48b8` see the game's own. A frame drawn only for the staging then takes
    the changed path (`+$4b94`: the other views' redraw and the swap), so `_view` does the
    unchanged path's per-frame flags for it (`+$4ba8`-`+$4be6`: `+$eef5` from bit 2 of
-   the view's `+1`, `+$ef2b`, and the countdown `+$ef2a` of a view with bit 5 set). The view's
+   the view's `+1`, `+$ef2b`, and the countdown `+$ef2a` of a view with bit 5 set), and
+   first marks the view's elements to be projected again as `+$4992`-`+$49ae` does on the
+   game's own changes (`_emark`: each in the view's chain, from d3 through `+6`, in state 0
+   with byte `+33` not negative set to state 2; the drawing's walk `+$a732` projects only
+   state 2 elements, `+$a7d4`, and puts them back in depth order in state 0). The view's
    velocity (`+$4980`, on changed frames only) stays on the game's own changes. No
    interpolation across a jump (a position step over 128, about four of the player's
    walking runs, or an angle over 45 degrees), for a new view or followed object, or out of
@@ -160,7 +164,8 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    table allocated at install (none: no patch). For each drawing `_view` stages those
    objects' 3D elements (chained from the object's `-24` through `+4`): each moved back by
    step x (1 - alpha), its heading (`+36`) too where it is the object's, and put back after
-   the drawing. While the camera stays, a frame is drawn for the staging only when a staged
+   the drawing; they are projected through the view's marking (item 7). While the camera
+   stays, a frame is drawn for the staging only when a staged
    element's screen box (`+12`/`+14`, size `+40`/`+42`, `+16` negative when not
    projected) meets the view's (`+14`/`+16`, size `+18`/`+20`); otherwise the game's own
    redraw of a moved element's region stays (the unchanged path `+$4be8`, `+$5094` → `jsr

@@ -6,7 +6,7 @@ measured and not kept and its step 6's pacing replaced by step 7 (`docs/internal
 improvements"): the world runs on the game's own 3-field grid whatever the drawing takes,
 the camera and the other moving objects are drawn between their runs (step 9 not yet seen
 with a creature on screen), and each drawing starts as soon as its list has run, so the
-drawing sets the frame rate (151 frames in the window on the setup's core, 102 on the
+drawing sets the frame rate (148 frames in the window on the setup's core, 101 on the
 aprof core, against 55 on the player's 9 fields). The rest of step 10 (the drawing itself:
 the landscape, the map in chip, the beam wait) is examined, not done.
 The ECS plan is done: steps 1 and 2 (the conversion and the

@@ -1410,6 +1410,9 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         beq     .draw                   ; unchanged: as START
         bset    #7,(a2)
         moveq   #1,d6
+        move.w  14(a7),d0               ; d3 at entry: the view's element chain
+        move.l  36(a7),a0               ; a1 at entry: START's element table
+        bsr     _emark
 .set    moveq   #0,d5                   ; the staged camera in, and drawn
 .put    move.w  (a1,d5.w),d0
         move.w  I_NEW(a3,d5.w),d1
@@ -1451,6 +1454,20 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         jsr     (a0)
         bra     .out
 .cam    dc.w    22,24,26,52,54,56
+
+; the view's elements to be projected again, as +$4992-+$49ae on the game's own changes
+; (an element is projected only in state 2, so one left in state 0 keeps its screen
+; position from the last change): each in state 0 with byte +33 not negative set to 2.
+; d0 the view's chain (its offset in the table), a0 START's element table
+_emark  move.w  6(a0,d0.w),d0
+        beq     .out
+        tst.b   33(a0,d0.w)
+        bmi     _emark
+        tst.b   (a0,d0.w)
+        bne     _emark
+        move.b  #2,(a0,d0.w)
+        bra     _emark
+.out    rts
 
 ; at each list's end, W the list's count: the followed object's pose, kept with the one
 ; before it when it changes
