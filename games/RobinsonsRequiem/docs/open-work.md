@@ -7,8 +7,8 @@ improvements"): the world runs on the game's own 3-field grid whatever the drawi
 the camera and the other moving objects are drawn between their runs (step 9 seen smooth
 by eye in play with `human` walking up to the player), and each drawing starts as soon as its list has run, so the
 drawing sets the frame rate (148 frames in the window on the setup's core, 101 on the
-aprof core, against 55 on the player's 9 fields). Step 10.2's map in fast memory took that
-to 161 and 108; the rest of step 10 (the landscape's code, the shade table, the beam wait)
+aprof core, against 55 on the player's 9 fields). Step 10.2's map and shade table in fast
+memory took that to 163 and 110; the rest of step 10 (the landscape's code, the beam wait)
 is examined, not done.
 The ECS plan is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
@@ -26,8 +26,8 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 Next, in order:
 
 1. The AGA plan's step 10.2 (`docs/performance.md`, "Plan", "AGA, beyond the player's
-   period": the landscape with an equivalence check like `tools/rr_ecsland.py`, the shade
-   table, the beam wait with the pointer's redraw), each measured with
+   period": the landscape with an equivalence check like `tools/rr_ecsland.py`, the beam
+   wait with the pointer's redraw), each measured with
    `tools/rr_objects.py` and `tools/rr_passes.py` before the next; steps 7-9 also in a
    heavier scene than the jungle start (more trees and objects).
 2. Play-test both variants further (loading and saving) with the rebuilt slaves, against

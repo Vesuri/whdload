@@ -1928,7 +1928,29 @@ _mappatch
         beq     .put
         move.w  #$4e71,6(a0,d0.l)       ; nop
         bra     .put
-.done   move.l  _resload(pc),a2
+.done   move.l  a0,d0                   ; the shade table: its set-up and its two reads
+        add.l   #$ef3c,d0
+        cmp.w   #$23c9,$30b4(a0)        ; move.l a1,<+$ef3c>
+        bne     .fl
+        cmp.l   $30b6(a0),d0
+        bne     .fl
+        cmp.w   #$2079,$baac(a0)        ; movea.l <+$ef3c>,a0
+        bne     .fl
+        cmp.l   $baae(a0),d0
+        bne     .fl
+        cmp.w   #$2079,$be7e(a0)
+        bne     .fl
+        cmp.l   $be80(a0),d0
+        bne     .fl
+        lea     _mvars(pc),a2
+        move.l  d0,S_TABA(a2)
+        move.w  #$4eb9,$30b4(a0)
+        lea     _shadeset(pc),a1
+        move.l  a1,$30b6(a0)
+        lea     _sshade(pc),a1
+        move.l  a1,$baae(a0)
+        move.l  a1,$be80(a0)
+.fl     move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
 .sites  dc.l    $de74,$34311016,$d1f11010       ; move.w (22,a1,d1.w),d2; adda.l (16,a1,d1.w),a0
@@ -1953,6 +1975,7 @@ _maprows
         move.l  M_TABA(a4),a5
         move.l  (a5),a5                 ; START's row table
         move.l  a5,a2
+        bsr     _shadeupd
         cmp.l   M_ROWBLK(a4),a5         ; the block _rowalloc extended
         bne     .orig
         moveq   #0,d6
@@ -2091,6 +2114,13 @@ _rowalloc
         movem.l d1-d4/a0-a2,-(a7)
         lea     _mvars(pc),a2
         clr.l   M_ROWBLK(a2)
+        clr.l   S_BUF(a2)               ; no shade copy: the spans read the table itself
+        clr.l   S_ORIG(a2)
+        move.l  S_TABA(a2),d1
+        beq     .ns
+        move.l  d1,a0
+        move.l  (a0),S_SHADE(a2)
+.ns
         move.l  d0,d3                   ; START's size
         moveq   #0,d1
         move.w  -970(a3),d1
@@ -2103,7 +2133,8 @@ _rowalloc
         add.l   #4+15+15,d2             ; the copy's room: its alignment and offset
         move.l  d2,d1
         add.l   d3,d2
-        add.l   d3,d2                   ; the block
+        add.l   d3,d2
+        add.l   #SHADEMAX+15,d2         ; the block, with the shade table's copy
         move.l  _hunk1(pc),a1           ; room in the fast pool (as _fastalloc)
         move.l  $100(a1),d0
         beq     .start
@@ -2123,6 +2154,12 @@ _rowalloc
         add.l   d3,a0
         move.l  a0,M_TAB(a2)
         add.l   d3,a0
+        move.l  a0,d2
+        add.l   #15,d2
+        and.w   #-16,d2
+        move.l  d2,S_BUF(a2)
+        move.l  d2,a0
+        lea     SHADEMAX(a0),a0
         move.l  a0,d2
         add.l   #15,d2
         and.w   #-16,d2
@@ -2215,6 +2252,82 @@ _mapinit
         move.l  (a7)+,a2
         rts
 
+; +$30b4 move.l a1,<+$ef3c>, the end of the view's shade set-up: a0 the view, a1 the table
+; (16 levels of 256 colours in the jungle), 160(a0) its levels, 158(a0) the far level.
+; Each drawing's shading steps from a start level (levels - 1, 6, 0 or the far level) to
+; the far level over the rows and three steps on (+$dcc2, +$de18), each step a fraction of
+; a level, so it reads the table's first max(levels, far + 1, 7) levels: copied when that
+; is the table, with a level to spare above the far level of every set-up so far
+_shadeset
+        movem.l d0-d1/a2-a3,-(a7)
+        lea     _mvars(pc),a2
+        move.l  a1,S_SHADE(a2)
+        clr.l   S_ORIG(a2)
+        clr.l   S_N(a2)
+        move.w  158(a0),d1
+        bmi     .no
+        cmp.w   S_FAR(a2),d1
+        bls     .f
+        move.w  d1,S_FAR(a2)
+.f      moveq   #0,d0
+        move.w  160(a0),d0
+        move.w  S_FAR(a2),d1
+        addq.w  #1,d1
+        cmp.w   d1,d0
+        bls     .no
+        cmp.w   #7,d0
+        blo     .no
+        cmp.w   #SHADEMAX/256,d0
+        bhi     .no
+        lsl.l   #8,d0
+        move.l  d0,S_N(a2)
+.no     move.l  S_TABA(a2),a3
+        move.l  a1,(a3)                 ; the original's store and flags
+        movem.l (a7)+,d0-d1/a2-a3
+        rts
+
+; from _maprows, a4 _mvars, a5 START's row table: the spans' table, the copy when the row
+; table is _rowalloc's block and the set-up allowed it, the table itself otherwise
+_shadeupd
+        move.l  S_TABA(a4),d0
+        beq     .x
+        movem.l d0-d1/a0-a1,-(a7)
+        move.l  d0,a0
+        move.l  (a0),d0                 ; the table
+        cmp.l   M_ROWBLK(a4),a5
+        bne     .t
+        move.l  S_N(a4),d1
+        beq     .t
+        move.l  S_BUF(a4),a1
+        move.l  a1,d1
+        beq     .t
+        cmp.l   S_ORIG(a4),d0
+        beq     .c
+        move.l  d0,a0
+        move.l  S_N(a4),d1
+        lsr.l   #2,d1
+        subq.w  #1,d1
+.l      move.l  (a0)+,(a1)+
+        dbf     d1,.l
+        move.l  d0,S_ORIG(a4)
+.c
+        IFD MAPCHECK
+        move.l  d0,a0
+        move.l  S_BUF(a4),a1
+        move.l  S_N(a4),d1
+        lsr.l   #2,d1
+        subq.w  #1,d1
+.k      cmpm.l  (a0)+,(a1)+
+        beq     .k1
+        addq.l  #1,S_BAD(a4)
+.k1     dbf     d1,.k
+        addq.l  #1,S_CALLS(a4)
+        ENDC
+        move.l  S_BUF(a4),d0
+.t      move.l  d0,S_SHADE(a4)
+        movem.l (a7)+,d0-d1/a0-a1
+.x      rts
+
 _mvars
 _mtaba          dc.l    0               ; hunk 1 +$a1de
 _mrowblk        dc.l    0               ; START's row table that _rowalloc extended
@@ -2232,6 +2345,15 @@ _mbad           dc.l    0               ; MAPCHECK: longwords that differed
 _mcalls         dc.l    0               ; MAPCHECK: calls
 _mfull          dc.b    0               ; the copy to be made again
         even
+_staba          dc.l    0               ; hunk 1 +$ef3c (0: the shade table not patched)
+_sshade         dc.l    0               ; the table the spans read (+$baac, +$be7e)
+_sbuf           dc.l    0               ; the copy's room in _rowalloc's block (0 none)
+_sorig          dc.l    0               ; the table copied (0 none)
+_sn             dc.l    0               ; the bytes the shading reads (0: no copy)
+_sbad           dc.l    0               ; MAPCHECK: longwords that differed
+_scalls         dc.l    0               ; MAPCHECK: calls with the copy
+_sfar           dc.w    0               ; the highest far level set up
+SHADEMAX equ    32*256
 M_TABA  equ     _mtaba-_mvars
 M_ROWBLK equ    _mrowblk-_mvars
 M_ROWS  equ     _mrows-_mvars
@@ -2247,6 +2369,14 @@ M_HI    equ     _mhi-_mvars
 M_BAD   equ     _mbad-_mvars
 M_CALLS equ     _mcalls-_mvars
 M_FULL  equ     _mfull-_mvars
+S_TABA  equ     _staba-_mvars
+S_SHADE equ     _sshade-_mvars
+S_BUF   equ     _sbuf-_mvars
+S_ORIG  equ     _sorig-_mvars
+S_N     equ     _sn-_mvars
+S_BAD   equ     _sbad-_mvars
+S_CALLS equ     _scalls-_mvars
+S_FAR   equ     _sfar-_mvars
 
 _ivars
 _iview          dc.l    0               ; the view

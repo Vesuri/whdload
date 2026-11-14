@@ -206,6 +206,27 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
      `+$b264`, `+$e828`, read it).
    The test define `MAPCHECK` compares the whole copy with the map at every drawing.
 
+10. **The shade table in fast memory** (`_shadeset`, `_shadeupd`, with item 9's patch;
+    `docs/performance.md`, plan step 10.2). The spans shade each colour through the table
+    at `<+$ef3c>` (16 levels of 256 colours in the jungle, 4 KB in the resource heap in
+    chip), indexed by a level and the colour. The table is set only at the end of the
+    view's shade set-up (`+$3056`-`+$30ba`), which also writes the view's `+154` (the
+    table), `+158` (the far level) and `+160` (the levels). Each drawing's level steps from
+    a start level (levels − 1, 6, 0 or the far level, `+$e622`-`+$e67a`) to the far level
+    over the rows and three steps on (`+$dcc2`, the row loop to −3 at `+$de18`), each step a
+    fraction of a level, so the spans read the table's first max(levels, far + 1, 7)
+    levels. Three sites, all checked first, patched only with item 9's:
+    - `+$30b4` [`$7560`] `move.l a1,<+$ef3c>` (`23c9` and the address) becomes `jsr
+      _shadeset`, which stores it as before and records how many bytes the spans read when
+      those are the table's own: at most 32 levels and a level to spare above the far level
+      of every set-up so far.
+    - `+$baac` [`$ff58`] and `+$be7e` [`$1032a`] `movea.l <+$ef3c>,a0` (`2079` and the
+      address) read `_sshade` instead. `_maprows` (item 9) sets it at every drawing, before
+      the spans: a copy in an 8 KB room of `_rowalloc`'s block, 16-aligned, made when the
+      table's address changes; the table itself when the row table is not that block or
+      the set-up did not allow a copy.
+    `MAPCHECK` also compares the copy with the table at every drawing.
+
 ## ECS improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan:
