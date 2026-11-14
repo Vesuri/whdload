@@ -142,7 +142,7 @@ for chip memory: where data sits does not matter here (INFERRED).
 | Function | What | ms/frame | Share |
 |---|---|---|---|
 | hunk 2 `+$19a2` | chunky-to-planar: 4 planes by `add`/`addx` bit shifts, 41 cycles per pixel, 32,000 pixels | 182.6 | 27.4% |
-| hunk 1 `+$bee2` | landscape columns: per-column set-up with absolute-addressed variables, divisions (`+$c3a2`...) | 128.2 | 19.2% |
+| hunk 1 `+$bee2` | landscape columns: the loop over a row's samples (`+$c010`), two map walkers and the projection, every register taken | 128.2 | 19.2% |
 | hunk 1 `+$9d54`-`+$a4ff` | landscape spans: clipping, shade lookups, fills | 103.7 | 15.5% |
 | hunk 1 `+$ad48`-`+$b1ff` | unrolled vertical and `move.l` fills | 68 | 10.2% |
 | hunk 1 `+$d090` | objects: scaled sprites with transparency, a byte per pixel (`+$d2de`) | 46.4 | 7.0% |
@@ -186,7 +186,7 @@ AGA, a1200-030:
 ECS, A500:
 
 1. **Chunky-to-planar: 183 ms** (27%), an `add`/`addx` shifter at 40 cycles per pixel.
-2. **Landscape: 300 ms** (45%): column set-up 128 ms, spans 104 ms, fills 68 ms.
+2. **Landscape: 300 ms** (45%): columns 128 ms, spans 104 ms, fills 68 ms.
 3. **Objects 46 ms, sky 28 ms**, beam wait 8 ms. Memory and the blitter are idle.
 
 ## Plan
@@ -275,14 +275,37 @@ ECS, from 666.7 ms (1.5 fps), far from both caps on a 7 MHz 68000:
    `tools/rr_skycheck.py ecs`: 2,000 random cases identical to START's loop. Measured: the
    sky 25.8 → 13.9 ms per frame, the mean frame interval 596.3 → 578.2 ms (17 frames
    either way).
-3. **Column set-up** (hunk 1 `+$bee2`): variables in registers, divisions by reciprocal
-   table: 30-50 ms. About 500 ms.
-4. **Span set-up and clipping** (hunk 1 `+$9d54`-`+$a4ff`; the fills are unrolled
-   already): 20-40 ms. About 470 ms, 2.1 fps.
+3. **Column set-up** (examined, not done): the per-instruction profile of step 2's run puts
+   the function's 122.6 ms in the loop over a row's far samples (hunk 1 `+$c010`-`+$c202`,
+   966 samples a frame, about 900 cycles each: the near row's walker `+$c028` 38.7 ms, the
+   far sample `+$c0ee` 40.0 ms, the rest 27.9 ms) and 14.3 ms in the 55 rows' set-up, of
+   which its three divisions a row take 3.3 ms. The loop holds all fifteen registers (two
+   map walkers and their steps, the screen x and its step, the map's row table, the
+   projection table, the variables' base), so its 25 or so memory operands a sample cannot
+   move into registers without spilling others. What can go without registers: the clear
+   of `+$bec4` on every sample, needed only after an object's column (20 cycles, 2.7 ms),
+   and a reload of `-604(a1)` in its min/max (about 10 cycles, 1.4 ms); reciprocal tables
+   would save under 2 ms of the divisions and change their rounding. About 4-6 ms in all
+   (DERIVED: the 68000's cycle counts times the profile's counts), 1% of the frame, for a
+   second copy of the game's loop: not done.
+4. **Span set-up and clipping** (examined, not done): hunk 1 `+$9d54`-`+$a4ff`, 95.9 ms
+   over some 200 basic blocks, the largest `+$a0e2` (13.4 ms, register code already). The
+   call from the column loop (`bsr`, `movem.l d4-d7` both ways, `rts`: 118 cycles, 503
+   calls a frame, 8.4 ms) has to stay: d4-d7 are the caller's map walkers and the span code
+   needs four registers of its own; the entry's checks (`+$9d54`-`+$9de6`, about 20 ms)
+   compare against variables that change between calls. A few milliseconds at most: not
+   done.
 
-Stop there: what is left is fills that are unrolled `move.l` stores already, the objects
-(46 ms) and the logic, each a rewrite for under 10%. Beyond that, fewer pixels (the LOW
-detail and window settings), not code.
+Stop there: the code that is left is register-bound (the landscape), unrolled already (the
+fills, 65 ms) or small (the objects, 41 ms, and the logic), each a rewrite for a few per
+cent. The conversion is the largest item (143 ms, 25% after step 2): the blitter, idle, could
+take its last exchanges in parallel with the CPU (planes and an intermediate buffer in chip
+memory). Beyond that, fewer pixels (the LOW detail and window settings), not code.
+
+`tools/rr_snap.py` and `tools/rr_ecsland.py` are the check any patch to the landscape needs:
+snapshots of the machine at its entry (hunk 1 `+$bee2`) in the walk, then the landscape run
+from each under Unicorn as the game has it and patched, all memory compared. An equivalent
+test patch at `+$c010` came out identical on four snapshots and a one-operand change did not.
 
 ## Reproducing
 
@@ -304,6 +327,9 @@ python3 tools/rr_skycheck.py 2000
 # the ECS conversion and sky copy against START's loops
 python3 tools/rr_ecsc2pcheck.py 3000
 python3 tools/rr_skycheck.py ecs 2000
+# the ECS landscape: snapshots at its entry in the walk, then each run under Unicorn
+BUILD=profile python3 tools/rr_snap.py tmp/ecs/snap 4
+python3 tools/rr_ecsland.py tmp/ecs/snap
 ```
 
 The `profile` build is the current source, every step done so far; v1.2's figures are the
