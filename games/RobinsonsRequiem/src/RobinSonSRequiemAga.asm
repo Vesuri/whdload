@@ -42,7 +42,12 @@ PRESTIGE_CRACK
 ;============================================================================
 
 CHIPMEMSIZE     = $1A0000
+; EXP_FASTMEM (measurement builds only, docs/performance.md): another ExpMem size.
+        IFD EXP_FASTMEM
+FASTMEMSIZE     = EXP_FASTMEM
+        ELSE
 FASTMEMSIZE     = $40000
+        ENDC
 NUMDRIVES       = 1
 WPDRIVES        = %1111
 
@@ -52,7 +57,13 @@ WPDRIVES        = %1111
 BOOTDOS
 ;CBDOSLOADSEG
 ;CBDOSREAD
+; EXP_CACHECHIPDATA (measurement builds only): BaseMem write-through instead of
+; non-cacheable, so that the caches stay on without WHDLoad's MMU (68030 default).
+        IFD EXP_CACHECHIPDATA
+CACHECHIPDATA
+        ELSE
 CACHE
+        ENDC
 ;DEBUG
 ;DISKSONBOOT
 ;DOSASSIGN
@@ -275,6 +286,19 @@ _cont
             add.l   a1,a1
             add.l   a1,a1
             bsr _directstart
+   ENDC
+
+   IFD PROFILE
+            move.l  d7,a1
+            add.l   a1,a1
+            add.l   a1,a1
+            bsr _framecount
+   ENDC
+   IFD EXP_FASTPOOL
+            move.l  d7,a1
+            add.l   a1,a1
+            add.l   a1,a1
+            bsr _fastpool
    ENDC
 
         ;call
@@ -752,6 +776,68 @@ _prefs_jump     dc.w    $20,4
 _menu_jump      dc.w    $97,4
                 dc.b    $0a,$00,$00,$31
         EVEN
+
+  ENDC
+
+**********************************************
+; Profile builds: count the frames the game draws in PROFILE_FRAMES (a longword in user
+; vector 67, after the $106 jump), for tools/rr_prof.py. The chunky-to-planar entry, hunk 2
+; +$2db8, calls the conversion loop once per frame through jsr <hunk 2 +$2e84> at +$2e78;
+; that call goes through _framehook instead.
+
+  IFD PROFILE
+
+PROFILE_FRAMES  = $10c
+
+_framecount
+        move.l  (a1),d0                 ; hunk 1
+        lsl.l   #2,d0
+        move.l  d0,a0
+        move.l  (a0),d0                 ; hunk 2
+        lsl.l   #2,d0
+        move.l  d0,a0
+        addq.l  #4,a0
+        cmp.w   #$4eb9,$2e78(a0)
+        bne     .no
+        lea     $2e84(a0),a1
+        cmp.l   $2e7a(a0),a1
+        bne     .no
+        lea     _c2p(pc),a2
+        move.l  a1,(a2)
+        pea     _framehook(pc)
+        move.l  (a7)+,$2e7a(a0)
+        clr.l   PROFILE_FRAMES.w
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+
+_framehook
+        addq.l  #1,PROFILE_FRAMES.w
+        move.l  _c2p(pc),-(a7)
+        rts
+
+_c2p    dc.l    0
+
+  ENDC
+
+**********************************************
+; EXP_FASTPOOL (measurement builds only): START sizes a fast-memory pool (hunk 0 +$162,
+; AvailMem(MEMF_FAST|MEMF_LARGEST) - 50000, none under 100000) and then discards it with
+; move.l #0,<hunk 1 +$f4> at hunk 0 +$196; everything then comes from the chip pool. Branch
+; over that store.
+
+  IFD EXP_FASTPOOL
+
+_fastpool
+        lea     4(a1),a0                ; hunk 0
+        cmp.l   #$23fc0000,$196(a0)
+        bne     .no
+        cmp.w   #$0000,$19a(a0)
+        bne     .no
+        move.w  #$6008,$196(a0)         ; bra.s to +$1a0
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
 
   ENDC
 

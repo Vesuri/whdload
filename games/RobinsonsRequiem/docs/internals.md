@@ -2,8 +2,8 @@
 
 What CFou!'s v1.2 slaves do, from their source (`src/`) and the installed executables.
 Offsets are into the game's `START` executable: hunk data offsets, with the file offset in
-brackets, and for the AGA game's MAIN script, offsets from a name in it. Nothing has been
-measured yet.
+brackets, and for the AGA game's MAIN script, offsets from a name in it. `docs/performance.md` has the
+measurements and the renderer's functions by cost.
 
 ## How it loads
 
