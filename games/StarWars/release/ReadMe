@@ -39,7 +39,10 @@
  - DMA wait in sample player fixed (x4)
  - High-score saving fixed/added (disabled if trainer is used)
  - Unlimited Shields trainer (CUSTOM1)
- - Timing fixed (can be disabled with CUSTOM2)
+ - Timing fixed (always on)
+ - Enhanced framerate: 50 frames a second at the game's own speed (CUSTOM2,
+   SPS 403 only; machines too slow for it play as without it)
+ - Drawing fixed on fast CPUs (SPS 403)
  - NewIcon (created by me)
  - Source code included as usual
  - Quit option that works on 68000 machines (default key is 'F10')
@@ -56,7 +59,8 @@
  CUSTOM1, the option can then be toggled on and off with the "S" key.
  High-score saving will be disabled if the trainer is used!
 
- The timing fix can be disabled with CUSTOM2.
+ The timing fix can be disabled with CUSTOM2. (Since 3.0b the timing fix
+ is always on and CUSTOM2 selects the enhanced framerate.)
 
  The game displays a short instruction text at the beginning, I have
  decided to leave it in and fixed the CPU dependent delay which was used
@@ -85,6 +89,18 @@
 
  History:
  --------
+
+ version 3.0b (14.11.2026) done by Vesuri:
+ - timing fix always on (CUSTOM2 no longer disables it, which ran the game
+   too fast on fast machines)
+ - CUSTOM2 is now "Enhanced framerate": the game, the wave select and the
+   attract scenes drawn at up to 50 frames a second, interpolated, at the
+   game's own speed (SPS 403; an A1200 with fast RAM or a faster CPU, a
+   stock A500 or A1200 draws as before)
+ - 68060: words and strokes no longer missing from the vector text
+   (scoring page, wave select)
+ - wave select: no black box cut into the WAVE 1 text and the Death Star,
+   and it no longer runs faster on fast CPUs
 
  version 2.00 (10.08.2016) done by StingRay:
  - patch redone

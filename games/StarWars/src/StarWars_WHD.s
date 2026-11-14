@@ -115,7 +115,7 @@ slv_info	dc.b	"installed by StingRay/[S]carab^Scoopex",10
 		IFD	DEBUG
 		dc.b	"DEBUG!!! "
 		ENDC
-		dc.b	"Version 3.0b (13.11.2026)",0
+		dc.b	"Version 3.0b (14.11.2026)",0
 slv_config	dc.b	"C1:B:Unlimited Shields;"
 		dc.b	"C2:B:Enhanced framerate"
 		dc.b	0
