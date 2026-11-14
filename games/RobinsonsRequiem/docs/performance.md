@@ -79,6 +79,7 @@ the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 | 2: caches on | 51 (196.1 ms) | 185.9 ms | 56 |
 | 3: the 3D view's buffers in fast memory | 57 (175.4 ms) | 132.7 ms | 55 |
 | 4: Kalms' 68030 chunky-to-planar | 57 (175.4 ms) | 111.3 ms | 53 |
+| 5: no beam wait (not kept) | 57 (175.4 ms) | 113.5 ms | |
 
 From step 3 on the frame counts are near the object period's ceiling: step 3's frames
 alternate a drawing pass of about 7 fields with an idle 3-field pass (33.1 ms per frame in
@@ -179,12 +180,18 @@ AGA, from 277.8 ms (3.6 fps):
    pixel-identical to step 3's. Measured: the conversion 36.2 → 10.5 ms (8,080 longword
    writes per frame instead of 32,256 byte writes and 32,256 chip reads); busy 132.7 →
    111.3 ms.
-5. **No beam wait**: the swap (hunk 0 `+$13e0`) waits for line 256 and rewrites the copper
-   list's plane pointers (`+$13f6`), which sit at the list's start, where the copper reads
-   them at the top of every field. Two small copper lists in chip, the plane pointers and a
-   jump into the game's list behind its own, swapped through COP1LC (taken at the next
-   field) instead: the swap waits for nothing. The beam wait is 6.7 ms per frame after
-   step 3.
+5. **No beam wait** (measured, not kept): the swap (hunk 0 `+$13e0`) waits for line 256 and
+   rewrites the copper list's plane pointers (`+$13f6`) at the list's start. Two small
+   copper lists in chip, the plane pointers and a jump into the game's list behind its
+   own, swapped through COP1LC (taken at the next field), with the drawing into the
+   replaced planes held until the next field (the conversion, the blitter copy hunk 2
+   `+$5b6`, the pointer hunk 2 `+$4ec`), removed the beam wait (5.8 ms per frame) and the
+   copper-interrupt wait (3.5 ms). Nothing came of it: the next 3D pass still waits for the
+   swap to show, now in START's own wait for the pointer's redraw on the new screen (hunk 1
+   `+$4a14`: `+$ed99`, set at the swap `+$4b44`, is cleared by the VBL's pointer routine
+   `+$9aa6`), 7.3 ms per frame, and the rest grew from 111.3 to 113.5 ms; 57 frames either
+   way. The beam wait ends at line 256, about a millisecond before the field does, so it
+   never costs a pass a field.
 6. **The landscape loop for the 68030** (hunk 1 `+$d88c`, `+$b7ca`) until the drawing pass
    takes at most 5 fields (100 ms busy) in this walk, so every frame lands on the object's
    8 fields.
