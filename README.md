@@ -31,7 +31,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Red Baron Enhanced | JOTD | [3.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/RedBaronEnhanced-3.0b-20261013) |
 | Road Rash Enhanced | JOTD | [3.0b (11.11.2026)](https://github.com/Vesuri/whdload/releases/tag/RoadRashEnhanced-3.0b-20261111) |
 | Robinson's Requiem Enhanced | CFou! | not yet released |
-| Star Wars Enhanced | StingRay | not yet released |
+| Star Wars Enhanced | StingRay | [3.0b (14.11.2026)](https://github.com/Vesuri/whdload/releases/tag/StarWarsEnhanced-3.0b-20261114) |
 | Stellar 7 Enhanced | Psygore | [2.0b (07.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Stellar7Enhanced-2.0b-20261107) |
 | Test Drive Enhanced | JOTD | [2.0b (13.11.2026)](https://github.com/Vesuri/whdload/releases/tag/TestDriveEnhanced-2.0b-20261113) |
 | Test Drive II Enhanced | JOTD | released upstream as JOTD's 2.1 (11.10.2026) |
