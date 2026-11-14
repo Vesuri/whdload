@@ -282,6 +282,9 @@ drawing faster alone.
 
 AGA, beyond the player's period (planned, not started): frames between the player's runs,
 with the world on the game's own rhythm whatever the frame rate. Step 7 replaces step 6.
+The world's speed is the game's own, the cap's grid, as decided: the player every 9 fields,
+not step 6's 8. Holding the player at 8 would need a grid of single fields, on which the
+short periods run faster than the game ever runs them (`caporal` every 4 fields, not 6).
 
 7. **The world on the cap's grid**. A world count W, advanced by the cap (3 fields) per
    pass, takes the VBL count's place in the scheduler's due test and next run (hunk 1
