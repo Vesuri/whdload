@@ -16,6 +16,7 @@ Read `docs/open-work.md` first.
 | `docs/internals.md` | how the game loads, Kickstart use, every slave patch with its code-hunk and file offsets |
 | `docs/performance.md` | where the frame time goes in both games (`tools/rr_prof.py`, `tools/rr_report.py`), the pain points and the plan |
 
-The slave source is `src/` (`RobinsonSRequiemEcs.asm`, `RobinSonSRequiemAga.asm`, the
+The slave source is `src/` (`RobinsonSRequiemEcs.asm`, `RobinSonSRequiemAga.asm` with the
+chunky-to-planar conversion it includes, `c2p030.s`, the
 `lvo/intuition.i` bridge in `src/include/`, and CFou!'s unassembled bitplane-fix fragment
 `_fixBPL1&2-InFast-Silmarils.s`); `tools/` is the development harness and never ships.

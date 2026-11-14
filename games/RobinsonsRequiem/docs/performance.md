@@ -78,6 +78,7 @@ the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 | 1: fast pool, 1 MB ExpMem | 48 (208.3 ms) | 198.5 ms | 51 |
 | 2: caches on | 51 (196.1 ms) | 185.9 ms | 56 |
 | 3: the 3D view's buffers in fast memory | 57 (175.4 ms) | 132.7 ms | 55 |
+| 4: Kalms' 68030 chunky-to-planar | 57 (175.4 ms) | 111.3 ms | 53 |
 
 From step 3 on the frame counts are near the object period's ceiling: step 3's frames
 alternate a drawing pass of about 7 fields with an idle 3-field pass (33.1 ms per frame in
@@ -168,19 +169,16 @@ AGA, from 277.8 ms (3.6 fps):
    accesses 120.2 → 61.0 ms per frame (18.0 of them the plane writes); busy 185.9 → 132.7
    ms. The resource heap (map data) and MAIN's 256 KB block (the objects' graphics) stay in
    chip: the heap also holds the sounds Paula plays (INFERRED: the `.SND` files load there).
-4. **A 68030 chunky-to-planar**: Kalms' `c2p1x1_8_c5_030_2` (`$AMIGA_SHARE/kalms-c2p`)
-   for the loop at hunk 2 `+$2e84`: 8,064 longword writes instead of 32,256 byte writes,
-   the merge in registers. It fits: the game's loop is a plain 8x8 bit transpose, chunky
-   bit n to plane n, no remap. What needs care: the game converts a rectangle (window x
-   rounded down to 16 pixels, chunky stride `+$ef1e`, plane modulo set at `+$2e3a`), so a
-   per-row driver like `KalmsC2PRect.s` with the strides read at run time (the adapter's
-   are assembly constants); Kalms takes widths in 32-pixel steps, the game 16, so a window
-   16 pixels over a multiple of 32 keeps the old loop for its last 16; the game's planes
-   are 4 pointers (`+$2e02`), each with a second plane at +16000, while Kalms writes plane
-   n at n x bplsize (16000 is under its 16 KB limit; if the 4 blocks are not 32,000 apart,
-   its stores take 4 base registers); and it reads one longword past each row. The
-   conversion goes from 36.2 ms (after step 3) to about 10 ms. Validate the planes byte for
-   byte against the original loop.
+4. **A 68030 chunky-to-planar** (done): Kalms' `c2p1x1_8_c5_030_2` for the loop at hunk 2
+   `+$2e84` (`src/c2p030.s`). The game's loop is a plain 8x8 bit transpose, chunky bit n to
+   plane n; its planes 0-1 are in the slave's reserved chip block and 2-7 elsewhere (each
+   pointer with its pair 16,000 bytes on), so each of Kalms' two passes writes through two
+   bases; a row driver applies START's strides, and widths that are not a multiple of 32
+   pixels (not in this walk) go back to START's loop. `tools/rr_c2pcheck.py`: 4,000 random
+   rectangles byte-identical to START's loop; the walk's first screenshot is
+   pixel-identical to step 3's. Measured: the conversion 36.2 → 10.5 ms (8,080 longword
+   writes per frame instead of 32,256 byte writes and 32,256 chip reads); busy 132.7 →
+   111.3 ms.
 5. **No beam wait**: the swap (hunk 0 `+$13e0`) waits for line 256 and rewrites the copper
    list's plane pointers (`+$13f6`), which sit at the list's start, where the copper reads
    them at the top of every field. Two small copper lists in chip, the plane pointers and a
@@ -232,6 +230,8 @@ BUILD=profile FSUAE=$FSUAE_ARM python3 tools/rr_prof.py tmp/prof/base-arm
 # ECS
 VARIANT=RobinsonsRequiem SETUP=custom BUILD=developer BARTO=1 python3 tools/rr_prof.py tmp/prof/ecs-base
 python3 tools/rr_report.py tmp/prof/base-aprof
+# the AGA conversion against START's loop (after make unpack)
+python3 tools/rr_c2pcheck.py 2000
 ```
 
 The `profile` build is the current source, every step done so far; v1.2's figures are the

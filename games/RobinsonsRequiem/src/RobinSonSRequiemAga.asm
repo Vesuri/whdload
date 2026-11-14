@@ -300,6 +300,7 @@ _cont
             add.l   a1,a1
             add.l   a1,a1
             bsr _fastblocks
+            bsr _c2ppatch
 
         ;call
                 move.l  d7,a1
@@ -977,3 +978,24 @@ _fastfree
 _hunk1          dc.l    0
 _hunk2          dc.l    0
 _chipalloc      dc.l    0
+
+**********************************************
+; The chunky-to-planar conversion (src/c2p030.s): START's loop at hunk 2 +$2e84 starts
+; with move.w d6,<hunk 2 +$2db6>, which becomes jmp _c2p030. After _fastblocks (_hunk2).
+
+_c2ppatch
+        move.l  _hunk2(pc),a0
+        lea     $2e84(a0),a1
+        cmp.w   #$33c6,(a1)
+        bne     .no
+        lea     $2db6(a0),a0
+        cmp.l   2(a1),a0
+        bne     .no
+        move.w  #$4ef9,(a1)
+        pea     _c2p030(pc)
+        move.l  (a7)+,2(a1)
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+
+        INCLUDE c2p030.s
