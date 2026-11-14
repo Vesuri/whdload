@@ -189,6 +189,70 @@ pointer (`a3`) and variable frame (`a6`); a frame's bytes are the program's vari
   screen and skips the intro (`flags` goes straight to `baratin*`, `param`, `init3d`,
   `prefs*`). Later, Esc ends the running part only.
 
+### Objects and the scheduler
+
+MAIN's loop (hunk 1 `+$24f8`-`+$25e0`) walks the object table (`+$ed6c`: per object a
+longword frame pointer, `a6`, and at `+4` the word offset of the next entry; MAIN is entry 0)
+and, at the list's end, calls the frame routine (`+$250e` [`$69ba`] `bsr +$49b2`). For each
+object:
+
+- **Every pass** (`+$2530`-`+$256a`): when its flags `-36(a6)` have bit 7 set and bit 1
+  clear and its program has a pass handler (header `+10`, the header at `-20(a6)`, whose
+  first word is the program's slot), that handler runs.
+- **Timed** (`+$256e`-`+$25dc`): when its state `-4(a6)` is not 0 and the VBL count
+  (`+$ee6c`, counted at `+$99ea`) is past its next run (`-62(a6)`), the next run becomes the
+  count plus its period (`-58(a6)`, `+$257e` [`$6a2a`]-`+$2590`) and its program runs on from
+  `-8(a6)` until it yields (op `$42`), then its post handler (header `+6`). Op `$36`
+  (`+$6478`) sets the period and the next run to the count plus it (`+$6480` [`$a92c`]).
+  A period-0 object runs once per pass, but at most once per field.
+
+Lateness is not carried: an object runs at the first pass after it is due and is due again
+a period after that. When MAIN keeps up, the frame routine's cap wait (until `+$ee6b`, the
+fields since its last start, reaches the cap `+$ee6a`, 3 in game) puts the passes on a grid
+of 3 fields, and an object runs every period + 1 fields rounded up to a multiple of 3:
+measured standing still without the frame pacing (`tools/rr_objects.py`), every 3 fields
+for the period-0 objects, 9 for period 7, 6 for period 3, 12 for period 10, 18 for period 15.
+A longer frame routine delays everything due during it (`docs/performance.md`, "Objects'
+rhythm").
+
+An object's frame holds its pose: positions at `+0`, `+8`, `+16` (16.16 longwords, the
+integer word first), angles at `+24`, `+32`, `+40` (words, whole degrees, kept within
+±360), velocities as bytes at `+52`, `+56`, `+60`, and the angle offsets the view adds at
+`+64`, `+68`, `+72`. Ops `$4c`/`$4d` set or add the position, `$f0`/`$f1` the angles, `$90`
+adds the velocities, `$fa` adds them turned by the angles, `$fb` turns towards a heading;
+`$f9` gives the position plus the turned velocities, `$f7` and `$fd` query the map, `$f8`
+moves with a collision check and `$b2` finds objects within a radius. Before a timed run
+`+$4762` copies the pose's six words to `+$edac`-`+$edb8`; after it `+$4792` [`$8c3e`]
+brings the angles within ±360 and, when the object has moved or turned, moves its 3D
+elements (`+$ed86`'s table, chained from `-24(a6)`) by the difference, marking them changed.
+
+The views are part of MAIN's frame (`+$eda8` points at both): the first at `+$edd6`, chained
+at `+4`; flags at `+0` (bit 7 changed, bit 6 skipped) and `+1` (bit 1: 3D), the camera
+position at `+22`-`+26` and angles at `+52`-`+56`, the followed object at `+96` (its offset
+in `+$ed6c`) with follow flags at `+132` (bit 0 position, bit 1 angles) and offsets at
+`+134`-`+144`. Per frame routine, for each view, `+$48b8` sets the camera from the followed
+object's pose plus the offsets and marks the view changed when the camera moved; when
+changed, `+$4980` adds the view's velocity (`+42`-`+46`) to the camera and `+$a3a6` draws
+the 3D view (`+$a470`); unchanged, it copies the shown planes into the back buffer once.
+Scripts read the views like any of MAIN's variables (the walk's camera heading is MAIN's
+word `$18a`).
+
+In the jungle start (the walk, `tools/rr_objects.py`) nine objects run:
+
+| Entry | Slot | Program | Period | What it does there |
+|---|---|---|---|---|
+| 0 | 0 | MAIN | 0 | the game's phases |
+| 6 | 2 | `souris` | 0 | the pointer |
+| 12 | 15 | `heros` | 7 | the player; the 3D view follows it. Turning stores its heading (7 to 9 degrees a run); walking takes two sub-steps a run through ops `$f9`, `$f7`, `$b2`, `$fd` and `$f8` |
+| 18 | 3 | `yoda` | 0 | about 53 ops a run (not examined) |
+| 24 | 9 | `time` | 0 | adds 1 to MAIN's word `$1a08` at every run (180 of 180 traced) and switches on it; MAIN's byte `$1922` went from 2 to 4 in 182 fields (a game clock counted in passes, INFERRED) |
+| 30 | 29 | `caporal` | 3 | |
+| 36 | 75 | `sjungle` | 0 | three ops a run: the jungle's sounds (INFERRED from the name) |
+| 54 | 85 | `skyjun` | 15 | the jungle's sky (INFERRED from the name) |
+| 138 | 21 | `human` | 10 | moves (its position changed between snapshots) |
+
+Walking on, other objects start (a trace of 329 fields walking saw three more run).
+
 ### Direct start
 
 `_directstart` (developer builds) replaces hunk 0 `+$2540`'s `bsr.s $24da / bsr.w $294a`

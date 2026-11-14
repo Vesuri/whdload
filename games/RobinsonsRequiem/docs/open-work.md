@@ -1,9 +1,12 @@
 # Open work
 
-Both games are profiled (`docs/performance.md`: where the frame time goes walking in the
-jungle, and the plan). The AGA plan is done, its step 5 measured and not kept
-(`docs/internals.md`, "AGA improvements"): walking, every frame lands on the followed
-object's 8 fields, the ceiling. The ECS plan is done: steps 1 and 2 (the conversion and the
+Both games are profiled (`docs/performance.md`: where the frame time goes turning in the
+jungle, and the plan). The AGA plan's steps 1-6 are done, its step 5 measured and not kept
+(`docs/internals.md`, "AGA improvements"): turning, every frame lands on the player's 8
+fields, the ceiling while frames come only when the player has moved. Its steps 7-10 (frames
+between the player's runs, the world on the game's own 3-field grid) are planned, not
+started; step 6 changed the objects' rhythm ("Objects' rhythm"), which step 7 puts back.
+The ECS plan is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
 landscape code being register-bound (about 1% each). Both developer builds boot straight
@@ -18,10 +21,9 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 
 Next, in order:
 
-1. The AGA game in heavier scenes than the jungle walk (more trees and objects):
-   `tools/rr_passes.py` shows whether the frames keep the 8 fields. The frame pacing
-   takes MAIN round twice per frame instead of three times: check that what runs on every
-   pass (the period-0 objects) keeps its speed in play.
+1. The AGA plan's steps 7-10 (`docs/performance.md`, "Plan", "AGA, beyond the player's
+   period"), each measured with `tools/rr_objects.py` and `tools/rr_passes.py` before the
+   next, also in a heavier scene than the jungle start (more trees and objects).
 2. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`). The AGA game's objects' frames are in fast
    memory since step 1: check that a game saved with v1.2 loads with the new slave and the

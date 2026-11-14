@@ -9,14 +9,17 @@ offsets (`docs/internals.md`).
 
 `tools/rr_prof.py OUT` boots a developer-type build (`docs/development.md`, "Straight into
 the game"), stops at the open of `avion.DO`/`.CO`, runs 150 fields, then holds keypad 9
-(forward and to the right) for 500 fields, 10 s PAL, under `WARP=1 DETERMINISTIC=1`.
+for 500 fields, 10 s PAL, under `WARP=1 DETERMINISTIC=1`. Keypad 9 turns the player on the
+spot (AGA: its position stayed put for 182 fields while its heading went from -63 to -249
+degrees); keypad 8 walks forward.
 `tools/rr_report.py OUT` prints the tables below from its output; `tools/rr_passes.py OUT`
 runs the same workload under gdb breakpoints for the AGA game's drawing passes and frame
 intervals.
 
 - The game draws no frame while the player stands still (`KEY=none`: 0 frames in 500
-  fields), so walking is the workload. Movement depends on the frame rate (INFERRED: after
-  the same window the compass reads NW at 36 frames and SE at 51), so the views drift apart
+  fields), so turning is the workload. The player turns once per run of its script (`heros`,
+  period 7, 7 to 9 degrees a run; `docs/internals.md`, "Objects and the scheduler"), and its
+  runs depend on the frame rate ("Objects' rhythm" below), so the views drift apart
   between builds.
 - **AGA**, `SETUP=a1200-030` (68030, 50 MHz). The setup's own core (with the MMU model)
   cannot be profiled; aprof runs on the cycle-exact core without it (`FSUAE=$FSUAE_APROF
@@ -32,16 +35,40 @@ Both games hold each frame to at least 3 fields: the frame wait (AGA hunk 1 `+$4
 `+$30ac`) loops until the VBL's field count reaches MAIN's cap, hunk 1 `+$ee6a` (ECS
 `+$d4c0`), which is 3 in game in both.
 
-The AGA game's 3D frames are bounded further by the object the view follows (measured in
-this walk, `tmp`-only `period.py` logging hunk 1 `+$258c`; the view redraws when that
-object has moved, hunk 1 `+$48b8`). MAIN runs the due objects, then the frame routine
-(hunk 1 `+$49b2`: after a swap the copper-interrupt wait for the next field, the cap wait,
-the drawing, the swap), and again; an object is due once the VBL count passes its last run
-plus its period (hunk 1 `+$257e`-`+$2590`: next run `-62(a6)`, period `-58(a6)`). This
-object's period is 7, so a 3D frame comes at most every 8 fields: **160 ms, 6.25 fps, is
-the ceiling in this walk** (62.5 frames in the window). Movement is per frame (INFERRED
-from the compass: NW after 36 frames, SE after 51), so the period sets the game's speed
-and stays.
+The AGA game's 3D frames are bounded further by the object the view follows, the player
+(`heros`; the view redraws when it has moved, hunk 1 `+$48b8`). MAIN runs the due objects,
+then the frame routine (hunk 1 `+$49b2`: after a swap the copper-interrupt wait for the
+next field, the cap wait, the drawing, the swap), and again; an object is due once the VBL
+count passes its last run plus its period (`docs/internals.md`, "Objects and the
+scheduler"). The player's period is 7, so a 3D frame comes at most every 8 fields: **160 ms,
+6.25 fps, is the ceiling in this walk** (62.5 frames in the window) with the frame pacing
+(plan, step 6). The game itself, when it keeps up, runs its objects on the cap's grid of 3
+fields, the player every 9 (5.56 fps). The player turns and walks a fixed step per run of
+its script, so its period sets its speed; the plan's "Beyond the player's period" draws
+frames between its runs.
+
+### Objects' rhythm
+
+Fields between an object's runs, the mean of 117 to 171 fields (`tools/rr_objects.py`, the
+`developer` build of the current source; without the pacing, the same with step 6's `bsr
+_pacepatch` left out):
+
+| Objects | Period | No pacing, standing | No pacing, turning | Current, standing | Current, turning | Current, walking |
+|---|---|---|---|---|---|---|
+| MAIN, `souris`, `yoda`, `time`, `sjungle` | 0 | 3.00 | 3.1 | 3.97 | 2.7 | 2.7 |
+| `caporal` | 3 | 6.00 | 4.65 | 8.00 | 5.82 | 4.80 |
+| `heros` (the player) | 7 | 9.00 | 9.20 | 8.00 | 8.00 | 8.00 |
+| `human` | 10 | 12.00 | 12.6 | 12.00 | 12.00 | 12.00 |
+| `skyjun` | 15 | 18.00 | 18.6 | 16.00 | 16.00 | 16.00 |
+
+Standing still without the pacing every object runs on the cap's grid: period + 1 fields
+rounded up to a multiple of 3, the game's rhythm whenever it keeps up. Drawing breaks the
+grid: a drawing pass delays what comes due during it, and the pass after a long one starts
+at once (its cap has passed), so turning gives longer intervals to the long periods and
+shorter ones (1-field gaps) to the short. The pacing (step 6) changed the rhythm in all
+three cases: the player every 8 fields instead of 9, the period-0 objects (`time` counts
+the passes: a game clock, INFERRED) every 3.97 fields standing and 2.7 turning instead of
+3, `caporal` every 8 standing instead of 6, `skyjun` 16 instead of 18.
 
 Without the frame pacing (plan, step 6) MAIN sees the object due only between frame
 routines: at the drawing pass's end, at the next pass's (the view copied into the other
@@ -246,16 +273,70 @@ AGA, from 277.8 ms (3.6 fps):
       so that MAIN runs it when it is due, and the next pass, which draws its frame, skips
       its cap wait. 62 frames on both cores, every interval 8 fields, with drawing passes
       of up to 6.5 fields: the frame starts when the object has run, so the pass has
-      nearly the whole 8 fields. MAIN now goes round twice per frame instead of three
-      times (the idle pass before the object came due is gone), the rate of a machine
-      whose drawing pass takes a little over 4 fields; the objects that run on every pass
-      (period 0) run that much less often per second (not checked: what they do).
+      nearly the whole 8 fields. It changed every object's rhythm ("Objects' rhythm"):
+      the player every 8 fields where the game, keeping up, gives 9; the period-0 objects
+      (with `time`'s clock) every 2.7 fields turning and 3.97 standing instead of 3.
 
-Stop there: at 8 fields per frame the object's period holds every frame, and nothing faster
-shows. Beyond it is a different project: a shorter period changes the game's speed
-(movement per frame, INFERRED) and needs a fixed-time simulation first. Check step 6
-against heavier scenes (more trees and objects) than this walk: the pacing keeps the 8
-fields while the drawing pass ends before the object is next due.
+At 8 fields per frame the player's period holds every frame, and nothing faster shows by
+drawing faster alone.
+
+AGA, beyond the player's period (planned, not started): frames between the player's runs,
+with the world on the game's own rhythm whatever the frame rate. Step 7 replaces step 6.
+
+7. **The world on the cap's grid**. A world count W, advanced by the cap (3 fields) per
+   pass, takes the VBL count's place in the scheduler's due test and next run (hunk 1
+   `+$257e` [`$6a2a`]) and in op `$36` (`+$6480` [`$a92c`]). At the list's end (`+$250e`
+   [`$69ba`]) MAIN goes round the list again without the frame routine while W is a pass
+   or more behind the VBL count, at most twice in a row; further behind (a load, a pause) W
+   is set to the count, dropping the time as the game does. Each pass waits until the VBL
+   count reaches W, which takes over the cap wait's job. Every object then runs as the game
+   runs it when it keeps up (the "No pacing, standing" column), however long the drawing
+   takes: the player every 9 fields (5.56 runs a second: the game's speed, 12.5% slower than
+   step 6's 8), the period-0 objects and `time`'s clock every 3. In 3D mode (`+$ee03`)
+   first, W set to the count when it starts. Check: `tools/rr_objects.py` gives the grid's
+   intervals standing, turning and walking, on both cores and in a heavier scene (more
+   trees and objects); the catch-up passes per frame and their cost.
+8. **The camera between the player's runs**. The frame routine draws on every pass (at most
+   every 3 fields, 16.7 fps) with the view's camera staged between the followed object's
+   last two poses. After each timed run (`+$4792` [`$8c3e`]) the slave keeps the pose
+   before it (`+$edac`-`+$edb8`), the pose after it and the run's W. Before the drawing
+   (`+$4b8e`, step 6's `_view`) it sets the camera to prev + (cur - prev) × alpha, alpha =
+   (now - W of cur) / (W of cur - W of prev), at most 1 (angles the short way round, in
+   whole degrees), marks the view changed, draws, and puts the camera back: scripts read
+   the views among MAIN's variables, and `+$48b8` compares against the camera. No
+   interpolation across a jump: a move longer than a walk's step, a new followed object,
+   3D mode starting, a load. Per-frame code that assumes a frame per move stays on world
+   passes: `+$4980` adds the view's velocity (`+42`-`+46`) on every changed frame, and the
+   countdown `+$ef2a` (view flag bit 5) counts frame routines. Check what runs between
+   staging and putting back (the VBL calls `+$6c4e` when `+$ee71` is set) and how the
+   pointer picks objects in the view. The view lags by one run: a new pose is reached one
+   run (9 fields, 180 ms) after the run instead of at the next frame, though the motion
+   starts showing in the same frame as now. Extrapolation, cur + (cur - prev) × alpha, has
+   no lag but overshoots by up to a run's step (7 to 9 degrees) when the player stops: to
+   try in play. Check: `tools/rr_passes.py` (frames per 500 fields, their intervals), the
+   camera per frame evenly spaced while turning, `tools/rr_objects.py` as after step 7,
+   and with alpha held at 1 (a test define) frames pixel-identical to step 7's. Estimate
+   (DERIVED from the drawing passes after step 6, 2.1 to 4.1 fields on the setup's core
+   and 3.3 to 6.5 on the aprof core, plus the objects' runs): a frame every 3 to 4 fields
+   on the setup's core (12.5 to 16.7 fps) and every 4 to 7 on the aprof core (7 to 12.5
+   fps), against 5.56 on the grid and 6.25 with the pacing.
+9. **The other moving objects between their runs**: their 3D elements (`+$4792` moves them
+   by their object's difference at each run) staged the same way for the drawing (`human`
+   here); their animation frames stay per run. Check with a moving creature in view.
+10. **The drawing pass again**: it now sets the frame rate, up to the cap. The function
+   table above predates steps 3 to 6: profile the current build and work down it (the
+   landscape `+$d88c`, the spans `+$b7ca`, the map and shade-table reads in chip, about
+   12 ms).
+
+Beyond 16.7 fps (an 040 or 060): frames between world passes, presentation only, without
+going round MAIN; the cap stays the world's grid.
+
+Not planned: running the scripts more often in smaller steps. The engine has no step
+length: each object runs every period and its script moves it by its own constants (the
+player 7 to 9 whole degrees a turn, two collision-checked sub-steps a walk). Smaller steps
+would mean rewriting those constants and every per-run counter in `heros` and in every
+creature's program in every level, with headings in whole degrees (a quarter of 9 degrees
+has no value), for the picture step 8 gives less one run of lag.
 
 ECS, from 666.7 ms (1.5 fps), far from both caps on a 7 MHz 68000:
 
@@ -321,6 +402,9 @@ python3 tools/rr_report.py tmp/prof/base-aprof
 # the AGA game's drawing passes and frame intervals (gdb breakpoints, no profile)
 BUILD=profile FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
     python3 tools/rr_passes.py tmp/prof/passes
+# the AGA game's objects and their intervals ("Objects' rhythm"; KEY=none standing,
+# 3e walking; SLAVE=<a slave assembled without bsr _pacepatch> for no pacing)
+BUILD=developer python3 tools/rr_objects.py tmp/prof/objects 300
 # the AGA conversion and sky copy against START's loops (after make unpack)
 python3 tools/rr_c2pcheck.py 2000
 python3 tools/rr_skycheck.py 2000
