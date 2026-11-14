@@ -1055,7 +1055,7 @@ _skypatch
 ; last run's count plus its period (-58(a6)). Keeping up, the passes start a cap (+$ee6a, 3
 ; fields in game) apart and every object runs on that grid; a long drawing pass breaks it.
 ; In 3D mode (+$ee03) a world count W takes the VBL count's place: W goes up by the cap per
-; pass, each pass waits for the VBL count to reach W (the cap wait's job), and while W is a
+; pass, each pass waits at its end for the VBL count to reach W (the cap wait's job), and while W is a
 ; pass or more behind at the list's end MAIN goes round the list again without the frame
 ; routine, at most twice in a row; three passes or more behind (a load, a pause) W is set
 ; to the count.
@@ -1063,6 +1063,8 @@ _skypatch
 ; - +$6480 movea.l <+$ee6c>,a0 (op $36, the period) becomes jsr _wa0
 ; - +$250e bsr.w +$49b2, bra.s +$251a (the list's end) becomes jsr _listend
 ; - +$49e8 move.b <+$ee6a>,d0 (the cap, for the wait at +$49ee) becomes jsr _capwait
+; - +$4b54 movem.l (sp)+,d0-a6 and rts (the frame routine's end) become jmp _passend, which
+;   waits for W (plan step 10: the wait at the pass's end, not before its drawing)
 ; and, for plan step 8 (below), when it checks:
 ; - +$4b8e jsr +$a3a6 (the 3D view's drawing) becomes jsr _view
 ; - +$4880 movea.l <+$ed86>,a1 (an object's elements moved) becomes jsr _emove (step 9)
@@ -1085,6 +1087,10 @@ _worldpatch
         cmp.l   #$610024a2,(a1)         ; bsr.w +$49b2
         bne     .no
         cmp.w   #$6006,4(a1)            ; bra.s +$251a
+        bne     .no
+        cmp.l   #$4cdf7fff,$4b54(a0)    ; movem.l (sp)+,d0-a6, rts: the frame routine's end
+        bne     .no
+        cmp.w   #$4e75,$4b58(a0)
         bne     .no
         lea     _wvars(pc),a2
         move.l  a0,d0
@@ -1134,6 +1140,10 @@ _worldpatch
         lea     $49e8(a0),a1
         move.w  d1,(a1)
         pea     _capwait(pc)
+        move.l  (a7)+,2(a1)
+        lea     $4b54(a0),a1
+        move.w  #$4ef9,(a1)
+        pea     _passend(pc)
         move.l  (a7)+,2(a1)
         move.l  a0,a3                   ; plan step 9, when it checks and its table
         add.l   #$4880,a3               ; is allocated
@@ -1222,7 +1232,8 @@ _listend
         rts
 
 ; d0.b the cap for the wait at +$49ee, as START's move.b (the rest of d0 kept); in 3D mode
-; the wait for the count to reach W, and 0 (no wait) for START's
+; 0 (no wait: the wait for W is at the pass's end, _passend) and the drawing's time, the
+; next pass's count
 _capwait
         movem.l d1/a0-a1,-(a7)
         lea     _wvars(pc),a1
@@ -1241,24 +1252,43 @@ _capwait
         st      W_ON(a1)
         lea     W_W(a1),a0
         move.l  a0,W_PTR(a1)
-        bra     .none
-.none   clr.b   d0
+.on     moveq   #0,d1
+        move.b  d0,d1
+        add.l   W_W(a1),d1
+        move.l  d1,W_DRAWT(a1)
+        clr.b   d0
         movem.l (a7)+,d1/a0-a1
         rts
 .off    sf      W_ON(a1)
         move.l  W_VBL(a1),W_PTR(a1)
         movem.l (a7)+,d1/a0-a1
         rts
-.on     moveq   #0,d1
-        move.b  d0,d1
+
+; the frame routine's end (+$4b54): in 3D mode W goes up by the cap and the pass waits for
+; the count to reach it, so the next list runs at its time and the next drawing starts as
+; soon as that list has run
+_passend
+        movem.l (a7)+,d0-a6
+        movem.l d1/a0-a1,-(a7)
+        lea     _wvars(pc),a1
+        tst.b   W_ON(a1)
+        beq     _passout
+        move.l  W_3D(a1),a0
+        tst.b   (a0)
+        beq     _passout
+        move.l  W_CAP(a1),a0
+        moveq   #0,d1
+        move.b  (a0),d1
+        beq     _passout
         add.l   W_W(a1),d1
         move.l  d1,W_W(a1)
+        move.l  W_VBL(a1),a0
 _wwait  cmp.l   (a0),d1                 ; until the count reaches W
         bhi     _wwait
-        clr.b   d0
+_wwaitend
+_passout
         movem.l (a7)+,d1/a0-a1
         rts
-_wwaitend
 
 **********************************************
 ; The camera between the followed object's runs (docs/performance.md, plan step 8). The
@@ -1309,7 +1339,7 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         move.l  (a0,d0.w),d0
         cmp.l   I_OBJ(a3),d0
         bne     .staged
-        move.l  _wvars+W_W(pc),d6
+        move.l  _wvars+W_DRAWT(pc),d6
         sub.l   I_WR(a3),d6             ; alpha's numerator
         move.l  I_DEN(a3),d7
         cmp.l   d7,d6
@@ -1668,7 +1698,7 @@ _eplan  movem.l d1-d7/a0-a1/a3-a4,-(a7)
         clr.w   32(a3)
         tst.b   W_ON(a0)
         beq     .done
-        move.l  W_W(a0),d5
+        move.l  W_DRAWT(a0),d5
         sub.l   4(a3),d5                ; alpha's numerator
         move.l  8(a3),d6
         cmp.l   d6,d5
@@ -1773,7 +1803,7 @@ _estage movem.l d0-d7/a0-a1/a3-a4,-(a7)
         bne     .some
         tst.b   d0                      ; none: after the drawing, a done move's slot freed
         beq     .clr
-        move.l  W_W(a0),d6
+        move.l  W_DRAWT(a0),d6
         sub.l   4(a3),d6
         cmp.l   8(a3),d6
         blo     .next
@@ -1856,6 +1886,7 @@ I_STAGED equ    _istaged-_ivars
 
 _wvars
 _ww             dc.l    0               ; W
+_wdrawt         dc.l    0               ; the drawing's time: W plus the cap
 _wptr           dc.l    0               ; the count the objects run by: +$ee6c or W
 _wvbl           dc.l    0               ; +$ee6c
 _wcap           dc.l    0               ; +$ee6a
@@ -1871,6 +1902,7 @@ _wcatch         dc.b    0               ; catch-up passes in a row
 _won            dc.b    0               ; W in use
         even
 W_W     equ     _ww-_wvars
+W_DRAWT equ     _wdrawt-_wvars
 W_PTR   equ     _wptr-_wvars
 W_VBL   equ     _wvbl-_wvars
 W_CAP   equ     _wcap-_wvars

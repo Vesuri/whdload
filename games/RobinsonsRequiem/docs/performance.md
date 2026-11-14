@@ -129,6 +129,7 @@ the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 | 7: the world on the cap's grid | 55 (181.8 ms) | 110.0 ms | 55 |
 | 8: the camera between the player's runs | 80 (125.0 ms) | 94.8 ms | 126 |
 | 9: the other moving objects between their runs | 80 (125.0 ms) | 94.9 ms | 126 |
+| 10a: the wait for the world at the pass's end | 102 (98.0 ms) | 91.0 ms | 151 |
 
 After step 6 every frame interval is 8 fields on both cores (`tools/rr_passes.py`, 240
 events: 36 frames on the aprof core with drawing passes of 3.3 to 6.5 fields, 28 on the
@@ -368,10 +369,45 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
    drawn (`tools/rr_passes.py KEY=none`: 40 passes every 3 fields, none drawing); turning,
    the frames and busy time are step 8's. A creature moving on screen is not checked: no
    scene with one is at hand.
-10. **The drawing pass again**: it now sets the frame rate, up to the cap. The function
-   table above predates steps 3 to 6: profile the current build and work down it (the
-   landscape `+$d88c`, the spans `+$b7ca`, the map and shade-table reads in chip, about
-   12 ms).
+10. **The drawing pass again**: it now sets the frame rate, up to the cap.
+   1. **The wait for the world at the pass's end** (done, `docs/internals.md`, "AGA
+      improvements"). After step 9 a frame still started on the cap's grid: the wait for W
+      was at the frame routine's start, where START's cap wait is, so a drawing that ended
+      late in its third field, its list then running into the fourth, set off a catch-up
+      pass and the next frame waited for the sixth (19 of 55 frames walking on the setup's
+      core, from `tools/rr_passes.py`'s swaps and pass starts; on the aprof core the world
+      wait was 23.7 ms per frame). With the wait at the frame routine's end the next list
+      waits for its time and the drawing after it starts at once. Measured: 151 frames in
+      the window on the setup's core (frame intervals of 3 or 4 fields: turning 39 and 18,
+      walking 48 and 10, 151.8 and 157.6 frames per 500 fields against 131.5 and 121.6) and
+      102 on the aprof core (10.2 fps, 98.0 ms; intervals of 4 to 7 fields turning, 5 or 6
+      walking), the world wait 0.4 ms per frame, busy 91.0 ms; the objects' intervals the
+      grid's standing, turning and walking (`tools/rr_objects.py`).
+   2. What is left is the drawing, after 10a (aprof core, 102 frames, ms per frame):
+
+      | Function | ms/frame | In chip accesses |
+      |---|---|---|
+      | hunk 1 `+$d88c`, the landscape | 36.2 | 18% |
+      | hunk 1 `+$b7ca`, the spans | 18.1 | 28% |
+      | Kalms' conversion, both passes | 10.0 | 47% |
+      | hunk 1 `+$b6ea`, span set-up, 1,570 calls | 5.8 | 0% |
+      | hunk 0 `+$13ce`, the beam wait | 5.6 | 99% |
+      | the sky (`_skyrows`) | 4.2 | 87% |
+      | hunk 1 `+$ea3a`, objects | 1.9 | 82% |
+      | hunk 0 `+$13c0`, the copper-interrupt wait | 1.1 | 99% |
+
+      The landscape's loop (`+$d9ba`-`+$dbac`, a sample per pass round it) spreads its
+      time over some 70 instructions of 0.1 to 0.8 ms each, most on its variables
+      (`-6xx(a1)`), with the two map reads from chip the largest (`+$da6c`, `+$db1e`, 3.4 ms
+      each); the 68020's scaled index would save a few instructions a sample (about 1 ms,
+      INFERRED from the profile's per-instruction times), and no equivalence check for the
+      AGA landscape exists yet (`tools/rr_ecsland.py` is the ECS one). The map and shade
+      table reads in chip (about 12 ms with the spans' `+$ba7c`-`+$ba92` and `+$bab6`) need
+      a fast copy kept in step with the heap's compaction and the scripts' writes (step
+      6.2). The beam and copper-interrupt waits (6.7 ms) now cost time, the drawing being
+      the bound; step 5's copper lists removed them but the next pass then waited in
+      START's wait for the pointer's redraw (`+$4a14`), which would have to move to before
+      the conversion as well. Not done.
 
 Beyond 16.7 fps (an 040 or 060): frames between world passes, presentation only, without
 going round MAIN; the cap stays the world's grid.

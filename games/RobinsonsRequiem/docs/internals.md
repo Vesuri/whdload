@@ -111,8 +111,10 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
 6. **The world on the cap's grid** (`_worldpatch`, `docs/performance.md`, plan step 7): in
    3D mode (hunk 1 `+$ee03`) the objects run by a world count W instead of the VBL count
    ("Objects and the scheduler" below), so they keep the game's own rhythm however long the
-   drawing takes. W goes up by the cap (`+$ee6a`) per pass, and each pass waits for the
-   VBL count to reach it; at the list's end, while W is a pass or more behind the count,
+   drawing takes. W goes up by the cap (`+$ee6a`) per pass, and each pass waits at its
+   end for the VBL count to reach it, so the next list runs at its time and the next
+   drawing starts as soon as that list has run (plan step 10; before it the wait was at the
+   frame routine's start, where START's cap wait is); at the list's end, while W is a pass or more behind the count,
    MAIN goes round the list again without the frame routine (a catch-up pass), at most
    twice in a row; three passes or more behind (a load, a pause) W is set to the count less
    the cap. Out of 3D mode, or with a cap of 0, the count is the VBL count and the cap wait
@@ -122,8 +124,11 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    `$36`) `jsr _wa0`, each giving the count; `+$250e` [`$69ba`] `bsr.w +$49b2` and `bra.s
    +$251a` (`6100 24a2 6006`, the list's end) become `jsr _listend`, which returns to
    `+$251a` either way; `+$49e8` [`$8e94`] `move.b <+$ee6a>,d0` (`1039` and the address,
-   the cap for the wait at `+$49ee`) becomes `jsr _capwait`, which in 3D mode waits for W
-   and gives 0 for START's wait. All four are checked first.
+   the cap for the wait at `+$49ee`) becomes `jsr _capwait`, which in 3D mode gives 0 for
+   START's wait and notes the drawing's time (W plus the cap, the next pass's count, which
+   steps 8 and 9 interpolate to); `+$4b54` [`$9000`] `movem.l (sp)+,d0-a6` and `rts`
+   (`4cdf 7fff 4e75`, the frame routine's end) become `jmp _passend`, which waits for W.
+   All five are checked first.
 
 7. **The camera between the followed object's runs** (`_view`, `_isample`, part of
    `_worldpatch`; `docs/performance.md`, plan step 8): hunk 1 `+$4b8e` [`$903a`] `jsr
@@ -133,7 +138,8 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    new pose keeps the one before it, the world count of the change and its interval (since
    the last change, at most the object's period on the cap's grid, 9 fields for the
    player). Before the drawing `_view` moves the camera (`+22`-`+26`, `+52`-`+56`) back by
-   (new - old) x (1 - alpha), alpha = (W - W of the change) / the interval, angles the
+   (new - old) x (1 - alpha), alpha = (the drawing's time - W of the change) / the
+   interval, angles the
    short way round and within ±360; when that camera differs from the last one drawn it
    marks the view changed (bit 7), the view is drawn, and the camera is put back, so
    scripts and `+$48b8` see the game's own. A frame drawn only for the staging then takes

@@ -3,7 +3,7 @@
 Silmarils' Robinson's Requiem (1994) under WHDLoad, in its two versions: the ECS/OCS game on
 Kickstart 1.3 and the AGA game on Kickstart 3.1, one slave each. Both slaves are made
 faster (`docs/performance.md`, "Plan": the ECS plan done, the AGA plan's world on the
-game's own grid and its camera and moving objects between their runs done, step 10 to go). The original slaves are by CFou! (game.conf `AUTHOR`, `UPSTREAM`): his v1.2 install
+game's own grid and its camera and moving objects between their runs done, the drawing itself to go). The original slaves are by CFou! (game.conf `AUTHOR`, `UPSTREAM`): his v1.2 install
 package from whdload.de, which ships their source.
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.

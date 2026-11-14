@@ -1,13 +1,14 @@
 # Open work
 
 Both games are profiled (`docs/performance.md`: where the frame time goes turning in the
-jungle, and the plan). The AGA plan's steps 1-9 are done, its step 5 measured and not kept
-and its step 6's pacing replaced by step 7 (`docs/internals.md`, "AGA improvements"): the
-world runs on the game's own 3-field grid whatever the drawing takes, and the camera is
-drawn between the player's runs, so the drawing sets the frame rate (126 frames in the
-window on the setup's core, 80 on the aprof core, against 55 on the player's 9 fields).
-The other moving objects are drawn between their runs too (step 9, not yet seen with a
-creature on screen). Its step 10 (the drawing again) is not done yet.
+jungle, and the plan). The AGA plan's steps 1-9 and 10's first change are done, its step 5
+measured and not kept and its step 6's pacing replaced by step 7 (`docs/internals.md`, "AGA
+improvements"): the world runs on the game's own 3-field grid whatever the drawing takes,
+the camera and the other moving objects are drawn between their runs (step 9 not yet seen
+with a creature on screen), and each drawing starts as soon as its list has run, so the
+drawing sets the frame rate (151 frames in the window on the setup's core, 102 on the
+aprof core, against 55 on the player's 9 fields). The rest of step 10 (the drawing itself:
+the landscape, the map in chip, the beam wait) is examined, not done.
 The ECS plan is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
@@ -23,10 +24,12 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 
 Next, in order:
 
-1. The AGA plan's step 10 (`docs/performance.md`, "Plan", "AGA, beyond the player's
-   period"), each measured with `tools/rr_objects.py` and `tools/rr_passes.py` before the
-   next; steps 7-9 also in a heavier scene than the jungle start (more trees and objects)
-   and step 9 with a creature moving on screen.
+1. The AGA plan's step 10.2 (`docs/performance.md`, "Plan", "AGA, beyond the player's
+   period": the landscape with an equivalence check like `tools/rr_ecsland.py`, a fast
+   copy of the map, the beam wait with the pointer's redraw), each measured with
+   `tools/rr_objects.py` and `tools/rr_passes.py` before the next; steps 7-9 also in a
+   heavier scene than the jungle start (more trees and objects) and step 9 with a creature
+   moving on screen.
 2. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`). The AGA game's objects' frames are in fast
    memory since step 1: check that a game saved with v1.2 loads with the new slave and the
