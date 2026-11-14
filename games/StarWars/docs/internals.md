@@ -146,9 +146,10 @@ put back, the cache flushed) in direct mode: colour $1840, line $19ae, plot $1b2
 $9806, rectangle $0810, plane copy $0a1c, clear $1c08, swap wait $09a8, TIE fighter draw
 $839c (keys its ops by the fighter), surface object draw $a982 (keys a tower's or a
 base's lines by its world position), the ground dots ($1e6c, $1ea6, $a67e), the trench's
-wall rows $c562 and floor ribs ($d16c, $d1c0), and the swap flag store $09fa. Static
-(CUSTOM2, also in direct mode): the world's movement summed at $a6aa, the dots' wrap
-marks at $a640 and $a666, and the trench's rib shifts counted at $bb88.
+wall rows $c562 and floor ribs ($d16c, $d1c0), the fireball draw $49a2, and the swap
+flag store $09fa. Static (CUSTOM2, also in direct mode): the world's movement summed at
+$a6aa, the dots' wrap marks at $a640 and $a666, the trench's rib shifts counted at
+$bb88, and the fireballs' steps nearer summed at $48c4, $a52e and $bca2.
 
 - **Pairing.** An op is keyed by the code address that called the primitive, and for TIE
   fighters by the fighter (the low word of its record). It is paired with the next op of
@@ -190,6 +191,30 @@ marks at $a640 and $a666, and the trench's rib shifts counted at $bb88.
   a tick at most) were the nearest row and rib leaving past the camera, growing as 1/z.
   Before, in 5 of 11 ticks 16 to 32 panel lines were drawn in place, and up to 32 a tick
   changed velocity by more than 12 pixels.
+- **Fireballs.** The fireballs of all three phases are one table (-25492(a4), 12
+  bytes: z, state, x, y, vx, vy; the count at -25364(a4)) sorted by depth, each drawn by
+  $49a2 (18 lines; another 15 while it explodes, its state negative). A new one is put in
+  at its depth ($47ea) and the table closes up behind one that passed or burnt out, so by
+  draw order a fireball paired with another one. All move nearer by the same step each
+  tick ($48bc in space, d4; $a522 on the surface, the speed + 50; $bca2 in the trench,
+  600), and vx and vy stay as fired (on the surface vy is the height it climbs or falls
+  to), so z plus the steps summed, vx and vy name a fireball. The trench's towers fire
+  two at once, at the same depth with mirrored vx, and the same pair again later;
+  the surface's towers fire some at once that share all three, and those keep their
+  order in the table, so each after the first takes the next free key. A fireball's
+  lines are keyed by a hash of those and whether it explodes, flagged `OPF_ID` and
+  `OPF_FB` (they pair only with a fireball's lines, should a hash match a tower's or a
+  trench row's key), and interpolated however far. The world entry is a2 when $49a2 is
+  called from $4710 (space and the surface, $46ee) and -25496(a4) from the trench ($cb8e,
+  $d24e). Wave 3 on a1200-030 (`tmp/scripts/phdump.sh`, `tmp/scripts/fbtrack.py`,
+  `tmp/scripts/fbmotion.py`), 24 ticks of space and of the surface and 16 of the trench:
+  every fireball line drawn the tick before paired with the same fireball's; the
+  unpaired ones were new fireballs and explosions' first ticks. The lines whose velocity
+  changed by more than 12 pixels were fireballs near the camera, growing as 1/z. Before,
+  a fireball put in nearer than others (space) or two that shared a key (the surface)
+  paired with another or not at all. In space a fireball's x wraps round by 4096
+  ($48fe) as the view steers; one that wraps in view would be interpolated across the
+  screen for a tick (not seen in these runs).
 - **Ground dots.** The surface's dots are a table of 25 entries (-25758(a4), z and x of
   two points each) sorted by depth, which $1dda projects into six points per entry and
   plots at $1ea6. When the nearest entry passes, $a67e shifts the table down one entry

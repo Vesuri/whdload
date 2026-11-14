@@ -51,6 +51,7 @@ SM_SCREEN	= 32000			; a screen: four planes of 8000 bytes
 SM_CHIPKEEP	= 65536			; Chip RAM left for the game after the third screen
 SM_HUDROWS	= 31			; rows the clear ($1c08) leaves: the HUD strip
 SM_CLRROWS	= 169			; rows the clear clears in each plane
+SM_FBN		= 16			; fireball keys noted per recording (SmFb)
 SM_RECB		= 4+4*28		; a screen's record: the clear's key.w, a pad, then
 					; each plane's rows drawn (224 bits, row 0 first)
 SM_LATE		= 128			; more of the recent ticks late than this (of 256): direct
@@ -73,6 +74,8 @@ SM_HOLD		= 50			; direct ticks at least, before trying
 OPF_ID		= 6			; flags: the key is the object's own identity
 					; (the ground dots, the surface's towers and
 					; bases), interpolated however far
+OPF_FB		= 5			; and a fireball's (its lines pair only with
+					; a fireball's)
 OP_NOP		= 0
 OP_COLOR	= 1
 OP_LINE		= 2
@@ -152,6 +155,9 @@ sv_clrbad	rs.l	1		; and those that left a row of the clear not empty
 sv_trk		rs.l	1		; SmRender: the record of the screen it draws (0: none)
 sv_f		rs.w	1		; SmRender: d6 * sv_mul, the in-between step
 sv_crec		rs.b	2*SM_RECB	; each of our screens' record (SmPClear)
+sv_fbt		rs.l	1		; SmFb: the recording its keys are of,
+sv_fbc		rs.w	1		; how many,
+sv_fbk		rs.w	SM_FBN		; and they
 sv_SIZE		rs.b	0
 
 ; the game routine at code-hunk offset \1, called
@@ -184,6 +190,9 @@ PLSMOOTH403
 	PL_PS	$a640,SmDotMove		; lea -25758(a4),a2; moveq #51,d6
 	PL_PS	$a666,SmDotWrap		; move.w d7,2(a2); addq.l #4,a2
 	PL_PS	$bb88,SmRibShift	; lea -24914(a4),a0; movea.l a0,a2
+	PL_PSS	$48c4,SmFbSpace,2	; move.w 8(a5),d4; move.w 10(a5),d5
+	PL_PSS	$a52e,SmFbSurf,2	; move.w -24972(a4),d6; add.w #50,d6
+	PL_PS	$bca2,SmFbTrench	; move.w -25364(a4),d4; addq.w #1,d4
 	PL_PSS	$897e,SmPresent3a,8	; the wait (cmpi.w; bge.s; bra.s) and the swap jsr
 	PL_PSS	$b612,SmPresent3b,8
 	PL_PSS	$b65e,SmPresent3a,8
@@ -487,8 +496,9 @@ SmHookTab
 	dc.w	$c562,SmTrRow-SmHookTab		; link a5,#0; movem.l d4-d6,-(sp)
 	dc.w	$d16c,SmRib-SmHookTab		; move.w -25010(a4),d0; neg.w d0
 	dc.w	$d1c0,SmRibEnd-SmHookTab	; cmpi.w #9,-25342(a4)
+	dc.w	$49a2,SmFb-SmHookTab		; link a5,#-16; movem.l d4-d7/a2,-(sp)
 	dc.w	0
-SM_HOOKS	= 17
+SM_HOOKS	= 18
 SmHookSave	ds.b	SM_HOOKS*6
 
 ; d0: 1 install the hooks (jmp, saving the bytes the first time), 0 restore the bytes
@@ -654,7 +664,7 @@ SmLine
 	move.w	(a1),d1
 	addq.w	#1,(a1)
 	or.w	SmSurfK(pc),d1
-	moveq	#1<<OPF_ID,d0
+	move.b	SmSurfF(pc),d0
 .n	bsr	SmNew
 	beq.b	.x
 	move.b	#OP_LINE,(a0)
@@ -826,7 +836,7 @@ SmSurf
 	mulu	#40503,d0
 	swap	d0
 	and.w	#$ffc0,d0		; the line number below
-	bsr.b	SmObj
+	bsr	SmObj
 	move.l	8(a7),-(a7)		; the object
 	move.l	8(a7),-(a7)		; the points
 	bsr.b	.draw
@@ -846,7 +856,8 @@ SmObj
 	lea	SmSurfK(pc),a0
 	move.w	d0,(a0)+
 	clr.w	(a0)+			; SmSurfN
-	st	(a0)			; SmSurfOn
+	st	(a0)+			; SmSurfOn
+	move.b	#1<<OPF_ID,(a0)		; SmSurfF
 	btst	#0,SmV+sv_rec(pc)
 	beq.b	.x
 	move.l	SmV+sv_end(pc),a0
@@ -865,7 +876,7 @@ SmObj
 SmSurfK	dc.w	0
 SmSurfN	dc.w	0
 SmSurfOn	dc.b	0
-	even
+SmSurfF		dc.b	0			; the flags of its lines
 
 ; The trench ($cff4) draws its floor ribs (a table of 10 depths, -24916(a4), near
 ; first) and then the wall panels of the map rows in view, far to near ($c562, one call
@@ -880,7 +891,7 @@ SmTrRow
 	move.w	-26528+2(a4),d0		; $c562: link a5,#0; movem.l d4-d6,-(sp)
 	lsl.w	#5,d0			; (the address is even: the row's number * 64)
 	and.w	#$7fc0,d0
-	bsr.b	SmObj
+	bsr	SmObj
 	move.w	4(a7),-(a7)		; the map word
 	bsr.b	.draw
 	addq.l	#2,a7
@@ -899,7 +910,7 @@ SmRib
 	add.w	SmRibSh(pc),d0
 	lsl.w	#6,d0
 	or.w	#$8000,d0
-	bsr.b	SmObj
+	bsr	SmObj
 	move.w	-25010(a4),d0
 	neg.w	d0
 	GOTOG	$d172
@@ -923,6 +934,102 @@ SmRibShift
 	move.l	a0,a2
 	rts
 SmRibSh	dc.w	0
+
+; $49a2 draws a fireball (its state on the stack, negative: exploding; its projection
+; at -25372(a4)). The fireballs are a table (-25492(a4), 12 bytes: z, state, x, y, vx,
+; vy) sorted by depth: a new one is put in at its depth ($47ea) and the table closes
+; up behind one that passed or burnt out, so by draw order a fireball paired with
+; another one. All move nearer by the same step each tick ($48bc in space, $a522 on
+; the surface, $bc10 in the trench, summed in SmFbZ), and vx and vy stay as they were
+; fired (on the surface vy is the height it climbs or falls to), so z + SmFbZ, vx and
+; vy name a fireball (the trench's towers fire two at once, at the same depth, and the
+; same pair again later). The surface's towers fire some at once that share all
+; three: in the table they stay in order, and each after the first takes the next free
+; key. Its lines are keyed by a hash of those and whether it explodes, flagged OPF_FB,
+; and interpolated however far, as the surface's objects are. The world entry: a2 when
+; called from $4710 (space, the surface), -25496(a4) from the trench ($cb8e, $d24e).
+SmFb
+	move.l	(a7),d0
+	sub.l	SmCode(pc),d0
+	move.l	a2,a0
+	cmp.w	#$4714,d0
+	beq.b	.k
+	move.l	-25496(a4),a0
+.k	move.w	(a0),d0
+	add.w	SmFbZ(pc),d0
+	mulu	#40503,d0
+	add.w	8(a0),d0
+	mulu	#40503,d0
+	add.w	10(a0),d0
+	mulu	#40503,d0
+	swap	d0
+	tst.w	4(a7)
+	bpl.b	.o
+	not.w	d0
+.o	and.w	#$ffc0,d0
+	movem.l	d2/a1,-(a7)
+	lea	SmV+sv_fbt(pc),a0
+	move.l	SmV+sv_cur(pc),d1
+	cmp.l	(a0)+,d1
+	beq.b	.u
+	move.l	d1,-4(a0)		; a new recording
+	clr.w	(a0)
+.u	move.w	(a0)+,d2		; sv_fbc
+.u1	move.l	a0,a1
+	move.w	d2,d1
+	bra.b	.u3
+.u2	cmp.w	(a1)+,d0
+	bne.b	.u3
+	add.w	#$9e40,d0		; taken: the next (633 * 64, odd: every key
+	bra.b	.u1			; comes round)
+.u3	dbf	d1,.u2
+	cmp.w	#SM_FBN,d2
+	bhs.b	.u4
+	move.w	d0,(a1)
+	addq.w	#1,-2(a0)
+.u4	movem.l	(a7)+,d2/a1
+	bsr	SmObj
+	lea	SmSurfF(pc),a0
+	bset	#OPF_FB,(a0)
+	move.w	4(a7),-(a7)
+	bsr.b	.draw
+	addq.l	#2,a7
+	lea	SmSurfOn(pc),a0
+	clr.b	(a0)
+	rts
+.draw	link	a5,#-16
+	movem.l	d4-d7/a2,-(a7)
+	GOTOG	$49aa
+
+; The fireballs' step nearer summed: $48c4 (space: move.w 8(a5),d4; move.w 10(a5),d5,
+; d4 the step), $a52e (the surface: move.w -24972(a4),d6; add.w #50,d6), $bca2 (the
+; trench, 600: move.w -25364(a4),d4; addq.w #1,d4). Not hooks (they run in direct mode
+; too).
+SmFbSpace
+	move.w	8(a5),d4
+	move.w	10(a5),d5
+	move.l	a0,-(a7)
+	lea	SmFbZ(pc),a0
+	add.w	d4,(a0)
+	move.l	(a7)+,a0
+	rts
+SmFbSurf
+	move.w	-24972(a4),d6
+	add.w	#50,d6
+	move.l	a0,-(a7)
+	lea	SmFbZ(pc),a0
+	add.w	d6,(a0)
+	move.l	(a7)+,a0
+	rts
+SmFbTrench
+	move.l	a0,-(a7)
+	lea	SmFbZ(pc),a0
+	add.w	#600,(a0)
+	move.l	(a7)+,a0
+	move.w	-25364(a4),d4
+	addq.w	#1,d4
+	rts
+SmFbZ	dc.w	0
 
 ; $a6aa (the world moving, each tick: sub.w d4,-27068(a4); add.w d5,-27066(a4)): the
 ; movement summed. Not a hook (it runs in direct mode too).
