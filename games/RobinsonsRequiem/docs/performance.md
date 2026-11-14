@@ -132,6 +132,7 @@ the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 | 10a: the wait for the world at the pass's end | 101 (99.0 ms) | 92.2 ms | 148 |
 | 10b: the map in fast memory | 108 (92.6 ms) | 83.6 ms | 161 |
 | 10c: the shade table in fast memory | 110 (90.9 ms) | 82.0 ms | 163 |
+| 10d: the swap without the beam wait | 122 (82.0 ms) | 81.6 ms | 166 |
 
 Rows 8 and 9 were measured before frames drawn only for the staging re-projected the
 view's elements (step 8); the projection cost 10a 3 frames on the setup's core and 1 on
@@ -278,7 +279,8 @@ AGA, from 277.8 ms (3.6 fps):
    `+$4a14`: `+$ed99`, set at the swap `+$4b44`, is cleared by the VBL's pointer routine
    `+$9aa6`), 7.3 ms per frame, and the rest grew from 111.3 to 113.5 ms; 57 frames either
    way. The beam wait ends at line 256, about a millisecond before the field does, so it
-   never costs a pass a field.
+   never costs a pass a field. Step 10.2 removes it with the next pass's waits put off to
+   its first access to the back screen.
 6. **Every frame on the object's 8 fields** (done). The drawing pass, from the pass's
    start after the cap wait (hunk 1 `+$49f6`) to the swap (`+$4b30`), took 3.44 to 5.75
    fields on the aprof core after step 4 (`tools/rr_passes.py`), 2.0 to 3.1 on the
@@ -432,8 +434,33 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
       reads 2.37 → 0.47 ms per frame, the spans 15.9 → 14.2 ms and their chip accesses
       2,682 → 47 per frame; busy 83.6 → 82.0 ms; the objects' intervals the grid's,
       turning and walking (`tools/rr_objects.py`).
-   4. What is left is the drawing, after 10a (aprof core, 102 frames, ms per frame; after
-      10c the landscape 30.7, the spans 14.2, the beam wait 7.1):
+   4. **The swap without the beam wait** (done, `docs/internals.md`, "AGA
+      improvements"). After 10c the waits around the swap took 8.4 ms per frame on the
+      aprof core: the beam wait before it (hunk 0 `+$13ce`, 7.1 ms) and, at the next
+      pass's start, the wait for it to show (`+$13c0`, 1.3 ms). The copper takes the plane
+      pointers at the field's start, so the swap's line does not change the field the
+      frame shows in; the waits only held back the next drawing, which renders into the
+      fast chunky buffer and needs the back screen only from the conversion on. So the
+      swap writes the pointers at once, and the wait for it to show, START's pointer
+      wait (`+$4a14`) and the back screen's update are put off to the pass's first access
+      to the back screen (step 5 had removed the waits without this, and the next pass
+      waited at `+$4a14` instead). The back screen's other loads, from the scripts' and
+      the menus' drawing, wait for the swap to show first. Checks: screenshots at the
+      start and after 500 fields turning and 500 walking pixel-identical to 10c's, with
+      the same poses (a first version that let START's `+$525a` leave its last rectangle
+      in `<+$edda>`-`<+$ede3>` in the middle of the drawing showed the 3D view's bottom
+      line drawn over the panel's border after turning); the release build reaches the
+      jungle through the intro and menu (`tools/rr.py ingame`), pointer drawn. Measured:
+      122 frames on the aprof core (12.2 fps, 82.0 ms) against 110, the waits 8.8 → 0.3
+      ms per frame (the world wait), busy 82.0 → 81.6 ms; the setup's core at the cap, 166
+      frames against 163, every frame interval 3 fields turning and walking (47 of 47,
+      `tools/rr_passes.py`, drawing passes of 1.70 to 3.00 fields turning, 2.25 to 2.48
+      walking); the aprof core's intervals 3 to 6 fields, 3.93 on average (turning,
+      drawing passes of 2.93 to 4.98 fields); the objects' intervals the grid's, turning
+      and walking (`tools/rr_objects.py`). Not checked: the mouse pointer moving (the
+      runs have no mouse input) and the scripts' drawing (none in these runs).
+   5. What is left is the drawing, after 10a (aprof core, 102 frames, ms per frame; after
+      10d the landscape 30.6, the spans 14.1, the waits 0.3):
 
       | Function | ms/frame | In chip accesses |
       |---|---|---|
@@ -451,11 +478,7 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
       (`-6xx(a1)`), with the two map reads from chip the largest (`+$da6c`, `+$db1e`, 3.4 ms
       each); the 68020's scaled index would save a few instructions a sample (about 1 ms,
       INFERRED from the profile's per-instruction times), and no equivalence check for the
-      AGA landscape exists yet (`tools/rr_ecsland.py` is the ECS one). The beam and
-      copper-interrupt waits (8.4 ms after 10c) now cost time, the drawing being
-      the bound; step 5's copper lists removed them but the next pass then waited in
-      START's wait for the pointer's redraw (`+$4a14`), which would have to move to before
-      the conversion as well. Not done.
+      AGA landscape exists yet (`tools/rr_ecsland.py` is the ECS one). Not done.
 
 Beyond 16.7 fps (an 040 or 060): frames between world passes, presentation only, without
 going round MAIN; the cap stays the world's grid.

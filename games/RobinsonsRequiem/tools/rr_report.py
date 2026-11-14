@@ -38,11 +38,16 @@ C2P_READS = list(range(0x2e94, 0x2ea4, 2)) + list(range(0x2f6a, 0x2f7a, 2))
 C2P_WRITES = (0x2f52, 0x2f56, 0x2f58, 0x2f5c, 0x2f5e, 0x2f62, 0x2f64, 0x2f68,
               0x3028, 0x302c, 0x302e, 0x3032, 0x3034, 0x3038, 0x303a, 0x303e)
 # AGA waits, (hunk, first, end): the cap wait's loop, the copper-interrupt wait at the start
-# of a 3D pass, the beam wait before the swap
+# of a 3D pass (the swap shown), the beam wait before the swap, the wait for the VBL's
+# pointer redraw after it
 WAITS = {'cap wait': (1, 0x49ee, 0x49f6), 'copper wait': (0, 0x13c0, 0x13ca),
-         'beam wait': (0, 0x13ce, 0x13de)}
-# and the slave's, between two of its labels (src/): the wait for the world count (plan step 7)
-SLAVE_WAITS = {'world wait': ('_wwait', '_wwaitend')}
+         'beam wait': (0, 0x13ce, 0x13de), 'pointer wait': (1, 0x4a14, 0x4a1c)}
+# and the slave's, between two of its labels (src/): the wait for the world count (plan step
+# 7); plan step 10.2's swap outside the copper's pointer lines, its copy of the pointer
+# wait, and the back screen's loads waiting for the swap to show
+SLAVE_WAITS = {'world wait': ('_wwait', '_wwaitend'), 'swap wait': ('_swait', '_swaitend'),
+               'pointer wait (slave)': ('_bpwait', '_bpwaitend'),
+               'screen wait': ('_gwait', '_gwaitend')}
 
 
 def slave_symbols(run):

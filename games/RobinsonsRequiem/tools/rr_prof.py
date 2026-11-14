@@ -50,8 +50,9 @@ from rr import find_hunk0, layout  # noqa: E402
 # The profile build's frame counter (src/, PROFILE_FRAMES): frames drawn since boot.
 PROFILE_FRAMES = 0x10c
 PROFILE_SLAVE = 0x110       # and the slave's address
-# Hunk 0: the beam wait before each buffer swap, entered once per presented frame.
-FRAME_MARK = {'RobinsonsRequiemAGA': 0x13ce, 'RobinsonsRequiem': 0xcac}
+# Hunk 0: each buffer swap's plane pointers (AGA; since plan step 10.2 the 3D swap's beam
+# wait is gone) or its beam wait (ECS), entered once per presented frame.
+FRAME_MARK = {'RobinsonsRequiemAGA': 0x13f6, 'RobinsonsRequiem': 0xcac}
 # START's variables read with the counters: (hunk, offset, bytes). The frame wait (AGA hunk 1
 # +$49e8, ECS +$30ac) holds each frame until `fields` reaches `cap`; the VBL counts both.
 GAME_VARS = {'RobinsonsRequiemAGA': {'cap': (1, 0xee6a, 1), 'fields': (1, 0xee6b, 1),

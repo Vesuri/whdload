@@ -304,6 +304,7 @@ _cont
             bsr _skypatch
             bsr _worldpatch
             bsr _mappatch
+            bsr _swappatch
 
         ;call
                 move.l  d7,a1
@@ -1449,7 +1450,8 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         subq.b  #1,$ef2a-$eef5(a0)
         bne     .out
         st      $ef2b-$eef5(a0)
-.out    movem.l (a7)+,d0-d7/a0-a1/a3-a4
+.out    bsr     _bflush                 ; plan step 10.2: the screen brought up to date
+        movem.l (a7)+,d0-d7/a0-a1/a3-a4
         rts
 .draw   move.l  _wvars+W_DRAW(pc),a0
         jsr     (a0)
@@ -2327,6 +2329,390 @@ _shadeupd
 .t      move.l  d0,S_SHADE(a4)
         movem.l (a7)+,d0-d1/a0-a1
 .x      rts
+
+**********************************************
+; The swap without the beam wait (docs/performance.md, plan step 10.2). START's 3D swap
+; (hunk 1 +$4b30 jsr <hunk 0 +$13e0>) waits for line 256 (+$13ce), writes the plane pointers
+; at the copper list's start (+$13f6) and clears INTENA's COPER bit, which the list's next
+; move after the pointers sets again: a pass's start (+$49cc jsr <hunk 0 +$13c0>) waits for
+; that bit, the new screen shown, and then (+$4a0a-+$4a7c) for the VBL's pointer redraw on it
+; (+$4a14, <+$ed99>), copies last pass's rectangles from the shown screen into the back one
+; (+$525a), puts back the background under the pointer there (hunk 2 +$4ec) and empties the
+; rectangle list (+$4a76). The copper takes the pointers at the field's start, so the line
+; does not change the field the frame shows in; the passes' waits only kept the next
+; drawing from starting. Here:
+; - +$4b30 becomes jsr _swap: the pointers written at once, the bit cleared, except within
+;   the lines where the copper takes them (310 to 1)
+; - +$49cc becomes jsr _pstart: the wait and the block put off (<+$edd0> set: both as before)
+; - +$4a0a tst.b <+$ed97> becomes jmp _pblock: the block, unless put off, then +$4a80
+; - the block put off (_bflush) runs before the pass's first access to the back screen: the
+;   conversion's (hunk 2 +$2e02 movea.l <+$10>,a1 becomes jsr _c2pld), a 2D view's (+$4b5e
+;   movea.l <+$ed86>,a1 becomes jsr _viewent), the 3D view's drawing's end (_view), the
+;   views' end (+$4ada clr.b <+$edcf> becomes jsr _vend)
+; - the other loads of the back screen (<+$10>) in hunks 0 and 2 that draw into it (text,
+;   rectangles, blits: _gsites) wait for the swap to show first (_bshow), so nothing the
+;   scripts draw between the swap and the field's start shows on the old screen; not
+;   +$4fc, the VBL's pointer, which runs at the field's start.
+; All checked first; with _worldpatch's _view.
+
+_swappatch
+        move.l  _hunk1(pc),a0
+        move.l  _hunk2(pc),a3
+        lea     _bvars(pc),a2
+        tst.l   _wvars+W_DRAW(pc)
+        beq     .no
+        cmp.w   #$4eb9,$49cc(a0)
+        bne     .no
+        move.l  $49ce(a0),d0            ; hunk 0 +$13c0
+        move.l  d0,B_13C0(a2)
+        move.l  d0,a1
+        sub.w   #$13c0,a1               ; hunk 0
+        cmp.l   #$08390004,$13c0(a1)    ; btst #4,$dff01d
+        bne     .no
+        cmp.l   #$00dff01d,$13c4(a1)
+        bne     .no
+        lea     $13e0(a1),a4            ; the swap: jsr +$13ce, jsr +$13f6, move.w #$10,$dff09a
+        cmp.w   #$4eb9,(a4)
+        bne     .no
+        lea     $13ce(a1),a5
+        cmp.l   2(a4),a5
+        bne     .no
+        cmp.w   #$4eb9,6(a4)
+        bne     .no
+        lea     $13f6(a1),a5
+        cmp.l   8(a4),a5
+        bne     .no
+        move.l  a5,B_13F6(a2)
+        cmp.l   #$33fc0010,12(a4)
+        bne     .no
+        cmp.l   #$00dff09a,16(a4)
+        bne     .no
+        cmp.w   #$4eb9,$4b30(a0)        ; the 3D swap
+        bne     .no
+        cmp.l   $4b32(a0),a4
+        bne     .no
+        lea     .h1(pc),a4              ; hunk 1's sites: offset, opcode, operand in hunk 1
+.c1     move.l  (a4)+,d0
+        beq     .c1end
+        move.w  (a4)+,d1
+        move.l  (a4)+,d2
+        add.l   a0,d2
+        cmp.w   (a0,d0.l),d1
+        bne     .no
+        cmp.l   2(a0,d0.l),d2
+        bne     .no
+        bra     .c1
+.c1end  cmp.w   #$4eb9,$4a2c(a0)        ; jsr +$525a
+        bne     .no
+        lea     $525a(a0),a5
+        cmp.l   $4a2e(a0),a5
+        bne     .no
+        move.l  a5,B_525A(a2)
+        cmp.w   #$4eb9,$4a46(a0)        ; jsr <hunk 2 +$4ec>
+        bne     .no
+        lea     $4ec(a3),a5
+        cmp.l   $4a48(a0),a5
+        bne     .no
+        move.l  a5,B_4EC(a2)
+        cmp.w   #$23fc,$4a76(a0)        ; move.l #<the rectangle list>,<+$ee08>
+        bne     .no
+        lea     $ee08(a0),a5
+        cmp.l   $4a7c(a0),a5
+        bne     .no
+        move.l  $4a78(a0),B_LIST(a2)
+        cmp.l   #$66f85239,$4a1a(a0)    ; bne.s +$4a14, addq.b #1,<+$ed98>
+        bne     .no
+        cmp.w   #$2279,$2e02(a3)        ; movea.l <+$10>,a1: the conversion
+        bne     .no
+        lea     $10(a0),a5
+        cmp.l   $2e04(a3),a5
+        bne     .no
+        lea     _gsites(pc),a4          ; the back screen's other loads
+.cg     move.w  (a4)+,d0
+        bmi     .cgend
+        move.w  (a4)+,d1
+        move.w  (a4)+,d2
+        bsr     .site
+        cmp.w   (a1),d2
+        bne     .no
+        cmp.l   2(a1),a5
+        bne     .no
+        bra     .cg
+.cgend  move.w  #$4eb9,d1               ; all checked: the patches
+        lea     $49cc(a0),a1
+        lea     _pstart(pc),a4
+        bsr     .jsr
+        lea     $4ada(a0),a1
+        lea     _vend(pc),a4
+        bsr     .jsr
+        lea     $4b30(a0),a1
+        lea     _swap(pc),a4
+        bsr     .jsr
+        lea     $4b5e(a0),a1
+        lea     _viewent(pc),a4
+        bsr     .jsr
+        lea     $2e02(a3),a1
+        lea     _c2pld(pc),a4
+        bsr     .jsr
+        lea     $4a0a(a0),a1
+        lea     _pblock(pc),a4
+        move.w  #$4ef9,(a1)
+        move.l  a4,2(a1)
+        lea     _gsites(pc),a4
+.pg     move.w  (a4)+,d0
+        bmi     .pgend
+        move.w  (a4)+,d1
+        move.w  (a4)+,d2
+        bsr     .site
+        rol.w   #7,d2
+        and.w   #7,d2                   ; the register
+        mulu.w  #_g10a1-_g10a0,d2
+        move.w  #$4eb9,(a1)
+        lea     _g10a0(pc,d2.w),a6
+        move.l  a6,2(a1)
+        bra     .pg
+.pgend  st      B_ON(a2)
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+; d0 the hunk, d1 the offset: a1 the site (a1 above hunk 0 kept in a6)
+.site   move.l  a6,-(a7)
+        move.l  a0,a6
+        cmp.w   #1,d0
+        beq     .s
+        move.l  a3,a6
+        cmp.w   #2,d0
+        beq     .s
+        move.l  B_13C0(a2),a6
+        sub.w   #$13c0,a6
+.s      lea     (a6,d1.w),a1
+        cmp.w   #$8000,d1
+        blo     .s1
+        add.l   #$10000,a1
+.s1     move.l  (a7)+,a6
+        rts
+.jsr    move.w  d1,(a1)
+        move.l  a4,2(a1)
+        rts
+.h1     dc.l    $4a0a
+        dc.w    $4a39
+        dc.l    $ed97
+        dc.l    $4a14
+        dc.w    $4a39
+        dc.l    $ed99
+        dc.l    $4a80
+        dc.w    $4239
+        dc.l    $ee05
+        dc.l    $4ada
+        dc.w    $4239
+        dc.l    $edcf
+        dc.l    $4b5e
+        dc.w    $2279
+        dc.l    $ed86
+        dc.l    0
+
+; hunk, offset, movea.l <+$10>,An
+_gsites dc.w    0,$1394,$2479,0,$184e,$2c79,0,$1896,$2c79,0,$1994,$2879,0,$1ad8,$2879
+        dc.w    0,$1b50,$2479,0,$1b98,$2479,0,$1bd4,$2479,0,$1c26,$2879,0,$1c66,$2879
+        dc.w    0,$1c9e,$2879,0,$1e20,$2879,0,$1e7e,$2879
+        dc.w    2,$3e,$2679,2,$618,$2079,2,$67e,$2079,2,$884,$2c79,2,$9a4,$2c79
+        dc.w    2,$a62,$2c79,2,$3c1e,$2279,2,$3d5e,$2a79,2,$4364,$2a79
+        dc.w    -1
+
+; +$4b30: the 3D swap without the beam wait
+_swap   movem.l d0/a0,-(a7)
+_swait  move.l  $dff004,d0              ; not while the copper takes the pointers
+        lsr.l   #8,d0
+        and.w   #$1ff,d0
+        cmp.w   #2,d0
+        blo     _swait
+        cmp.w   #310,d0
+        bhs     _swait
+_swaitend
+        move.l  _bvars+B_13F6(pc),a0
+        jsr     (a0)
+        move.w  #$10,$dff09a
+        lea     _bvars(pc),a0
+        st      B_UNSHOWN(a0)
+        move.l  _wvars+W_VBL(pc),d0
+        move.l  d0,a0
+        move.l  (a0),d0
+        lea     _bvars(pc),a0
+        move.l  d0,B_SVBL(a0)
+        movem.l (a7)+,d0/a0
+        rts
+
+; +$49cc in 3D mode: the wait for the swap and the block put off, both now with <+$edd0>
+_pstart movem.l a0-a1,-(a7)
+        lea     _bvars(pc),a1
+        move.l  _hunk1(pc),a0
+        tst.b   ($edd0,a0)
+        bne     .now
+        st      B_PEND(a1)
+        movem.l (a7)+,a0-a1
+        rts
+.now    sf      B_PEND(a1)
+        move.l  B_13C0(a1),a0
+        jsr     (a0)
+        sf      B_UNSHOWN(a1)
+        movem.l (a7)+,a0-a1
+        rts
+
+; +$4a0a: the block now when not put off; on at +$4a80
+_pblock tst.b   _bvars+B_PEND(pc)
+        bne     .on
+        bsr     _bblock
+.on     move.l  _hunk1(pc),-(a7)
+        add.l   #$4a80,(a7)
+        rts
+
+; +$4ada: the views' end
+_vend   bsr     _bflush
+        move.l  a0,-(a7)
+        move.l  _hunk1(pc),a0
+        clr.b   ($edcf,a0)
+        move.l  (a7)+,a0
+        rts
+
+; +$4b5e, a view's drawing: a2 the view; a 2D view (bit 1 of +1 clear) draws into the screen
+_viewent
+        btst    #1,1(a2)
+        bne     .v
+        bsr     _bflush
+.v      move.l  _hunk1(pc),a1
+        move.l  ($ed86,a1),a1
+        rts
+
+; hunk 2 +$2e02, the conversion
+_c2pld  bsr     _bflush
+        move.l  _hunk1(pc),a1
+        move.l  $10(a1),a1
+        rts
+
+; the block put off, if it is: the wait for the swap (+$13c0) and the block, the drawing's
+; rectangle (+$edda-+$ede3, which +$525a leaves at the last one it copies) kept
+_bflush tst.b   _bvars+B_PEND(pc)
+        beq     .x
+        movem.l d0-d2/a0-a1,-(a7)
+        lea     _bvars(pc),a1
+        sf      B_PEND(a1)
+        move.l  B_13C0(a1),a0
+        jsr     (a0)
+        sf      B_UNSHOWN(a1)
+        move.l  _hunk1(pc),a0
+        move.l  ($edda,a0),d0
+        move.l  ($edde,a0),d1
+        move.w  ($ede2,a0),d2
+        bsr     _bblock
+        move.l  _hunk1(pc),a0
+        move.l  d0,($edda,a0)
+        move.l  d1,($edde,a0)
+        move.w  d2,($ede2,a0)
+        movem.l (a7)+,d0-d2/a0-a1
+.x      rts
+
+; START's +$4a0a-+$4a7c
+_bblock movem.l d0-d7/a0-a6,-(a7)
+        move.l  _hunk1(pc),a5
+        tst.b   ($ed97,a5)
+        bmi     _bbneg
+_bpwait tst.b   ($ed99,a5)              ; the VBL's pointer redraw
+        bne     _bpwait
+_bpwaitend
+        addq.b  #1,($ed98,a5)
+        beq     .l
+        subq.b  #1,($ed98,a5)
+.l      move.l  _bvars+B_525A(pc),a0
+        jsr     (a0)
+        move.b  #1,($ed99,a5)
+        cmpi.b  #2,($ed97,a5)
+        beq     .s
+        move.l  _bvars+B_4EC(pc),a0
+        jsr     (a0)                    ; it keeps no registers
+        move.l  _hunk1(pc),a5
+.s      clr.b   ($ed99,a5)
+        st      ($ed98,a5)
+        tst.b   ($ed97,a5)
+        bne     _bbend
+        st      ($ed97,a5)
+        bra     _bbend
+_bbneg  move.l  _bvars+B_525A(pc),a0
+        jsr     (a0)
+_bbend  move.l  _bvars+B_LIST(pc),($ee08,a5)
+        movem.l (a7)+,d0-d7/a0-a6
+        rts
+
+; the back screen loaded, after the swap shows (INTENA's COPER bit set again, or two
+; fields since the swap); no wait when none is pending
+_bshow  move.w  ccr,-(a7)
+        tst.b   _bvars+B_UNSHOWN(pc)
+        beq     _bshx
+        movem.l d0-d1/a0-a1,-(a7)
+        lea     _bvars(pc),a1
+        move.l  _wvars+W_VBL(pc),a0
+        move.l  #200000,d1
+_gwait  btst    #4,$dff01d
+        bne     _gwaitend
+        move.l  (a0),d0
+        sub.l   B_SVBL(a1),d0
+        cmp.l   #2,d0
+        bge     _gwaitend
+        subq.l  #1,d1
+        bne     _gwait
+_gwaitend
+        sf      B_UNSHOWN(a1)
+        movem.l (a7)+,d0-d1/a0-a1
+_bshx   move.w  (a7)+,ccr
+        rts
+_g10a0  bsr.w   _bshow
+        move.l  _hunk1(pc),a0
+        move.l  $10(a0),a0
+        rts
+_g10a1  bsr.w   _bshow
+        move.l  _hunk1(pc),a1
+        move.l  $10(a1),a1
+        rts
+_g10a2  bsr.w   _bshow
+        move.l  _hunk1(pc),a2
+        move.l  $10(a2),a2
+        rts
+_g10a3  bsr.w   _bshow
+        move.l  _hunk1(pc),a3
+        move.l  $10(a3),a3
+        rts
+_g10a4  bsr.w   _bshow
+        move.l  _hunk1(pc),a4
+        move.l  $10(a4),a4
+        rts
+_g10a5  bsr.w   _bshow
+        move.l  _hunk1(pc),a5
+        move.l  $10(a5),a5
+        rts
+_g10a6  bsr.w   _bshow
+        move.l  _hunk1(pc),a6
+        move.l  $10(a6),a6
+        rts
+
+_bvars
+_b13c0          dc.l    0               ; hunk 0 +$13c0, the wait for the swap
+_b13f6          dc.l    0               ; hunk 0 +$13f6, the plane pointers
+_b525a          dc.l    0               ; hunk 1 +$525a, the rectangles' copy
+_b4ec           dc.l    0               ; hunk 2 +$4ec, the pointer's background
+_blist          dc.l    0               ; the rectangle list's start
+_bsvbl          dc.l    0               ; the VBL count at the swap
+_bpend          dc.b    0               ; the wait and the block put off
+_bunshown       dc.b    0               ; a swap not yet shown
+_bon            dc.b    0               ; patched
+        even
+B_13C0  equ     _b13c0-_bvars
+B_13F6  equ     _b13f6-_bvars
+B_525A  equ     _b525a-_bvars
+B_4EC   equ     _b4ec-_bvars
+B_LIST  equ     _blist-_bvars
+B_SVBL  equ     _bsvbl-_bvars
+B_PEND  equ     _bpend-_bvars
+B_UNSHOWN equ   _bunshown-_bvars
+B_ON    equ     _bon-_bvars
 
 _mvars
 _mtaba          dc.l    0               ; hunk 1 +$a1de

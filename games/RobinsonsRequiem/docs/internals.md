@@ -227,6 +227,47 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
       the set-up did not allow a copy.
     `MAPCHECK` also compares the copy with the table at every drawing.
 
+11. **The swap without the beam wait** (`_swappatch`, `_swap`, `_pstart`, `_pblock`,
+    `_bflush`, `_bblock`, `_bshow`; `docs/performance.md`, plan step 10.2). START's 3D swap
+    (hunk 1 `+$4b30` [`$8fdc`] `jsr <hunk 0 +$13e0>` [`$140c`]) waits for line 256, writes
+    the plane pointers at the copper list's start (`+$13f6`) and clears INTENA's COPER
+    bit, which the list's next move after the pointers sets again (no copper interrupt is
+    requested: the bit is a flag). A pass then waits for that bit (`+$49cc` `jsr <hunk 0
+    +$13c0>` [`$13ec`]: the new screen shown) and, in the block `+$4a0a`-`+$4a7c`, for the
+    VBL's pointer redraw on it (`+$4a14`, `<+$ed99>`, under the lock `<+$ed98>`), copies
+    last pass's rectangles from the shown screen into the back one (`+$525a`), puts back
+    the background under the pointer there (hunk 2 `+$4ec`) and empties the rectangle list
+    (`+$4a76`, `<+$ee08>`). The copper takes the pointers at the field's start, so the
+    line of the swap does not change the field the frame shows in. All checked first,
+    with `_view` (item 8):
+    - `+$4b30` [`$8fdc`] becomes `jsr _swap`: the pointers are written at once, except
+      within lines 310 to 1, where the copper takes them; then the bit is cleared.
+    - `+$49cc` [`$8e78`] becomes `jsr _pstart`, which puts off the wait and the block
+      (with `<+$edd0>` set, the palette's turn at `+$35a4`, both run as before), and
+      `+$4a0a` [`$8eb6`] `tst.b <+$ed97>` becomes `jmp _pblock`: the block then, unless it
+      was put off, and on at `+$4a80`.
+    - The block put off (`_bflush`: the wait for the bit, then START's block, keeping the
+      drawing's rectangle `<+$edda>`-`<+$ede3>`, which `+$525a` leaves at the last one it
+      copies) runs before the pass's first access to the back screen, at the first of: the
+      conversion (hunk 2 `+$2e02` [`$19936`] `movea.l <+$10>,a1` becomes `jsr _c2pld`), a
+      2D view (`+$4b5e` [`$900a`] `movea.l <+$ed86>,a1` becomes `jsr _viewent`; bit 1 of a
+      view's `+1` clear), the end of the 3D view's drawing (`_view`), and the views' end
+      (`+$4ada` [`$8f86`] `clr.b <+$edcf>` becomes `jsr _vend`). The only rectangles are
+      added by `+$521e`, from the views' element paths (`+$4dea`-`+$4fa8` through
+      `+$5094`), after those points. The 3D drawing's own copy of the view from the shown
+      screen (`+$a4fe` [`$e9aa`], with `<+$a1ff>` set) now comes before the block instead
+      of after it; both copy from the shown screen under the lock.
+    - The back screen's other loads that draw into it (`movea.l <+$10>,An`, each becoming
+      `jsr _g10aN`, which waits for the bit after a swap, at most two fields): hunk 0
+      `+$1394` [`$13c0`], `+$184e` [`$187a`], `+$1896` [`$18c2`], `+$1994` [`$19c0`],
+      `+$1ad8` [`$1b04`], `+$1b50` [`$1b7c`], `+$1b98` [`$1bc4`], `+$1bd4` [`$1c00`],
+      `+$1c26` [`$1c52`], `+$1c66` [`$1c92`], `+$1c9e` [`$1cca`], `+$1e20` [`$1e4c`],
+      `+$1e7e` [`$1eaa`]; hunk 2 `+$3e` [`$16b72`], `+$618` [`$1714c`], `+$67e` [`$171b2`],
+      `+$884` [`$173b8`], `+$9a4` [`$174d8`], `+$a62` [`$17596`], `+$3c1e` [`$1a752`],
+      `+$3d5e` [`$1a892`], `+$4364` [`$1ae98`]. Without the beam wait the scripts run
+      while the old screen still shows; these keep anything they draw from showing a
+      field early. Not hunk 2 `+$4fc`, the VBL's pointer, which runs at the field's start.
+
 ## ECS improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan:

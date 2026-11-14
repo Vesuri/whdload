@@ -8,8 +8,8 @@ the camera and the other moving objects are drawn between their runs (step 9 see
 by eye in play with `human` walking up to the player), and each drawing starts as soon as its list has run, so the
 drawing sets the frame rate (148 frames in the window on the setup's core, 101 on the
 aprof core, against 55 on the player's 9 fields). Step 10.2's map and shade table in fast
-memory took that to 163 and 110; the rest of step 10 (the landscape's code, the beam wait)
-is examined, not done.
+memory and its swap without the beam wait took that to 166, the cap (every frame 3 fields
+apart), and 122; the rest of step 10 (the landscape's code) is examined, not done.
 The ECS plan is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
@@ -26,12 +26,14 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 Next, in order:
 
 1. The AGA plan's step 10.2 (`docs/performance.md`, "Plan", "AGA, beyond the player's
-   period": the landscape with an equivalence check like `tools/rr_ecsland.py`, the beam
-   wait with the pointer's redraw), each measured with
-   `tools/rr_objects.py` and `tools/rr_passes.py` before the next; steps 7-9 also in a
-   heavier scene than the jungle start (more trees and objects).
+   period": the landscape with an equivalence check like `tools/rr_ecsland.py`), measured
+   with `tools/rr_objects.py` and `tools/rr_passes.py`; steps 7-10 also in a heavier scene
+   than the jungle start (more trees and objects) and in other areas (other maps and
+   shade tables).
 2. Play-test both variants further (loading and saving) with the rebuilt slaves, against
-   the shipped ones (`make run SLAVE=original`). The AGA game's objects' frames are in fast
+   the shipped ones (`make run SLAVE=original`); in the AGA game step 10.2's swap with the
+   mouse pointer moving and the scripts drawing (inventory, messages), which the harness
+   runs do not do. The AGA game's objects' frames are in fast
    memory since step 1: check that a game saved with v1.2 loads with the new slave and the
    other way round.
 3. `tools/rr_prof.py` on `a1200-060` did not reach the game in 10 minutes (both slaves
