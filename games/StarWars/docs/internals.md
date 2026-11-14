@@ -223,6 +223,31 @@ marks at $a640 and $a666, and the trench's rib shifts counted at $bb88.
   game's back screen first. One frame at most is queued; the display ($00a0) takes it at
   its field. The palette fade the VBL server does with each swap is done when an exact
   frame is shown.
+- **Clears.** The replayed clear $1c08 clears the 169 rows of each plane up to the
+  viewport's last row (rows 31 to 199 in play; its last store in each block of 34 rows
+  writes 32 bytes, so each plane gets 169 rows, not 170). Into one of the extra screens,
+  which only the replay draws into (and the HUD copy, rows 0-30), it clears only the rows
+  drawn since that screen's last clear (`SmPClear`): each screen keeps a record, a bitmap
+  of rows per plane, which the replay marks with each op's rows (a line's or a rect's from
+  y0 to y1, a plot's, a shape's from its hot spot and height, a plane copy's destination;
+  in the planes the colour sets, all four for shapes, rects and copies). Any HUD rows the
+  clear reaches (a smaller viewport) are cleared always. The record is keyed by the
+  clear's end row: a new key (a screen's first clear, the viewport changed) clears it all.
+  The game's own screens, which the game also draws into outside the replay, get the
+  whole clear. The lerp multiplies once per coordinate (d6 times the step, made once a
+  frame) instead of twice.
+
+  The `chk` build (`-DVERIFY=1 -DSM_CLRCHECK=1`) reads each partial clear's 169 rows a
+  plane back: none was left with a pixel, in wave 3 on a1200-030 (4462 clears) and
+  a1200-060 (9389) and in 80 s of the attract on a1200-030 (2989). On a1200-030 these
+  clears wrote 383 rows of the 676 a whole clear writes (wave 3) and 395 (the attract).
+  Mean frame drawing time over 6 s of each wave 3 phase (`tmp/scripts/scenehist.sh`,
+  from 32-line buckets), against the build before: space 303 lines (316), the surface
+  434 (437), the trench 336 (342). Wave 3, 5 to 35 s (`tmp/scripts/wave3c.sh`): 2.48
+  frames a tick, 15 late ticks and 102 dropped frames in 2713 ticks; the build before:
+  2.46, 16 and 110 in 2909. a1200-fast, the attract 10 to 80 s: 2.26 frames a tick
+  (2.25). The line blits are most of what is left: on the surface a third of the CPU's
+  cycles (30 %) wait for the blitter.
 - **Direct mode.** A tick is late when it starts more than a frame behind or its exact
   frame misses its field. When more than half the recent ticks are late the hooks come out
   and ticks run exactly as the default runs them. Smooth is tried again (after 50 direct

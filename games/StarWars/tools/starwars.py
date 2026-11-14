@@ -153,7 +153,7 @@ def probe(server, g, rest):
 
 
 SV = ('buf cur prev ptr end pend b0 f0 vp0 vp1 vp2 vbuf tmp0 tmp1 obj_r flags '
-      'maxops ovf ticks frames paired unpaired fields j0 j1 j2 j3 rl0').split() + [f'h{i}' for i in range(16)] + 'rmax x0 x1 shown ready t_base lastt_lastc hudcopies dir_slow_hold l0 work dticks hooked_saved_ravg worksum late_lates chipfree n_mul thr_call exact_prec_cstart rel_pad dropped'.split()
+      'maxops ovf ticks frames paired unpaired fields j0 j1 j2 j3 rl0').split() + [f'h{i}' for i in range(16)] + 'rmax x0 x1 shown ready t_base lastt_lastc hudcopies dir_slow_hold l0 work dticks hooked_saved_ravg worksum late_lates chipfree n_mul thr_call exact_prec_cstart rel_pad dropped clrn clrrows clrbad'.split()
 
 
 def smooth(server, g, rest):
@@ -172,7 +172,7 @@ def smooth(server, g, rest):
     used = (v['ptr'] - v['cur']) // 16 if v['buf'] else 0
     return (f"buf {v['buf']:#x} ops now {used} max {v['maxops']} overflows {v['ovf']} "
             f"ticks {v['ticks']} frames {v['frames']} paired {v['paired']} "
-            f"unpaired {v['unpaired']} fields {v['fields']} first-frame field {[v[k] for k in ('j0','j1','j2','j3')]} render lines hist/32 {[v[f'h{i}'] for i in range(16)]} max {v['rmax']} screens {v['x0']:#x} {v['x1']:#x} chipfree {v['chipfree']} hudcopies {v['hudcopies']} direct {v['dir_slow_hold'] >> 24} dticks {v['dticks']} work {v['work']} mean work {v['worksum'] // max(1, v['dticks'])} ravg {(v['hooked_saved_ravg'] & 0xffff) // 8} late ticks {v['late_lates'] & 0xffff} dropped {v['dropped']} r {v['obj_r'] & 0xffff} flags {v['flags']:#010x}")
+            f"unpaired {v['unpaired']} fields {v['fields']} first-frame field {[v[k] for k in ('j0','j1','j2','j3')]} render lines hist/32 {[v[f'h{i}'] for i in range(16)]} max {v['rmax']} screens {v['x0']:#x} {v['x1']:#x} chipfree {v['chipfree']} hudcopies {v['hudcopies']} direct {v['dir_slow_hold'] >> 24} dticks {v['dticks']} work {v['work']} mean work {v['worksum'] // max(1, v['dticks'])} ravg {(v['hooked_saved_ravg'] & 0xffff) // 8} late ticks {v['late_lates'] & 0xffff} dropped {v['dropped']} clears {v['clrn']} rows {v['clrrows']} bad {v['clrbad']} r {v['obj_r'] & 0xffff} flags {v['flags']:#010x}")
 
 
 def seq(server, g, rest):

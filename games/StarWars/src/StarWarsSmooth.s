@@ -50,6 +50,9 @@ SM_MARGIN	= 16			; raster lines added to the last frame's time
 SM_SCREEN	= 32000			; a screen: four planes of 8000 bytes
 SM_CHIPKEEP	= 65536			; Chip RAM left for the game after the third screen
 SM_HUDROWS	= 31			; rows the clear ($1c08) leaves: the HUD strip
+SM_CLRROWS	= 169			; rows the clear clears in each plane
+SM_RECB		= 4+4*28		; a screen's record: the clear's key.w, a pad, then
+					; each plane's rows drawn (224 bits, row 0 first)
 SM_LATE		= 128			; more of the recent ticks late than this (of 256): direct
 SM_GO		= 3			; quarters of the tick's fields a smooth tick must fit in
 SM_HOLD		= 50			; direct ticks at least, before trying
@@ -143,6 +146,12 @@ sv_rel		rs.b	1		; the loop keeps the counter running (phase 8 on)
 sv_pad		rs.b	1
 sv_pad2		rs.w	1
 sv_dropped	rs.l	1		; VERIFY: in-between frames that missed their field
+sv_clrn		rs.l	1		; VERIFY: clears of our screens by their records,
+sv_clrrows	rs.l	1		; the plane rows they cleared (a whole clear: 680),
+sv_clrbad	rs.l	1		; and those that left a row of the clear not empty
+sv_trk		rs.l	1		; SmRender: the record of the screen it draws (0: none)
+sv_f		rs.w	1		; SmRender: d6 * sv_mul, the in-between step
+sv_crec		rs.b	2*SM_RECB	; each of our screens' record (SmPClear)
 sv_SIZE		rs.b	0
 
 ; the game routine at code-hunk offset \1, called
@@ -1481,7 +1490,18 @@ SmRender
 	move.l	-28138(a4),-(a7)	; its plane flags
 	move.l	-26442(a4),d4		; back buffer
 	move.l	-26446(a4),d5		; front buffer
-	move.l	sv_cur(a3),a2
+	move.w	d6,d0
+	mulu	sv_mul(a3),d0		; (below 32768: d6 < sv_n)
+	move.w	d0,sv_f(a3)
+	clr.l	sv_trk(a3)		; one of our screens: its record
+	lea	sv_crec(a3),a0
+	cmp.l	sv_x(a3),d4
+	beq.b	.trk
+	lea	SM_RECB(a0),a0
+	cmp.l	sv_x+4(a3),d4
+	bne.b	.trk0
+.trk	move.l	a0,sv_trk(a3)
+.trk0	move.l	sv_cur(a3),a2
 	move.l	sv_prev(a3),a6
 	lea	SmRBuf(pc),a0
 	clr.b	(a0)
@@ -1527,14 +1547,29 @@ SmRender
 	move.w	4(a0),-(a7)
 	CALLG	$1b06			; line to
 	addq.l	#4,a7
-	rts
+	tst.l	sv_trk(a3)
+	beq.w	.lx
+	lea	SmV+sv_tmp(pc),a0	; its rows (the clipped line's are among them)
+	move.w	2(a0),d0
+	move.w	6(a0),d1
+	cmp.w	d0,d1
+	bge.b	.l1
+	exg	d0,d1
+.l1	move.w	-28142(a4),d2		; the planes it sets: its colour's
+	bra	.dirty
+.lx	rts
 
 .plot	moveq	#2-1,d7
 	bsr	.coords
 	move.l	(a0),-(a7)
 	CALLG	$1b2c
 	addq.l	#4,a7
-	rts
+	tst.l	sv_trk(a3)
+	beq.w	.lx
+	move.w	SmV+sv_tmp+2(pc),d0
+	move.w	d0,d1
+	move.w	-28142(a4),d2
+	bra	.dirty
 
 .shape	moveq	#2-1,d7
 	bsr	.coords
@@ -1542,14 +1577,28 @@ SmRender
 	move.l	(a0),-(a7)
 	CALLG	$9806
 	addq.l	#8,a7
-	rts
+	tst.l	sv_trk(a3)
+	beq.w	.lx
+	move.l	8(a2),a0		; the shape: height at +2, hot spot y at +8
+	move.w	SmV+sv_tmp+2(pc),d0
+	sub.w	8(a0),d0
+	move.w	d0,d1
+	add.w	2(a0),d1
+	subq.w	#1,d0			; (a row more each side)
+	moveq	#$f,d2
+	bra	.dirty
 
 .rect	move.w	12(a2),-26414(a4)
 	move.l	8(a2),-(a7)
 	move.l	4(a2),-(a7)
 	CALLG	$0810
 	addq.l	#8,a7
-	rts
+	tst.l	sv_trk(a3)
+	beq.w	.lx
+	move.w	6(a2),d0		; y0, y1
+	move.w	10(a2),d1
+	moveq	#$f,d2
+	bra	.dirty
 
 .copy	move.l	8(a2),-(a7)		; x1 y1
 	move.l	4(a2),-(a7)		; x0 y0
@@ -1566,7 +1615,30 @@ SmRender
 	CALLG	$0a1c
 	lea	16(a7),a7
 	lea	SM_OPSZ(a2),a2		; and the ARG op
-	rts
+	tst.l	sv_trk(a3)
+	beq.b	.cpx
+	move.b	1-SM_OPSZ(a2),d0	; into the frame's screen: its rows (the
+	lsr.b	#2,d0			; offset's, plus y0 to y1 and one for x)
+	and.b	#3,d0
+	subq.b	#1,d0
+	bne.b	.cpx
+	move.l	12(a2),d0
+	cmp.l	#8000,d0
+	blo.b	.cp1
+	moveq	#0,d0			; (not in plane 0: every row)
+	move.w	#199,d1
+	moveq	#$f,d2
+	bra.b	.cp2
+.cp1	divu	#40,d0
+	move.w	d0,d1
+	add.w	6-SM_OPSZ(a2),d0
+	add.w	10-SM_OPSZ(a2),d1
+	addq.w	#1,d1
+	moveq	#$f,d2
+.cp2	sub.w	-26410(a4),d0		; (.dirty adds the viewport's)
+	sub.w	-26410(a4),d1
+	bra.w	.dirty
+.cpx	rts
 .unx	and.b	#3,d1
 	beq.b	.abs
 	subq.b	#1,d1
@@ -1576,8 +1648,64 @@ SmRender
 .front	add.l	d5,d0
 	rts
 
-.clear	CALLG	$1c08
+.clear	tst.l	sv_trk(a3)
+	beq.b	.clr
+	btst	#0,SmRBuf(pc)
+	beq	SmPClear
+.clr	CALLG	$1c08
 	rts
+
+; d0.w, d1.w: the first and last row drawn (in the viewport: -26410(a4) added here),
+; d2: its planes. Marks the rows in the record of the screen being drawn (sv_trk).
+.dirty	btst	#0,SmRBuf(pc)		; (into another buffer: not the screen)
+	bne.b	.dx
+	add.w	-26410(a4),d0
+	bpl.b	.d0
+	moveq	#0,d0
+.d0	add.w	-26410(a4),d1
+	cmp.w	#199,d1
+	ble.b	.d1
+	move.w	#199,d1
+.d1	cmp.w	d0,d1
+	blt.b	.dx
+	movem.l	d4-d7,-(a7)
+	moveq	#-1,d4			; the first long's bits from the first row
+	moveq	#31,d3
+	and.w	d0,d3
+	lsr.l	d3,d4
+	moveq	#-1,d5			; the last's up to the last row
+	moveq	#31,d3
+	and.w	d1,d3
+	eor.w	#31,d3
+	lsl.l	d3,d5
+	lsr.w	#5,d0			; their longs (offsets)
+	lsl.w	#2,d0
+	lsr.w	#5,d1
+	lsl.w	#2,d1
+	cmp.w	d0,d1
+	bne.b	.dm
+	and.l	d5,d4
+.dm	move.l	sv_trk(a3),a0
+	addq.l	#4,a0
+	moveq	#4-1,d3
+.dp	lsr.b	#1,d2
+	bcc.b	.dn
+	move.w	d0,d6
+	or.l	d4,(a0,d6.w)
+	cmp.w	d6,d1
+	beq.b	.dn
+	addq.w	#4,d6
+	moveq	#-1,d7
+	bra.b	.df
+.dff	move.l	d7,(a0,d6.w)
+	addq.w	#4,d6
+.df	cmp.w	d6,d1
+	bne.b	.dff
+	or.l	d5,(a0,d6.w)
+.dn	lea	28(a0),a0
+	dbf	d3,.dp
+	movem.l	(a7)+,d4-d7
+.dx	rts
 
 .state	move.l	4(a2),-26412(a4)
 	move.l	8(a2),-26398(a4)
@@ -1637,8 +1765,7 @@ SmRender
 .lerp	move.w	(a1)+,d1
 	move.w	(a0),d0
 	sub.w	d1,d0
-	muls	d6,d0
-	muls	SmV+sv_mul(pc),d0
+	muls	SmV+sv_f(pc),d0
 	add.l	d0,d0
 	add.l	#$8000,d0
 	swap	d0
@@ -1649,6 +1776,117 @@ SmRender
 .cx	rts
 
 ;----------------------------------------------------------------------------
+
+; The replayed clear ($1c08: in each plane the SM_CLRROWS rows up to the viewport's
+; last, -26410 + -26398(a4); rows 31-199 in play) into one of our screens, which only
+; SmRender draws into (the HUD strip, SmHudCopy, aside): only the rows each plane's
+; record marks as drawn since its last clear, and any rows of the HUD strip the clear
+; reaches, so the screen comes out as the whole clear leaves it. The record's key is the clear's end: a new one (a
+; new screen, the viewport changed) clears it all. a3: SmV.
+SmPClear
+	movem.l	d0-a2/a5-a6,-(a7)
+	move.l	sv_trk(a3),a1
+	move.w	-26410(a4),d6
+	add.w	-26398(a4),d6
+	addq.w	#1,d6			; E: each plane clears rows E-169 to E-1
+	cmp.w	#SM_CLRROWS,d6		; (a viewport the records do not cover:
+	blt.b	.out			; the whole clear)
+	cmp.w	#200,d6
+	ble.b	.in
+.out	clr.w	(a1)
+	bra.b	.all
+.in	cmp.w	(a1),d6
+	beq.b	.part
+	move.w	d6,(a1)
+.all	CALLG	$1c08
+	bra.w	.reset
+.part	BLIT_WAIT			; as the fix's clear: no blit running, the
+	move.l	#-1,$dff044		; masks open (BlitMasks)
+	move.l	a3,-(a7)
+	addq.l	#4,a1			; plane 0's rows
+	move.l	-26442(a4),a5		; plane 0
+	moveq	#0,d7			; rows cleared (VERIFY)
+	moveq	#4-1,d4
+.pl	move.w	d6,d1			; this plane's clear: rows d0 to d1
+	subq.w	#1,d1
+	move.w	d1,d0
+	sub.w	#SM_CLRROWS-1,d0
+	cmp.w	#SM_HUDROWS-1,d0	; the rows of the HUD strip in it, always
+	bgt.b	.walk
+	moveq	#-1,d2
+	moveq	#31,d3
+	and.w	d0,d3
+	lsr.l	d3,d2
+	move.w	d0,d3
+	lsr.w	#5,d3
+	lsl.w	#2,d3
+	or.l	d2,(a1,d3.w)		; (to row 31: the end of the first long)
+.walk	move.w	d0,d3			; the bits from row d0 on, in d2
+	lsr.w	#5,d3
+	lsl.w	#2,d3
+	lea	(a1,d3.w),a2
+	move.l	(a2)+,d2
+	moveq	#31,d3
+	and.w	d0,d3
+	lsl.l	d3,d2
+	moveq	#32,d5			; bits left in d2
+	sub.w	d3,d5
+	move.w	d0,d3			; the row's address
+	mulu	#40,d3
+	lea	(a5,d3.l),a0
+	sub.w	d0,d1			; rows - 1
+	movem.l	d4/d6/a1/a5,-(a7)
+	moveq	#0,d0
+	moveq	#0,d3
+	moveq	#0,d4
+	moveq	#0,d6
+	sub.l	a3,a3
+.row	add.l	d2,d2
+	bcc.b	.skip
+	movem.l	d0/d3-d4/d6/a3,(a0)	; a row
+	movem.l	d0/d3-d4/d6/a3,20(a0)
+	addq.w	#1,d7
+.skip	lea	40(a0),a0
+	subq.w	#1,d5
+	bne.b	.nx
+	move.l	(a2)+,d2
+	moveq	#32,d5
+.nx	dbf	d1,.row
+	movem.l	(a7)+,d4/d6/a1/a5
+	moveq	#28/4-1,d0		; the plane's record: nothing drawn since
+.cl	clr.l	(a1)+
+	dbf	d0,.cl
+	lea	8000(a5),a5
+	dbf	d4,.pl
+	move.l	(a7)+,a3
+	add.l	d7,sv_clrrows(a3)
+	addq.l	#1,sv_clrn(a3)
+	IFD	SM_CLRCHECK
+	move.l	sv_trk(a3),a1		; the whole clear's rows all empty?
+	move.w	(a1),d6
+	move.l	-26442(a4),a5
+	moveq	#4-1,d5
+.vp	move.w	d6,d0
+	sub.w	#SM_CLRROWS,d0
+	mulu	#40,d0
+	lea	(a5,d0.l),a0
+	move.w	#SM_CLRROWS*10-1,d0
+.vl	tst.l	(a0)+
+	bne.b	.bad
+	dbf	d0,.vl
+	lea	8000(a5),a5
+	dbf	d5,.vp
+	bra.b	.x
+.bad	addq.l	#1,sv_clrbad(a3)
+	ENDC
+	bra.b	.x
+.reset	move.l	sv_trk(a3),a1		; nothing drawn since
+	addq.l	#4,a1
+	moveq	#4*28/4-1,d0
+.rs	clr.l	(a1)+
+	dbf	d0,.rs
+.x	movem.l	(a7)+,d0-a2/a5-a6
+	rts
 
 SmCode	dc.l	0			; the code hunk (PL_GA)
 SmRBuf	dc.b	0			; SmRender: drawing into another buffer than

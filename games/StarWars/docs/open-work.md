@@ -27,11 +27,14 @@ the fixes alone (`internals.md`, the end of "Enhanced framerate").
 - The Obi-Wan text and the flight instructions scroll by plane copies, which move per
   tick in enhanced framerate: interpolate the copy's position.
 - Cheaper frames: a1200-fast draws about 1.7 frames a tick (frames 380-540 lines), and
-  a1200-030 only two of the wave select's three (frames about 330 lines). The replayed
-  CPU clear $1c08 costs about 57 lines on a1200-030 (the zoom stayed smooth without it);
-  clearing only the rows the screen's last frame drew, or pairing only when the
-  recording changed, would help. The retry from direct mode uses the last smooth
-  frame-time average, which direct ticks do not update.
+  a1200-030 two on the surface (frames about 430 lines; space and the trench 300-340).
+  The extra screens' clears now clear only the rows drawn (`internals.md`, "Clears"):
+  about 43 % fewer rows, frames 1-4 % shorter. Line blits dominate what is left (30 %
+  of the CPU's cycles waiting for the blitter on the surface); the lines' blits that
+  clear the planes below a colour's highest bit (a fifth of them) change only where
+  lines cross, which the original shows. The game's own screens could get the partial
+  clear too, if every drawing outside the replay marked them. The retry from direct
+  mode uses the last smooth frame-time average, which direct ticks do not update.
 - The ReadMe for 3.0b (the slave info says "Version 3.0b (13.11.2026)" and "Enhanced by
   Vesuri"; Features and History: the fixes, the timing fix always on, CUSTOM2 now
   "Enhanced framerate") before a release; gameplay tests on `SETUPS`.
