@@ -303,6 +303,7 @@ _cont
             bsr _c2ppatch
             bsr _skypatch
             bsr _worldpatch
+            bsr _mappatch
 
         ;call
                 move.l  d7,a1
@@ -1868,6 +1869,384 @@ _estage movem.l d0-d7/a0-a1/a3-a4,-(a7)
         dbf     d7,.slot
 .out    movem.l (a7)+,d0-d7/a0-a1/a3-a4
         rts
+
+**********************************************
+; The map in fast memory (docs/performance.md, plan step 10.2). The landscape (hunk 1
+; +$d88c) reads the map, a script object's grid of word cells (512 rows of 256 in the
+; jungle, 256 KB in the resource heap in chip), through the row table at <+$a1de>, which it
+; loads once at +$d908; the spans and the far samples read it through the landscape's cell
+; pointers. The row table's allocation (+$a30e, jsr _fastalloc since plan step 3) becomes
+; jsr _rowalloc, which asks the fast pool for a fast row table and a copy of the map behind
+; START's table in the same block, freed with it (when they do not fit, START's table alone
+; as before); +$d908 movea.l <+$a1de>,a2 becomes jsr _maprows, which gives the landscape
+; the fast table while START's table is that block, the copy at the map's address modulo
+; 16 (+$b986 uses bit 1 of a cell's address). The copy is made again in full when the map's
+; address, size or stride changes, after the fill op (+$3b74) wrote it and after a map
+; object's set-up (+$3540); the rectangle op's writes (+$3b22) are copied at the next call;
+; and the row after the map (the shading reads the next row, +$ba8e) is copied at every
+; call. The two reads at a tile's offset from a cell (+$de74, +$df78: types with a negative
+; flag stand on another cell, 89,192 bytes on in the jungle) go back to the original, so
+; no offset leaves the copy. A map that has grown past the block, or an irregular row
+; table: START's own table. MAPCHECK (a test define): every call compares the whole copy
+; with the map after the update, counting differing longwords in M_BAD.
+
+_mappatch
+        move.l  _hunk1(pc),a0
+        lea     .sites(pc),a2
+.chk    move.l  (a2)+,d0
+        beq     .ok
+        move.l  (a2)+,d2
+        move.l  (a2)+,d3
+        cmp.l   (a0,d0.l),d2
+        bne     .no
+        cmp.l   4(a0,d0.l),d3
+        bne     .no
+        bra     .chk
+.ok     cmp.w   #$2479,$d908(a0)        ; movea.l <+$a1de>,a2
+        bne     .no
+        move.l  a0,d0
+        add.l   #$a1de,d0
+        cmp.l   $d90a(a0),d0
+        bne     .no
+        lea     _mvars(pc),a2
+        move.l  d0,M_TABA(a2)
+        cmp.w   #$4eb9,$a30e(a0)        ; the row table's allocation: _fastalloc (plan step
+        bne     .no                     ; 3), with a fast pool
+        lea     _fastalloc(pc),a1
+        cmp.l   $a310(a0),a1
+        bne     .no
+        lea     _rowalloc(pc),a1
+        move.l  a1,$a310(a0)
+        lea     .jsrs(pc),a2
+.put    move.l  (a2)+,d0
+        beq     .done
+        move.l  (a2)+,d1
+        move.w  #$4eb9,(a0,d0.l)
+        lea     .jsrs(pc,d1.l),a1
+        move.l  a1,2(a0,d0.l)
+        tst.l   (a2)+
+        beq     .put
+        move.w  #$4e71,6(a0,d0.l)       ; nop
+        bra     .put
+.done   move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no     rts
+.sites  dc.l    $de74,$34311016,$d1f11010       ; move.w (22,a1,d1.w),d2; adda.l (16,a1,d1.w),a0
+        dc.l    $df78,$d1f11010,$34311016
+        dc.l    $3b22,$43f10800,$3228fc3c       ; lea (0,a1,d0.l),a1; move.w -964(a0),d1
+        dc.l    $3b74,$22484a29,$ffff6a00       ; movea.l a0,a1; tst.b -1(a1); bpl.w
+        dc.l    $3540,$217c0000,$0004fc24       ; move.l #4,-988(a0)
+        dc.l    0
+; site, routine (from .jsrs), a nop after the jsr
+.jsrs   dc.l    $d908,_maprows-.jsrs,0
+        dc.l    $de74,_mapoff-.jsrs,1
+        dc.l    $df78,_mapoff-.jsrs,1
+        dc.l    $3b22,_maprect-.jsrs,1
+        dc.l    $3b74,_mapfill-.jsrs,0
+        dc.l    $3540,_mapinit-.jsrs,1
+        dc.l    0
+
+; a1 (and a3) the map's object: a2 the row table for the landscape
+_maprows
+        movem.l d0-d7/a0-a1/a3-a6,-(a7)
+        lea     _mvars(pc),a4
+        move.l  M_TABA(a4),a5
+        move.l  (a5),a5                 ; START's row table
+        move.l  a5,a2
+        cmp.l   M_ROWBLK(a4),a5         ; the block _rowalloc extended
+        bne     .orig
+        moveq   #0,d6
+        move.w  -972(a1),d6             ; the rows
+        cmp.l   #2,d6
+        blo     .orig
+        cmp.l   M_ROWS(a4),d6
+        bhi     .orig
+        move.l  (a5),d0                 ; the map
+        move.l  4(a5),d7
+        sub.l   d0,d7                   ; the stride
+        ble     .orig
+        cmp.l   #1020,d7
+        bhi     .orig
+        move.l  d6,d1
+        subq.l  #1,d1
+        move.l  d1,d2
+        mulu.w  d7,d2
+        add.l   d0,d2
+        lsl.l   #2,d1
+        cmp.l   (a5,d1.l),d2            ; a regular table
+        bne     .orig
+        move.l  d6,d5
+        mulu.w  d7,d5                   ; the size
+        move.l  d0,d1
+        and.l   #15,d1                  ; the copy's offset in its room
+        add.l   d5,d1
+        add.l   d7,d1
+        addq.l  #4,d1
+        cmp.l   M_BUFSIZE(a4),d1
+        bhi     .orig
+        tst.b   M_FULL(a4)
+        bne     .full
+        cmp.l   M_ORIG(a4),d0
+        bne     .full
+        cmp.l   M_SIZE(a4),d5
+        bne     .full
+        move.l  d5,d1
+        add.l   d7,d1
+        addq.l  #4,d1
+        cmp.l   M_SPAN(a4),d1           ; the stride
+        bne     .full
+        move.l  M_HI(a4),d2             ; the rectangle op's writes
+        beq     .margin
+        move.l  M_LO(a4),d1
+        cmp.l   d5,d2
+        bls     .h
+        move.l  d5,d2
+.h      cmp.l   d2,d1
+        bhs     .clean
+        bsr     .copy
+.clean  clr.l   M_HI(a4)
+        bra     .margin
+.full   sf      M_FULL(a4)
+        clr.l   M_HI(a4)
+        move.l  d0,M_ORIG(a4)
+        move.l  d5,M_SIZE(a4)
+        move.l  d5,d1
+        add.l   d7,d1
+        addq.l  #4,d1
+        move.l  d1,M_SPAN(a4)
+        move.l  d0,d1
+        moveq   #15,d2
+        and.l   d2,d1
+        add.l   M_BUF(a4),d1
+        move.l  d1,M_COPY(a4)
+        moveq   #0,d1
+        move.l  d5,d2
+        bsr     .copy
+        move.l  M_COPY(a4),d3           ; the fast table: START's entries moved to the copy
+        sub.l   d0,d3
+        move.l  M_TAB(a4),a0
+        move.l  a5,a6
+        move.l  d6,d1
+        subq.w  #1,d1
+.t      move.l  (a6)+,d4
+        add.l   d3,d4
+        move.l  d4,(a0)+
+        dbf     d1,.t
+.margin move.l  d5,d1                   ; the row after the map
+        move.l  M_SPAN(a4),d2
+        bsr     .copy
+        IFD MAPCHECK
+        addq.l  #1,M_CALLS(a4)
+        move.l  M_ORIG(a4),a0
+        move.l  M_COPY(a4),a1
+        move.l  d5,d1
+        lsr.l   #2,d1
+.k      cmpm.l  (a0)+,(a1)+
+        beq     .k1
+        addq.l  #1,M_BAD(a4)
+.k1     subq.l  #1,d1
+        bne     .k
+        ENDC
+        move.l  M_TAB(a4),a2
+        movem.l (a7)+,d0-d7/a0-a1/a3-a6
+        rts
+.orig   clr.l   M_ORIG(a4)
+        clr.l   M_SIZE(a4)
+        clr.l   M_SPAN(a4)
+        movem.l (a7)+,d0-d7/a0-a1/a3-a6
+        rts
+; the map's bytes d1 to d2 into the copy (the two equal modulo 16)
+.copy   movem.l d1-d2/a0-a1,-(a7)
+        move.l  M_ORIG(a4),a0
+        move.l  M_COPY(a4),a1
+        add.l   d1,a0
+        add.l   d1,a1
+        sub.l   d1,d2
+        beq     .cend
+.cb     move.l  a0,d1
+        and.w   #3,d1
+        beq     .cl
+        move.b  (a0)+,(a1)+
+        subq.l  #1,d2
+        bne     .cb
+        bra     .cend
+.cl     move.l  d2,d1
+        lsr.l   #2,d1
+        beq     .ct
+.cll    move.l  (a0)+,(a1)+
+        subq.l  #1,d1
+        bne     .cll
+.ct     and.w   #3,d2
+        beq     .cend
+.ctb    move.b  (a0)+,(a1)+
+        subq.w  #1,d2
+        bne     .ctb
+.cend   movem.l (a7)+,d1-d2/a0-a1
+        rts
+
+; +$a30e: d0 the row table's size (4 x the rows), a3 the map's object: START's table, then
+; the fast table and the copy (the map, the row after it, the alignment) in one block from
+; the fast pool when they fit; START's table alone otherwise
+_rowalloc
+        movem.l d1-d4/a0-a2,-(a7)
+        lea     _mvars(pc),a2
+        clr.l   M_ROWBLK(a2)
+        move.l  d0,d3                   ; START's size
+        moveq   #0,d1
+        move.w  -970(a3),d1
+        add.l   d1,d1                   ; the stride
+        moveq   #0,d2
+        move.w  -972(a3),d2             ; the rows
+        move.l  d2,d4
+        mulu.w  d1,d2
+        add.l   d1,d2
+        add.l   #4+15+15,d2             ; the copy's room: its alignment and offset
+        move.l  d2,d1
+        add.l   d3,d2
+        add.l   d3,d2                   ; the block
+        move.l  _hunk1(pc),a1           ; room in the fast pool (as _fastalloc)
+        move.l  $100(a1),d0
+        beq     .start
+        sub.l   d2,d0
+        subq.l  #8,d0
+        and.w   #-16,d0
+        cmp.l   $ed82(a1),d0
+        blo     .start
+        move.l  d2,d0
+        bsr     _fastalloc
+        tst.l   d0
+        beq     .out
+        move.l  d0,a0
+        move.l  (a0),a0                 ; the block
+        move.l  a0,M_ROWBLK(a2)
+        move.l  d4,M_ROWS(a2)
+        add.l   d3,a0
+        move.l  a0,M_TAB(a2)
+        add.l   d3,a0
+        move.l  a0,d2
+        add.l   #15,d2
+        and.w   #-16,d2
+        move.l  d2,M_BUF(a2)
+        sub.l   a0,d2
+        sub.l   d2,d1
+        move.l  d1,M_BUFSIZE(a2)
+        clr.l   M_ORIG(a2)
+        clr.l   M_SIZE(a2)
+        clr.l   M_SPAN(a2)
+        bra     .out
+.start  move.l  d3,d0
+        bsr     _fastalloc
+.out    movem.l (a7)+,d1-d4/a0-a2
+        rts
+
+; +$de74, +$df78: a0 a cell, a1 the tile table, d1 the tile's entry; a0 back in the map
+_mapoff move.l  d0,-(a7)
+        move.l  a0,d0
+        sub.l   _mvars+M_COPY(pc),d0
+        cmp.l   _mvars+M_SPAN(pc),d0
+        bhs     .o
+        add.l   _mvars+M_ORIG(pc),d0
+        move.l  d0,a0
+.o      move.l  (a7)+,d0
+        move.w  22(a1,d1.w),d2
+        adda.l  16(a1,d1.w),a0
+        rts
+
+; +$3b22, the rectangle op: a1 its first word, d1 the grid's stride, d7+1 columns of up to
+; d6+2 rows: the bytes it writes kept to be copied when the grid is the map
+_maprect
+        lea     0(a1,d0.l),a1
+        move.w  -964(a0),d1
+        movem.l d0/d2-d3/a2,-(a7)
+        lea     _mvars(pc),a2
+        move.l  a1,d0
+        sub.l   M_ORIG(a2),d0
+        cmp.l   M_SIZE(a2),d0
+        bhs     .out
+        move.w  d6,d2
+        ext.l   d2
+        bpl     .r
+        moveq   #0,d2
+.r      addq.l  #2,d2
+        mulu.w  d1,d2
+        add.l   d0,d2
+        moveq   #0,d3
+        move.w  d7,d3
+        addq.l  #1,d3
+        add.l   d3,d3
+        add.l   d3,d2
+        tst.l   M_HI(a2)
+        beq     .set
+        cmp.l   M_LO(a2),d0
+        bhs     .l1
+        move.l  d0,M_LO(a2)
+.l1     cmp.l   M_HI(a2),d2
+        bls     .out
+        move.l  d2,M_HI(a2)
+        bra     .out
+.set    move.l  d0,M_LO(a2)
+        move.l  d2,M_HI(a2)
+.out    movem.l (a7)+,d0/d2-d3/a2
+        rts
+
+; +$3b74, the fill op: a0 the grid's object; the copy made again when it is the map
+_mapfill
+        movea.l a0,a1
+        movem.l d0/a2,-(a7)
+        move.l  a1,d0
+        tst.b   -1(a1)
+        bpl     .d
+        move.l  (a1),a2
+        move.l  (a2),d0
+.d      lea     _mvars(pc),a2
+        cmp.l   M_ORIG(a2),d0
+        bne     .x
+        st      M_FULL(a2)
+.x      movem.l (a7)+,d0/a2
+        tst.b   -1(a1)
+        rts
+
+; +$3540, a grid object's set-up: the copy made again
+_mapinit
+        move.l  #4,-988(a0)
+        move.l  a2,-(a7)
+        lea     _mvars(pc),a2
+        st      M_FULL(a2)
+        move.l  (a7)+,a2
+        rts
+
+_mvars
+_mtaba          dc.l    0               ; hunk 1 +$a1de
+_mrowblk        dc.l    0               ; START's row table that _rowalloc extended
+_mrows          dc.l    0               ; its rows
+_mtab           dc.l    0               ; the fast row table, after START's
+_mbuf           dc.l    0               ; the copy's room, after it
+_mbufsize       dc.l    0               ; its size
+_morig          dc.l    0               ; the map copied
+_mcopy          dc.l    0               ; the copy
+_msize          dc.l    0               ; the map's size
+_mspan          dc.l    0               ; and the row after it
+_mlo            dc.l    0               ; the rectangle op's writes, from
+_mhi            dc.l    0               ; to (0 none)
+_mbad           dc.l    0               ; MAPCHECK: longwords that differed
+_mcalls         dc.l    0               ; MAPCHECK: calls
+_mfull          dc.b    0               ; the copy to be made again
+        even
+M_TABA  equ     _mtaba-_mvars
+M_ROWBLK equ    _mrowblk-_mvars
+M_ROWS  equ     _mrows-_mvars
+M_TAB   equ     _mtab-_mvars
+M_BUF   equ     _mbuf-_mvars
+M_BUFSIZE equ   _mbufsize-_mvars
+M_ORIG  equ     _morig-_mvars
+M_COPY  equ     _mcopy-_mvars
+M_SIZE  equ     _msize-_mvars
+M_SPAN  equ     _mspan-_mvars
+M_LO    equ     _mlo-_mvars
+M_HI    equ     _mhi-_mvars
+M_BAD   equ     _mbad-_mvars
+M_CALLS equ     _mcalls-_mvars
+M_FULL  equ     _mfull-_mvars
 
 _ivars
 _iview          dc.l    0               ; the view

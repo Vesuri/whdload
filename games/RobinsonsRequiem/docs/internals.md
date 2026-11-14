@@ -173,6 +173,39 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    freed object is dropped. No interpolation across a jump (as for the camera: `human`'s
    178-degree turns in the jungle are drawn as the game draws them).
 
+9. **The map in fast memory** (`_mappatch`, `_rowalloc`, `_maprows`, `_mapoff`,
+   `_maprect`, `_mapfill`, `_mapinit`; `docs/performance.md`, plan step 10.2). The
+   landscape (hunk 1 `+$d88c`) reads the map, a script object's grid of word cells (512 rows
+   of 256 in the jungle, 256 KB in the resource heap in chip; the object's `-972` rows,
+   `-970` cells a row, `-964` bytes a row, the data behind a handle when `-1` is negative),
+   through the row table at `<+$a1de>`, loaded once at `+$d908`; the spans and the far
+   samples read through its cell pointers, `+$b986` uses bit 1 of a cell's address, and
+   the shading reads the next row (`+$ba8e`). Six sites, all checked first:
+   - `+$a30e` [`$e7ba`], the row table's allocation (`jsr _fastalloc` since item 3, with
+     a fast pool), becomes `jsr _rowalloc`: START's table, a fast row table and room for a
+     copy of the map and the row after it in one block from the top of the fast pool when
+     they fit (a3 is the map's object there), freed with the view; START's table alone
+     otherwise. Allocated at install instead, 270 KB less in the pool hung the game at the
+     Silmarils logo.
+   - `+$d908` [`$ddb4`] `movea.l <+$a1de>,a2` (`2479` and the address) becomes `jsr
+     _maprows`: while START's table is that block and the map fits, the fast table, into a
+     copy at the map's address modulo 16. The copy is made again in full when the map's
+     address, size or stride changes or a write below asks for it, the rectangle op's
+     writes are copied, and the row after the map is copied at every call.
+   - `+$de74` [`$12320`] and `+$df78` [`$12424`], a cell plus the offset of its tile
+     (`move.w (22,a1,d1.w),d2` and `adda.l (16,a1,d1.w),a0`, in either order; tiles with a
+     negative flag stand on another cell, 89,192 bytes on in the jungle), become `jsr
+     _mapoff` and a `nop`: the cell is taken back into the map in chip first, so no offset
+     leaves the copy.
+   - `+$3b22` [`$7fce`], in the rectangle op (`lea (0,a1,d0.l),a1`, `move.w -964(a0),d1`),
+     becomes `jsr _maprect` and a `nop`: the bytes it writes into the map are kept and
+     copied at the next drawing. `+$3b74` [`$8020`], the fill op (`movea.l a0,a1`, `tst.b
+     -1(a1)`), becomes `jsr _mapfill`, and `+$3540` [`$79ec`], a grid object's set-up
+     (`move.l #4,-988(a0)`), `jsr _mapinit` and a `nop`: the copy is made again. These are
+     the only writes to a grid in START (the handle's other users, `+$39a0`, `+$aa26`,
+     `+$b264`, `+$e828`, read it).
+   The test define `MAPCHECK` compares the whole copy with the map at every drawing.
+
 ## ECS improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan:

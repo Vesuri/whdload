@@ -130,6 +130,7 @@ the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 | 8: the camera between the player's runs | 80 (125.0 ms) | 94.8 ms | 126 |
 | 9: the other moving objects between their runs | 80 (125.0 ms) | 94.9 ms | 126 |
 | 10a: the wait for the world at the pass's end | 101 (99.0 ms) | 92.2 ms | 148 |
+| 10b: the map in fast memory | 108 (92.6 ms) | 83.6 ms | 161 |
 
 Rows 8 and 9 were measured before frames drawn only for the staging re-projected the
 view's elements (step 8); the projection cost 10a 3 frames on the setup's core and 1 on
@@ -290,7 +291,8 @@ AGA, from 277.8 ms (3.6 fps):
       (`+$ef3c`, `+$bab6`, 2 ms), both in the resource heap. The heap compacts (hunk 1
       `+$92dc` moves the blocks above a freed one down and lowers every table pointer above
       it, with no upper bound), so a block cannot live in fast memory, and the scripts
-      write the map (`+$3b2c`-`+$3b4e`, `+$3b82`), so a fast copy would go stale.
+      write the map (`+$3b2c`-`+$3b4e`, `+$3b82`), so a fast copy would go stale unless
+      those writes reach it (done in step 10.2 for the map).
    3. **Frame pacing** (done, replaced by step 7): when a pass ends
       and the followed object comes due within the cap, the frame routine waits for it,
       so that MAIN runs it when it is due, and the next pass, which draws its frame, skips
@@ -397,7 +399,25 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
       grid's standing, turning and walking (`tools/rr_objects.py`). With step 8's
       projection of the view's elements in staged frames: 148 on the setup's core and 101
       on the aprof core (10.1 fps, 99.0 ms, busy 92.2 ms).
-   2. What is left is the drawing, after 10a (aprof core, 102 frames, ms per frame):
+   2. **The map in fast memory** (done, `docs/internals.md`, "AGA improvements"). After
+      10a the map's reads from chip took 9.6 ms per frame on the aprof core (`+$da6c`,
+      `+$db1e`, `+$ba7c`-`+$ba92`: about 10,600 byte and word reads at 0.9 µs each). The
+      landscape reads it only through the row table it loads at `+$d908`, so it gets a
+      table into a copy in fast memory, in the row table's block from the fast pool; the
+      copy follows the map's moves and the scripts' two grid writes. Checks: with
+      `MAPCHECK` the copy equal to the map at all 86 drawings of 500 fields turning and
+      500 walking; gdb at every map read site for 6 drawings walking, no pointer outside
+      the copy (and the row after it) or the map (a control run with the copy left out of
+      the range stops at once); screenshots after the keys are let go pixel-identical to
+      10a's wherever the player's pose is the same (6 of 9: when a walk ends depends on
+      when the frames fall, so the new build walked one step further, 5,090 against 5,062,
+      in a run that is deterministic: the committed build gave the same poses twice).
+      Measured: 161 frames on the setup's core against 148, 108 on the aprof core (10.8
+      fps, 92.6 ms) against 101, busy 92.2 → 83.6 ms, the map's reads 0.9 ms; the beam
+      wait 5.4 → 7.3 ms (more frames); the objects' intervals the grid's, turning and
+      walking (`tools/rr_objects.py`).
+   3. What is left is the drawing, after 10a (aprof core, 102 frames, ms per frame; after
+      10b the landscape 30.5, the spans 15.9, the beam wait 7.3):
 
       | Function | ms/frame | In chip accesses |
       |---|---|---|
@@ -415,10 +435,8 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
       (`-6xx(a1)`), with the two map reads from chip the largest (`+$da6c`, `+$db1e`, 3.4 ms
       each); the 68020's scaled index would save a few instructions a sample (about 1 ms,
       INFERRED from the profile's per-instruction times), and no equivalence check for the
-      AGA landscape exists yet (`tools/rr_ecsland.py` is the ECS one). The map and shade
-      table reads in chip (about 12 ms with the spans' `+$ba7c`-`+$ba92` and `+$bab6`) need
-      a fast copy kept in step with the heap's compaction and the scripts' writes (step
-      6.2). The beam and copper-interrupt waits (6.7 ms) now cost time, the drawing being
+      AGA landscape exists yet (`tools/rr_ecsland.py` is the ECS one). The shade table's
+      reads in chip (`+$bab6`, `+$babe`, 2.1 ms after 10b) are left. The beam and copper-interrupt waits (6.7 ms) now cost time, the drawing being
       the bound; step 5's copper lists removed them but the next pass then waited in
       START's wait for the pointer's redraw (`+$4a14`), which would have to move to before
       the conversion as well. Not done.
