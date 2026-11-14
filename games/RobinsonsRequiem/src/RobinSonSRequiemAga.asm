@@ -1063,6 +1063,8 @@ _skypatch
 ; - +$6480 movea.l <+$ee6c>,a0 (op $36, the period) becomes jsr _wa0
 ; - +$250e bsr.w +$49b2, bra.s +$251a (the list's end) becomes jsr _listend
 ; - +$49e8 move.b <+$ee6a>,d0 (the cap, for the wait at +$49ee) becomes jsr _capwait
+; and, for plan step 8 (below), when it checks:
+; - +$4b8e jsr +$a3a6 (the 3D view's drawing) becomes jsr _view
 
 _worldpatch
         move.l  _hunk1(pc),a0
@@ -1097,6 +1099,25 @@ _worldpatch
         move.l  a0,d0
         add.l   #$49b2,d0
         move.l  d0,W_FRAME(a2)
+        move.l  a0,d0
+        add.l   #$ed6c,d0
+        move.l  d0,W_OBJTAB(a2)
+        move.l  a0,d0
+        add.l   #$eef5,d0
+        move.l  d0,W_FLAGS(a2)
+        move.l  a0,a3
+        add.l   #$4b8e,a3
+        cmp.w   #$4eb9,(a3)
+        bne     .noview
+        move.l  a0,d0
+        add.l   #$a3a6,d0
+        cmp.l   2(a3),d0
+        bne     .noview
+        move.l  d0,W_DRAW(a2)
+        move.w  #$4eb9,(a3)
+        pea     _view(pc)
+        move.l  (a7)+,2(a3)
+.noview
         move.w  #$4eb9,d1
         move.w  d1,(a1)
         pea     _listend(pc)
@@ -1139,6 +1160,7 @@ _wa0    move.l  _wvars+W_PTR(pc),a0
 ; pass or more behind, at most twice in a row; the frame routine otherwise
 _listend
         addq.l  #6,(a7)                 ; +$2514 -> +$251a
+        bsr     _isample
         movem.l d0-d2/a0-a1,-(a7)
         lea     _wvars(pc),a1
         tst.b   W_ON(a1)
@@ -1213,6 +1235,300 @@ _wwait  cmp.l   (a0),d1                 ; until the count reaches W
         rts
 _wwaitend
 
+**********************************************
+; The camera between the followed object's runs (docs/performance.md, plan step 8). The
+; 3D view (in MAIN's frame, +$eda8; its camera at +22/24/26, its angles at +52/54/56)
+; follows an object (+96; flags +132, bit 0 the position, bit 1 the angles): hunk 1 +$48b8
+; sets the camera from the object's pose and marks the view changed (bit 7 of +0), so it
+; changes only when that object has run, every 9 fields for the player. At each list's end
+; (_listend) _isample reads the object's pose as +$48b8 does (the position words +0/+8/+16,
+; the angles +24/+32/+40 plus +64/+68/+72); a new pose keeps the one before it and the
+; world count W of the change. Before the drawing (+$4b8e jsr +$a3a6 becomes jsr _view)
+; the camera is moved back by (cur - prev) x (1 - alpha), alpha = (W - W of cur) / the
+; change's interval (at most the object's period on the cap's grid), angles the short way
+; round; when that camera differs from the last one drawn the view is marked changed, it is
+; drawn, and the camera is put back. A frame drawn only for the staging takes the changed
+; path after the drawing (+$4b94: the other views and the swap), so the unchanged path's
+; per-frame flags and countdown (+$4ba8-+$4be6: +$eef5, +$ef2b, +$ef2a) are done here for
+; it. No interpolation across a jump (a position step over I_JUMP or an angle over 45
+; degrees), for a new view or followed object, or outside 3D mode (W not in use).
+; INTERP_OFF (a test define): alpha always 1, the frames those of plan step 7.
+
+I_JUMP  equ     128
+
+; a2 the view, a1 START's element table (+$ed86)
+_view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
+        lea     _ivars(pc),a3
+        lea     .cam(pc),a1
+        lea     I_OFF(a3),a4
+        clr.l   (a4)+
+        clr.l   (a4)+
+        clr.l   (a4)
+        cmp.l   I_VIEW(a3),a2
+        beq     .same
+        move.l  a2,I_VIEW(a3)
+        sf      I_VALID(a3)
+        sf      I_DRAWN(a3)
+        sf      I_STAGED(a3)
+        bra     .staged
+.same   lea     _wvars(pc),a0
+        tst.b   W_ON(a0)
+        beq     .staged
+        tst.b   I_VALID(a3)
+        beq     .staged
+        IFND INTERP_OFF
+        move.w  96(a2),d0
+        bmi     .staged
+        move.l  _wvars+W_OBJTAB(pc),a0
+        move.l  (a0),a0
+        move.l  (a0,d0.w),d0
+        cmp.l   I_OBJ(a3),d0
+        bne     .staged
+        move.l  _wvars+W_W(pc),d6
+        sub.l   I_WR(a3),d6             ; alpha's numerator
+        move.l  I_DEN(a3),d7
+        cmp.l   d7,d6
+        bhs     .staged                 ; alpha 1 (or before the change: none)
+        moveq   #0,d5
+.off    move.w  I_CUR(a3,d5.w),d0
+        sub.w   I_PREV(a3,d5.w),d0      ; the step
+        cmp.w   #6,d5
+        blo     .pos
+        cmp.w   #180,d0
+        ble     .a1
+        sub.w   #360,d0
+.a1     cmp.w   #-180,d0
+        bge     .a2
+        add.w   #360,d0
+.a2     btst    #1,132(a2)
+        bra     .part
+.pos    btst    #0,132(a2)
+.part   beq     .next
+        move.w  d0,d1
+        muls.w  d6,d1
+        divs.w  d7,d1
+        sub.w   d0,d1                   ; step x alpha - step
+        move.w  d1,I_OFF(a3,d5.w)
+.next   addq.w  #2,d5
+        cmp.w   #12,d5
+        blo     .off
+        ENDC
+.staged moveq   #0,d4                   ; the staged camera: d4 differs from the last drawn
+        moveq   #0,d3                   ; d3 offsets
+        moveq   #0,d5
+.stage  move.w  (a1,d5.w),d0
+        move.w  (a2,d0.w),d1
+        move.w  d1,I_SAVE(a3,d5.w)
+        move.w  I_OFF(a3,d5.w),d2
+        or.w    d2,d3
+        add.w   d1,d2
+        cmp.w   #6,d5
+        blo     .spos
+        cmp.w   #360,d2
+        ble     .s1
+        sub.w   #360,d2
+.s1     cmp.w   #-360,d2
+        bge     .spos
+        add.w   #360,d2
+.spos   move.w  d2,I_NEW(a3,d5.w)
+        cmp.w   I_DRAWV(a3,d5.w),d2
+        sne     d0
+        or.b    d0,d4
+        addq.w  #2,d5
+        cmp.w   #12,d5
+        blo     .stage
+        tst.b   I_DRAWN(a3)
+        bne     .known
+        st      d4
+.known  tst.w   d3                      ; staged now, or the last drawn was
+        bne     .need
+        tst.b   I_STAGED(a3)
+        bne     .need
+        moveq   #0,d4
+.need   moveq   #0,d6                   ; d6 a frame only for the staging
+        tst.b   (a2)
+        bmi     .set
+        tst.b   d4
+        beq     .draw                   ; unchanged: as START
+        bset    #7,(a2)
+        moveq   #1,d6
+.set    moveq   #0,d5                   ; the staged camera in, and drawn
+.put    move.w  (a1,d5.w),d0
+        move.w  I_NEW(a3,d5.w),d1
+        move.w  d1,(a2,d0.w)
+        move.w  d1,I_DRAWV(a3,d5.w)
+        addq.w  #2,d5
+        cmp.w   #12,d5
+        blo     .put
+        st      I_DRAWN(a3)
+        tst.w   d3
+        sne     I_STAGED(a3)
+        move.l  _wvars+W_DRAW(pc),a0
+        jsr     (a0)
+        moveq   #0,d5                   ; the camera back
+.back   move.w  (a1,d5.w),d0
+        move.w  I_SAVE(a3,d5.w),(a2,d0.w)
+        addq.w  #2,d5
+        cmp.w   #12,d5
+        blo     .back
+        tst.b   d6
+        beq     .out
+        move.l  _wvars+W_FLAGS(pc),a0   ; +$eef5, +$ef2b, +$ef2a as +$4ba8-+$4be6
+        sf      (a0)
+        btst    #2,1(a2)
+        beq     .f1
+        move.b  #1,(a0)
+.f1     sf      $ef2b-$eef5(a0)
+        btst    #5,(a2)
+        beq     .out
+        move.b  #1,$ef2b-$eef5(a0)
+        subq.b  #1,$ef2a-$eef5(a0)
+        bne     .out
+        st      $ef2b-$eef5(a0)
+.out    movem.l (a7)+,d0-d7/a0-a1/a3-a4
+        rts
+.draw   move.l  _wvars+W_DRAW(pc),a0
+        jsr     (a0)
+        bra     .out
+.cam    dc.w    22,24,26,52,54,56
+
+; at each list's end, W the list's count: the followed object's pose, kept with the one
+; before it when it changes
+_isample
+        movem.l d0-d7/a0-a3,-(a7)
+        lea     _ivars(pc),a3
+        lea     _wvars(pc),a1
+        move.l  I_VIEW(a3),d0
+        beq     .out
+        move.l  d0,a2
+        tst.b   W_ON(a1)
+        beq     .none
+        tst.b   132(a2)
+        beq     .none
+        move.w  96(a2),d0
+        bmi     .none
+        move.l  W_OBJTAB(a1),a0
+        move.l  (a0),a0
+        move.l  (a0,d0.w),d0
+        beq     .none
+        move.l  d0,a0
+        lea     I_POSE(a3),a2           ; the pose as +$48b8 reads it
+        move.w  (a0),(a2)+
+        move.w  8(a0),(a2)+
+        move.w  16(a0),(a2)+
+        move.w  24(a0),d0
+        add.w   64(a0),d0
+        move.w  d0,(a2)+
+        move.w  32(a0),d0
+        add.w   68(a0),d0
+        move.w  d0,(a2)+
+        move.w  40(a0),d0
+        add.w   72(a0),d0
+        move.w  d0,(a2)
+        move.l  W_W(a1),d7
+        tst.b   I_VALID(a3)
+        beq     .snap
+        cmp.l   I_OBJ(a3),a0
+        bne     .snap
+        moveq   #0,d4                   ; moved
+        moveq   #0,d5
+.cmp    move.w  I_POSE(a3,d5.w),d0
+        sub.w   I_CUR(a3,d5.w),d0
+        beq     .cnext
+        moveq   #1,d4
+        cmp.w   #6,d5
+        blo     .cpos
+        cmp.w   #180,d0                 ; an angle the short way round
+        ble     .c1
+        sub.w   #360,d0
+.c1     cmp.w   #-180,d0
+        bge     .c2
+        add.w   #360,d0
+.c2     bsr     .abs
+        cmp.w   #45,d0
+        bhi     .snap
+        bra     .cnext
+.cpos   bsr     .abs
+        cmp.w   #I_JUMP,d0
+        bhi     .snap
+.cnext  addq.w  #2,d5
+        cmp.w   #12,d5
+        blo     .cmp
+        tst.b   d4
+        beq     .out
+        move.l  I_CUR(a3),I_PREV(a3)
+        move.l  I_CUR+4(a3),I_PREV+4(a3)
+        move.l  I_CUR+8(a3),I_PREV+8(a3)
+        move.l  d7,d0                   ; the interval: since the last change, at most
+        sub.l   I_WR(a3),d0             ; the period on the cap's grid
+        move.l  W_CAP(a1),a2
+        moveq   #0,d1
+        move.b  (a2),d1
+        beq     .none
+        moveq   #0,d2
+        move.w  -58(a0),d2              ; period + 1 rounded up to the cap
+        addq.l  #1,d2
+        add.l   d1,d2
+        subq.l  #1,d2
+        divu.w  d1,d2
+        mulu.w  d1,d2
+        tst.l   d0
+        ble     .grid
+        cmp.l   d2,d0
+        bls     .den
+.grid   move.l  d2,d0
+.den    move.l  d0,I_DEN(a3)
+        bra     .keep
+.snap   move.l  a0,I_OBJ(a3)            ; a jump, or a new object: no interpolation
+        st      I_VALID(a3)
+        move.l  I_POSE(a3),I_PREV(a3)
+        move.l  I_POSE+4(a3),I_PREV+4(a3)
+        move.l  I_POSE+8(a3),I_PREV+8(a3)
+.keep   move.l  I_POSE(a3),I_CUR(a3)
+        move.l  I_POSE+4(a3),I_CUR+4(a3)
+        move.l  I_POSE+8(a3),I_CUR+8(a3)
+        move.l  d7,I_WR(a3)
+.out    movem.l (a7)+,d0-d7/a0-a3
+        rts
+.none   sf      I_VALID(a3)
+        bra     .out
+.abs    tst.w   d0
+        bpl     .abs1
+        neg.w   d0
+.abs1   rts
+
+_ivars
+_iview          dc.l    0               ; the view
+_iobj           dc.l    0               ; the object it follows
+_iwr            dc.l    0               ; W of the pose's change
+_iden           dc.l    0               ; the change's interval
+_ipose          dc.w    0,0,0,0,0,0     ; the pose sampled
+_icur           dc.w    0,0,0,0,0,0     ; the pose (camera order: x, y, z, three angles)
+_iprev          dc.w    0,0,0,0,0,0     ; the pose before it
+_ioff           dc.w    0,0,0,0,0,0     ; the staging's offsets
+_isave          dc.w    0,0,0,0,0,0     ; the camera
+_inew           dc.w    0,0,0,0,0,0     ; the staged camera
+_idrawv         dc.w    0,0,0,0,0,0     ; the last camera drawn
+_ivalid         dc.b    0               ; a pose sampled
+_idrawn         dc.b    0               ; a camera drawn
+_istaged        dc.b    0               ; the last camera drawn was staged
+        even
+I_VIEW  equ     _iview-_ivars
+I_OBJ   equ     _iobj-_ivars
+I_WR    equ     _iwr-_ivars
+I_DEN   equ     _iden-_ivars
+I_POSE  equ     _ipose-_ivars
+I_CUR   equ     _icur-_ivars
+I_PREV  equ     _iprev-_ivars
+I_OFF   equ     _ioff-_ivars
+I_SAVE  equ     _isave-_ivars
+I_NEW   equ     _inew-_ivars
+I_DRAWV equ     _idrawv-_ivars
+I_VALID equ     _ivalid-_ivars
+I_DRAWN equ     _idrawn-_ivars
+I_STAGED equ    _istaged-_ivars
+
+
 _wvars
 _ww             dc.l    0               ; W
 _wptr           dc.l    0               ; the count the objects run by: +$ee6c or W
@@ -1220,6 +1536,9 @@ _wvbl           dc.l    0               ; +$ee6c
 _wcap           dc.l    0               ; +$ee6a
 _w3d            dc.l    0               ; +$ee03
 _wframe         dc.l    0               ; +$49b2
+_wobjtab        dc.l    0               ; +$ed6c
+_wdraw          dc.l    0               ; +$a3a6
+_wflags         dc.l    0               ; +$eef5
 _wcatch         dc.b    0               ; catch-up passes in a row
 _won            dc.b    0               ; W in use
         even
@@ -1229,5 +1548,8 @@ W_VBL   equ     _wvbl-_wvars
 W_CAP   equ     _wcap-_wvars
 W_3D    equ     _w3d-_wvars
 W_FRAME equ     _wframe-_wvars
+W_OBJTAB equ    _wobjtab-_wvars
+W_DRAW  equ     _wdraw-_wvars
+W_FLAGS equ     _wflags-_wvars
 W_CATCH equ     _wcatch-_wvars
 W_ON    equ     _won-_wvars

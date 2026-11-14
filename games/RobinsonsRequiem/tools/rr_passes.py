@@ -7,7 +7,8 @@ instead of a profile: the frame routine's entry (+$49b2, P), the pass's start af
 cap wait (+$49f6, p), the 3D view's drawing (+$a478, D), the swap (+$4b30, S) and the
 list's start (+$251a with d5 0, L: every pass, a catch-up pass since plan step 7 an L
 without a P), each event with the VBL count (+$ee6c) and the beam's line. KEY=hex the raw
-key held (default 3f, keypad 9; 3e walks). EVENTS events (default 240) after
+key held (default 3f, keypad 9; 3e walks). A D event also has the view's camera, as the
+drawing sees it (a2's +22/24/26 and +52/54/56). EVENTS events (default 240) after
 50 fields of walking. Prints the drawing passes in fields (a D pass's p to its S, with the
 line as a fraction of 313), the frame intervals (D to D, in fields), the frames per 500
 fields at that rate, the passes, frame routines and catch-up passes, and the event log; OUT/passes.json keeps the events.
@@ -65,14 +66,21 @@ def main():
             pc = int(s.g.cmd('info registers pc').split()[1], 16)
             vbl = int.from_bytes(s.read(h1 + VBL, 4), 'big')
             line = (int.from_bytes(s.read(0xdff004, 4), 'big') >> 8) & 0x1ff
-            ev.append((marks.get(pc, hex(pc)), vbl, line))
+            m = marks.get(pc, hex(pc))
+            if m == 'D':
+                a2 = int(s.g.cmd('info registers a2').split()[1], 16)
+                b = s.read(a2, 58)
+                cam = [int.from_bytes(b[o:o + 2], 'big', signed=True) for o in (22, 24, 26, 52, 54, 56)]
+                ev.append((m, vbl, line, cam))
+            else:
+                ev.append((m, vbl, line))
         s.cmd('delete')
         s.cmd(f'monitor key {key} 0')
     finally:
         s.quit()
     t0 = ev[0][1]
     passes, draws, start, drawing = [], [], None, False
-    for m, v, line in ev:
+    for m, v, line, *_ in ev:
         t = v + line / LINES
         if m == 'p':
             start, drawing = t, False
@@ -87,10 +95,12 @@ def main():
     print('frame intervals:', dict(sorted(collections.Counter(gaps).items())),
           f'mean {sum(gaps) / len(gaps):.2f}, {500 * len(gaps) / sum(gaps):.1f} frames '
           'per 500 fields' if gaps else '')
-    cnt = collections.Counter(m for m, _, _ in ev)
+    cnt = collections.Counter(e[0] for e in ev)
     print(f"passes {cnt['L']}, frame routines {cnt['P']}, catch-up passes {cnt['L'] - cnt['P']}, "
           f"in {ev[-1][1] - t0} fields")
-    print('events:', ' '.join(f'{m}{v - t0}.{line}' for m, v, line in ev))
+    cams = [(e[1], e[3]) for e in ev if e[0] == 'D']
+    print('cameras (field: x y z, angles):', ' '.join(f'{v - t0}:{",".join(map(str, c))}' for v, c in cams))
+    print('events:', ' '.join(f'{e[0]}{e[1] - t0}.{e[2]}' for e in ev))
     (out / 'passes.json').write_text(json.dumps(dict(env=s.env, events=ev)) + '\n')
 
 

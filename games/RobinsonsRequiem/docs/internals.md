@@ -125,6 +125,26 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    the cap for the wait at `+$49ee`) becomes `jsr _capwait`, which in 3D mode waits for W
    and gives 0 for START's wait. All four are checked first.
 
+7. **The camera between the followed object's runs** (`_view`, `_isample`, part of
+   `_worldpatch`; `docs/performance.md`, plan step 8): hunk 1 `+$4b8e` [`$903a`] `jsr
+   +$a3a6` (the 3D view's drawing, checked first) becomes `jsr _view`. At each list's end
+   `_listend` samples the pose of the object the view follows as `+$48b8` reads it (the
+   position words `+0`/`+8`/`+16`, the angles `+24`/`+32`/`+40` plus `+64`/`+68`/`+72`); a
+   new pose keeps the one before it, the world count of the change and its interval (since
+   the last change, at most the object's period on the cap's grid, 9 fields for the
+   player). Before the drawing `_view` moves the camera (`+22`-`+26`, `+52`-`+56`) back by
+   (new - old) x (1 - alpha), alpha = (W - W of the change) / the interval, angles the
+   short way round and within ±360; when that camera differs from the last one drawn it
+   marks the view changed (bit 7), the view is drawn, and the camera is put back, so
+   scripts and `+$48b8` see the game's own. A frame drawn only for the staging then takes
+   the changed path (`+$4b94`: the other views' redraw and the swap), so `_view` does the
+   unchanged path's per-frame flags for it (`+$4ba8`-`+$4be6`: `+$eef5` from bit 2 of
+   the view's `+1`, `+$ef2b`, and the countdown `+$ef2a` of a view with bit 5 set). The view's
+   velocity (`+$4980`, on changed frames only) stays on the game's own changes. No
+   interpolation across a jump (a position step over 128, about four of the player's
+   walking runs, or an angle over 45 degrees), for a new view or followed object, or out of
+   3D mode. The test define `INTERP_OFF` holds alpha at 1.
+
 ## ECS improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan:

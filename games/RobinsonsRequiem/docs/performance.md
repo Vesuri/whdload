@@ -45,8 +45,9 @@ the player (period 7) every 9: **a frame every 9 fields, 180 ms, 5.56 fps, is th
 while frames come only when the player has run** (55.6 frames in the window), and the
 world's speed since plan step 7, which keeps that grid whatever the drawing takes. Step 6's
 frame pacing ran the player every 8 fields (6.25 fps), faster than the game. The player
-turns and walks a fixed step per run of its script, so its period sets its speed; the
-plan's "Beyond the player's period" draws frames between its runs.
+turns and walks a fixed step per run of its script, so its period sets its speed; since
+plan step 8 the frames between its runs show the camera on its way between two runs'
+poses, so the drawing sets the frame rate, up to the cap's 3 fields (16.7 fps).
 
 ### Objects' rhythm
 
@@ -126,6 +127,7 @@ the user's (`FSUAE=$FSUAE_ARM`, MMU model on), frames only:
 | 6a: the sky copy by longwords | 57 (175.4 ms) | 108.8 ms | 53 |
 | 6b: frame pacing (replaced by step 7) | 62 (161.3 ms) | 108.4 ms | 62 |
 | 7: the world on the cap's grid | 55 (181.8 ms) | 110.0 ms | 55 |
+| 8: the camera between the player's runs | 80 (125.0 ms) | 94.8 ms | 126 |
 
 After step 6 every frame interval is 8 fields on both cores (`tools/rr_passes.py`, 240
 events: 36 frames on the aprof core with drawing passes of 3.3 to 6.5 fields, 28 on the
@@ -135,7 +137,12 @@ After step 7 every frame interval is 9 fields, the game's own (300 events: 30 fr
 aprof core turning, drawing passes of 3.2 to 6.2 fields, 33 walking with 4.4 to 5.4; 26 on
 the setup's core, 2.0 to 4.1), with a catch-up pass after nearly every frame on the aprof
 core (33 in 92 passes turning, 33 in 99 walking) and 10 in 80 on the setup's core; the wait
-for the world count is 61.2 ms per frame, the busy time 110.0 ms.
+for the world count is 61.2 ms per frame, the busy time 110.0 ms. After step 8 a frame
+comes on every pass the drawing allows: every 6 fields on the aprof core (46 of 48
+intervals turning, 47 of 48 walking; drawing passes of 3.3 to 6.2 fields), every 3 or 6 on
+the setup's core (41 and 15 turning, 34 and 20 walking; 1.9 to 3.7 fields). The busy time
+falls to 94.8 ms: the unchanged passes' copy of the shown planes (hunk 2 `+$5b6`, 13.3 → 1.7
+ms per frame) is nearly gone, every pass drawing.
 
 From step 3 on the frame counts are near the object period's ceiling: step 3's frames
 alternate a drawing pass of about 7 fields with an idle 3-field pass (33.1 ms per frame in
@@ -313,30 +320,41 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
    (`tools/rr_passes.py`, its `L` marks; table above). Not yet checked in a heavier scene
    (more trees and objects), where the drawing pass would pass the 9 fields two catch-up
    passes cover.
-8. **The camera between the player's runs**. The frame routine draws on every pass (at most
+8. **The camera between the player's runs** (done, `docs/internals.md`, "AGA
+   improvements"). The frame routine draws on every pass (at most
    every 3 fields, 16.7 fps) with the view's camera staged between the followed object's
-   last two poses. After each timed run (`+$4792` [`$8c3e`]) the slave keeps the pose
-   before it (`+$edac`-`+$edb8`), the pose after it and the run's W. Before the drawing
-   (`+$4b8e`, step 6's `_view`) it sets the camera to prev + (cur - prev) × alpha, alpha =
-   (now - W of cur) / (W of cur - W of prev), at most 1 (angles the short way round, in
-   whole degrees), marks the view changed, draws, and puts the camera back: scripts read
-   the views among MAIN's variables, and `+$48b8` compares against the camera. No
-   interpolation across a jump: a move longer than a walk's step, a new followed object,
-   3D mode starting, a load. Per-frame code that assumes a frame per move stays on world
-   passes: `+$4980` adds the view's velocity (`+42`-`+46`) on every changed frame, and the
-   countdown `+$ef2a` (view flag bit 5) counts frame routines. Check what runs between
-   staging and putting back (the VBL calls `+$6c4e` when `+$ee71` is set) and how the
-   pointer picks objects in the view. The view lags by one run: a new pose is reached one
-   run (9 fields, 180 ms) after the run instead of at the next frame, though the motion
-   starts showing in the same frame as now. Extrapolation, cur + (cur - prev) × alpha, has
-   no lag but overshoots by up to a run's step (7 to 9 degrees) when the player stops: to
+   last two poses. At each list's end the slave samples the followed object's pose as
+   `+$48b8` reads it, keeping the one before a change and the change's W and interval (at
+   most the object's period on the cap's grid). Before the drawing (`+$4b8e`) it moves
+   the camera back by (cur - prev) × (1 - alpha), alpha = (now - W of cur) / the interval,
+   at most 1 (angles the short way round, in whole degrees), marks the view changed when
+   that camera was not the last drawn, draws, and puts the camera back: scripts read the
+   views among MAIN's variables, and `+$48b8` compares against the camera. No
+   interpolation across a jump: a move longer than about four walking runs, a new followed
+   object, 3D mode starting, a load. Per-frame code that assumes a frame per move stays on
+   world passes: `+$4980` adds the view's velocity (`+42`-`+46`) on the game's own
+   changed frames only, and the unchanged path's countdown `+$ef2a` (view flag bit 5) is
+   counted by the slave on the frames drawn only for the staging. What runs between staging
+   and putting back is the drawing and the interrupts (the VBL's `+$6c4e`, when `+$ee71` is
+   set, fades the palette). The view lags by one run: a new pose is reached one run (9
+   fields, 180 ms) after the run instead of at the next frame, though the motion starts
+   showing in the same frame as before. Extrapolation, cur + (cur - prev) × alpha, has no
+   lag but overshoots by up to a run's step (7 to 9 degrees) when the player stops: to
    try in play. Check: `tools/rr_passes.py` (frames per 500 fields, their intervals), the
    camera per frame evenly spaced while turning, `tools/rr_objects.py` as after step 7,
    and with alpha held at 1 (a test define) frames pixel-identical to step 7's. Estimate
    (DERIVED from the drawing passes after step 6, 2.1 to 4.1 fields on the setup's core
    and 3.3 to 6.5 on the aprof core, plus the objects' runs): a frame every 3 to 4 fields
    on the setup's core (12.5 to 16.7 fps) and every 4 to 7 on the aprof core (7 to 12.5
-   fps), against 5.56 on the grid and 6.25 with the pacing.
+   fps), against 5.56 on the grid and 6.25 with the pacing. Measured: 126 frames in the
+   window on the setup's core (12.6 fps, 79.4 ms) and 80 on the aprof core (8.0 fps, 125.0
+   ms), against 55; the camera evenly spaced (`tools/rr_passes.py`'s cameras: turning 3
+   degrees every 3 fields on the setup's core and 6 every 6 on the aprof core, walking
+   about 9.5 units every 3 fields), the objects' intervals unchanged (`tools/rr_objects.py`
+   turning and walking), and with `INTERP_OFF` the window's frames (55) and both
+   screenshots pixel-identical to step 7's; with interpolation the last frame (after the key
+   is let go) is too. Extrapolation not tried; the pointer's picking in a staged frame not
+   checked.
 9. **The other moving objects between their runs**: their 3D elements (`+$4792` moves them
    by their object's difference at each run) staged the same way for the drawing (`human`
    here); their animation frames stay per run. Check with a moving creature in view.
