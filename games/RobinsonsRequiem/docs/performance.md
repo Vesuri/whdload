@@ -143,11 +143,19 @@ AGA, from 277.8 ms (3.6 fps):
    and object graphics from the fast pool (find how START's allocator picks the chip pool for
    them; bitplanes, copper lists, sprites and samples stay in chip). Up to 101 ms of chip
    access goes; fast accesses cost some: about 105 ms, 9.5 fps.
-4. **A 68030 chunky-to-planar**: Kalms' `c2p1x1_8_c5_030_2` through `KalmsC2PRect.s`
-   (`$AMIGA_SHARE/kalms-c2p`) for the loop at hunk 2 `+$2e84`: 8,064 longword writes
-   instead of 32,256 byte writes, the merge in registers. The conversion goes from about
-   36 ms (after step 3) to about 10 ms: about 80 ms, 12.5 fps. Validate the planes byte
-   for byte against the original loop.
+4. **A 68030 chunky-to-planar**: Kalms' `c2p1x1_8_c5_030_2` (`$AMIGA_SHARE/kalms-c2p`)
+   for the loop at hunk 2 `+$2e84`: 8,064 longword writes instead of 32,256 byte writes,
+   the merge in registers. It fits: the game's loop is a plain 8x8 bit transpose, chunky
+   bit n to plane n, no remap. What needs care: the game converts a rectangle (window x
+   rounded down to 16 pixels, chunky stride `+$ef1e`, plane modulo set at `+$2e3a`), so a
+   per-row driver like `KalmsC2PRect.s` with the strides read at run time (the adapter's
+   are assembly constants); Kalms takes widths in 32-pixel steps, the game 16, so a window
+   16 pixels over a multiple of 32 keeps the old loop for its last 16; the game's planes
+   are 4 pointers (`+$2e02`), each with a second plane at +16000, while Kalms writes plane
+   n at n x bplsize (16000 is under its 16 KB limit; if the 4 blocks are not 32,000 apart,
+   its stores take 4 base registers); and it reads one longword past each row. The
+   conversion goes from about 36 ms (after step 3) to about 10 ms: about 80 ms, 12.5 fps.
+   Validate the planes byte for byte against the original loop.
 5. **No beam wait**: set the bitplane pointers from the VBL (hunk 0 `+$13ce`, `+$13f6`), and
    wait only when the next conversion would write the shown planes. About 75 ms.
 6. **The landscape loop for the 68030** (hunk 1 `+$d88c`, `+$b7ca`: about 40 ms of CPU
@@ -160,10 +168,19 @@ scenes (more trees and objects) than this walk.
 
 ECS, from 666.7 ms (1.5 fps); 60 ms is out of reach on a 7 MHz 68000:
 
-1. **Chunky-to-planar**: a table-driven 4-plane conversion that keeps the nibble dither, about
-   15-20 cycles per pixel: 183 → 70-90 ms. Or blitter-assisted (blitter and 68.5% of the
-   slots idle; the chunky buffer then in chip): less CPU, overlapping the next frame.
-   About 560 ms.
+1. **Chunky-to-planar** (hunk 2 `+$19a2`, loop `+$1a62`): a merge (Kalms c5) 4-plane
+   conversion. The game's loop shifts one bit at a time with `add`/`addx`, 41 cycles per
+   pixel; a merge conversion swaps bit groups a longword at a time, about 18-22 cycles per
+   pixel on the 68000: 183 → about 85 ms. Kalms' `c2p1x1_4_c5_gen` is the model but not a
+   drop-in: it wants a pixel per byte in the low nibble, whole-screen chunky and planes at
+   one spacing. The game packs its dither into the chunky bytes (an even pixel is the high
+   nibble of its byte, an odd one the low nibble of the next, `+$1a66`-`+$1a84`), so a mask
+   (`$f00ff00f`) and shift replace Kalms' first merge stage; it converts a rectangle in
+   16-pixel steps with a run-time modulo (`+$1a20`, `+$1a3e`) and writes two plane
+   pointers, each with a second plane at +16000, from one of two tables (`+$d459` picks
+   the buffer). Validate the planes byte for byte against the original loop. Later, if the
+   CPU is still the limit: the blitter (idle, 68.5% of slots free) can take the last merge
+   pass in parallel while the CPU runs from fast memory. About 570 ms.
 2. **Sky** by blitter, or `movem.l`: up to 27 ms. About 540 ms.
 3. **Column set-up** (hunk 1 `+$bee2`): variables in registers, divisions by reciprocal
    table: 30-50 ms. About 500 ms.
