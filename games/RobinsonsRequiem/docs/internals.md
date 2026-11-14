@@ -108,16 +108,22 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    same segments (the sky wraps around at its row's end) with aligned longword reads, two
    words a chip access. `tools/rr_skycheck.py` checks it against START's loop under
    Unicorn, the view and the registers the code after `+$e292` reads.
-6. **Frame pacing** (`_pacepatch`, `docs/performance.md`, "Workload and instruments" and
-   step 6): in 3D mode (hunk 1 `+$ee03`), when the frame routine ends and the object the
-   view follows (MAIN's object table `+$ed6c` at the view's `+96`) has a period and comes
-   due within the cap (`+$ee6a`), the slave waits until the VBL count passes its next run;
-   the next pass, which draws its frame, skips the cap wait. Hunk 1 `+$4b8e` [`$903a`]
-   `jsr +$a3a6` (the view's drawing) becomes `jsr _view`, which notes the view's object;
-   `+$4b54` [`$9000`] `movem.l (sp)+,d0-a6` and `rts` (`4cdf 7fff 4e75`, the frame
-   routine's end) become `jmp _passend`; `+$49e8` [`$8e94`] `move.b <+$ee6a>,d0` (`1039`
-   and the address, the cap for the wait at `+$49ee`) becomes `jsr _capwait`, which gives
-   0 after a pacing wait. All three are checked first.
+6. **The world on the cap's grid** (`_worldpatch`, `docs/performance.md`, plan step 7): in
+   3D mode (hunk 1 `+$ee03`) the objects run by a world count W instead of the VBL count
+   ("Objects and the scheduler" below), so they keep the game's own rhythm however long the
+   drawing takes. W goes up by the cap (`+$ee6a`) per pass, and each pass waits for the
+   VBL count to reach it; at the list's end, while W is a pass or more behind the count,
+   MAIN goes round the list again without the frame routine (a catch-up pass), at most
+   twice in a row; three passes or more behind (a load, a pause) W is set to the count less
+   the cap. Out of 3D mode, or with a cap of 0, the count is the VBL count and the cap wait
+   START's; W starts from the count after START's cap wait when 3D mode starts. Hunk 1
+   `+$257e` [`$6a2a`] `movea.l <+$ee6c>,a3` (`2679` and the address: the scheduler's due
+   test) becomes `jsr _wa3` and `+$6480` [`$a92c`] `movea.l <+$ee6c>,a0` (`2079`, op
+   `$36`) `jsr _wa0`, each giving the count; `+$250e` [`$69ba`] `bsr.w +$49b2` and `bra.s
+   +$251a` (`6100 24a2 6006`, the list's end) become `jsr _listend`, which returns to
+   `+$251a` either way; `+$49e8` [`$8e94`] `move.b <+$ee6a>,d0` (`1039` and the address,
+   the cap for the wait at `+$49ee`) becomes `jsr _capwait`, which in 3D mode waits for W
+   and gives 0 for START's wait. All four are checked first.
 
 ## ECS improvements
 
@@ -200,7 +206,8 @@ object:
   clear and its program has a pass handler (header `+10`, the header at `-20(a6)`, whose
   first word is the program's slot), that handler runs.
 - **Timed** (`+$256e`-`+$25dc`): when its state `-4(a6)` is not 0 and the VBL count
-  (`+$ee6c`, counted at `+$99ea`) is past its next run (`-62(a6)`), the next run becomes the
+  (`+$ee6c`, counted at `+$99ea`; the slave's world count W in 3D mode, "AGA improvements"
+  6) is past its next run (`-62(a6)`), the next run becomes the
   count plus its period (`-58(a6)`, `+$257e` [`$6a2a`]-`+$2590`) and its program runs on from
   `-8(a6)` until it yields (op `$42`), then its post handler (header `+6`). Op `$36`
   (`+$6478`) sets the period and the next run to the count plus it (`+$6480` [`$a92c`]).
@@ -210,10 +217,10 @@ Lateness is not carried: an object runs at the first pass after it is due and is
 a period after that. When MAIN keeps up, the frame routine's cap wait (until `+$ee6b`, the
 fields since its last start, reaches the cap `+$ee6a`, 3 in game) puts the passes on a grid
 of 3 fields, and an object runs every period + 1 fields rounded up to a multiple of 3:
-measured standing still without the frame pacing (`tools/rr_objects.py`), every 3 fields
-for the period-0 objects, 9 for period 7, 6 for period 3, 12 for period 10, 18 for period 15.
-A longer frame routine delays everything due during it (`docs/performance.md`, "Objects'
-rhythm").
+measured standing still in START's code (`tools/rr_objects.py`), every 3 fields for the
+period-0 objects, 9 for period 7, 6 for period 3, 12 for period 10, 18 for period 15. In
+START's code a longer frame routine delays everything due during it (`docs/performance.md`,
+"Objects' rhythm"); the slave's world count keeps the grid standing, turning and walking.
 
 An object's frame holds its pose: positions at `+0`, `+8`, `+16` (16.16 longwords, the
 integer word first), angles at `+24`, `+32`, `+40` (words, whole degrees, kept within

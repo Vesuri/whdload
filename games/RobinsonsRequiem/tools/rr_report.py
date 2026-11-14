@@ -41,8 +41,8 @@ C2P_WRITES = (0x2f52, 0x2f56, 0x2f58, 0x2f5c, 0x2f5e, 0x2f62, 0x2f64, 0x2f68,
 # of a 3D pass, the beam wait before the swap
 WAITS = {'cap wait': (1, 0x49ee, 0x49f6), 'copper wait': (0, 0x13c0, 0x13ca),
          'beam wait': (0, 0x13ce, 0x13de)}
-# and the slave's, between two of its labels (src/): the frame pacing's wait
-SLAVE_WAITS = {'pacing wait': ('_pacewait', '_pacedone')}
+# and the slave's, between two of its labels (src/): the wait for the world count (plan step 7)
+SLAVE_WAITS = {'world wait': ('_wwait', '_wwaitend')}
 
 
 def slave_symbols(run):

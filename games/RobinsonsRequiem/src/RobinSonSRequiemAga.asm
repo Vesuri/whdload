@@ -302,7 +302,7 @@ _cont
             bsr _fastblocks
             bsr _c2ppatch
             bsr _skypatch
-            bsr _pacepatch
+            bsr _worldpatch
 
         ;call
                 move.l  d7,a1
@@ -1049,122 +1049,185 @@ _skypatch
         INCLUDE sky030.s
 
 **********************************************
-; Frame pacing (docs/performance.md, "Workload and instruments" and plan step 6). MAIN
-; runs the due script objects, then the frame routine (hunk 1 +$49b2: copper-interrupt and
-; cap waits, drawing, swap), and again; an object is due once the VBL count (+$ee6c) passes
-; its next run (-62(a6)), the VBL count at its last run plus its period (-58(a6)). The 3D
-; view redraws when the object it follows (MAIN's object table +$ed6c at the view's +96,
-; hunk 1 +$48b8) has moved; that object's period is 7, so its frames could come every 8
-; fields, but MAIN only sees it due when it comes round, a cap (+$ee6a, 3 fields) after
-; the last pass started: a pass that ends a field or two before the object is due puts its
-; frame a pass later (frames every 9 to 12 fields). In 3D mode (+$ee03) the frame routine,
-; when it ends, waits for the followed object if it has a period and is due within the
-; cap, so that MAIN sees it due when it is: the pass that would have idled through a cap
-; before it is not run. The pass after that wait, the one that draws the object's frame,
-; skips its cap wait: the frame starts when the object has run instead of up to 2 fields
-; later.
-; - hunk 1 +$4b8e jsr +$a3a6 (the view's drawing) becomes jsr _view (the view's object)
-; - +$4b54 movem.l (sp)+,d0-a6 and rts (the frame routine's end) become jmp _passend
+; The world on the cap's grid (docs/performance.md, plan step 7). MAIN runs the due script
+; objects, then the frame routine (hunk 1 +$49b2: the cap wait, the drawing, the swap), and
+; again; an object is due once the VBL count (+$ee6c) passes its next run (-62(a6)), its
+; last run's count plus its period (-58(a6)). Keeping up, the passes start a cap (+$ee6a, 3
+; fields in game) apart and every object runs on that grid; a long drawing pass breaks it.
+; In 3D mode (+$ee03) a world count W takes the VBL count's place: W goes up by the cap per
+; pass, each pass waits for the VBL count to reach W (the cap wait's job), and while W is a
+; pass or more behind at the list's end MAIN goes round the list again without the frame
+; routine, at most twice in a row; three passes or more behind (a load, a pause) W is set
+; to the count.
+; - hunk 1 +$257e movea.l <+$ee6c>,a3 (the scheduler's due test) becomes jsr _wa3
+; - +$6480 movea.l <+$ee6c>,a0 (op $36, the period) becomes jsr _wa0
+; - +$250e bsr.w +$49b2, bra.s +$251a (the list's end) becomes jsr _listend
 ; - +$49e8 move.b <+$ee6a>,d0 (the cap, for the wait at +$49ee) becomes jsr _capwait
 
-_pacepatch
+_worldpatch
         move.l  _hunk1(pc),a0
-        move.l  a0,a1
-        add.l   #$4b8e,a1
-        cmp.w   #$4eb9,(a1)
+        lea     .sites(pc),a2
+.chk    move.l  (a2)+,d0
+        beq     .ok
+        move.w  (a2)+,d2
+        move.l  (a2)+,d3
+        add.l   a0,d3                   ; the absolute operand
+        cmp.w   (a0,d0.l),d2
         bne     .no
+        cmp.l   2(a0,d0.l),d3
+        bne     .no
+        bra     .chk
+.ok     move.l  a0,a1
+        add.l   #$250e,a1
+        cmp.l   #$610024a2,(a1)         ; bsr.w +$49b2
+        bne     .no
+        cmp.w   #$6006,4(a1)            ; bra.s +$251a
+        bne     .no
+        lea     _wvars(pc),a2
         move.l  a0,d0
-        add.l   #$a3a6,d0
-        cmp.l   2(a1),d0
-        bne     .no
-        lea     _viewdraw(pc),a2
-        move.l  d0,(a2)
-        move.l  a0,a3
-        add.l   #$4b54,a3
-        cmp.l   #$4cdf7fff,(a3)
-        bne     .no
-        cmp.w   #$4e75,4(a3)
-        bne     .no
-        move.l  a0,a4
-        add.l   #$49e8,a4
-        cmp.w   #$1039,(a4)
-        bne     .no
+        add.l   #$ee6c,d0
+        move.l  d0,W_VBL(a2)
+        move.l  d0,W_PTR(a2)
         move.l  a0,d0
         add.l   #$ee6a,d0
-        cmp.l   2(a4),d0
-        bne     .no
-        lea     _cap(pc),a2
-        move.l  d0,(a2)
-        move.w  #$4eb9,(a4)
-        pea     _capwait(pc)
-        move.l  (a7)+,2(a4)
-        pea     _view(pc)
+        move.l  d0,W_CAP(a2)
+        move.l  a0,d0
+        add.l   #$ee03,d0
+        move.l  d0,W_3D(a2)
+        move.l  a0,d0
+        add.l   #$49b2,d0
+        move.l  d0,W_FRAME(a2)
+        move.w  #$4eb9,d1
+        move.w  d1,(a1)
+        pea     _listend(pc)
         move.l  (a7)+,2(a1)
-        move.w  #$4ef9,(a3)
-        pea     _passend(pc)
-        move.l  (a7)+,2(a3)
+        lea     $257e(a0),a1
+        move.w  d1,(a1)
+        pea     _wa3(pc)
+        move.l  (a7)+,2(a1)
+        lea     $6480(a0),a1
+        move.w  d1,(a1)
+        pea     _wa0(pc)
+        move.l  (a7)+,2(a1)
+        lea     $49e8(a0),a1
+        move.w  d1,(a1)
+        pea     _capwait(pc)
+        move.l  (a7)+,2(a1)
         move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
+.sites  dc.l    $257e
+        dc.w    $2679
+        dc.l    $ee6c
+        dc.l    $6480
+        dc.w    $2079
+        dc.l    $ee6c
+        dc.l    $49e8
+        dc.w    $1039
+        dc.l    $ee6a
+        dc.l    0
 
-_view   move.l  a0,-(a7)
-        lea     _viewobj(pc),a0
-        move.l  a2,(a0)
-        move.l  (a7)+,a0
-        move.l  _viewdraw(pc),-(a7)
+; the count the objects run by: W in 3D mode, the VBL count otherwise
+_wa3    move.l  _wvars+W_PTR(pc),a3
+        move.l  (a3),a3
+        rts
+_wa0    move.l  _wvars+W_PTR(pc),a0
+        move.l  (a0),a0
         rts
 
-_passend
-        movem.l (a7)+,d0-a6
-        movem.l d0-d1/a0-a1,-(a7)
-        move.l  _viewobj(pc),d0
-        beq     _pacedone
-        move.l  d0,a1
-        move.l  _hunk1(pc),a0
-        add.l   #$ee00,a0
-        tst.b   3(a0)                   ; +$ee03: 3D
-        beq     _pacedone
-        move.w  96(a1),d0               ; the followed object
-        bmi     _pacedone
-        move.l  $6c-$100(a0),a1         ; +$ed6c, MAIN's object table
-        move.l  (a1,d0.w),d0
-        beq     _pacedone
-        move.l  d0,a1
-        tst.w   -58(a1)                 ; its period
-        beq     _pacedone
-        move.l  -62(a1),d0              ; next run: due when the count passes it
-        sub.l   $6c(a0),d0              ; fields until due, less one
-        bmi     _pacedone
-        moveq   #0,d1
-        move.b  $6a(a0),d1              ; the cap
-        cmp.l   d1,d0
-        bhs     _pacedone
-        move.l  -62(a1),d0
-_pacewait
-        cmp.l   $6c(a0),d0
-        bhs     _pacewait
-        lea     _paced(pc),a1
-        st      (a1)
-_pacedone
-        movem.l (a7)+,d0-d1/a0-a1
-        rts
-
-; d0.b the cap for the wait at +$49ee, none (0) after a pacing wait; as START's move.b,
-; the rest of d0 kept
-_capwait
-        clr.b   d0
-        move.l  a0,-(a7)
-        lea     _paced(pc),a0
+; the list's end: a catch-up pass (back to +$251a without the frame routine) while W is a
+; pass or more behind, at most twice in a row; the frame routine otherwise
+_listend
+        addq.l  #6,(a7)                 ; +$2514 -> +$251a
+        movem.l d0-d2/a0-a1,-(a7)
+        lea     _wvars(pc),a1
+        tst.b   W_ON(a1)
+        beq     .frame
+        move.l  W_3D(a1),a0
         tst.b   (a0)
-        sf      (a0)
-        bne     .out
-        move.l  _cap(pc),a0
-        move.b  (a0),d0
-.out    move.l  (a7)+,a0
+        beq     .frame
+        move.l  W_CAP(a1),a0
+        moveq   #0,d1
+        move.b  (a0),d1
+        beq     .frame
+        move.l  W_VBL(a1),a0
+        move.l  (a0),d0
+        sub.l   W_W(a1),d0              ; fields behind
+        cmp.l   d1,d0
+        blt     .frame                  ; less than a pass
+        move.l  d1,d2
+        add.l   d2,d2
+        add.l   d1,d2
+        cmp.l   d2,d0
+        bge     .rebase
+        cmp.b   #2,W_CATCH(a1)
+        bhs     .frame
+        addq.b  #1,W_CATCH(a1)
+        add.l   d1,W_W(a1)
+        movem.l (a7)+,d0-d2/a0-a1
+        rts
+.rebase move.l  (a0),d0                 ; W = the count less the cap, which the frame
+        sub.l   d1,d0                   ; routine's wait adds back
+        move.l  d0,W_W(a1)
+.frame  clr.b   W_CATCH(a1)
+        movem.l (a7)+,d0-d2/a0-a1
+        move.l  _wvars+W_FRAME(pc),-(a7)
         rts
 
-_viewdraw       dc.l    0
-_viewobj        dc.l    0
-_cap            dc.l    0
-_paced          dc.b    0
+; d0.b the cap for the wait at +$49ee, as START's move.b (the rest of d0 kept); in 3D mode
+; the wait for the count to reach W, and 0 (no wait) for START's
+_capwait
+        movem.l d1/a0-a1,-(a7)
+        lea     _wvars(pc),a1
+        move.l  W_CAP(a1),a0
+        move.b  (a0),d0
+        beq     .off
+        move.l  W_3D(a1),a0
+        tst.b   (a0)
+        beq     .off
+        move.l  W_VBL(a1),a0
+        tst.b   W_ON(a1)
+        bne     .on
+.start  cmp.b   -1(a0),d0               ; 3D starts: START's cap wait (+$ee6b), then W
+        bhi     .start                  ; from the count
+        move.l  (a0),W_W(a1)
+        st      W_ON(a1)
+        lea     W_W(a1),a0
+        move.l  a0,W_PTR(a1)
+        bra     .none
+.none   clr.b   d0
+        movem.l (a7)+,d1/a0-a1
+        rts
+.off    sf      W_ON(a1)
+        move.l  W_VBL(a1),W_PTR(a1)
+        movem.l (a7)+,d1/a0-a1
+        rts
+.on     moveq   #0,d1
+        move.b  d0,d1
+        add.l   W_W(a1),d1
+        move.l  d1,W_W(a1)
+_wwait  cmp.l   (a0),d1                 ; until the count reaches W
+        bhi     _wwait
+        clr.b   d0
+        movem.l (a7)+,d1/a0-a1
+        rts
+_wwaitend
+
+_wvars
+_ww             dc.l    0               ; W
+_wptr           dc.l    0               ; the count the objects run by: +$ee6c or W
+_wvbl           dc.l    0               ; +$ee6c
+_wcap           dc.l    0               ; +$ee6a
+_w3d            dc.l    0               ; +$ee03
+_wframe         dc.l    0               ; +$49b2
+_wcatch         dc.b    0               ; catch-up passes in a row
+_won            dc.b    0               ; W in use
         even
+W_W     equ     _ww-_wvars
+W_PTR   equ     _wptr-_wvars
+W_VBL   equ     _wvbl-_wvars
+W_CAP   equ     _wcap-_wvars
+W_3D    equ     _w3d-_wvars
+W_FRAME equ     _wframe-_wvars
+W_CATCH equ     _wcatch-_wvars
+W_ON    equ     _won-_wvars

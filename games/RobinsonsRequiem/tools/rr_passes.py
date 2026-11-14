@@ -4,23 +4,26 @@
 rr_prof.py's workload (its Session: the direct start, the avion.DO open, 150 fields, then
 keypad 9 held; the run options through the environment) with gdb breakpoints in hunk 1
 instead of a profile: the frame routine's entry (+$49b2, P), the pass's start after the
-cap wait (+$49f6, p), the 3D view's drawing (+$a478, D) and the swap (+$4b30, S), each
-event with the VBL count (+$ee6c) and the beam's line. EVENTS events (default 240) after
+cap wait (+$49f6, p), the 3D view's drawing (+$a478, D), the swap (+$4b30, S) and the
+list's start (+$251a with d5 0, L: every pass, a catch-up pass since plan step 7 an L
+without a P), each event with the VBL count (+$ee6c) and the beam's line. KEY=hex the raw
+key held (default 3f, keypad 9; 3e walks). EVENTS events (default 240) after
 50 fields of walking. Prints the drawing passes in fields (a D pass's p to its S, with the
 line as a fraction of 313), the frame intervals (D to D, in fields), the frames per 500
-fields at that rate and the event log; OUT/passes.json keeps the events.
+fields at that rate, the passes, frame routines and catch-up passes, and the event log; OUT/passes.json keeps the events.
 
 Breakpoints stop the emulation, not its time: the counts are those of the run itself.
 """
 import collections
 import json
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rr_prof import Session, find_hunk0, hunks, layout  # noqa: E402
 
-MARKS = {0x49b2: 'P', 0x49f6: 'p', 0xa478: 'D', 0x4b30: 'S'}
+MARKS = {0x49b2: 'P', 0x49f6: 'p', 0xa478: 'D', 0x4b30: 'S', 0x251a: 'L'}
 VBL = 0xee6c
 LINES = 313
 
@@ -28,6 +31,7 @@ LINES = 313
 def main():
     out = Path(sys.argv[1])
     n = int(sys.argv[2]) if len(sys.argv) > 2 else 240
+    key = os.environ.get('KEY', '3f')
     s = Session(out)
     try:
         if s.env['VARIANT'] != 'RobinsonsRequiemAGA':
@@ -48,11 +52,13 @@ def main():
         s.cmd('delete')
         s.fields(150)
         h1 = hunks(s, base)[1]
-        s.cmd('monitor key 3f 1')
+        s.cmd(f'monitor key {key} 1')
         s.fields(50)
         marks = {h1 + o: m for o, m in MARKS.items()}
         for a in marks:
             s.cmd(f'break *{a:#x}')
+            if marks[a] == 'L':
+                s.cmd('condition $bpnum ($d5 & 0xffff) == 0')
         ev = []
         for _ in range(n):
             s.g.cmd('continue', timeout=300)
@@ -61,7 +67,7 @@ def main():
             line = (int.from_bytes(s.read(0xdff004, 4), 'big') >> 8) & 0x1ff
             ev.append((marks.get(pc, hex(pc)), vbl, line))
         s.cmd('delete')
-        s.cmd('monitor key 3f 0')
+        s.cmd(f'monitor key {key} 0')
     finally:
         s.quit()
     t0 = ev[0][1]
@@ -81,6 +87,9 @@ def main():
     print('frame intervals:', dict(sorted(collections.Counter(gaps).items())),
           f'mean {sum(gaps) / len(gaps):.2f}, {500 * len(gaps) / sum(gaps):.1f} frames '
           'per 500 fields' if gaps else '')
+    cnt = collections.Counter(m for m, _, _ in ev)
+    print(f"passes {cnt['L']}, frame routines {cnt['P']}, catch-up passes {cnt['L'] - cnt['P']}, "
+          f"in {ev[-1][1] - t0} fields")
     print('events:', ' '.join(f'{m}{v - t0}.{line}' for m, v, line in ev))
     (out / 'passes.json').write_text(json.dumps(dict(env=s.env, events=ev)) + '\n')
 

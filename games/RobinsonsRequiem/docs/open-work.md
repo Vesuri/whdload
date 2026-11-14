@@ -1,11 +1,11 @@
 # Open work
 
 Both games are profiled (`docs/performance.md`: where the frame time goes turning in the
-jungle, and the plan). The AGA plan's steps 1-6 are done, its step 5 measured and not kept
-(`docs/internals.md`, "AGA improvements"): turning, every frame lands on the player's 8
-fields, the ceiling while frames come only when the player has moved. Its steps 7-10 (frames
-between the player's runs, the world on the game's own 3-field grid) are planned, not
-started; step 6 changed the objects' rhythm ("Objects' rhythm"), which step 7 puts back.
+jungle, and the plan). The AGA plan's steps 1-7 are done, its step 5 measured and not kept
+and its step 6's pacing replaced by step 7 (`docs/internals.md`, "AGA improvements"): the
+world runs on the game's own 3-field grid whatever the drawing takes, and turning, every
+frame lands on the player's 9 fields, the ceiling while frames come only when the player
+has run. Its steps 8-10 (frames between the player's runs) are not done yet.
 The ECS plan is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
@@ -21,9 +21,9 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 
 Next, in order:
 
-1. The AGA plan's steps 7-10 (`docs/performance.md`, "Plan", "AGA, beyond the player's
+1. The AGA plan's steps 8-10 (`docs/performance.md`, "Plan", "AGA, beyond the player's
    period"), each measured with `tools/rr_objects.py` and `tools/rr_passes.py` before the
-   next, also in a heavier scene than the jungle start (more trees and objects).
+   next; step 7 also in a heavier scene than the jungle start (more trees and objects).
 2. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`). The AGA game's objects' frames are in fast
    memory since step 1: check that a game saved with v1.2 loads with the new slave and the
