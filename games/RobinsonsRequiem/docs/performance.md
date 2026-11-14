@@ -61,6 +61,7 @@ of the step's commit; the setup's core is the user's (`FSUAE=$FSUAE_ARM`, MMU mo
 |---|---|---|
 | v1.2 | 36 (277.8 ms) | 37 |
 | 1: fast pool, 1 MB ExpMem | 48 (208.3 ms) | 51 |
+| 2: caches on | 51 (196.1 ms) | 56 |
 
 Measured before the steps, with measurement switches since removed (commit `a01d9f08`):
 a 2 MB ExpMem alone 35 and 37 (nothing moves to fast memory without the pool); the caches
@@ -73,7 +74,7 @@ The setup's core gains more from the caches because its data cache also caches c
 memory: with that cache's emulation off, `pcache` gives 43. Accelerator boards do not cache
 chip memory, and the aprof core does not either (INFERRED: the aprof core is the closer one).
 
-The pool and the caches (`ppoolc` at `a01d9f08`), 196.1 ms per frame: chip accesses 120.2 ms (168,000), the rest 75.8 ms.
+After step 2 (the same as `ppoolc` at `a01d9f08`), 196.1 ms per frame: chip accesses 120.2 ms (168,000), the rest 75.8 ms.
 
 | Function | ms/frame | In chip accesses |
 |---|---|---|
@@ -138,9 +139,8 @@ AGA, from 277.8 ms (3.6 fps):
 
 1. **Keep the fast pool and give it room** (done): branch over hunk 0 `+$196` and a 1 MB
    ExpMem. Measured: 208.3 ms, 4.8 fps (setup's core 37 → 51 frames).
-2. **Caches on**: `CACHECHIPDATA` instead of `CACHE`; the game uses no blitter, so the
-   write-through chip data stays coherent (INFERRED). Measured: 196.1 ms, 5.1 fps (setup's
-   core 58 frames).
+2. **Caches on** (done): `CACHECHIPDATA` instead of `CACHE`; the game's one blitter copy
+   writes planes the CPU never reads. Measured: 196.1 ms, 5.1 fps (setup's core 56 frames).
 3. **The CPU-only data to fast**: the chunky buffer, height-map rows, shade tables, map data
    and object graphics from the fast pool (find how START's allocator picks the chip pool for
    them; bitplanes, copper lists, sprites and samples stay in chip). Up to 101 ms of chip

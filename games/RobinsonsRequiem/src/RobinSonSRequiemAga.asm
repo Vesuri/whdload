@@ -56,13 +56,10 @@ WPDRIVES        = %1111
 BOOTDOS
 ;CBDOSLOADSEG
 ;CBDOSREAD
-; EXP_CACHECHIPDATA (measurement builds only): BaseMem write-through instead of
-; non-cacheable, so that the caches stay on without WHDLoad's MMU (68030 default).
-        IFD EXP_CACHECHIPDATA
+; BaseMem write-through instead of v1.2's CACHE (non-cacheable): the caches stay on without
+; WHDLoad's MMU, the 68030's default. The game's only blitter use copies the shown planes into
+; the back planes (hunk 2 +$5b6), which the CPU only writes.
 CACHECHIPDATA
-        ELSE
-CACHE
-        ENDC
 ;DEBUG
 ;DISKSONBOOT
 ;DOSASSIGN

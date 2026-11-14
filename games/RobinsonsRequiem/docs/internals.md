@@ -23,7 +23,7 @@ script interpreter in `START` with the data files (`*.CO` for ECS, `*.DO` for AG
 |---|---|---|
 | KickEmu | `kick13.s`, `kick34005.A500` | `kick31.s`, `kick40068.A1200` (or `.A4000`), `INITAGA` |
 | Chip / ExpMem | `$100000` / `$40000` | `$1A0000` / `$100000` (`MemConfig=1`: `$40000`, v1.2's), `WHDLF_ReqAGA` |
-| Options | `BLACKSCREEN`, `SETPATCH`, `IOCACHE=12000` | `CACHE`, `IOCACHE=11000`, `STACKSIZE=6000` |
+| Options | `BLACKSCREEN`, `SETPATCH`, `IOCACHE=12000` | `CACHECHIPDATA` (v1.2: `CACHE`), `IOCACHE=11000`, `STACKSIZE=6000` |
 | `START` | 102,068 bytes; hunks: 0 code `$2f30`, 1 data `$ea30`, 2 code `$1ec8`, 3 code `$10d0`, 4 code `$1154` | 121,452 bytes; hunks: 0 code `$3a30`, 1 data `$103d8`, 2 code `$543c`, 3 code `$1154` |
 
 Hunk 1 is a DATA hunk but holds code, the interpreter among it.
@@ -81,6 +81,10 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
 1. **START's fast pool kept** (`_fastpool`): with the 1 MB ExpMem (not with `MemConfig=1`),
    hunk 0 `+$196` [`$1c2`], `move.l #0,<hunk 1 +$f4>` (`23fc 0000 0000`, checked first),
    becomes `bra.s +$1a0` (`6008`), so the pool START sized is kept ("Memory" below).
+2. **Caches on**: `CACHECHIPDATA` instead of `CACHE`. Without WHDLoad's MMU, `CACHE` left
+   both caches off on the 68030 (CACR `$2000`); `CACHECHIPDATA` turns them on with BaseMem
+   write-through. The game's one blitter use (hunk 2 `+$5b6`) copies the shown planes into
+   the back planes, which the CPU only writes, so no cached data goes stale.
 
 ## Memory (AGA)
 
