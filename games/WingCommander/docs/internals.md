@@ -2106,8 +2106,9 @@ and intro are counted in updates, paced by the CPU, with no clock.
 
 The light scenes run at 9–13 advances/s on the reference PC, around the 10 Hz of
 flight; the fight (ships and explosions) and the asteroid field fall behind, as
-busy flight does. The credit cards' durations do not halve at 3460, so their
-deadlines are timed, not counted (as on the Amiga, where they are native).
+busy flight does. The credits are counted too: from "Design" to the end they take
+76 s at 3460 and more than 134 s at 1730 (the capture ended on "Directed by"); at
+1730 a card stays about 9–10 s.
 
 ## Phase 6 rendering implementation
 
