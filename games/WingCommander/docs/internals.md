@@ -2110,6 +2110,36 @@ busy flight does. The credits are counted too: from "Design" to the end they tak
 76 s at 3460 and more than 134 s at 1730 (the capture ended on "Directed by"); at
 1730 a card stays about 9–10 s.
 
+**In-game scenes at the reference.** Two played captures, sound off, at 1730
+and 3460 cycles (2026-11-15), measured the same way (talking heads and the
+pointer-driven rooms excluded). Every scene below runs faster at 3460, so all
+are paced by the CPU; none is held to the BIOS 18.2 Hz clock.
+
+| Scene | Advances/s at 1730 (usual interval, display frames) | At 3460 | Duration at 1730 / 3460 | Slave (enhanced) |
+|---|---|---|---|---|
+| Bar, idle | 3.7 (19) | 4.8 (14–15) | — | pass every 3 fields |
+| Briefing end, crowd stands | 4.6 (13–15) | 5.0 (8) | 11.3 / 7.2 s | every 3 fields |
+| Running pilots, three shots | 6.1 (9, 12) | 12.4 (5–6) | 4.2, 3.1, 4.0 s / 1.9, 1.6, 1.3 s | 95-field (1.9 s) shots kept |
+| Hangar exterior launch | 6.4 while moving (11–12) | 11.6 (6) | 13.4 / about 7.9 s | every 3 fields |
+| Cockpit launch tunnel | about 3.6 (17–28) | 3.6 (12–18) | 4.3 / 1.9 s | 25 ticks, 2.5 s |
+| Flight after launch | 9.8 (6–8) | — | — | 10 Hz |
+| Autopilot fly-by | 11.7 (6) | 12.8 (5–6) | 10.6 / about 6 s | 10 Hz within 240 fields (4.8 s) |
+| Ejection (letterbox) | 6.9 (9–10) | 10.2 (5–8) | 6.4 / 5.0 s | 10 Hz, 150 ticks |
+| Funeral exterior shots | 4.6 (15) | 6.8–8.2 (9) | whole funeral 37 / 33 s | every 3 fields |
+| Funeral salute | 8.8 (5) | 19.7 (3) | — | every 3 fields |
+| Carrier approach (cockpit) | 6.2 (10–13) | — | — | — |
+| Landing: deck approach, outside | 9.2 (6–7, 11) | — | 9.4 s | 100 steps, 6 s PAL |
+| Landing: inside the hangar | 6.6 (10–11) | — | 12.8 s | 85 steps, 5.1 s PAL |
+
+The bitmap cutscenes (running pilots, hangar, tunnel, fly-by, landing) take
+far longer on the reference PC than the Amiga's native spans: they are heavy
+full-screen scaling, and the reference machine falls behind there as in busy
+flight, so these figures bound the PC's speed rather than show a designed rate.
+The funeral is mostly held by its text and changes little in length. Some
+scenes reach exactly three display frames per advance at 3460 (salute, funeral,
+"The End"), which may be a frame limiter; a run at a much higher setting would
+show which scenes level off at a designed maximum.
+
 ## Phase 6 rendering implementation
 
 Rendering work is complete; intended-speed calibration and exact duration
