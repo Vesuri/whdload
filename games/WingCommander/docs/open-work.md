@@ -351,16 +351,8 @@ displayed 200 kps corresponds to 20 km per update. This supersedes the unmeasure
 15/s prior. The experimental timing build uses this rate; it does not establish every
 animation/AI cadence. Do not transfer intro evidence to flight.
 
-**Why 10 Hz.** The game's world has no clock: each update adds every object's
-velocity to its position once, however long the update took. The HUD turns that
-per-update velocity into kps by multiplying it by ten (`E:22c2–22ca`, `E:22ee–230a`),
-and shows navpoint range in the same kilometres. A displayed 200 kps therefore means
-200 km a second, and range closing at the speed shown, only at 10 updates a second;
-any other rate makes the game's own instruments wrong. Two observations agree:
-Psygore's `Custom5=0` limiter on a stock 020 runs flight at 10.1–10.2 updates/s, and
-the PC version (WC.EXE) uses the same units (20.00 km per update at 200 kps). The
-kps figure is a designers' choice, so this is the rate their units assume, not a
-recorded design document. Details: internals, "Native speed/range anchor".
+The reasoning and measurements are in internals, "Native speed/range anchor"; the
+PC version uses the same units (internals, "PC speed calibration").
 
 **The reference PC: DOSBox at about 1715 cycles, sound off.** The PC version, like
 the Amiga original, advances its world once per drawn frame as fast as the CPU allows,
