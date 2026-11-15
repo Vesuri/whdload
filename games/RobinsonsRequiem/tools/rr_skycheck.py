@@ -6,7 +6,11 @@ RobinsonsRequiemAGA/data-aga/START, hunk 1 loaded at address 0 so that its own v
 resolve) and src/sky030.s's _skyrows under Unicorn (68020) on the same random rows,
 segments, strides and bytes, and compares the view and the registers the code after +$e292
 can see: all but d3, which it sets (+$e2d8) or restores (+$e2e4) before reading, and a7.
-Sources on any alignment, odd row lengths included.
+Sources on any alignment, odd row lengths included. Every other case _skyrows reads the
+sky from its copy in fast memory (plan step 12): an image's header placed around the rows
+(width - 1 at +2, height at +4, the pixels from +8), its address on the stack as START
+leaves it (+$e22a), the copy's room set (K_BUF); the copy must be made (K_ORIG) and the
+view and the registers be START's.
 
 `ecs`: the ECS game's loop (hunk 1 +$c8b8 to +$c8e8, data-ecs/START) against
 src/sky000.s on a 68000: sources, row lengths, the view and its modulo even, as the
@@ -26,21 +30,23 @@ from rr_c2pcheck import (ROOT, START, Machine, UC_CPU_M68K_M68000,  # noqa: E402
                          UC_CPU_M68K_M68020, hunk, STACK)
 
 CODE_NEW = 0x700000
-SKY, VIEW = 0x200000, 0x400000
+SKY, VIEW, COPY = 0x200000, 0x400000, 0x600000
+KVARS = CODE_NEW + 8        # the stub's pointer to _kvars (aga): K_BUF, K_ORIG
 SKY_SIZE, VIEW_SIZE = 0x100000, 0x100000
 GAMES = {
     'aga': dict(start=START, loop=0xe262, end=0xe292, width=0xedfe, src='sky030.s',
-                cpu=UC_CPU_M68K_M68020, opt='-m68020', even=False),
+                cpu=UC_CPU_M68K_M68020, opt='-m68020', even=False, copy=True),
     'ecs': dict(start=ROOT / 'tmp/game/RobinsonsRequiem/data-ecs/START', loop=0xc8b8,
                 end=0xc8e8, width=0xd454, src='sky000.s', cpu=UC_CPU_M68K_M68000,
-                opt='-m68000', even=True),
+                opt='-m68000', even=True, copy=False),
 }
 
 
 def assemble(game):
     tmp = Path(tempfile.mkdtemp(dir=ROOT / 'tmp'))
     s, b = tmp / 'sky.s', tmp / 'sky.bin'
-    s.write_text(f'\t\tORG\t${CODE_NEW:x}\n\t\tbra.w\t_skyrows\n_hunk1\tdc.l\t0\n'
+    kv = '\t\tdc.l\t_kvars\n' if game['copy'] else ''
+    s.write_text(f'\t\tORG\t${CODE_NEW:x}\n\t\tbra.w\t_skyrows\n_hunk1\tdc.l\t0\n{kv}'
                  f'\t\tINCLUDE\t"{ROOT / "src" / game["src"]}"\n')
     subprocess.run([os.environ.get('VASM', 'vasmm68k_mot'), game['opt'], '-devpac', '-Fbin',
                     '-quiet', '-o', str(b), str(s)], check=True)
@@ -60,14 +66,25 @@ def main():
     code, new = hunk(1, game['start']), assemble(game)
     ev = 2 if game['even'] else 1
     sky = rnd.randbytes(SKY_SIZE)
+    copies = 0
     for n in range(cases):
+        copy = game['copy'] and n % 2 == 1
         width = rnd.choice([rnd.randrange(0, 700), 320, 256, 2, 1, 0])
         d0 = rnd.choice([-1, 0, rnd.randrange(-1, width // 2 + 2)])
         row = ev * rnd.choice([rnd.randrange(1, 1200 // ev), 2 * rnd.randrange(1, 600 // ev),
                                640 // ev])
         rows = rnd.randrange(1, 120)
+        if copy:            # an image of up to 32 KB holding every byte the rows read
+            width, row, rows = rnd.randrange(0, 400), rnd.randrange(1, 200), \
+                rnd.randrange(1, 60)
+            d0 = rnd.choice([-1, 0, rnd.randrange(-1, width // 2 + 2)])
         mod = ev * rnd.randrange(0, 80 // ev)
         src = SKY + 0x40000 + ev * rnd.randrange(0, 64 // ev)
+        if copy:
+            img = src - 8 - row - rnd.randrange(0, 64)
+            height = (src + 2 * (abs(d0) + 1) + width + rows * row - img - 8) // row + 2
+            image = (struct.pack('>HHH', 0, row - 1, height) +
+                     sky[img + 6 - SKY:img + 8 - SKY])
         dst = VIEW + ev * rnd.randrange(0, 64 // ev)
         regs = [rnd.getrandbits(32) for _ in range(16)]
         regs[0] = (regs[0] & 0xffff0000) | (d0 & 0xffff)
@@ -86,10 +103,20 @@ def main():
             m.write(CODE_NEW, new)
             m.write(SKY, sky)
             m.write(VIEW, view)
+            if copy:
+                m.write(img, image)
             if target == game['loop']:
                 m.call(target, regs, until=game['end'])
             else:
+                if copy:
+                    m.write(STACK, struct.pack('>L', img))
+                    kvars = struct.unpack('>L', m.read(KVARS, 4))[0]
+                    m.write(kvars, struct.pack('>L', COPY))
                 m.call(CODE_NEW, regs)
+                if copy:
+                    if struct.unpack('>L', m.read(kvars + 4, 4))[0] != img:
+                        sys.exit(f'case {n}: no copy made (image {8 + row * height} bytes)')
+                    copies += 1
             r = m.regs()
             keep = [r[i] for i in range(15) if i != 3]
             out.append((m.read(VIEW, VIEW_SIZE), keep))
@@ -102,7 +129,7 @@ def main():
             print(f'case {n}: width {width} d0 {d0} row {row} rows {rows} mod {mod} '
                   f'src {src:#x} dst {dst:#x}: {what}')
             sys.exit(1)
-    print(f'{cases} cases identical')
+    print(f'{cases} cases identical, {copies} from the copy')
 
 
 if __name__ == '__main__':

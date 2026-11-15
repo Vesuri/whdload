@@ -305,6 +305,20 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
     show, and the swap came that long after the wait. The test define `PRESENT_OFF`
     leaves the frames those of item 11: no presentation frames, the drawing's time W
     plus the cap.
+13. **The sky in fast memory** (`_skycopy`, `_skyset`, `_skyget` in `src/sky030.s`, with
+    item 5's patch; `docs/performance.md`, plan step 12). The sky's image is a resource in
+    the chip heap (its width − 1 at `+2`, its height at `+4`, the pixels from `+8`; 10,248
+    bytes in the jungle), the view's `+164` set by the script op `+$30bc`, the row's source
+    found at `+$e252` [`$126fe`] and the image's address pushed at `+$e22a`. `_skyrows`
+    reads the rows from a copy: `_skyget` makes it when the image's address or size
+    differs from the last copy's, at the image's address modulo 16 (the longword
+    alignment of the rows is START's), in a 32 KB room `_skycopy` takes from the fast
+    memory list at install (none: the image itself, as do images over 32 KB). The two
+    single bytes the routine reads for the rows above and below the sky (`+$e1d2`,
+    `+$e2c4`) still come from the image. `+$30e0` [`$758c`] `move.l d2,164(a0)` and
+    `bsr.w +$7b58` (checked first) become `jsr _skyset` and a `nop`: the image set as
+    before, the copy to be made again. `MAPCHECK` also compares the copy with the image at
+    every drawing; `tools/rr_skycheck.py` runs every other case from the copy.
 
 ## ECS improvements
 

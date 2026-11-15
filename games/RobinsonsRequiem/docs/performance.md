@@ -515,14 +515,23 @@ decides only how close a real 68030 to 68060 gets.
     frame the sky 4.0 ms, the landscape 3.5, the conversion 2.7 + 2.6, the spans 1.6, the
     objects 1.5. On the 50 MHz cores no frames between passes (their drawing takes 1.7
     fields and more): 166 frames on the setup's core and 122 on the aprof core, as 10.2's.
-12. **The sky in fast memory**: `_skyrows` reads 4,196 longwords a frame from the sky's
-    image, a resource in the chip heap (width - 1 at `+2`, height at `+4`, the pixels from
-    `+8`; the row's source set at hunk 1 `+$e252` [`$126fe`]). A copy in fast memory,
-    made again when the image's address or size changes (the heap moves blocks; as for
-    the shade table in 10c), checked as the map and the shade table are (a `MAPCHECK`
-    compare at every drawing, turning and walking; gdb on writes into the image).
-    Estimate: 3.9 → under 1 ms a frame at 400 MHz (INFERRED: the same 16.8 KB copied
-    fast to fast).
+12. **The sky in fast memory** (done, `docs/internals.md`, "AGA improvements"):
+    `_skyrows` read 4,196 longwords a frame from the sky's image, a resource in the chip
+    heap (width - 1 at `+2`, height at `+4`, the pixels from `+8`, 10,248 bytes in the
+    jungle; the row's source set at hunk 1 `+$e252` [`$126fe`]). It now reads a copy in a
+    32 KB room from the fast memory list, made again when the image's address or size
+    changes and after the sky's set-up (the script op `+$30bc`). Checks: with `MAPCHECK`
+    the copy equal to the image at all 87 drawings of 500 fields turning and 67 walking
+    (the map's and the shade table's copies still made); `tools/rr_skycheck.py` with every
+    other case from the copy, 1,000 cases (a control with a stale copy taken as current
+    differs at its first); the setup core's start and end screenshots pixel-identical to
+    step 11's. Measured at 400 MHz: 445 frames against 367 (44.5 fps, 22.5 ms), the sky
+    4.0 → 0.1 ms a frame, chip accesses 13.8 → 9.9 ms (18,351 → 13,980 a frame), busy 20.4
+    → 16.5 ms, the world wait 5.8 → 4.8 ms; turning, 23 world passes and 42 frames between
+    them in 66 fields, shown a field apart 62 times and 2 fields once. The estimate
+    (INFERRED) was under 1 ms. On the aprof core 129 frames against 122 (12.9 fps, 77.5
+    ms), chip accesses 14.3 → 10.4 ms, the sky 0.8 ms; on the setup's core 165 against
+    166, both at the cap.
 13. **The objects' graphics in fast memory**: the scaled sprites' pixel reads (hunk 1
     `+$eb5c` [`$13008`] and `+$ec88` [`$13134`], `move.b (0,a0,d0.w),d2`) go to the 3D
     objects' frames in MAIN's 256 KB block in chip, 2,119 reads a frame. First, what else

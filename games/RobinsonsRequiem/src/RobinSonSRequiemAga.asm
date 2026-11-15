@@ -1033,6 +1033,7 @@ _skypatch
         pea     _skyrows(pc)
         move.l  (a7)+,2(a1)
         move.l  #$60000028,6(a1)        ; bra.w +$e292
+        bsr     _skycopy
         move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
@@ -1048,6 +1049,48 @@ _skypatch
 .old    dc.w    $4a40,$6d00,$000a,$3600,$32d8,$51cb,$fffc,$3639,0,0,$e24b,$9640
         dc.w    $5543,$6d00,$000a,$90c1,$32d8,$51cb,$fffc,$d2c5,$d8c1,$204c,$51cf,$ffd2
 .oldend
+
+; The sky in fast memory (docs/performance.md, plan step 12): a room from the fast memory
+; list for _skyrows's copy of the image, and the sky's set-up (the script op +$30bc, the
+; view's image at +164) +$30e0 move.l d2,164(a0) and bsr.w +$7b58 becoming jsr _skyset and
+; a nop, after a check of their bytes. No room: _skyrows reads the image itself. a0 hunk 1.
+
+_skycopy
+        IFND SKYCOPY_OFF
+        movem.l d0-d1/a0-a1/a6,-(a7)
+        cmp.l   #$214200a4,$30e0(a0)
+        bne     .x
+        cmp.l   #$61004a72,$30e4(a0)
+        bne     .x
+        move.l  #SKYMAX+40,d0
+        moveq   #MEMF_FAST|MEMF_PUBLIC,d1
+        move.l  4.w,a6
+        jsr     _LVOAllocMem(a6)
+        move.l  8(a7),a0
+        tst.l   d0
+        beq     .x
+        add.l   #15,d0
+        and.w   #-16,d0
+        lea     _kvars(pc),a1
+        move.l  d0,K_BUF(a1)
+        move.w  #$4eb9,$30e0(a0)
+        pea     _skyset(pc)
+        move.l  (a7)+,$30e2(a0)
+        move.w  #$4e71,$30e6(a0)        ; nop
+.x      movem.l (a7)+,d0-d1/a0-a1/a6
+        ENDC
+        rts
+
+; +$30e0: the view's image set as before, the copy to be made again, on to +$7b58 (its rts
+; returning to the nop after the jsr, as the bsr.w did)
+_skyset move.l  d2,164(a0)
+        move.l  a1,-(a7)
+        lea     _kvars(pc),a1
+        clr.l   K_ORIG(a1)
+        move.l  (a7)+,a1
+        move.l  _hunk1(pc),-(a7)
+        add.l   #$7b58,(a7)
+        rts
 
         INCLUDE sky030.s
 
