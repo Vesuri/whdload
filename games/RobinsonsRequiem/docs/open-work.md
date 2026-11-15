@@ -9,10 +9,11 @@ by eye in play with `human` walking up to the player), and each drawing starts a
 drawing sets the frame rate (148 frames in the window on the setup's core, 101 on the
 aprof core, against 55 on the player's 9 fields). Step 10.2's map and shade table in fast
 memory and its swap without the beam wait took that to 166, the cap (every frame 3 fields
-apart), and 122. The plan to 50 fps on a fast CPU (steps 11-15: frames between world
-passes, the chip bus's time per frame, the landscape's code for real CPUs) is written, not
-started: with the 68030 at 400 MHz the game is at the cap with 22.3 ms busy a frame, 13.7
-of it chip accesses. The ECS plan for the A500 is done: steps 1 and 2 (the conversion and the
+apart), and 122. Of the plan to 50 fps on a fast CPU (steps 11-15: frames between world
+passes, the chip bus's time per frame, the landscape's code for real CPUs) step 11 is done:
+with the 68030 at 400 MHz the slave draws frames between the world's passes, 367 in the
+window against the cap's 166, most a field apart, with 20.4 ms busy a frame, 13.8 of it
+chip accesses; on the 50 MHz cores the drawing leaves no room for them. The ECS plan for the A500 is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
 landscape code being register-bound (about 1% each). On the AGA's 50 MHz 68030 the ECS
@@ -30,11 +31,12 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 
 Next, in order:
 
-1. The AGA plan's step 11, frames between world passes, then steps 12-14, the sky's and the
-   objects' chip reads and the rest of a frame's chip time (`docs/performance.md`, "Plan",
+1. The AGA plan's steps 12-14, the sky's and the objects' chip reads and the rest of a
+   frame's chip time (`docs/performance.md`, "Plan",
    "AGA, to 50 fps"), each measured at 400 MHz and on the setup's and the aprof cores
    (`tools/rr_prof.py`, `tools/rr_passes.py`, `tools/rr_objects.py`); step 15, the
-   landscape's code, for real CPUs. Steps 7-11 also in a heavier scene than the jungle
+   landscape's code, for real CPUs. Step 11's frames to be play-checked (the pointer's
+   picking between passes). Steps 7-11 also in a heavier scene than the jungle
    start (more trees and objects) and in other areas (other maps and shade tables).
 2. The ECS plan's steps 5-11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"): the
    tools, the AGA's sites in the ECS game, its memory and 68020 code, the AGA's steps 7-14,

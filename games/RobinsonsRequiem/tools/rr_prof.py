@@ -9,7 +9,8 @@ raw key, KEY=none none. The ECS game: VARIANT=RobinsonsRequiem SETUP=custom BUIL
 BARTO=1 (its 68000 cannot run under aprof; frames from FRAME_MARK).
 
 Boots deterministically (WARP=1 DETERMINISTIC=1 JOY0=none, INSTANCE=prof); the run options
-of common/run.sh apply through the environment (SETUP, FSUAE, EXTRA_ARGS, BUILD, ...). From
+of common/run.sh apply through the environment (SETUP, FSUAE, EXTRA_ARGS, BUILD, SLAVE=path
+for any slave file, ...). From
 the reset it runs chunks of 10 fields until START's hunk 0 is loaded, then stops at the
 dos.library Open of avion.DO or .CO (a conditional breakpoint on hunk 0's Open, rr.py's
 LAYOUTS: +$255e AGA, +$1b0e ECS), deletes it and
@@ -72,6 +73,8 @@ class Session:
                    VARIANT='RobinsonsRequiemAGA', SETUP='a1200-030', WARP='1',
                    DETERMINISTIC='1', JOY0='none', WINDOW='none', FSUAE_CLAIM_STRICT='1')
         env.update({k: os.environ[k] for k in env if k in os.environ})
+        if os.environ.get('SLAVE'):             # any slave file instead of BUILD's
+            env['SLAVE'] = str(Path(os.environ['SLAVE']).resolve())
         self.env = env
         self.g = self.s.boot(env)
         self.field = 0
@@ -216,7 +219,8 @@ def main():
         if key is not None:
             s.cmd(f'monitor key {key:x} 0')
         s.shot('end.png')
-        slave = ROOT / 'tmp/build' / s.env['BUILD'] / f'{s.env["VARIANT"]}.Slave'
+        slave = Path(s.env['SLAVE']) if 'SLAVE' in s.env else \
+            ROOT / 'tmp/build' / s.env['BUILD'] / f'{s.env["VARIANT"]}.Slave'
         frames = c1['frames'] - c0['frames']
         if trace:   # the frames the trace saw start (FRAME_MARK)
             frames = sum(1 for e in red.events if e[0] == 'frame')

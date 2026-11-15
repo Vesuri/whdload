@@ -305,6 +305,7 @@ _cont
             bsr _worldpatch
             bsr _mappatch
             bsr _swappatch
+            bsr _prespatch
 
         ;call
                 move.l  d7,a1
@@ -1257,6 +1258,24 @@ _capwait
 .on     moveq   #0,d1
         move.b  d0,d1
         add.l   W_W(a1),d1
+        IFND PRESENT_OFF
+        tst.b   _pvars+P_ON(pc)         ; plan step 11: the field the frame shows in, at
+        beq     .t                      ; most W plus the cap (W, the next pass's count,
+        movem.l d0/d2/a0,-(a7)          ; in a presentation frame)
+        lea     _pvars(pc),a0
+        move.l  d1,d2
+        tst.b   P_IN(a0)
+        beq     .t1
+        move.l  W_W(a1),d2
+.t1     bsr     _now
+        move.l  d0,P_T0(a0)
+        st      P_TIMED(a0)
+        sf      P_ACC(a0)
+        bsr     _pwhen
+        move.l  d2,d1
+        movem.l (a7)+,d0/d2/a0
+.t
+        ENDC
         move.l  d1,W_DRAWT(a1)
         clr.b   d0
         movem.l (a7)+,d1/a0-a1
@@ -1271,6 +1290,8 @@ _capwait
 ; soon as that list has run
 _passend
         movem.l (a7)+,d0-a6
+        tst.b   _pvars+P_IN(pc)
+        bne     _passpres               ; a presentation frame's end: back to _present
         movem.l d1/a0-a1,-(a7)
         lea     _wvars(pc),a1
         tst.b   W_ON(a1)
@@ -1284,13 +1305,213 @@ _passend
         beq     _passout
         add.l   W_W(a1),d1
         move.l  d1,W_W(a1)
+        bsr     _present                ; plan step 11: frames while there is time
         move.l  W_VBL(a1),a0
 _wwait  cmp.l   (a0),d1                 ; until the count reaches W
         bhi     _wwait
 _wwaitend
 _passout
         movem.l (a7)+,d1/a0-a1
+_passpres
         rts
+
+**********************************************
+; Frames between world passes (docs/performance.md, plan step 11). After a world pass's
+; frame, while the next pass is not due, _passend draws again: START's frame routine from
+; +$49c2 (past +$49b2's operand reads from the list's script stream, +$294a), as on a pass
+; on which no object was due, with the camera and the staged elements at the field the
+; frame will show in. Per-pass work stays on world passes: the scripts' countdown (+$4bd6
+; subq.b #1,<+$ef2a>, checked first, becomes jsr _cdown, which skips it in a presentation
+; frame; _view skips it too), the view's velocity (+$4980, on the game's own changes only)
+; and the objects' sampling (_listend). A presentation frame is drawn only when the last
+; frame drawn was staged (the camera, or an element), when its field is later than the
+; last frame's, and when it is expected to swap before the next pass is due; one that did
+; not swap ends them for that pass.
+;
+; Times are in lines: the VBL count x 313 + the beam's line. The frame's field is
+; estimated from the last frame drawn (its start to its first access to the back screen,
+; and from after that access's wait to its swap): the access waits for the last swap to
+; show. PRESENT_OFF (a test define): no presentation frames and the drawing's time W plus
+; the cap, the frames those of plan step 10.2.
+
+P_LINES equ     313
+P_MARGIN equ    P_LINES/8               ; lines to spare before the next pass is due
+
+; d0 the time in lines. START's VBL routine counts the field first thing (hunk 1 +$99ea);
+; in the field's first half with VERTB still requested it has not run yet for this field
+_now    movem.l d1-d2/a0,-(a7)
+        move.l  _wvars+W_VBL(pc),a0
+.r      move.l  (a0),d1
+        move.l  $dff004,d0
+        move.w  $dff01e,d2
+        cmp.l   (a0),d1
+        bne     .r
+        lsr.l   #8,d0
+        and.l   #$1ff,d0
+        btst    #5,d2
+        beq     .t
+        cmp.w   #P_LINES/2,d0
+        bhs     .t
+        addq.l  #1,d1
+.t      mulu.l  #P_LINES,d1
+        add.l   d1,d0
+        movem.l (a7)+,d1-d2/a0
+        rts
+
+; d0 the time now, d2 the latest field: d1 the frame's expected swap (lines), d2 the field
+; it shows in, at most the given one
+_pwhen  movem.l d0/d3,-(a7)
+        add.l   _pvars+P_PRE(pc),d0     ; to its first access to the back screen
+        move.l  _bvars+B_SVBL(pc),d3
+        addq.l  #1,d3                   ; the field the last swap shows in, which the
+        mulu.l  #P_LINES,d3             ; access waits for
+        cmp.l   d3,d0
+        bhs     .w
+        move.l  d3,d0
+.w      add.l   _pvars+P_TAIL(pc),d0
+        move.l  d0,d1
+        divu.l  #P_LINES,d0
+        addq.l  #1,d0                   ; shown from the next field
+        cmp.l   d2,d0
+        bhs     .x
+        move.l  d0,d2
+.x      movem.l (a7)+,d0/d3
+        rts
+
+; from _passend, a1 _wvars, W the next pass's count
+_present
+        IFND PRESENT_OFF
+        movem.l d0-a6,-(a7)
+        lea     _pvars(pc),a4
+        tst.b   P_ON(a4)
+        beq     .out
+.loop   bsr     _pneed
+        beq     .out
+        bsr     _now
+        move.l  _wvars+W_W(pc),d2
+        bsr     _pwhen
+        cmp.l   P_LASTT(a4),d2
+        bls     .out                    ; no later field than the last frame's
+        add.l   #P_MARGIN,d1
+        move.l  _wvars+W_W(pc),d0
+        mulu.l  #P_LINES,d0
+        cmp.l   d0,d1
+        bhs     .out                    ; it would end after the next pass is due
+        st      P_IN(a4)
+        sf      P_SWAP(a4)
+        move.l  _hunk1(pc),a0
+        jsr     $49c2(a0)
+        lea     _pvars(pc),a4
+        sf      P_IN(a4)
+        tst.b   P_SWAP(a4)
+        beq     .out
+        addq.l  #1,P_FRAMES(a4)
+        bra     .loop
+.out    movem.l (a7)+,d0-a6
+        ENDC
+        rts
+
+; Z clear when the last frame drawn was staged: the camera, or an element (step 9's slots)
+_pneed  movem.l d0/d7/a3,-(a7)
+        tst.b   _ivars+I_STAGED(pc)
+        bne     .yes
+        move.l  _wvars+W_ETAB(pc),d0
+        beq     .no
+        move.l  d0,a3
+        moveq   #ESLOTS-1,d7
+.s      tst.l   (a3)
+        beq     .n
+        tst.b   22(a3)
+        bne     .yes
+.n      lea     ESIZE(a3),a3
+        dbf     d7,.s
+.no     moveq   #0,d0
+        bra     .x
+.yes    moveq   #1,d0
+.x      movem.l (a7)+,d0/d7/a3
+        rts
+
+; +$4bd6, the countdown of a view with bit 5 set: not in a presentation frame (Z clear: the
+; bne.w after it taken, as for a count not yet out)
+_cdown  tst.b   _pvars+P_IN(pc)
+        bne     .x
+        move.l  a0,-(a7)
+        move.l  _hunk1(pc),a0
+        subq.b  #1,($ef2a,a0)
+        movea.l (a7)+,a0
+.x      rts
+
+; the frame's timing: at its first access to the back screen (_bflush, before and after the
+; wait for the last swap) and at its swap
+_ptacc  movem.l d0/a0,-(a7)
+        lea     _pvars(pc),a0
+        tst.b   P_TIMED(a0)
+        beq     .x
+        tst.b   P_ACC(a0)
+        bne     .x
+        bsr     _now
+        move.l  d0,P_TA(a0)
+.x      movem.l (a7)+,d0/a0
+        rts
+_ptwait movem.l d0/a0,-(a7)
+        lea     _pvars(pc),a0
+        tst.b   P_TIMED(a0)
+        beq     .x
+        tst.b   P_ACC(a0)
+        bne     .x
+        st      P_ACC(a0)
+        bsr     _now
+        move.l  d0,P_TB(a0)
+.x      movem.l (a7)+,d0/a0
+        rts
+_ptswap movem.l d0-d1/a0,-(a7)
+        lea     _pvars(pc),a0
+        st      P_SWAP(a0)
+        tst.b   P_TIMED(a0)
+        beq     .x
+        sf      P_TIMED(a0)
+        move.l  _wvars+W_DRAWT(pc),P_LASTT(a0)
+        bsr     _now
+        tst.b   P_ACC(a0)
+        bne     .acc
+        sub.l   P_T0(a0),d0             ; no access noted: all of it before
+        move.l  d0,P_PRE(a0)
+        clr.l   P_TAIL(a0)
+        bra     .x
+.acc    sub.l   P_TB(a0),d0
+        move.l  d0,P_TAIL(a0)
+        move.l  P_TA(a0),d0
+        sub.l   P_T0(a0),d0
+        move.l  d0,P_PRE(a0)
+.x      movem.l (a7)+,d0-d1/a0
+        rts
+
+_pvars
+_pt0            dc.l    0               ; the frame's start
+_pta            dc.l    0               ; its first access to the back screen
+_ptb            dc.l    0               ; after that access's wait
+_ppre           dc.l    0               ; the last frame drawn: its start to its access
+_ptail          dc.l    0               ; and after the wait to its swap
+_plastt         dc.l    0               ; its field (W_DRAWT)
+_pframes        dc.l    0               ; presentation frames drawn
+_pon            dc.b    0               ; patched
+_pin            dc.b    0               ; in a presentation frame
+_ptimed         dc.b    0               ; the frame timed (3D, W in use)
+_pacc           dc.b    0               ; its access noted
+_pswap          dc.b    0               ; a swap in the presentation frame
+        even
+P_T0    equ     _pt0-_pvars
+P_TA    equ     _pta-_pvars
+P_TB    equ     _ptb-_pvars
+P_PRE   equ     _ppre-_pvars
+P_TAIL  equ     _ptail-_pvars
+P_LASTT equ     _plastt-_pvars
+P_FRAMES equ    _pframes-_pvars
+P_ON    equ     _pon-_pvars
+P_IN    equ     _pin-_pvars
+P_TIMED equ     _ptimed-_pvars
+P_ACC   equ     _pacc-_pvars
+P_SWAP  equ     _pswap-_pvars
 
 **********************************************
 ; The camera between the followed object's runs (docs/performance.md, plan step 8). The
@@ -1447,6 +1668,8 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         btst    #5,(a2)
         beq     .out
         move.b  #1,$ef2b-$eef5(a0)
+        tst.b   _pvars+P_IN(pc)         ; plan step 11: per world pass
+        bne     .out
         subq.b  #1,$ef2a-$eef5(a0)
         bne     .out
         st      $ef2b-$eef5(a0)
@@ -2511,6 +2734,36 @@ _swappatch
         dc.l    $ed86
         dc.l    0
 
+; plan step 11, with _view, step 9's slots and the swap patched: +$4bd6 subq.b #1,<+$ef2a>
+; becomes jsr _cdown, and frames between world passes are drawn
+_prespatch
+        IFND PRESENT_OFF
+        tst.b   _bvars+B_ON(pc)
+        beq     .no
+        tst.l   _wvars+W_DRAW(pc)
+        beq     .no
+        tst.l   _wvars+W_ETAB(pc)
+        beq     .no
+        move.l  _hunk1(pc),a0
+        lea     $4bd6(a0),a1
+        cmp.w   #$5339,(a1)
+        bne     .no
+        lea     $ef2a(a0),a2
+        cmp.l   2(a1),a2
+        bne     .no
+        cmp.l   #$6600000a,6(a1)        ; bne.w +$4be8
+        bne     .no
+        move.w  #$4eb9,(a1)
+        pea     _cdown(pc)
+        move.l  (a7)+,2(a1)
+        lea     _pvars(pc),a2
+        st      P_ON(a2)
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.no
+        ENDC
+        rts
+
 ; hunk, offset, movea.l <+$10>,An
 _gsites dc.w    0,$1394,$2479,0,$184e,$2c79,0,$1896,$2c79,0,$1994,$2879,0,$1ad8,$2879
         dc.w    0,$1b50,$2479,0,$1b98,$2479,0,$1bd4,$2479,0,$1c26,$2879,0,$1c66,$2879
@@ -2539,6 +2792,7 @@ _swaitend
         move.l  (a0),d0
         lea     _bvars(pc),a0
         move.l  d0,B_SVBL(a0)
+        bsr     _ptswap
         movem.l (a7)+,d0/a0
         rts
 
@@ -2596,8 +2850,10 @@ _bflush tst.b   _bvars+B_PEND(pc)
         movem.l d0-d2/a0-a1,-(a7)
         lea     _bvars(pc),a1
         sf      B_PEND(a1)
+        bsr     _ptacc
         move.l  B_13C0(a1),a0
         jsr     (a0)
+        bsr     _ptwait
         sf      B_UNSHOWN(a1)
         move.l  _hunk1(pc),a0
         move.l  ($edda,a0),d0

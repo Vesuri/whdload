@@ -491,20 +491,30 @@ chip), the conversion 5.2 ms (90-95%: its 8,064 longword plane writes), the obje
 11) and a frame's chip time well inside a field (steps 12-14). The CPU's work (step 15)
 decides only how close a real 68030 to 68060 gets.
 
-11. **Frames between world passes**, presentation only. After a world pass's frame, while
-    the next pass is not due (the world wait), the slave draws again with the camera and
-    the staged elements at the next field's alpha, converts and swaps, instead of waiting.
-    The world pass keeps the game's grid. Step 8's staging then has field steps: the
-    player's 9-field run shows in 9 camera positions instead of 3. First the frame
-    routine's per-pass work is to be told from the drawing: `+$4980`'s velocity, the
-    countdown `+$ef2a`, `+$525a`'s rectangles, the pointer's background, the 2D drawing's
-    locks. Each is either kept on world passes or made safe to repeat. Then what reads the
-    drawn frame between passes, such as the pointer's picking. No frame when nothing staged
-    moves (standing, as now). Checks: `tools/rr_passes.py` (frames and their intervals),
-    `tools/rr_objects.py` (the world's rhythm unchanged), with the presentation frames off
-    frames identical to 10d's. Estimate (DERIVED from the 400 MHz run): with 22.3 ms busy a
-    frame, about a frame every 1 to 2 fields at 400 MHz before steps 12-14. On the 50 MHz
-    cores little changes: their drawing takes most of the 3 fields.
+11. **Frames between world passes** (done, `docs/internals.md`, "AGA improvements"),
+    presentation only. After a world pass's frame, while the next pass is not due, the
+    slave runs START's frame routine again (from hunk 1 `+$49c2`, past the list's
+    operands, as on a pass on which no object came due) with the camera and the staged
+    elements at the field the frame will show in, instead of waiting. The world pass
+    keeps the game's grid. Of the frame routine's per-pass work, the countdown `+$ef2a`
+    is kept on world passes; `+$4980`'s velocity, the objects' sampling, `+$525a`'s
+    rectangles, the pointer's background and the locks are already safe to repeat (the
+    velocity and the sampling run only on the game's changes, the rest for every frame
+    routine as in START). A frame is drawn when the last one was staged (none standing),
+    shows in a later field than it and is expected to swap an eighth of a field before
+    the next pass is due (from the last frame's times). The pointer's picking reads the
+    boxes of the frame shown last, as since step 8 (INFERRED, not play-checked). The test
+    define `PRESENT_OFF` leaves them out. Checks: with `PRESENT_OFF` 166 frames on the
+    setup's core and the start and end screenshots pixel-identical to 10.2's; the objects'
+    intervals the grid's at 400 MHz turning and walking (`tools/rr_objects.py`).
+    Measured at 400 MHz: 367 frames against 166 (36.7 fps, 27.2 ms), busy 20.4 ms a frame
+    (13.8 of it chip accesses, 18,351 a frame), the world wait 5.8 ms; turning, 26 world
+    passes and 37 frames between them in 77 fields, shown 1 field apart 50 times, 2
+    fields 11 times and 4 fields once (`tools/rr_passes.py`, "shown intervals"), the
+    camera a step a field. The estimate (DERIVED) was a frame every 1 to 2 fields. Per
+    frame the sky 4.0 ms, the landscape 3.5, the conversion 2.7 + 2.6, the spans 1.6, the
+    objects 1.5. On the 50 MHz cores no frames between passes (their drawing takes 1.7
+    fields and more): 166 frames on the setup's core and 122 on the aprof core, as 10.2's.
 12. **The sky in fast memory**: `_skyrows` reads 4,196 longwords a frame from the sky's
     image, a resource in the chip heap (width - 1 at `+2`, height at `+4`, the pixels from
     `+8`; the row's source set at hunk 1 `+$e252` [`$126fe`]). A copy in fast memory,
@@ -675,8 +685,8 @@ BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
 # ECS on the AGA's CPU ("ECS on a fast CPU"; after ECS step 5, which widens the search)
 VARIANT=RobinsonsRequiem SETUP=a3000-50 BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
     EXTRA_ARGS=--uae_mmu_model=0 python3 tools/rr_prof.py tmp/prof/ecs-a3000
-# the AGA game's drawing passes, frame intervals and catch-up passes (gdb breakpoints,
-# no profile; KEY=3e walking)
+# the AGA game's drawing passes, frame intervals, the fields the frames show in, catch-up
+# passes and frames between passes (gdb breakpoints, no profile; KEY=3e walking)
 BUILD=profile FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
     python3 tools/rr_passes.py tmp/prof/passes
 # the AGA game's objects and their intervals ("Objects' rhythm"; KEY=none standing,

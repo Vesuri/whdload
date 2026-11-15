@@ -6,12 +6,14 @@ keypad 9 held; the run options through the environment) with gdb breakpoints in 
 instead of a profile: the frame routine's entry (+$49b2, P), the pass's start after the
 cap wait (+$49f6, p), the 3D view's drawing (+$a478, D), the swap (+$4b30, S) and the
 list's start (+$251a with d5 0, L: every pass, a catch-up pass since plan step 7 an L
-without a P), each event with the VBL count (+$ee6c) and the beam's line. KEY=hex the raw
+without a P; since plan step 11 a p without a P is a presentation frame's routine), each event with the VBL count (+$ee6c) and the beam's line. KEY=hex the raw
 key held (default 3f, keypad 9; 3e walks; none for no key). A D event also has the view's camera, as the
 drawing sees it (a2's +22/24/26 and +52/54/56). EVENTS events (default 240) after
 50 fields of walking. Prints the drawing passes in fields (a D pass's p to its S, with the
 line as a fraction of 313), the frame intervals (D to D, in fields), the frames per 500
-fields at that rate, the passes, frame routines and catch-up passes, and the event log; OUT/passes.json keeps the events.
+fields at that rate, the intervals of the fields the frames show in (an S before line 310
+shows in the next field, from line 310 the one after: the copper takes the pointers at
+the field's start, docs/internals.md, "AGA improvements", item 11), the passes, frame routines and catch-up passes, and the event log; OUT/passes.json keeps the events.
 
 Breakpoints stop the emulation, not its time: the counts are those of the run itself.
 """
@@ -27,6 +29,7 @@ from rr_prof import Session, find_hunk0, hunks, layout  # noqa: E402
 MARKS = {0x49b2: 'P', 0x49f6: 'p', 0xa478: 'D', 0x4b30: 'S', 0x251a: 'L'}
 VBL = 0xee6c
 LINES = 313
+SHOWN_BY = 310      # a swap from this line on shows a field later (_swap)
 
 
 def main():
@@ -93,13 +96,17 @@ def main():
             passes.append(t - start)
             drawing = False
     gaps = [b - a for a, b in zip(draws, draws[1:])]
+    shown = [v + 1 + (line >= SHOWN_BY) for m, v, line, *_ in ev if m == 'S']
+    sgaps = [b - a for a, b in zip(shown, shown[1:])]
     print('drawing pass fields:', ' '.join(f'{x:.2f}' for x in sorted(passes)))
     print('frame intervals:', dict(sorted(collections.Counter(gaps).items())),
           f'mean {sum(gaps) / len(gaps):.2f}, {500 * len(gaps) / sum(gaps):.1f} frames '
           'per 500 fields' if gaps else '')
+    print('shown intervals:', dict(sorted(collections.Counter(sgaps).items())),
+          f'mean {sum(sgaps) / len(sgaps):.2f}' if sgaps else '')
     cnt = collections.Counter(e[0] for e in ev)
     print(f"passes {cnt['L']}, frame routines {cnt['P']}, catch-up passes {cnt['L'] - cnt['P']}, "
-          f"in {ev[-1][1] - t0} fields")
+          f"presentation frame routines {cnt['p'] - cnt['P']}, in {ev[-1][1] - t0} fields")
     cams = [(e[1], e[3]) for e in ev if e[0] == 'D']
     print('cameras (field: x y z, angles):', ' '.join(f'{v - t0}:{",".join(map(str, c))}' for v, c in cams))
     print('events:', ' '.join(f'{e[0]}{e[1] - t0}.{e[2]}' for e in ev))

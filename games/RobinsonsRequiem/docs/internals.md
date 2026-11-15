@@ -268,6 +268,44 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
       while the old screen still shows; these keep anything they draw from showing a
       field early. Not hunk 2 `+$4fc`, the VBL's pointer, which runs at the field's start.
 
+12. **Frames between world passes** (`_present`, `_pwhen`, `_now`, `_pneed`, `_cdown`,
+    `_prespatch`; `docs/performance.md`, plan step 11). After a world pass's frame,
+    `_passend` (item 6) draws more frames until the next pass is due, then waits for it as
+    before. Each one is START's frame routine entered at hunk 1 `+$49c2`, as on a pass on
+    which no object came due. Entering there skips `+$49b2`-`+$49bc`, which reads four
+    operands from the list's script stream (`+$294a`, while `<+$ed37>` is set). Only
+    with items 7, 8 and 11 patched. Per-pass work stays on world passes:
+    - The countdown of a view with bit 5 set (`+$4bd6` [`$9082`] `subq.b #1,<+$ef2a>`,
+      checked first with the `bne.w +$4be8` after it): it becomes `jsr _cdown`, which
+      skips it in a presentation frame and leaves Z clear, so a count still running stays
+      running. `_view` skips it too in the staged frames it completes (item 7). The count
+      is set by a script op (`+$3bd6`).
+    - The view's velocity (`+$4980`): it is added only on the game's own changes, and
+      `+$48b8` finds the camera unchanged when no object has run.
+    - The objects' sampling (`_listend`, items 7 and 8): it runs only at a list's end.
+    - The rectangles' copy, the pointer's background and the locks (`+$4a0a`-`+$4a7c`,
+      item 11): they run for every frame, as START runs them for every frame routine.
+      A frame routine with nothing changed copies an empty list.
+
+    A presentation frame is drawn only when all three hold:
+    - The last frame drawn was staged (`_pneed`: the camera, or one of item 8's
+      slots). A frame that was not staged shows every pose as the game left it, and no
+      object has run since.
+    - The field it would show in is later than the last frame's.
+    - It is expected to swap at least an eighth of a field before the next pass is due.
+
+    A presentation frame that does not swap (the view unchanged) ends them for that pass.
+    The drawing's time (`W_DRAWT`, items 7 and 8) is the field the frame will show in, at
+    most W plus the cap (the next pass's count) for a pass's frame, and the next pass's
+    count for a presentation frame. Times are in lines: the VBL count × 313 plus the
+    beam's line, one field more when VERTB is still requested in the field's first half
+    (START's VBL routine counts the field first thing, hunk 1 `+$99ea`). The estimate
+    starts from the last frame drawn. Its first access to the back screen came that
+    long after its start (`_bflush`, item 11). The access waits for the last swap to
+    show, and the swap came that long after the wait. The test define `PRESENT_OFF`
+    leaves the frames those of item 11: no presentation frames, the drawing's time W
+    plus the cap.
+
 ## ECS improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan:
