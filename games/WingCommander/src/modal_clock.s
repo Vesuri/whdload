@@ -191,7 +191,7 @@ modal_run_feet:
         bra.w modal_feet_resume
 
 ; Ready/Game Over share the native text fly-in, but not flight input/scoring.
-; C ABI: text.l, delay.w, initial-depth.w, unused.w, particle-flag.w.
+; C ABI: text.l, delay.w, unused.w, initial-depth.w, particle-flag.w.
 ; Only the two known zero-particle callers are redirected here.
 modal_simulator:
         link a5,#-4
@@ -238,7 +238,7 @@ modal_simulator:
         andi.l #$ffff,d0
         add.l d0,d3
         moveq #0,d1
-        move.w 14(a5),d1
+        move.w 16(a5),d1       ; initial depth (native 40(sp) after its movem)
         sub.l d3,d1
         cmpi.l #100,d1
         bge.s .depth

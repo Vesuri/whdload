@@ -7455,7 +7455,10 @@ continuity guard. Native tests cover NTSC; no new live NTSC run is claimed.
 Enhanced builds now give the simulator's **Get Ready / Game Over** world the
 same 10 Hz updates and bounded render prediction as the intro. Their shared
 40-iteration text fly-in becomes 40 world ticks (four seconds), with fractional
-text depth sampled between ticks. Flight input/scoring is not enabled by this
+text depth sampled between ticks. The native arguments are text, delay, an unused
+word, initial depth and particle flag: Ready passes delay 0, depth 240; Game Over
+delay 20, depth 300. Depth falls 10 per tick to 100, so the text zooms in.
+Flight input/scoring is not enabled by this
 modal owner. Native text, projection, context setup/cleanup and abort handling
 remain in use. The particle-enabled alternative of the shared native routine
 retains its original path; the Ready/Game Over callers both request zero particles.

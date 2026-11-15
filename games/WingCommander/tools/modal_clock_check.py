@@ -184,18 +184,24 @@ def check(build,variant,model):
   c.write(data+0x7ffe+(-31670 if variant=='ocs' else -31696),long(1))
   for rate in (50,60):
    for gap in (1,3,9):
-    for delay,depth in ((0,240),(20,300)):
+    # Native callers: text, delay, unused, initial depth, particles (Ready, Game Over).
+    for delay,unused,depth in ((0,40,240),(20,120,300)):
      state.update(ticks=0,pictures=0,rate=rate,gap=gap,skip=False);scales.clear();c.write(field,long(100))
-     call('modal_dispatch',struct.pack('>Ihhhh',0x180000,delay,depth,0,0))
+     call('modal_dispatch',struct.pack('>Ihhhh',0x180000,delay,unused,depth,0))
      require(state['ticks']==40,('simulator world count',state))
      require(4*rate<=c.get(field,4)-100<4*rate+gap,('simulator duration',state,c.get(field,4)))
      require(scales and all(0<x<=512 for x in scales),'text scale/ABI')
+     # Fly-in from the native initial depth: starts far, never recedes, ends at depth 100.
+     first=51200//(depth-10*(delay+2))  # first picture may sample up to one tick in
+     require(scales[0]<=first,('text starts too close',delay,scales[:3],first))
+     require(all(a<=b for a,b in zip(scales,scales[1:])),('text zoom recedes',scales))
+     require(scales[-1]==512,('text zoom end',scales[-1]))
      if delay==0 and gap==1:require(len(set(scales))>14,'zoom still steps at 10 Hz')
      require(c.get(s+sy['intro_active'])==0,'modal owner leaked')
      sims.append(dict(hz=rate,gap=gap,delay=delay,ticks=state['ticks'],pictures=state['pictures']))
   state.update(ticks=0,pictures=0,rate=50,gap=1,skip=False,native_abort=True)
   c.write(field,long(100));c.write(abort-8,word(0x1234))
-  call('modal_dispatch',struct.pack('>Ihhhh',0x180000,0,240,0,0))
+  call('modal_dispatch',struct.pack('>Ihhhh',0x180000,0,40,240,0))
   require(state['pictures']==1 and state['ticks']==0,'native abort not observed')
   require(c.get(abort-8)==0x1234 and c.get(abort)==0,'abort damaged adjacent state')
   return dict(model=model,running_samples=samples,installer=True,rejected_sites=len(rejected),bar_samples=bars,foreground_rectangles=4,input_hz=25,hover_label_composition_replay=True,short_click_exactly_once=True,simulator=sims)
