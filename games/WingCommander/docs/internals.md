@@ -2060,6 +2060,35 @@ extrapolation. Discrete explosion images remain tick-owned; no intermediate
 artwork is fabricated. Music playback and native credit deadlines are retained.
 See the intro-clock implementation gate below for exact scope and validation.
 
+### PC speed calibration (DOSBox)
+
+The PC version (WC.EXE) runs flat out: its flight loop advances the world once
+per drawn frame (a data-segment counter steps by one each frame), so its rate
+follows the emulated CPU speed. Its units match the Amiga's: at a displayed
+200 kps the player moves 20.00 km per update. A DOSBox-staging 0.83 probe in
+INT 33h function 3, which the loop calls twice a frame, logged the emulated time
+of each call and snapshots of the data segment (player position at `DS:a9c2`, three
+longs with eight fractional bits). The setup: `machine = svga_s3`, `core = normal`,
+`cputype = 386`, fixed cycles; first mission, straight flight at 200 kps
+towards Nav 1, before the asteroids (2026-11-15).
+
+| Sound (game's installer setting) | Cycles | Frames | Updates/s |
+|---|---:|---:|---:|
+| AdLib | 3000 | 348 | 15.16 |
+| AdLib | 2000 | 185 / 947 | 8.87 / 10.77 (two stretches of one flight) |
+| AdLib | 1840 | 345 | 8.64 |
+| None | 1840 | 1052 | 10.69 |
+| None | 1533 | 160 | 8.76 |
+| None | 1730 | 881 | **10.10** (199.5 km/s) |
+
+The music driver shares the CPU, and its load depends on the song: with music on, the same
+cycles give rates about a fifth lower and varying from one stretch to another. With
+sound off the rate is steady and nearly proportional to cycles: **about 1715 cycles
+give 10 updates/s**. Ships, asteroids or other objects in view lower it
+(7.2 at 2000 cycles with music among enemies). This setting, sound off, in empty space, is the
+reference for measuring other PC animations; scenes paced by the PC timer instead
+of the CPU keep their speed at any setting, which a second cycle setting shows.
+
 ## Phase 6 rendering implementation
 
 Rendering work is complete; intended-speed calibration and exact duration
