@@ -2089,6 +2089,26 @@ give 10 updates/s** (1730 × 10 / 10.10). Ships, asteroids or other objects in v
 reference for measuring other PC animations; scenes paced by the PC timer instead
 of the CPU keep their speed at any setting, which a second cycle setting shows.
 
+**Opening and intro at the reference.** DOSBox video capture (every emulated
+70.09 Hz display frame) of the unattended opening and intro at 1730 and 3460 cycles,
+sound off. A picture change, merged with the next display frame when the drawing
+tears across two, counts as one advance. Every scripted scene has the same number
+of advances at both settings and takes about half as long at 3460: the PC opening
+and intro are counted in updates, paced by the CPU, with no clock.
+
+| Scene (1730 capture, seconds) | Advances | At 1730 | At 3460 |
+|---|---:|---:|---:|
+| Orchestra (2.8–11.0) | 74 | 9.0/s | 17.7/s |
+| Origin FX logo zoom and fireworks (11.0–16.3) | 68 | 12.8/s | 24.1/s |
+| Caption and ship fight, to the explosion (17.75–28.0) | 66 | 6.4/s | 13.0/s |
+| Explosion to the title logo (28.8–39.3) | 109 | 10.3/s | 20.9/s |
+| Asteroid credits (60–170; 30–105 at 3460) | — | 8.3/s | 16.7/s |
+
+The light scenes run at 9–13 advances/s on the reference PC, around the 10 Hz of
+flight; the fight (ships and explosions) and the asteroid field fall behind, as
+busy flight does. The credit cards' durations do not halve at 3460, so their
+deadlines are timed, not counted (as on the Amiga, where they are native).
+
 ## Phase 6 rendering implementation
 
 Rendering work is complete; intended-speed calibration and exact duration
