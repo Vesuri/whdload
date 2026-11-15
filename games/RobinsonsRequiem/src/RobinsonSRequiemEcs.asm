@@ -264,6 +264,7 @@ _bootdos        lea     (_saveregs,pc),a0
    IFD PROFILE
             pea     slv_base(pc)        ; for tools/rr_prof.py and rr_report.py
             move.l  (a7)+,PROFILE_SLAVE.w
+            clr.l   PROFILE_FRAMES.w
    ENDC
             bsr _c2ppatch
             bsr _skypatch
@@ -770,7 +771,11 @@ _hunks
 _hunk1          dc.l    0
 _hunk2          dc.l    0
 
-PROFILE_SLAVE   = $110                  ; profile builds: the slave's address (user vector 68)
+; Profile builds, as the AGA slave's: the frames the game draws in PROFILE_FRAMES (user
+; vector 67), counted at each conversion (_c2ppatch, once per frame), and the slave's address
+; in PROFILE_SLAVE (vector 68), for tools/rr_prof.py and rr_report.py.
+PROFILE_FRAMES  = $10c
+PROFILE_SLAVE   = $110
 
 **********************************************
 ; The chunky-to-planar conversion (src/c2p000.s): hunk 2 +$1a5e, START's loop, starts with
@@ -790,11 +795,21 @@ _c2ppatch
         lea     _c2pmod(pc),a3
         move.l  a2,(a3)
         move.w  #$4ef9,(a1)
+   IFD PROFILE
+        pea     _framehook(pc)
+   ELSE
         pea     _c2p000(pc)
+   ENDC
         move.l  (a7)+,2(a1)
         move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
+
+   IFD PROFILE
+_framehook
+        addq.l  #1,PROFILE_FRAMES.w
+        bra     _c2p000
+   ENDC
 
 _c2pmod         dc.l    0
 

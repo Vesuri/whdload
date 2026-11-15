@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
-"""The AGA game's passes and frames, walking: rr_passes.py OUT [EVENTS] (docs/performance.md)
+"""The game's passes and frames, walking: rr_passes.py OUT [EVENTS] (docs/performance.md)
 
-rr_prof.py's workload (its Session: the direct start, the avion.DO open, 150 fields, then
-keypad 9 held; the run options through the environment) with gdb breakpoints in hunk 1
-instead of a profile: the frame routine's entry (+$49b2, P), the pass's start after the
-cap wait (+$49f6, p), the 3D view's drawing (+$a478, D), the swap (+$4b30, S) and the
-list's start (+$251a with d5 0, L: every pass, a catch-up pass since plan step 7 an L
-without a P; since plan step 11 a p without a P is a presentation frame's routine), each event with the VBL count (+$ee6c) and the beam's line. KEY=hex the raw
-key held (default 3f, keypad 9; 3e walks; none for no key). A D event also has the view's camera, as the
-drawing sees it (a2's +22/24/26 and +52/54/56). EVENTS events (default 240) after
-50 fields of walking. Prints the drawing passes in fields (a D pass's p to its S, with the
-line as a fraction of 313), the frame intervals (D to D, in fields), the frames per 500
-fields at that rate, the intervals of the fields the frames show in (an S before line 310
-shows in the next field, from line 310 the one after: the copper takes the pointers at
-the field's start, docs/internals.md, "AGA improvements", item 11), the passes, frame routines and catch-up passes, and the event log; OUT/passes.json keeps the events.
+rr_prof.py's workload (its Session: the direct start, the avion open, 150 fields, then
+keypad 9 held; the run options through the environment, VARIANT=RobinsonsRequiem for the
+ECS game) with gdb breakpoints in hunk 1 instead of a profile: the frame routine's entry
+(AGA +$49b2, ECS +$3076: P), the pass's start after the cap wait (+$49f6, +$30ba: p), the
+3D view's drawing (+$a478, +$8ae2: D), the swap (+$4b30, +$31f4: S) and the list's start
+(+$251a, +$cbe, with d5 0: L; every pass, in the AGA game a catch-up pass since plan step 7
+an L without a P, and since plan step 11 a p without a P is a presentation frame's
+routine), each event with the VBL count (+$ee6c, +$d4c2) and the beam's line. The ECS
+game's frame routine and MAIN loop are the AGA's instruction for instruction. KEY=hex the
+raw key held (default 3f, keypad 9; 3e walks; none for no key). A D event also has the
+view's camera, as the drawing sees it (a2's +22/24/26 and +52/54/56). EVENTS events
+(default 240) after 50 fields of walking. Prints the drawing passes in fields (a D pass's p
+to its S, with the line as a fraction of 313), the frame intervals (D to D, in fields), the
+frames per 500 fields at that rate, the intervals of the fields the frames show in (an S
+before line 310 shows in the next field, from line 310 the one after: the copper takes the
+pointers at the field's start, docs/internals.md, "AGA improvements", item 11), the
+passes, frame routines and catch-up passes, and the event log; OUT/passes.json keeps the
+events.
 
 Breakpoints stop the emulation, not its time: the counts are those of the run itself.
 """
@@ -24,10 +29,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from rr_prof import Session, find_hunk0, hunks, layout  # noqa: E402
+from rr_prof import Session, hunks  # noqa: E402
 
-MARKS = {0x49b2: 'P', 0x49f6: 'p', 0xa478: 'D', 0x4b30: 'S', 0x251a: 'L'}
-VBL = 0xee6c
+# hunk 1: the events and the VBL count
+SITES = {'RobinsonsRequiemAGA': ({0x49b2: 'P', 0x49f6: 'p', 0xa478: 'D', 0x4b30: 'S',
+                                  0x251a: 'L'}, 0xee6c),
+         'RobinsonsRequiem': ({0x3076: 'P', 0x30ba: 'p', 0x8ae2: 'D', 0x31f4: 'S',
+                               0xcbe: 'L'}, 0xd4c2)}
 LINES = 313
 SHOWN_BY = 310      # a swap from this line on shows a field later (_swap)
 
@@ -38,28 +46,14 @@ def main():
     key = os.environ.get('KEY', '3f')
     s = Session(out)
     try:
-        if s.env['VARIANT'] != 'RobinsonsRequiemAGA':
-            raise SystemExit('the AGA game only')
-        base = None
-        while base is None:
-            if s.field > 3000:
-                raise TimeoutError('START hunk 0 not found in 3000 fields')
-            s.fields(10)
-            try:
-                base = find_hunk0(s.g, s.env['VARIANT'])
-            except RuntimeError:
-                pass
-        open_at = base + layout(s.env['VARIANT'])['calls']['open']
-        s.cmd(f'break *{open_at:#x}')
-        s.cmd('condition $bpnum *(unsigned int *)$d1 == 0x6176696f')
-        s.g.cmd('continue', timeout=1200)
-        s.cmd('delete')
+        sites, vbl_at = SITES[s.env['VARIANT']]
+        base = s.to_open()[0]
         s.fields(150)
         h1 = hunks(s, base)[1]
         if key != 'none':
             s.cmd(f'monitor key {key} 1')
         s.fields(50)
-        marks = {h1 + o: m for o, m in MARKS.items()}
+        marks = {h1 + o: m for o, m in sites.items()}
         for a in marks:
             s.cmd(f'break *{a:#x}')
             if marks[a] == 'L':
@@ -68,7 +62,7 @@ def main():
         for _ in range(n):
             s.g.cmd('continue', timeout=300)
             pc = int(s.g.cmd('info registers pc').split()[1], 16)
-            vbl = int.from_bytes(s.read(h1 + VBL, 4), 'big')
+            vbl = int.from_bytes(s.read(h1 + vbl_at, 4), 'big')
             line = (int.from_bytes(s.read(0xdff004, 4), 'big') >> 8) & 0x1ff
             m = marks.get(pc, hex(pc))
             if m == 'D':

@@ -40,17 +40,20 @@ from game_server import game_server  # noqa: E402
 # at other offsets; the server's VARIANT (common/run.sh's, the ECS game by default) picks one.
 HUNK0_SIG = '0x48e7, 0x60c0, 0x2208, 0x61c8, 0x243c'
 LAYOUTS = {
-    'RobinsonsRequiemAGA': dict(sig_offset=0x2546, size=0x3a30, search=(0x200000, 0x1000000),
+    'RobinsonsRequiemAGA': dict(sig_offset=0x2546, size=0x3a30,
                                 calls={'open': 0x255e, 'new': 0x267e, 'lock': 0x2590},
                                 # hunk 1 +$eda8 points at MAIN's variables (the menu's
                                 # settings are at +$383a-$383e)
                                 globals_ptr=0xeda8, ext='.DO'),
-    # The A500 machine's 2 MB fast memory ends at $400000: gdb's find stops at the first
-    # unreadable byte and then reports no match at all.
-    'RobinsonsRequiem': dict(sig_offset=0x1af6, size=0x2f30, search=(0x200000, 0x3ffff0),
+    'RobinsonsRequiem': dict(sig_offset=0x1af6, size=0x2f30,
                              calls={'open': 0x1b0e, 'new': 0x1c32, 'lock': 0x1b44},
                              globals_ptr=None, ext='.CO'),
 }
+# START is in the machine's Zorro II fast memory, from $200000 (the A500's 2 MB to $400000,
+# the a3000-50's and the A1200 setups' 8 MB to $a00000), where WHDLoad puts the slave's
+# ExpMem. gdb's find stops at the first unreadable byte and then reports no match at all, so
+# the search ends where fast memory does (fast_end).
+FAST, FAST_MAX, FAST_STEP = 0x200000, 0xa00000, 0x40000
 
 
 def layout(variant=None):
@@ -103,12 +106,22 @@ def key(g, raw):
     run_fields(g, 3)
 
 
+def fast_end(g):
+    """The end of the machine's fast memory: the first unreadable 256 KB step from $200000."""
+    end = FAST
+    while end < FAST_MAX and 'Cannot access' not in g.cmd(f'x/wx {end:#x}'):
+        end += FAST_STEP
+    return end
+
+
 def find_hunk0(g, variant=None):
     """START's hunk 0 (the CPU is stopped on return); RuntimeError while it is not loaded."""
     lay = layout(variant)
     g.stop()
-    lo, hi = lay['search']
-    out = g.cmd(f'find /h {lo:#x}, {hi:#x}, {HUNK0_SIG}', timeout=120)
+    end = fast_end(g)
+    if end == FAST:
+        raise RuntimeError('no fast memory at $200000')
+    out = g.cmd(f'find /h {FAST:#x}, {end - 16:#x}, {HUNK0_SIG}', timeout=120)
     hits = [int(w, 16) for w in out.split('\n') if re.fullmatch(r'0x[0-9a-f]+', w.strip())]
     # The PRELOAD copy of the file matches too; the loaded segment is the match whose
     # segment header (the allocation size, hunk size + 8, at -8) is there.

@@ -15,8 +15,8 @@ game never opens `avion.DO` (nor `srain`, `ordi` and `map`; the view is the same
 turns the player on the spot (AGA: its position stayed put for 182 fields while its
 heading went from -63 to -249 degrees); keypad 8 walks forward.
 `tools/rr_report.py OUT` prints the tables below from its output; `tools/rr_passes.py OUT`
-runs the same workload under gdb breakpoints for the AGA game's drawing passes and frame
-intervals.
+runs the same workload under gdb breakpoints for either game's drawing passes and frame
+intervals, and `tools/rr_objects.py OUT` for its objects' runs.
 
 - The game draws no frame while the player stands still (`KEY=none`: 0 frames in 500
   fields), so turning is the workload. The player turns once per run of its script (`heros`,
@@ -30,7 +30,10 @@ intervals.
   aprof's call count.
 - **ECS**, `custom` (A500, 68000 at 7.09 MHz, 1 MB chip, 2 MB fast), `BUILD=developer
   BARTO=1`: a Barto trace on the native cycle-exact 68000 core (142,102 cycles per field),
-  frames counted at the beam wait's entry, hunk 0 `+$cac`. Detail and window are the boot
+  frames counted at the beam wait's entry, hunk 0 `+$cac`. Since plan step 5 (ECS)
+  `BUILD=profile` also counts the frames drawn at the conversion (hunk 2 `+$1a5e`, once
+  after each drawing); the swap and its beam wait also run on passes that draw nothing on a
+  fast CPU. Detail and window are the boot
   values (the menu is skipped); the 3D window is full size in the screenshots.
 
 Both games hold each frame to at least 3 fields: the frame wait (AGA hunk 1 `+$49e8`, ECS
@@ -726,17 +729,29 @@ chip (13.6 ms a swap), the conversion 94% (5.0), the sky 3.7, the spans and fill
 CPU wait for the blitter. So the ECS game is behind for the two reasons the AGA's steps
 1-3 and 7-10 removed there: all its data is in chip memory (the slave gives 1 MB of chip
 and 256 KB of ExpMem, as the AGA's v1.2 did), and it draws only on the player's runs.
-Measured with `tools/rr_prof.py`'s search for START widened to the 8 MB (step 5) and the
-frames counted from the profile's calls. The A500 path (68000, no fast memory) stays as it
+Measured with `tools/rr_prof.py`, the frames counted from the profile's calls (the profile
+build's counter, step 5, gives the same 57). The A500 path (68000, no fast memory) stays as it
 is, each step below chosen at install, and the game has to keep working correctly on the
 68000: each step is checked on the A500 (`custom`) as well as on the fast machines. On
 68020 and up with fast memory nothing waits for the blitter.
 
-5. **Tools for the ECS game on fast machines**: `tools/rr.py`'s search for START over the
-   machine's fast memory (the A500's 2 MB ends at `$400000`, the `a3000-50`'s 8 MB at
-   `$a00000`; gdb's `find` gives no match past the end); a frame counter in the ECS
-   `profile` build, as the AGA's; `tools/rr_passes.py` and `tools/rr_objects.py` for the
-   ECS game.
+5. **Tools for the ECS game on fast machines** (done). `tools/rr.py` searches for START
+   over the machine's fast memory, from `$200000` to the first unreadable 256 KB step (the
+   A500's 2 MB end at `$400000`, the `a3000-50`'s and the A1200 setups' 8 MB at `$a00000`;
+   gdb's `find` gives no match at all past the end), where WHDLoad puts the ExpMem: START
+   at `$9c2760` on the `a3000-50`. The ECS `profile` build counts frames as the AGA's
+   (`PROFILE_FRAMES`, at the conversion's patched entry, hunk 2 `+$1a5e`): 57 in the window
+   on the `a3000-50`'s aprof core, as the profile's calls; breakpoints there show one
+   conversion after each drawing and one or two swaps (16 drawings, 16 conversions, the
+   counter 16). `tools/rr_passes.py` and `tools/rr_objects.py` take the ECS game's sites
+   (`VARIANT=RobinsonsRequiem`): its frame routine and MAIN loop are the AGA's instruction
+   for instruction (frame routine hunk 1 `+$3076`, pass start `+$30ba`, drawing `+$8ae2`,
+   swap call `+$31f4`, list start `+$cbe`, scheduler `+$d34`, object table `+$d3c2`, VBL
+   count `+$d4c2`; the fast pool's address and size at `+$e4`, the chip pool's at `+$d8`).
+   On the A500 turning: 17.5 frames per 500 fields, intervals of 23 to 35 fields (mean
+   28.57, the 578 ms of step 2), no catch-up passes; every object runs once per frame (mean
+   28.25 to 28.60 fields), the player (`heros`, period 7) too. The AGA game's figures are
+   unchanged (176 frames on the setup's core, every interval 3 fields).
 6. **The AGA's sites in the ECS game**: both STARTs are the same program at other offsets
    (the ECS swap, hunk 0 `+$cbe` [`$cee`], is the AGA's `+$13e0` instruction for
    instruction). Each AGA patch's checked bytes find its ECS site, giving a table of both
@@ -785,7 +800,7 @@ BUILD=profile SETUP=a1200-060 OPEN=human python3 tools/rr_prof.py tmp/prof/aga-0
 BUILD=profile SETUP=a1200-060 OPEN=human APROF=1 FSUAE=$FSUAE_APROF \
     EXTRA_ARGS='--uae_mmu_model=0 --uae_cpu_cycle_exact=true --uae_cpu_memory_cycle_exact=true --uae_blitter_cycle_exact=true' \
     python3 tools/rr_prof.py tmp/prof/aga-060-aprof
-# ECS on the AGA's CPU ("ECS on a fast CPU"; after ECS step 5, which widens the search)
+# ECS on the AGA's CPU ("ECS on a fast CPU")
 VARIANT=RobinsonsRequiem SETUP=a3000-50 BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
     EXTRA_ARGS=--uae_mmu_model=0 python3 tools/rr_prof.py tmp/prof/ecs-a3000
 # the AGA game's drawing passes, frame intervals, the fields the frames show in, catch-up
@@ -796,6 +811,9 @@ BUILD=profile FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
 # 3e walking; POSE=1 the poses; SLAVE=<a slave assembled without bsr _worldpatch> for
 # START's scheduling)
 BUILD=developer python3 tools/rr_objects.py tmp/prof/objects 300
+# the same for the ECS game (A500; SETUP=a3000-50 for the AGA's CPU)
+VARIANT=RobinsonsRequiem SETUP=custom python3 tools/rr_passes.py tmp/ecs/passes 120
+VARIANT=RobinsonsRequiem SETUP=custom python3 tools/rr_objects.py tmp/ecs/objects 150
 # the AGA conversion and sky copy against START's loops (after make unpack)
 python3 tools/rr_c2pcheck.py 2000
 python3 tools/rr_skycheck.py 2000

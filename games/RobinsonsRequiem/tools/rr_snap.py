@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from rr_prof import PROFILE_SLAVE, Session, find_hunk0, hunks, layout  # noqa: E402
+from rr_prof import PROFILE_SLAVE, Session, hunks  # noqa: E402
 
 # the landscape's entry in hunk 1 and the machine's memory, by variant
 LAND = {'RobinsonsRequiemAGA': 0xd88c, 'RobinsonsRequiem': 0xbee2}
@@ -35,20 +35,7 @@ def main():
     try:
         variant = s.env['VARIANT']
         land, regions = LAND[variant], REGIONS[variant]
-        base = None
-        while base is None:
-            if s.field > 3000:
-                raise TimeoutError('START hunk 0 not found in 3000 fields')
-            s.fields(10)
-            try:
-                base = find_hunk0(s.g, s.env['VARIANT'])
-            except RuntimeError:
-                pass
-        open_at = base + layout(s.env['VARIANT'])['calls']['open']
-        s.cmd(f'break *{open_at:#x}')
-        s.cmd('condition $bpnum *(unsigned int *)$d1 == 0x6176696f')
-        s.g.cmd('continue', timeout=1200)
-        s.cmd('delete')
+        base = s.to_open()[0]
         s.fields(150)
         bases = hunks(s, base)
         s.cmd('monitor key 3f 1')

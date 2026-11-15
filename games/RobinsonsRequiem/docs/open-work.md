@@ -29,8 +29,10 @@ sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
 landscape code being register-bound (about 1% each). On the AGA's 50 MHz 68030 the ECS
 game draws 57 frames against the AGA's 122 (its data all in chip memory, its frames on the
-player's runs only); its plan to 50 fps on 68020 and up with fast memory (steps 5-11, the
-A500 path apart) is written, not started. Both developer builds boot straight
+player's runs only); of its plan to 50 fps on 68020 and up with fast memory (steps 5-11,
+the A500 path apart) step 5 is done: the tools find START in any machine's fast memory, the
+ECS `profile` build counts frames, and `tools/rr_passes.py` and `tools/rr_objects.py` take
+the ECS game. Both developer builds boot straight
 into the game (the AGA one with detail and window at HIGH), and `tools/rr.py ingame` drives
 any AGA build there through the intro and menu (`docs/development.md`). The game is on the
 repository layout with CFou!'s v1.2 slave sources and the improvements; both variants build
@@ -51,9 +53,9 @@ Next, in order:
    equal (240 drawings, 4,419 object images given) and filled step 13's cache to 63,919
    of its 65,536 bytes (37 images) before emptying it once. The 040/060 conversion on a
    real 040 or 060.
-2. The ECS plan's steps 5-11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"): the
-   tools, the AGA's sites in the ECS game, its memory and 68020 code, the AGA's steps 7-13,
-   and the A500's own path. The game has to keep working correctly on the 68000: each
+2. The ECS plan's steps 6-11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"): the
+   AGA's sites in the ECS game, its memory and 68020 code, the AGA's steps 7-13, and the
+   A500's own path. The game has to keep working correctly on the 68000: each
    step chosen at install and checked on the A500 as well.
 3. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`); step 10.2's swap is play-tested with the

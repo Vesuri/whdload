@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Profile the jungle start with keypad 9 held: rr_prof.py OUT (docs/performance.md)
 
-The workload: a developer-type build's direct start (docs/development.md; for the AGA game
-by default BUILD=profile, the developer build plus a frame counter; another from game.conf
-with BUILD=), SETTLE fields (default 150) after the game opens avion.DO (.CO), then keypad
-9 (forward and to the right) held for FIELDS fields (default 500, 10 s PAL); KEY=hex another
-raw key, KEY=none none. The ECS game: VARIANT=RobinsonsRequiem SETUP=custom BUILD=developer
-BARTO=1 (its 68000 cannot run under aprof; frames from FRAME_MARK).
+The workload: a developer-type build's direct start (docs/development.md; by default
+BUILD=profile, the developer build plus a frame counter; another from game.conf with
+BUILD=), SETTLE fields (default 150) after the game opens avion.DO (.CO), then keypad 9
+(forward and to the right) held for FIELDS fields (default 500, 10 s PAL); KEY=hex another
+raw key, KEY=none none. The ECS game: VARIANT=RobinsonsRequiem with SETUP=custom (its A500)
+and BARTO=1 (its 68000 cannot run under aprof; frames from FRAME_MARK), or SETUP=a3000-50
+(the AGA's 68030 on ECS) with APROF=1.
 
 Boots deterministically (WARP=1 DETERMINISTIC=1 JOY0=none, INSTANCE=prof); the run options
 of common/run.sh apply through the environment (SETUP, FSUAE, EXTRA_ARGS, BUILD, SLAVE=path
@@ -59,7 +60,8 @@ FRAME_MARK = {'RobinsonsRequiemAGA': 0x13f6, 'RobinsonsRequiem': 0xcac}
 # +$49e8, ECS +$30ac) holds each frame until `fields` reaches `cap`; the VBL counts both.
 GAME_VARS = {'RobinsonsRequiemAGA': {'cap': (1, 0xee6a, 1), 'fields': (1, 0xee6b, 1),
                                      'vbl': (1, 0xee6c, 4)},
-             'RobinsonsRequiem': {'cap': (1, 0xd4c0, 1), 'fields': (1, 0xd4c1, 1)}}
+             'RobinsonsRequiem': {'cap': (1, 0xd4c0, 1), 'fields': (1, 0xd4c1, 1),
+                                  'vbl': (1, 0xd4c2, 4)}}
 
 
 class Session:
@@ -99,6 +101,30 @@ class Session:
             return Path(p).read_bytes()
         finally:
             os.unlink(p)
+
+    def to_open(self):
+        """From the reset to the Open of OPEN's file (default avion), the breakpoint then
+        deleted: (START's hunk 0, the name opened, the field)."""
+        base = None
+        while base is None:
+            if self.field > 3000:
+                raise TimeoutError('START hunk 0 not found in 3000 fields')
+            self.fields(10)
+            try:
+                base = find_hunk0(self.g, self.env['VARIANT'])
+            except RuntimeError:
+                pass
+        open_at = base + layout(self.env['VARIANT'])['calls']['open']
+        tag = os.environ.get('OPEN', 'avio')[:4].encode('latin1')
+        self.cmd(f'break *{open_at:#x}')
+        self.cmd(f'condition $bpnum *(unsigned int *)$d1 == {int.from_bytes(tag, "big"):#x}')
+        r = self.g.cmd('continue', timeout=1200)
+        pc = self.g.cmd('info registers pc')
+        if f'{open_at:#x}' not in pc:
+            raise RuntimeError(f'not stopped at the {tag.decode()} open: {r} {pc}')
+        name = self.read(int(self.g.cmd('info registers d1').split()[1], 16), 12)
+        self.cmd('delete')
+        return base, name.split(b'\0')[0].decode('latin1'), self.field
 
     def shot(self, name):
         p = self.run / 'shot.bin'
@@ -161,32 +187,13 @@ def main():
     t0 = time.time()
     s = Session(out)
     try:
-        base = None
-        while base is None:
-            if s.field > 3000:
-                raise TimeoutError('START hunk 0 not found in 3000 fields')
-            s.fields(10)
-            try:
-                base = find_hunk0(s.g, s.env['VARIANT'])
-            except RuntimeError:
-                pass
-        # Stop at the Open of avion.DO ('avio' at d1): a deterministic point after boot.
-        open_at = base + layout(s.env['VARIANT'])['calls']['open']
-        tag = os.environ.get('OPEN', 'avio')[:4].encode('latin1')
-        s.cmd(f'break *{open_at:#x}')
-        s.cmd(f'condition $bpnum *(unsigned int *)$d1 == {int.from_bytes(tag, "big"):#x}')
-        r = s.g.cmd('continue', timeout=1200)
-        pc = s.g.cmd('info registers pc')
-        if f'{open_at:#x}' not in pc:
-            raise RuntimeError(f'not stopped at the avion.DO open: {r} {pc}')
-        name = s.read(int(s.g.cmd('info registers d1').split()[1], 16), 12)
-        s.cmd('delete')
-        found_at = s.field
+        # A deterministic point after boot: the Open of avion.DO (.CO) or OPEN's file.
+        base, name, found_at = s.to_open()
         s.fields(settle)
         bases = hunks(s, base)
 
         def counters():
-            # frames: the AGA profile builds only; elsewhere a constant, so 0 frames
+            # frames: the profile builds' counter; in other builds a constant, so 0 frames
             c = {'frames': int.from_bytes(s.read(PROFILE_FRAMES, 4), 'big')}
             for k, (h, o, n) in GAME_VARS[s.env['VARIANT']].items():
                 c[k] = int.from_bytes(s.read(bases[h] + o, n), 'big')
@@ -229,7 +236,7 @@ def main():
         info = dict(env=s.env, key=None if key is None else f'{key:02x}', frames=frames, fps=round(50 * frames / (w1 - w0), 3), extra_args=os.environ.get('EXTRA_ARGS', ''),
                     fsuae=os.environ.get('FSUAE', ''), aprof=aprof, barto=trace,
                     slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(),
-                    avion_name=name.split(b'\0')[0].decode('latin1'), avion_field=found_at,
+                    avion_name=name, avion_field=found_at,
                     window=[w0, w1], hunks=[hex(b) for b in bases], counters=[c0, c1],
                     slave=hex(int.from_bytes(s.read(PROFILE_SLAVE, 4), 'big')),
                     host_seconds=round(time.time() - t0))
