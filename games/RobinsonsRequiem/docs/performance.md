@@ -459,29 +459,95 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
       drawing passes of 2.93 to 4.98 fields); the objects' intervals the grid's, turning
       and walking (`tools/rr_objects.py`). The mouse pointer moving and the scripts'
       drawing (inventory, messages) are play-tested; the runs have neither.
-   5. What is left is the drawing, after 10a (aprof core, 102 frames, ms per frame; after
-      10d the landscape 30.6, the spans 14.1, the waits 0.3):
+   5. What is left is the drawing (aprof core after 10d, 122 frames, 82.0 ms per frame,
+      busy 81.6 ms, 14.3 ms of it chip accesses):
 
       | Function | ms/frame | In chip accesses |
       |---|---|---|
-      | hunk 1 `+$d88c`, the landscape | 36.2 | 18% |
-      | hunk 1 `+$b7ca`, the spans | 18.1 | 28% |
-      | Kalms' conversion, both passes | 10.0 | 47% |
-      | hunk 1 `+$b6ea`, span set-up, 1,570 calls | 5.8 | 0% |
-      | hunk 0 `+$13ce`, the beam wait | 5.6 | 99% |
-      | the sky (`_skyrows`) | 4.2 | 87% |
-      | hunk 1 `+$ea3a`, objects | 1.9 | 82% |
-      | hunk 0 `+$13c0`, the copper-interrupt wait | 1.1 | 99% |
+      | hunk 1 `+$d88c`, the landscape | 30.6 | 0% |
+      | hunk 1 `+$b7ca`, the spans | 14.1 | 0% |
+      | Kalms' conversion, both passes | 10.5 | 45% |
+      | hunk 1 `+$b6ea`, span set-up, 1,575 calls | 5.9 | 0% |
+      | the sky (`_skyrows`) | 4.3 | 87% |
+      | hunk 1 `+$ea3a`, objects | 2.1 | 82% |
+      | hunk 2 `+$5b6`, the blitter copy of the view's rectangles | 1.1 | 93% |
 
-      The landscape's loop (`+$d9ba`-`+$dbac`, a sample per pass round it) spreads its
-      time over some 70 instructions of 0.1 to 0.8 ms each, most on its variables
-      (`-6xx(a1)`), with the two map reads from chip the largest (`+$da6c`, `+$db1e`, 3.4 ms
-      each); the 68020's scaled index would save a few instructions a sample (about 1 ms,
-      INFERRED from the profile's per-instruction times), and no equivalence check for the
-      AGA landscape exists yet (`tools/rr_ecsland.py` is the ECS one). Not done.
+      The landscape's loop (`+$d9ba`-`+$dbac`, 3,607 samples a frame) spreads its 28 ms
+      over some 60 instructions of 0.1 to 1.0 ms each, most on its variables (`-6xx(a1)`)
+      and five absolute stores a sample (step 15). The spans and their set-up spread 20 ms
+      over 1,575 set-ups and 1,319 spans a frame. All of it is in fast memory.
 
-Beyond 16.7 fps (an 040 or 060): frames between world passes, presentation only, without
-going round MAIN; the cap stays the world's grid.
+AGA, to 50 fps. The target is a frame every field on a CPU as fast as one likes. What the
+CPU's speed does not remove is the frame structure (one drawing per world pass, at most
+every 3 fields: 16.7 fps) and the time on the chip bus. Measured with the aprof core's
+68030 at 400 MHz, 8 times the preset's clock (`--uae_cpu_frequency=400000000`: still
+cycle-exact, chip accesses at the chipset's speed; FS-UAE's `uae_cpu_speed=max` is no
+stand-in: on the setup's core it gave 112 frames, against 166 at the preset's clock): 166 frames, the cap; busy 22.3
+ms per frame, 13.7 ms of it chip accesses (17,745 a frame), and 37.9 ms waiting for the
+world. The CPU's own work shrank with the clock (the landscape 30.6 → 3.5 ms, the spans
+14.1 → 1.7, the span set-up 5.9 → 0.7); the chip-bound work did not: the sky 3.9 ms (98%
+chip), the conversion 5.2 ms (90-95%: its 8,064 longword plane writes), the objects 1.8 ms
+(98%), the blitter copy 0.7 ms. A frame every field needs frames between world passes (step
+11) and a frame's chip time well inside a field (steps 12-14). The CPU's work (step 15)
+decides only how close a real 68030 to 68060 gets.
+
+11. **Frames between world passes**, presentation only. After a world pass's frame, while
+    the next pass is not due (the world wait), the slave draws again with the camera and
+    the staged elements at the next field's alpha, converts and swaps, instead of waiting.
+    The world pass keeps the game's grid. Step 8's staging then has field steps: the
+    player's 9-field run shows in 9 camera positions instead of 3. First the frame
+    routine's per-pass work is to be told from the drawing: `+$4980`'s velocity, the
+    countdown `+$ef2a`, `+$525a`'s rectangles, the pointer's background, the 2D drawing's
+    locks. Each is either kept on world passes or made safe to repeat. Then what reads the
+    drawn frame between passes, such as the pointer's picking. No frame when nothing staged
+    moves (standing, as now). Checks: `tools/rr_passes.py` (frames and their intervals),
+    `tools/rr_objects.py` (the world's rhythm unchanged), with the presentation frames off
+    frames identical to 10d's. Estimate (DERIVED from the 400 MHz run): with 22.3 ms busy a
+    frame, about a frame every 1 to 2 fields at 400 MHz before steps 12-14. On the 50 MHz
+    cores little changes: their drawing takes most of the 3 fields.
+12. **The sky in fast memory**: `_skyrows` reads 4,196 longwords a frame from the sky's
+    image, a resource in the chip heap (width - 1 at `+2`, height at `+4`, the pixels from
+    `+8`; the row's source set at hunk 1 `+$e252` [`$126fe`]). A copy in fast memory,
+    made again when the image's address or size changes (the heap moves blocks; as for
+    the shade table in 10c), checked as the map and the shade table are (a `MAPCHECK`
+    compare at every drawing, turning and walking; gdb on writes into the image).
+    Estimate: 3.9 → under 1 ms a frame at 400 MHz (INFERRED: the same 16.8 KB copied
+    fast to fast).
+13. **The objects' graphics in fast memory**: the scaled sprites' pixel reads (hunk 1
+    `+$eb5c` [`$13008`] and `+$ec88` [`$13134`], `move.b (0,a0,d0.w),d2`) go to the 3D
+    objects' frames in MAIN's 256 KB block in chip, 2,119 reads a frame. First, what else
+    reads the block (Paula, the blitter, the copper). If only the CPU, the block comes
+    from the fast pool (step 3's `_fastalloc`, with room for it); otherwise a copy of the
+    frames the drawing reads, as in step 12. Estimate: 1.8 → about 0.2 ms (INFERRED).
+14. **The rest of a frame's chip time**: after 12 and 13 about 8 ms a frame at 400 MHz
+    (DERIVED: 13.7 less the sky's and the objects'). Most of it is the conversion's plane
+    writes (5.2 ms), a floor while the CPU writes the planes. The rest is the blitter copy
+    (`h2+$5b6`, 0.7 ms, the CPU waiting for the blitter: to start it and go on, waiting
+    only before the conversion), the pointer's background (`h2+$4ec`, 0.3) and routines
+    not identified yet: hunk 2 `+$1256` (0.5), `+$1b4` (0.4), hunk 1 `+$7b74` (0.4, 193
+    calls a frame) and `+$a7d4` (0.2). Each is to be identified, then moved to fast
+    memory or left, measured at 400 MHz. Those that run per world pass do not recur in
+    step 11's frames.
+15. **The CPU's work**, for real CPUs. It does not decide the target: it scales with the
+    clock.
+    1. An equivalence check for the AGA landscape first, which every item below needs:
+       `tools/rr_snap.py` and `tools/rr_ecsland.py` for the AGA game (snapshots at hunk 1
+       `+$d88c` [`$11d38`], Unicorn as a 68030, all memory compared).
+    2. The loop's stores, 3.9 ms a frame on the aprof core: `<+$d888>` (`+$da70`, 1.0 ms,
+       read only after the loop at `+$de4a`), `<+$a21e>` (`+$db3e`, 0.8 ms, read only by
+       `+$d712`, 11 calls a frame, and equal to `-604(a1)` there), `clr.w <+$d86e>`
+       (`+$db88`, 0.6 ms, set only at `+$e0d6`) and `<+$a220>`
+       (`+$db22`, 0.6 ms, read by `+$d712` and after the loop) can be written only where
+       they are read. `<+$a226>` (`+$db8e`, 0.9 ms) is the previous row, read by every
+       span call, and stays. About 2 to 3 ms (INFERRED).
+    3. The 68020's scaled index for the row table (`movea.l (a2,d6.w*4),a0` instead of
+       two `add.w` and `(0,a2,d0.w)`) and `lea (a0,d7.w*2),a0` for the two `adda.w`:
+       about 1 ms (INFERRED).
+    4. The loop's path within the 68030's 256-byte instruction cache. The path is about
+       330 bytes with two cold blocks inline (`+$da02`-`+$da58`, `+$dab2`-`+$db08`);
+       moved out of line, it may fit. Not estimated: to measure.
+    5. The spans and their set-up (20 ms): examined after item 1; no change identified.
+    6. On the 040 and 060, Kalms' 040/060 conversion instead of the 030's.
 
 Not planned: running the scripts more often in smaller steps. The engine has no step
 length: each object runs every period and its script moves it by its own constants (the
@@ -529,7 +595,7 @@ ECS, from 666.7 ms (1.5 fps), far from both caps on a 7 MHz 68000:
    compare against variables that change between calls. A few milliseconds at most: not
    done.
 
-Stop there: the code that is left is register-bound (the landscape), unrolled already (the
+On the A500, stop there: the code that is left is register-bound (the landscape), unrolled already (the
 fills, 65 ms) or small (the objects, 41 ms, and the logic), each a rewrite for a few per
 cent. The conversion is the largest item (143 ms, 25% after step 2): the blitter, idle, could
 take its last exchanges in parallel with the CPU (planes and an intermediate buffer in chip
@@ -539,6 +605,57 @@ memory). Beyond that, fewer pixels (the LOW detail and window settings), not cod
 snapshots of the machine at its entry (hunk 1 `+$bee2`) in the walk, then the landscape run
 from each under Unicorn as the game has it and patched, all memory compared. An equivalent
 test patch at `+$c010` came out identical on four snapshots and a one-operand change did not.
+
+ECS on a fast CPU, to 50 fps. The figures above are the A500's. On the AGA's CPU
+(`a3000-50`: `a1200-030`'s 50 MHz 68030 and 8 MB of fast memory on ECS; aprof,
+`--uae_mmu_model=0`) the ECS game draws 57 frames in the window (the landscape's calls; the
+swap, hunk 0 `+$cbe`, runs 102 times, on passes that draw nothing too), where the AGA game
+draws 122 on the same core. The frame routine idles in its cap wait (hunk 1
+`+$30a6`-`+$30c6`, 29.9 ms a swap), and of the 98.0 ms a swap 49.2 are chip accesses.
+At 400 MHz it draws 53: the frames come on the player's runs whatever the CPU. Chip
+accesses then take 52.8 ms a swap, about 87 ms for each frame drawn (DERIVED, less the
+beam wait's and the copper-interrupt wait's), against the AGA's 13.7. The landscape is 97%
+chip (13.6 ms a swap), the conversion 94% (5.0), the sky 3.7, the spans and fills (`+$9e34`,
+`+$b12e`) 5.0, and the blitter copy of the view (hunk 2 `+$34e` [`$1495e`], 3.3 ms) has the
+CPU wait for the blitter. So the ECS game is behind for the two reasons the AGA's steps
+1-3 and 7-10 removed there: all its data is in chip memory (the slave gives 1 MB of chip
+and 256 KB of ExpMem, as the AGA's v1.2 did), and it draws only on the player's runs.
+Measured with `tools/rr_prof.py`'s search for START widened to the 8 MB (step 5) and the
+frames counted from the profile's calls. The A500 path (68000, no fast memory) stays as it
+is, each step below chosen at install; on 68020 and up with fast memory nothing waits for
+the blitter.
+
+5. **Tools for the ECS game on fast machines**: `tools/rr.py`'s search for START over the
+   machine's fast memory (the A500's 2 MB ends at `$400000`, the `a3000-50`'s 8 MB at
+   `$a00000`; gdb's `find` gives no match past the end); a frame counter in the ECS
+   `profile` build, as the AGA's; `tools/rr_passes.py` and `tools/rr_objects.py` for the
+   ECS game.
+6. **The AGA's sites in the ECS game**: both STARTs are the same program at other offsets
+   (the ECS swap, hunk 0 `+$cbe` [`$cee`], is the AGA's `+$13e0` instruction for
+   instruction). Each AGA patch's checked bytes find its ECS site, giving a table of both
+   variants' sites, each checked as now.
+7. **Memory, 68020 and up with fast memory**: START's fast pool kept with a 1 MB ExpMem
+   when the machine has it (WHDLoad's optional ExpMem, a negative size, or a setting like
+   the AGA's `MemConfig`), as now without it; caches on with `CACHECHIPDATA`; the chunky
+   buffer, the renderer's tables and the longword table in fast memory; the map and shade
+   table copies (AGA steps 1-3, 10b and 10c). Estimate: from about 87 ms of chip accesses a
+   frame toward the AGA's 14 (INFERRED: the same data on a 16-bit chip bus).
+8. **68020 code without the blitter**: a conversion for the 68020 and up from the
+   chunky buffer in fast memory with longword plane writes (`c2p000.s`'s packing of the
+   dither, then the exchanges; Kalms' 4-plane conversions cannot start from the dithered
+   bytes, step 1), the sky copied from fast memory, and the view's blitter copy (`+$34e`)
+   started without waiting: the blit runs while the CPU draws into the fast chunky
+   buffer, with a wait only before the conversion writes the planes. Chosen at install
+   from `AttnFlags`; the 68000 keeps today's code.
+9. **The world on the cap's grid and frames between the player's runs**: AGA steps 7, 8,
+   9 and 10a through step 6's sites, then 10d, the swap without the beam wait (7.1 ms a
+   swap at 400 MHz).
+10. **To 50 fps**: AGA steps 11-14 (frames between world passes, the sky and the
+    objects' graphics in fast memory, the rest of a frame's chip time), shared code where
+    the variants allow.
+11. **The A500 path**: what helps only the 68000 without fast memory: the conversion's
+    last exchanges on the blitter, in parallel with the CPU (the blitter is idle there,
+    0.1% of the DMA slots), and steps 3 and 4's few milliseconds.
 
 ## Reproducing
 
@@ -551,6 +668,13 @@ BUILD=profile FSUAE=$FSUAE_ARM python3 tools/rr_prof.py tmp/prof/base-arm
 # ECS (v1.2's figures: BUILD=developer at commit a8bb6fbe)
 VARIANT=RobinsonsRequiem SETUP=custom BUILD=profile BARTO=1 python3 tools/rr_prof.py tmp/prof/ecs
 python3 tools/rr_report.py tmp/prof/base-aprof
+# the chip floor ("AGA, to 50 fps"): the same with the 68030 at 400 MHz
+BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
+    EXTRA_ARGS='--uae_mmu_model=0 --uae_cpu_frequency=400000000' \
+    python3 tools/rr_prof.py tmp/prof/aga-400
+# ECS on the AGA's CPU ("ECS on a fast CPU"; after ECS step 5, which widens the search)
+VARIANT=RobinsonsRequiem SETUP=a3000-50 BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
+    EXTRA_ARGS=--uae_mmu_model=0 python3 tools/rr_prof.py tmp/prof/ecs-a3000
 # the AGA game's drawing passes, frame intervals and catch-up passes (gdb breakpoints,
 # no profile; KEY=3e walking)
 BUILD=profile FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
