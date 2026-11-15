@@ -364,18 +364,14 @@ off, because the music driver shares the CPU and its load changes with the song
 (about a fifth at 1840 cycles), so with music no single setting gives a steady rate.
 Removing it gives the game the CPU time that 10 Hz flight implies, in every scene.
 
-**Using the reference.** Run each part of the PC version at the reference setting
-and measure how its world and animations progress per second; compare with the
-slave's chosen rate. Rules:
-
-- Check each part at a second cycle setting too. A part whose speed does not change
-  is paced by the PC's timer or music, not the CPU, and its rate is read directly.
-- Measure in light scenes. Busy scenes (ships, asteroids, explosions) slow the PC
-  below its rate; that is the machine falling behind, not the design.
-- Compare progress (distance, frames, turning per second), not update counts: the
-  Amiga port may step differently per update from the PC version.
-- The PC version is a different program from the Amiga port. Its timings are
-  evidence for the intended pace, not proof that the Amiga code was meant to match.
+**Result (2026-11-15): no retuning.** The intro and the in-game scenes were measured
+at the reference and at double speed (internals, "PC speed calibration"). The PC
+paces every one by its CPU, with no clock. The light scenes (flight, orchestra, the
+title approach) run at about 10 per second, agreeing with the slave's 10 Hz. The
+bitmap cutscenes and busy scenes run two to three times slower than the Amiga
+original's native spans: there the reference PC falls behind, so it shows the
+machine's limit, not a designed rate. The slave's rates stay as they are. A run at a
+much higher setting, looking for frame limiters, was judged not worth doing.
 
 **Intro decision: 10 native world updates per second**, matching flight, with
 bounded renderer-only extrapolation between updates. The user selected this
