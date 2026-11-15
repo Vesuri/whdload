@@ -381,6 +381,41 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    `jsr _skyrows` and `bra.w +$c8e8`. `_skyrows` copies the same two segments a row by
    jumping into an unrolled run of `move.l (a0)+,(a1)+`. `tools/rr_skycheck.py ecs` checks
    it against START's loop under Unicorn.
+3. **Memory, 68020 and up** (`docs/performance.md`, ECS plan step 7):
+   - **A 1 MB ExpMem.** The slave asks for 1 MB of fast memory besides the Kickstart
+     (WHDLoad 20, `slv_Version` 20). `MemConfig=1` (`slv_MemConfig`) is v1.2's 256 KB.
+     START sizes its fast pool itself (hunk 0 `+$328`-`+$356`: `AvailMem(MEMF_FAST|MEMF_LARGEST)`
+     less 50,000, none under 100,000) and keeps it ("Memory (ECS)" below). In 256 KB it
+     gets none; with the 1 MB it gets 844 KB on the `a3000-50`, with MAIN's object table
+     and the objects' frames at its base. That is the game's own path on a machine with
+     fast memory, so it is taken on the 68000 too.
+   - **Caches.** `CACHECHIPDATA` (v1.2 had no cache option: both caches off) turns on the
+     instruction and data caches, with BaseMem write-through. The blitter draws only into
+     the screens (hunk 2), and the CPU writes the screens without reading them back: the
+     conversion, and the pointer's background (hunk 2 `+$2aa`).
+   - **On the 68020 and up** (`_mempatch`, WHDLoad's `AttnFlags`), the AGA slave's items
+     3, 9 and 10 at the ECS sites ("The AGA's sites in the ECS game"), all checked first:
+     - `_fastblocks`: the block allocator's calls for the chunky buffer (hunk 1 `+$891c`
+       [`$c214`]), the renderer's tables (`+$8938`) and the row table (`+$8978`), each
+       `jsr <hunk 0 +$2be8>`, become `jsr _fastalloc`. It takes them from the top of the
+       fast pool (`+$f4`) down to the objects' frames' end (`+$d3d8`), and from chip as
+       before when there is no pool or no room.
+     - The free, hunk 0 `+$2c42` [`$2c72`] (`48e7 8080 4a80`), becomes `jmp _fastfree`.
+       Like START's, it passes over a null handle first.
+     - `_mappatch`: the map copy and the fast row table, from `_rowalloc`'s block, with
+       its sites `+$bf5e` (`_maprows`), `+$c4ca` and `+$c5ce` (`_mapoff`), `+$21e6`
+       (`_maprect`), `+$2238` (`_mapfill`) and `+$1cd6` (`_mapinit`).
+     - The shade table copy: `+$184a` (`_shadeset`), and the spans' reads `+$a116` and
+       `+$a4de`, which read `_sshade`. The ECS table is read as words, two dithered
+       colours an entry, but its levels are 256 bytes as in the AGA game, so the copy's
+       size is worked out the same way. Hunk 2 `+$18dc` reads the table itself, as the
+       AGA's `+$2d00` does.
+
+     The 68000 keeps START's allocations. With 4 low-resolution planes the chip bus
+     costs it nothing, and the copies would. The code runs only on the 68020 and up, but
+     is assembled for the 68000: hunk 1 offsets above `$7fff` go through an index
+     register. `MAPCHECK` compares both copies with the originals at every drawing, as in
+     the AGA slave.
 
 ## The AGA's sites in the ECS game
 
@@ -449,6 +484,25 @@ In the jungle the block allocator holds, from the top: 256 KB and 4 KB for MAIN'
 (hunk 1 `+$3480`; the 3D objects' graphics are in the first), the 3D view's chunky buffer
 ((width + 1) × (height + 1) + 320 bytes, hunk 1 `+$a2b2`), the renderer's tables (34,592
 bytes, `+$a2c8`) and a 2 KB table (`+$a30e`).
+
+## Memory (ECS)
+
+The ECS START divides memory the same way (hunk 0 `+$328`-`+$440`), its variables 12 bytes
+lower in hunk 1:
+
+- **Fast pool** `+$e4`-`+$ec`, from `+$f0`. `+$f4` is set to the pool's end and not used.
+  START keeps the pool. With the slave's 1 MB ExpMem it is 844 KB on the `a3000-50`, and
+  MAIN's object table and the objects' frames take 59 KB of it in the jungle (to
+  `+$d3d8`). With v1.2's 256 KB (`MemConfig=1`) there is none.
+- **Chip pool** `+$d8`-`+$e0`: `AvailMem(MEMF_CHIP|MEMF_LARGEST)` less 6,000 (920 KB). The
+  resource heap grows up from `+$f8` (top `+$d3b6`), and the block allocator grows down
+  from `+$e0` (`+$fc` the lowest block). The allocator is hunk 0 `+$2be8`, its 16
+  handles are at hunk 1 `+$d598`, and the free is hunk 0 `+$2c42`.
+
+In the jungle on the 68020 and up ("ECS improvements" item 3), the fast pool also holds
+the chunky buffer (32 KB) and the renderer's tables (34,608 bytes). It also holds
+`_rowalloc`'s 76 KB block: the row table, the fast row table, the shade table's copy (4 KB
+of its 8 KB room used) and the map's copy. The map is 256 rows of 128 cells, 64 KB.
 
 ## The script interpreter (AGA)
 

@@ -23,7 +23,9 @@ The two Retroplay slaves and the ReadMes are byte-identical to the install packa
 | `RobinsonsRequiem` (default) | `src/RobinsonSRequiemEcs.asm` | `RobinsonsRequiem/RobinsonsRequiem.Slave` | `kick34005.A500` | `custom`: A500, 68000, 1 MB chip, 2 MB fast |
 | `RobinsonsRequiemAGA` | `src/RobinSonSRequiemAga.asm` | `RobinsonsRequiemAGA/RobinsonsRequiemAGA.Slave` | `kick40068.A1200` | `a1200-fast` |
 
-The ECS slave asks for 1 MB chip, which the shared `a500` (512 KB chip) cannot give; the AGA
+The ECS slave asks for 1 MB chip, which the shared `a500` (512 KB chip) cannot give, and a
+1 MB ExpMem besides the Kickstart (`WHD_ARGS=MEMCONFIG=1`: v1.2's 256 KB), which `custom`'s
+2 MB fast memory holds; the AGA
 slave asks for 1.6 MB chip, a 1 MB ExpMem (`WHD_ARGS=MEMCONFIG=1`: v1.2's 256 KB) and room
 for the 512 KB Kickstart image, so it runs with fast memory (the plain `a1200` was not
 tried). Only these two machines have been

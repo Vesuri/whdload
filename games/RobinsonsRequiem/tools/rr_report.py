@@ -10,8 +10,8 @@ label at or below them (slave_symbols: profile builds), other PCs outside START 
 by 4 KB.
 ms/frame is per frame drawn in the window (run.json `frames`), 20 ms per PAL field.
 
-aprof runs (OUT/window.prof) add the time in the AGA game's waits (WAITS, SLAVE_WAITS) and the
-rest, busy, per frame drawn; and chip memory: each function's share of time in chip
+aprof runs (OUT/window.prof) add the time in the game's waits (WAITS, and the AGA slave's
+SLAVE_WAITS) and the rest, busy, per frame drawn; and chip memory: each function's share of time in chip
 accesses and its accesses per frame, and in total the chunky-to-planar loop's accesses (AGA
 hunk 2 +$2e84: byte reads of the chunky buffer, byte writes to the eight planes) against
 the rest. Barto runs (OUT/window.pkl.gz) add the DMA slot shares and the frame intervals.
@@ -37,11 +37,17 @@ SIZES = {'RobinsonsRequiemAGA': (0x3a30, 0x103d8, 0x543c, 0x1154),
 C2P_READS = list(range(0x2e94, 0x2ea4, 2)) + list(range(0x2f6a, 0x2f7a, 2))
 C2P_WRITES = (0x2f52, 0x2f56, 0x2f58, 0x2f5c, 0x2f5e, 0x2f62, 0x2f64, 0x2f68,
               0x3028, 0x302c, 0x302e, 0x3032, 0x3034, 0x3038, 0x303a, 0x303e)
-# AGA waits, (hunk, first, end): the cap wait's loop, the copper-interrupt wait at the start
+# The waits, (hunk, first, end): the cap wait's loop, the copper-interrupt wait at the start
 # of a 3D pass (the swap shown), the beam wait before the swap, the wait for the VBL's
-# pointer redraw after it
-WAITS = {'cap wait': (1, 0x49ee, 0x49f6), 'copper wait': (0, 0x13c0, 0x13ca),
-         'beam wait': (0, 0x13ce, 0x13de), 'pointer wait': (1, 0x4a14, 0x4a1c)}
+# pointer redraw after it; the ECS game's at the same instructions (docs/internals.md, "The
+# AGA's sites in the ECS game")
+WAITS = {'RobinsonsRequiemAGA': {'cap wait': (1, 0x49ee, 0x49f6),
+                                 'copper wait': (0, 0x13c0, 0x13ca),
+                                 'beam wait': (0, 0x13ce, 0x13de),
+                                 'pointer wait': (1, 0x4a14, 0x4a1c)},
+         'RobinsonsRequiem': {'cap wait': (1, 0x30b2, 0x30ba), 'copper wait': (0, 0xc9e, 0xca8),
+                              'beam wait': (0, 0xcac, 0xcbc),
+                              'pointer wait': (1, 0x30d8, 0x30e0)}}
 # and the slave's, between two of its labels (src/): the wait for the world count (plan step
 # 7); plan step 10.2's swap outside the copper's pointer lines, its copy of the pointer
 # wait, and the back screen's loads waiting for the swap to show
@@ -160,14 +166,14 @@ def report(out, n):
         acc = sum(v[3] for v in pcs.values())
         print(f'  chip accesses {chip * ms:.1f} ms/frame ({acc / frames:.0f} per frame), '
               f'the rest {(total - chip) * ms:.1f} ms')
+        waits = {w: sum(v[0] for pc, v in pcs.items()
+                        if hk.bases[h] + a <= pc < hk.bases[h] + b)
+                 for w, (h, a, b) in WAITS[env['VARIANT']].items()}
+        waits.update({w: sum(v[0] for pc, v in pcs.items() if a <= pc < b)
+                      for w, (a, b) in slave_waits(run).items()})
+        print('  waits ' + ', '.join(f'{w} {u * ms:.1f}' for w, u in waits.items())
+              + f' ms; busy {(total - sum(waits.values())) * ms:.1f} ms/frame')
         if env['VARIANT'] == 'RobinsonsRequiemAGA':
-            waits = {w: sum(v[0] for pc, v in pcs.items()
-                            if hk.bases[h] + a <= pc < hk.bases[h] + b)
-                     for w, (h, a, b) in WAITS.items()}
-            waits.update({w: sum(v[0] for pc, v in pcs.items() if a <= pc < b)
-                          for w, (a, b) in slave_waits(run).items()})
-            print('  waits ' + ', '.join(f'{w} {u * ms:.1f}' for w, u in waits.items())
-                  + f' ms; busy {(total - sum(waits.values())) * ms:.1f} ms/frame')
             for what, offs in (('c2p plane writes', C2P_WRITES), ('c2p chunky reads', C2P_READS)):
                 ps = [pcs[hk.bases[2] + o] for o in offs if hk.bases[2] + o in pcs]
                 print(f'    {what}: {sum(p[2] for p in ps) * ms:.1f} ms '

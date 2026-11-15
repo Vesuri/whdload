@@ -765,12 +765,41 @@ is, each step below chosen at install, and the game has to keep working correctl
    the AGA's but for one `bsr.w`'s displacement, so `src/land030.s` needs the ECS checksum
    and offsets; the objects' cache needs the ECS image types. Each step below patches its
    ECS sites from that table, each checked first as in the AGA slave.
-7. **Memory, 68020 and up with fast memory**: START's fast pool kept with a 1 MB ExpMem
-   when the machine has it (WHDLoad's optional ExpMem, a negative size, or a setting like
-   the AGA's `MemConfig`), as now without it; caches on with `CACHECHIPDATA`; the chunky
-   buffer, the renderer's tables and the longword table in fast memory; the map and shade
-   table copies (AGA steps 1-3, 10b and 10c). Estimate: from about 87 ms of chip accesses a
-   frame toward the AGA's 14 (INFERRED: the same data on a 16-bit chip bus).
+7. **Memory, 68020 and up with fast memory** (done, `docs/internals.md`, "ECS
+   improvements", item 3).
+   - **What changed.**
+     - A 1 MB ExpMem by default, as in the AGA slave (`MemConfig=1` for v1.2's 256 KB).
+       WHDLoad's optional ExpMem cannot be used: kick13's Kickstart image lives in the
+       ExpMem. START keeps its own pool: 844 KB on the `a3000-50`.
+     - `CACHECHIPDATA`.
+     - On the 68020 and up, the AGA's steps 3, 10.2 and 10.3 at step 6's sites: the chunky
+       buffer, the renderer's tables and the row table in the fast pool, and the map's and
+       the shade table's copies.
+   - **Checks.**
+     - With `MAPCHECK`, both copies were equal to the originals at every drawing, 121
+       walking, turning and walking from the start and 61 turning, on the `a3000-50`.
+     - The screenshots at the start and after the first turn (the same camera) are
+       pixel-identical to step 6's. After that the faster build turns further in each step
+       (its passes are shorter, so the player runs more often).
+     - On the A500 (`custom`) the slave boots with the 1 MB ExpMem. START's pool holds the
+       objects there too (the game's own path with fast memory) and nothing else is
+       patched: 17.5 frames per 500 fields turning, mean interval 28.52 fields against
+       step 5's 28.57, with the same cameras.
+   - **Measured on the `a3000-50`'s aprof core:**
+
+     | | Before | After |
+     |---|---|---|
+     | Frames in the window (still on the player's runs) | 57 | 55 |
+     | Busy, a frame drawn | 107.7 ms | 54.5 ms |
+     | Chip accesses, a frame drawn | 88.0 ms | 44.6 ms |
+     | Cap wait, a frame drawn | 53.5 ms | 104.2 ms |
+     | Beam wait, a frame drawn | 11.6 ms | 18.7 ms |
+     | Landscape | 30.3 ms | 9.8 ms (0.2% chip) |
+     | Spans | 9.6 ms | 6.0 ms |
+     | Sky | 21.2 ms | 5.4 ms (its writes now go to the fast chunky buffer) |
+
+     The conversion is 9.1 ms, 46% chip. Of the chip time now, 23 ms is the waits' (beam
+     and copper) reads of the beam position and INTREQ.
 8. **68020 code without the blitter**: a conversion for the 68020 and up from the
    chunky buffer in fast memory with longword plane writes (`c2p000.s`'s packing of the
    dither, then the exchanges; Kalms' 4-plane conversions cannot start from the dithered

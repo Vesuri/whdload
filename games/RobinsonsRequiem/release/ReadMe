@@ -13,9 +13,10 @@
  This install requires WHDLoad to be in the path. It can be found in the
  WHDLoad package.
 
- The installed program requires 1.0 MB ChipMem and 0.8 MB OtherMem for ECS version
+ The installed program requires 1.0 MB ChipMem and 1.6 MB OtherMem for ECS version
                             and 1.7 MB ChipMem and 1.5 MB OtherMem for AGA version
- (AGA with the tooltype MemConfig=1: 1.7 MB ChipMem and 0.8 MB OtherMem)
+ (with the tooltype MemConfig=1: ECS 1.0 MB ChipMem and 0.8 MB OtherMem,
+                                 AGA 1.7 MB ChipMem and 0.8 MB OtherMem)
 
  It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
 
@@ -64,6 +65,10 @@
  ECS:
  - Faster chunky-to-planar conversion
  - Faster sky drawing
+ - Uses 1 MB of Fast memory (WHDLoad 20 or newer); with the tooltype
+   MemConfig=1 it runs in 256 KB of Fast memory as version 1.2 did
+ - The CPU caches are on
+ - On 68020 and up: the 3D view's buffers and a copy of the map in Fast memory
 
  version 1.2 (29.03.13) done by CFou!:
  - First two bitplanes memory allocation fixed for fast memory support (AGA)
