@@ -14,7 +14,8 @@ passes, the chip bus's time per frame, the landscape's code for real CPUs) steps
 are done: with the 68030 at 400 MHz the slave draws frames between the world's passes and
 the sky and the objects' images from fast memory, 480 frames in the window against the
 cap's 166, turning every one a field apart, with 15.3 ms busy a frame, 8.7 of it chip
-accesses; on the 50 MHz cores the drawing leaves no room for frames between passes (130
+accesses; step 14 found the rest of that chip time to be the conversion's plane writes
+(5.2 ms), waits and items of 0.4 ms or less, and nothing more worth moving; on the 50 MHz cores the drawing leaves no room for frames between passes (130
 on the aprof core with the copies). The ECS plan for the A500 is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
@@ -33,15 +34,14 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 
 Next, in order:
 
-1. The AGA plan's step 14, the rest of a frame's chip time (`docs/performance.md`, "Plan",
-   "AGA, to 50 fps"), each measured at 400 MHz and on the setup's and the aprof cores
-   (`tools/rr_prof.py`, `tools/rr_passes.py`, `tools/rr_objects.py`); step 15, the
-   landscape's code, for real CPUs. Step 11's frames to be play-checked (the pointer's
+1. The AGA plan's step 15, the landscape's code, for real CPUs (`docs/performance.md`,
+   "Plan", "AGA, to 50 fps"), each measured at 400 MHz and on the setup's and the aprof
+   cores (`tools/rr_prof.py`, `tools/rr_passes.py`, `tools/rr_objects.py`). Step 11's frames to be play-checked (the pointer's
    picking between passes). Steps 7-13 also in a heavier scene than the jungle start
    (more trees and objects) and in other areas (other maps, shade tables, skies and
    objects; step 13's 64 KB cache held 52 KB turning in the jungle).
 2. The ECS plan's steps 5-11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"): the
-   tools, the AGA's sites in the ECS game, its memory and 68020 code, the AGA's steps 7-14,
+   tools, the AGA's sites in the ECS game, its memory and 68020 code, the AGA's steps 7-13,
    and the A500's own path.
 3. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`); step 10.2's swap is play-tested with the

@@ -550,15 +550,30 @@ decides only how close a real 68030 to 68060 gets.
     last. The estimate (INFERRED) was 1.8 → about 0.2 ms. On the aprof core 130 frames
     against 129 (13.0 fps, 76.9 ms), chip accesses 10.4 → 8.8 ms, the objects 2.0 → 1.1 ms
     and the cache 0.2.
-14. **The rest of a frame's chip time**: after 12 and 13, 8.7 ms a frame at 400 MHz
-    (measured, step 13). Most of it is the conversion's plane
-    writes (5.2 ms), a floor while the CPU writes the planes. The rest is the blitter copy
-    (`h2+$5b6`, 0.7 ms, the CPU waiting for the blitter: to start it and go on, waiting
-    only before the conversion), the pointer's background (`h2+$4ec`, 0.3) and routines
-    not identified yet: hunk 2 `+$1256` (0.5), `+$1b4` (0.4), hunk 1 `+$7b74` (0.4, 193
-    calls a frame) and `+$a7d4` (0.2). Each is to be identified, then moved to fast
-    memory or left, measured at 400 MHz. Those that run per world pass do not recur in
-    step 11's frames.
+14. **The rest of a frame's chip time** (examined, not done). After 12 and 13, at 400 MHz
+    (step 13's run, 480 frames, keypad 9 held), 8.7 ms a frame in chip accesses (12,353, 0.70
+    µs each on average). By routine, per frame, and why it stays:
+
+    | Chip time | ms/frame | Accesses | Why it stays |
+    |---|---|---|---|
+    | the conversion's plane writes (`c2p030_pass1`, `_pass2`) | 5.2 | 8,064 | the planes themselves, a floor while the CPU writes them |
+    | the copper wait, hunk 0 `+$13c0` [`$13ec`] | 1.1 | 1,695 | polls: the pass's first access to the back screen waiting for the swap to show (step 10.2), not work |
+    | the pointer: its background saved and the pointer drawn (hunk 2 `+$1b4` [`$16ce8`]), the background put back twice (`+$4ec` [`$17020`], from hunk 1 `+$4a46` and `+$519c`) | 0.7 | 1,036 | the planes' own words under the pointer, read and written in place |
+    | the CPU waiting for the blitter, in hunk 2's blit routines: `+$5b6` [`$170ea`] (a panel strip, x 208-255, y 141-147 turning, copied from the shown screen to the back one), `+$dc0`, `+$1256` and `+$1f00` (a rectangle filled) | 0.7 | 326 | the blitter's own time on the planes, one plane at a time; the polls are the CPU idle |
+    | reads of the resource heap: objects' headers (hunk 1 `+$a7d4` [`$ec80`], 22 calls), the scripts' bytes (`+$7b74` [`$c020`], `+$25e4` [`$6a90`]), the cells' objects' headers (`+$d712` [`$11bbe`]), the 2D objects' headers (hunk 2 `+$20fc` [`$18c30`]) | 0.7 | 721 | five routines of 0.03 to 0.3 ms; the heap stays in chip (the sounds, step 13) |
+    | the map's row after its end, copied at every call (`_maprows`, step 10.2) | 0.1 | 129 | needed |
+    | the rest (the landscape's two reads of the original map, the spans, ...) | 0.2 | 382 | each under 0.1 ms |
+
+    The largest move to fast memory left, the objects' headers at `+$a7d4` through step
+    13's cache (its five reads of the image's header, `+$a8ac` to `+$a94e`, from the copy
+    the sprite routine then uses), would save 110 accesses, about 0.08 ms a frame
+    (DERIVED: 0.70 µs an access); the scripts' bytes move with the heap's compaction. The
+    pointer in longwords where its two words are aligned would save about a quarter of its
+    0.7 ms (INFERRED). Neither is worth the patch: busy 15.3 ms a frame, the drawing passes
+    0.61 to 0.99 fields turning, every frame shown a field after the last (step 13). On
+    the aprof core (130 frames, 76.9 ms a frame) the same items are 8.8 ms, the blitter
+    copy 1.0 ms and the scripts 0.7 ms there, as they run on every world pass and every
+    frame is one; what decides that core is the CPU's work (step 15).
 15. **The CPU's work**, for real CPUs. It does not decide the target: it scales with the
     clock.
     1. An equivalence check for the AGA landscape first, which every item below needs:
@@ -681,9 +696,9 @@ the blitter.
 9. **The world on the cap's grid and frames between the player's runs**: AGA steps 7, 8,
    9 and 10a through step 6's sites, then 10d, the swap without the beam wait (7.1 ms a
    swap at 400 MHz).
-10. **To 50 fps**: AGA steps 11-14 (frames between world passes, the sky and the
-    objects' graphics in fast memory, the rest of a frame's chip time), shared code where
-    the variants allow.
+10. **To 50 fps**: AGA steps 11-13 (frames between world passes, the sky and the
+    objects' graphics in fast memory; step 14 found nothing more worth moving), shared
+    code where the variants allow.
 11. **The A500 path**: what helps only the 68000 without fast memory: the conversion's
     last exchanges on the blitter, in parallel with the CPU (the blitter is idle there,
     0.1% of the DMA slots), and steps 3 and 4's few milliseconds.
