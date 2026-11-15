@@ -133,7 +133,7 @@ Original OCS CUSTOM1–4 tooltypes remain unchanged; the public build adds CUSTO
 | `CUSTOM2=0`, `1`, `2` | No cheats, cheat mode, cheat mode with invincibility |
 | `CUSTOM3=1..13` | Original system selection; requires cheat mode |
 | `CUSTOM4=0..2` | Original mission selection; requires cheat mode |
-| `CUSTOM5=2`, `4`, `6`, `8` | Request a 10/12/15/20 Hz flight world (1.0x-2.0x), one picture per world tick; CPU/Fast gate still applies |
+| `CUSTOM5=2`, `4`, `6`, `8` | Request a 10/12/15/20 Hz flight and intro world (1.0x-2.0x), one picture per world tick; CPU/Fast gate still applies |
 | `CUSTOM5=3`, `5`, `7`, `9` | The same world speeds with the enhanced framerate (in-between pictures) |
 | `CUSTOM5=0`, `1` / omitted / other | Original simulation, rendering, waits and cache request; bit-exact E1 shortcuts; waypoint marker drawn over the scene |
 | `PRELOAD` | Used by the tested launcher; RAM floor includes that setup |

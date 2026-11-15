@@ -440,7 +440,14 @@ field_shot_limit:
         move.l  d7,d1
         swap    d1
 .fraction:
+        ; The bolt's delayed phase, as in timing_scene_begin. A negative
+        ; phase is still in the previous step: no contact reached yet.
         move.l  d6,d0
+        sub.l   timing_world_rate(pc),d0
+        sub.l   timing_world_rate(pc),d0
+        bpl.s   .phase
+        moveq   #0,d0
+.phase:
         swap    d0
         clr.w   d0
         cmp.l   d1,d0

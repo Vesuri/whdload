@@ -5511,3 +5511,13 @@ world ticks, so keep the window short (default 100 fields; 200 at 1.0x and 1.2x)
 python3 tools/world_speed_live_check.py cd32 tmp/build/release/WingCommanderCD32 --custom5 9 --output tmp/speed-cd32-9
 python3 tools/world_speed_live_check.py ocs tmp/build/release/WingCommander --custom5 3 --fields 200 --output tmp/speed-ocs-3
 ```
+
+`--intro` measures the title world instead (from `intro_title`, no clicks; 200 fields
+fit). `--bolts N` holds fire (space) in the flight and samples the player's bolts at
+the end of N staged pictures; every bolt step must move at exactly its rate per
+display field. Pictures at the predictor's lead bound are excluded and counted:
+
+```
+python3 tools/world_speed_live_check.py cd32 tmp/build/release/WingCommanderCD32 --custom5 9 --intro --fields 200 --output tmp/speed-intro-cd32
+python3 tools/world_speed_live_check.py ocs tmp/build/release/WingCommander --custom5 9 --bolts 80 --output tmp/speed-bolts-ocs
+```

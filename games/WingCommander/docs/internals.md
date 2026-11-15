@@ -2153,12 +2153,14 @@ display-lead forecast (two fields are `2 * rate` units). The rate must be a whol
 number, which is why the option offers 1.2x rather than 1.25x.
 
 `timing_flight_rate` holds the option (10, 12, 15 or 20). The flight loops select
-it on entry and restore 10 on exit. Every scene on the shared clock enters through
-`intro_start`, which saves the current rate and selects 10, and leaves through
-`intro_stop`, which restores it: the title and credits, the autopilot fly-by inside
-flight, the launch tunnel, ejection and the room run. These scenes keep native
-timing at any world speed. Each change is followed by a rebase, so no debt crosses
-a rate change.
+it on entry and restore 10 on exit. The world intro (`intro_title`, and
+`intro_credits_update` for the asteroid credits) enters through `intro_world_start`,
+which saves the current rate and selects the flight rate. The other scenes on the
+shared clock enter through `intro_start`, which saves it and selects 10: the
+autopilot fly-by inside flight, the launch tunnel, ejection and the room run. Both
+leave through `intro_stop`, which restores the saved rate. Each change is followed
+by a rebase, so no debt crosses a rate change. The title-logo sampler
+(`intro_title_sample`) converts its elapsed fields at the current rate.
 
 `timing_high_framerate` holds the framerate bit. Off, the CD32 flight loop draws
 only after a completed world tick (`timing_drawn_tick`) and `timing_scene_begin`
@@ -4300,13 +4302,21 @@ velocity step beyond the muzzle. Forecasting from there omitted the entire near
 segment. The native owner byte is A4+`3a6a` on CD32, A4+`3058` on OCS; zero denotes
 the player. These are hunk-relative native operands, not runtime addresses.
 
-For these linear bolts, staging uses `P - V + V * min(f, 1)`, where `P` is
-the post-world position, `V` the native per-tick displacement and `f` the existing
-fraction including publication lead. The phase remains the same throughout the
-bolt's life: there is no first-tick hold, acceleration to catch up, or switch back
-to forward prediction on the second tick. At the normal first PAL sample (`f=0.2`)
-this displays 0.2 steps from the muzzle instead of 1.2. A delayed renderer cannot
-recover already-missed pictures; the bound holds at the completed endpoint.
+For these linear bolts, staging uses `P - V + V * g`, where `P` is the post-world
+position, `V` the native per-tick displacement, and `g = f - 2 fields`: the existing
+fraction `f`, which includes the one- or two-field publication lead, drawn two fields
+late. `f` is bounded to one tick plus two fields, so `g` lies in [-1 field, 1 tick):
+it never passes the completed endpoint, and it is linear in display time, so the bolt
+advances evenly. A negative `g` (one lead field and less than a field of debt) is the
+previous step's end, drawn as `P - 2V + V * (g + 1 tick)` so the 68000 scaler only
+sees non-negative fractions; a newborn bolt can then appear up to one field's travel
+behind its muzzle for one picture. The phase remains the same throughout the bolt's
+life: there is no first-tick hold, catch-up, or switch to forward prediction.
+
+The former `min(f, 1)` froze the object for the lead's part of every tick and then
+jumped (live, simulator held fire, cached 030: frozen on 166 of 402 bolt steps at
+2.0x; the phase inputs showed 12 of 59 pictures frozen at 1.0x). The swept field
+contact snap (`field_shot_limit`) compares the same delayed phase, clamped at zero.
 
 This is intentionally one tick behind the former bolt presentation. Ships retain
 forward prediction. The field-contact fix below also puts asteroids, mines and
@@ -4523,7 +4533,8 @@ hardware acceptance remain outside this bounded regression.
 ### Intro 10 Hz world and extrapolated presentation
 
 The enhanced English ship/title and asteroid-credit world now uses the same
-10 Hz scheduler and bounded display-time extrapolation as flight. This is the
+scheduler and bounded display-time extrapolation as flight, at 10 Hz by default
+and at the player's World speed otherwise ("World speed"). 10 Hz is the
 selected working rate, not a historical-rate proof from the PC recording.
 Other languages/options and the separate music-cued Origin logo remain native.
 Flight controls are not enabled in the intro: a separate activation flag shares
@@ -8064,7 +8075,7 @@ against class-9 asteroids and model-33/class-10 mines over the completed movemen
 interval. The native endpoint-only query could miss an object entirely between
 updates. Separately, drawing the bolt's previous interval against a hazard's
 predicted future interval displaced visible contacts. Hazards now use the same
-`P - V + V * min(f, 1)` position sampling as player cannon bolts. Their orientation
+delayed `P - V + V * g` position sampling as player cannon bolts. Their orientation
 and all other object policies retain their existing rules. Intro is excluded.
 
 | Native operation | CD32 H0 / file | OCS H0 / file |

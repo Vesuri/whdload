@@ -95,7 +95,9 @@ def poses(build,variant,model):
     call('timing_scene_begin')
     for slot in range(34,40):
      got=struct.unpack('>3i',c.read(a4+v.A4['position']+slot*12,12))
-     want=tuple(p-x+trunc(x*min(fraction,hz),hz) for p,x in zip((10000,20000,30000),(5121,-513,1)))
+     # Two fields late (one lead field here); negative is the previous step.
+     phase=fraction-20;back=2 if phase<0 else 1;phase+=hz if phase<0 else 0
+     want=tuple(p-x*back+trunc(x*phase,hz) for p,x in zip((10000,20000,30000),(5121,-513,1)))
      require(got==want,('field pose',model,slot,fraction,got,want));samples+=1
     call('timing_scene_end');require(c.read(DATA,v.HUNKS[1][2])==before,'field render leaked')
   return dict(samples=samples,restored=True)

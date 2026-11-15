@@ -66,10 +66,11 @@ def check(build,variant,model):
      put('ocs_clock_hz' if o else 'timing_hz',hz,4)
      for f in range(10,hz+21,10):
       c.write(SLAVE+sy[clock]+4,long(f-10));before=c.read(DATA,v.HUNKS[1][2]);run('timing_scene_begin')
-      fraction=min(f,hz)/hz
-      wantx=math.trunc(-speed+speed*fraction)
+      # Two fields late (one lead field here); negative is the previous step.
+      phase=f-20
+      wantx=math.trunc(-speed+speed*phase/hz)
       require(abs(readpos(34)[0]-wantx)<=1,('hazard interval',speed,hz,f,readpos(34)))
-      if f*65536>=t*hz:
+      if max(phase,0)*65536>=t*hz:
        contact=struct.unpack('>3i',c.read(SLAVE+sy['field_shot_contacts']+120,12))
        require(tuple(x-y for x,y in zip(readpos(10),readpos(34)))==contact,'bolt passed displayed contact')
       run('timing_scene_end');require(c.read(DATA,v.HUNKS[1][2])==before,'presentation leaked');samples+=1
@@ -95,7 +96,9 @@ def check(build,variant,model):
    require(c.read(SLAVE+sy['timing_scene_predictable']+10,1)==b'\1','first impact interval not certified')
    put('ocs_clock_hz' if o else 'timing_hz',50,4);c.write(SLAVE+sy[clock]+4,long(0))
    before=c.read(DATA,v.HUNKS[1][2]);run('timing_scene_begin')
-   require(readpos(10)==tuple(x+math.trunc(y/5) for x,y in zip(effect,step)),'impact phase jump')
+   # One lead field and no debt: two fields late is one field before the
+   # step's start, drawn as the previous linear step at phase 40/50.
+   require(readpos(10)==tuple(x-y+math.trunc(y*40/50) for x,y in zip(effect,step)),'impact phase jump')
    run('timing_scene_end');require(c.read(DATA,v.HUNKS[1][2])==before,'effect render leaked')
   # Exercise the native asteroid-breakup branch too; destruction remains RNG-owned.
   setup(speed=0);random_result[0]=0
@@ -126,7 +129,8 @@ def check(build,variant,model):
   # Negative controls: remove cache for tunnelling; remove display limiter.
   setup(speed=0);c.write(SLAVE+sy['field_shot_targets']+10,b'\xff');require(query()==65535,'tunnelling control blind')
   setup(speed=0);address=SLAVE+sy['field_shot_limit'];saved=c.read(address,2);c.write(address,word(0x4e75))
-  c.write(SLAVE+sy[clock]+4,long(40));run('timing_scene_begin');require(readpos(10)[2]>readpos(34)[2]+110*256,'display control blind');run('timing_scene_end');c.write(address,saved)
+  # Debt 60 plus one lead field is the predictor's bound: the completed endpoint.
+  c.write(SLAVE+sy[clock]+4,long(60));run('timing_scene_begin');require(readpos(10)[2]>readpos(34)[2]+110*256,'display control blind');run('timing_scene_end');c.write(address,saved)
   return dict(model=model,geometry=geometry,contacts=rows,negative_controls=True,exclusions=True,native_response=True,first_impact_interval=True)
  finally:c.close()
 

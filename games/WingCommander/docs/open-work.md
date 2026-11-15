@@ -404,9 +404,12 @@ Both public slaves read CUSTOM5 as bit 0 **Enhanced framerate** and bits 1-3
 **World speed**: Original, 1.0x, 1.2x, 1.5x, 2.0x (10, 12, 15, 20 world ticks per
 second; whole rates keep the clock's debt unit, which 1.25x would not). Original is
 the original game, so the framerate bit is then ignored. A fixed speed without the
-framerate draws one picture per world tick. Only ordinary flight changes speed: the
-title, fly-by, launch, ejection and room clocks run at 10 Hz whatever the option
-(internals, "World speed"). Icons and run defaults use `CUSTOM5=3`.
+framerate draws one picture per world tick. Ordinary flight and the intro's world
+(title battle and asteroid credits; the user asked for it, 2026-11-16) change speed;
+the fly-by, launch, ejection and room clocks run at 10 Hz whatever the option
+(internals, "World speed"). The intro's title-logo script runs on the same ticks, so
+it finishes sooner at a faster speed; credit text deadlines (fields) and music are
+unchanged. Icons and run defaults use `CUSTOM5=3`.
 
 Measured in emulated time on the cached 030 model (`tools/world_speed_live_check.py`,
 simulator flight, 2 or 4 s windows), every combination runs at its rate exactly:
@@ -414,6 +417,19 @@ CD32 and OCS 10.00/12.00/15.00/20.00 ticks/s, 50 pictures/s with the framerate a
 one picture per tick (10 or 20/s) without. Not measured: heavy scenes at the faster
 speeds, slower machines, and whether 1.2x-2.0x play well; the four-tick catch-up
 bound still drops (CD32) or defers (OCS) time when a machine cannot keep up.
+The title world measures 10.00 and 20.00 ticks/s on CD32, 10.00 and 19.75 on OCS
+(one tick of window quantisation; `--intro`, 200 fields).
+
+Player cannon bolts, asteroids, mines and their field-impact effects drew the
+completed step with the display lead clamped to it, so they froze for the lead's
+part of every tick: on 12 of 59 pictures at 1.0x and 24 of 59 at 2.0x, then jumped.
+They now draw that step two fields late (internals, "Player cannon muzzle
+presentation"). Ships, AI shots, missiles and the camera use the unclamped forecast
+and were already even. With held fire (`--bolts 80`, cached 030) every bolt step
+moves at exactly its rate, 1.0x and 2.0x, CD32 and OCS; the previous build fails.
+On OCS at 2.0x, 33 of 79 picture pairs were excluded because firing pushed the
+display lead past the predictor's bound (one tick plus two fields), which holds
+every object alike.
 
 ## Plan
 

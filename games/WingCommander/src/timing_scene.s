@@ -585,10 +585,19 @@ timing_scene_begin:
         tst.b   (a0,d4.w)         ; native shooter byte: player is slot zero
         bne.w   .shot_phase_done
 .shot_phase_bounded_check:
-        cmp.l   d7,d6
-        bls.s   .shot_phase_bounded
-        move.l  d7,d6             ; never forecast beyond the completed step
-.shot_phase_bounded:
+        ; Fixed two-field delay. D6 includes a one- or two-field publication
+        ; lead and is bounded to one tick plus two fields, so the delayed
+        ; phase lies in [-1 field, 1 tick) and advances evenly; clamping the
+        ; lead instead held these objects for its part of every tick. These
+        ; objects are linear: a negative phase is the previous step's end.
+        sub.l   timing_world_rate(pc),d6
+        sub.l   timing_world_rate(pc),d6
+        moveq   #1,d2             ; velocity steps back
+        tst.l   d6
+        bpl.s   .shot_phase_back
+        add.l   d7,d6
+        moveq   #2,d2
+.shot_phase_back:
         lea     A_4508(a4),a0
         adda.w  d5,a0
         lea     A_7534(a4),a1
@@ -598,6 +607,8 @@ timing_scene_begin:
         move.l  (a1)+,d1
         sub.l   d1,(a0)+
         dbra    d0,.shot_previous
+        subq.w  #1,d2
+        bne.s   .shot_phase_back
 .shot_phase_done:
         endif
         lea     A_4508(a4),a2

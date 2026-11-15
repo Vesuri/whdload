@@ -1,10 +1,17 @@
-; English ship/title and asteroid-credit world. Native E:02a8 runs at 10 Hz
-; (intro_start selects it whatever the flight speed);
-; rendering uses the same bounded display-time prediction and queue as flight.
+; English ship/title and asteroid-credit world. Native E:02a8 runs at the
+; player's world speed (intro_world_start); the other scenes sharing this
+; clock (fly-by, ejection, rooms) enter through intro_start at 10 Hz.
+; Rendering uses the same bounded display-time prediction and queue as flight.
 ; A separate flag avoids enabling flight input/player/control adapters.
+intro_world_start:
+        movem.l d0-d7/a0-a6,-(sp)
+        bsr.w   timing_rate_scene
+        bsr.w   timing_rate_flight
+        bra.s   intro_begin
 intro_start:
         movem.l d0-d7/a0-a6,-(sp)
         bsr.w   timing_rate_scene
+intro_begin:
         bsr.w   timing_rebase
         lea     intro_active(pc),a0
         move.w  #1,(a0)
@@ -128,7 +135,7 @@ intro_finish:
 ; between ticks without modifying D6 or the native local rotation angle.
 ; A5/D3/D7 and the surrounding native function's stack remain its own.
 intro_title:
-        bsr.w   intro_start
+        bsr.w   intro_world_start
 .loop:
         bsr.w   intro_due
         move.w  d0,d4
@@ -217,7 +224,7 @@ intro_title_sample:
         bls.s   .elapsed
         moveq   #6,d3
 .elapsed:
-        mulu.w  #10,d3
+        mulu.w  timing_world_rate+2(pc),d3
         add.l   timing_clock+4(pc),d3
         move.l  timing_hz(pc),d4
         cmp.l   d4,d3
@@ -256,7 +263,7 @@ intro_credits_update:
         movem.l d0-d7/a0-a6,-(sp)
         tst.w   intro_active(pc)
         bne.s   .ready
-        bsr.w   intro_start
+        bsr.w   intro_world_start
 .ready:
         bsr.w   intro_due
         move.w  d0,d4

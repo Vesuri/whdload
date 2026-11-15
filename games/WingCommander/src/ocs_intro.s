@@ -1,11 +1,19 @@
 ; OCS world intro uses the flight scheduler and bounded presentation, without
 ; enabling flight input, player integration, simulator events or fault polling.
+; The title/credits world runs at the player's world speed; other scenes on
+; this clock (fly-by, ejection, rooms) enter through intro_start at 10 Hz.
+intro_world_start:
+        movem.l d0-d7/a0-a6,-(sp)
+        bsr.w timing_rate_scene
+        bsr.w timing_rate_flight
+        bra.s intro_begin
 intro_start:
         movem.l d0-d7/a0-a6,-(sp)
+        bsr.w timing_rate_scene
+intro_begin:
         bsr.w timing_rate
         lea ocs_clock_hz(pc),a0
         move.l d0,(a0)
-        bsr.w timing_rate_scene
         bsr.w ocs_clock_rebase
         lea intro_active(pc),a0
         move.w #1,(a0)
@@ -114,7 +122,7 @@ intro_credits_update:
         movem.l d0-d7/a0-a6,-(sp)
         tst.w intro_active(pc)
         bne.s .ready
-        bsr.w intro_start
+        bsr.w intro_world_start
 .ready:
         bsr.w intro_due
         move.w d0,d4

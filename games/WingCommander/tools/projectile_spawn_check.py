@@ -146,8 +146,12 @@ def main():
                     run('timing_scene_begin');got=vec(0x919a,slot)
                     if kind in (5,8,10):
                         own=shooter==0 and kind==8
-                        phase=min(debt+10,50) if own else debt+10
-                        want=tuple(x-(v if own else 0)+(abs(v*phase)//50)*(-1 if v*phase<0 else 1) for x,v in zip(pos,vel))
+                        # Own bolts: two fields late (one lead field here);
+                        # a negative phase is the previous linear step's end.
+                        phase=debt+10-20 if own else debt+10
+                        back=(2 if phase<0 else 1) if own else 0
+                        if phase<0:phase+=50
+                        want=tuple(x-v*back+(abs(v*phase)//50)*(-1 if v*phase<0 else 1) for x,v in zip(pos,vel))
                         assert got==want,(weapon,debt,got,want)
                     samples.append(got)
                     run('timing_scene_end')
