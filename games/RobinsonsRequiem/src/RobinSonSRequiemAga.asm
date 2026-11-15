@@ -305,6 +305,7 @@ _cont
             bsr _objpatch
             bsr _worldpatch
             bsr _mappatch
+            bsr _landpatch
             bsr _swappatch
             bsr _prespatch
 
@@ -1094,6 +1095,36 @@ _skyset move.l  d2,164(a0)
         rts
 
         INCLUDE sky030.s
+
+**********************************************
+; The landscape's inner loop in the 68030's instruction cache (docs/performance.md, plan
+; step 15; src/land030.s), its copy in a 16-byte aligned block from the fast memory list
+; (none: no patch; the block is not freed if the loop's words differ). The test define
+; LAND_OFF leaves it out.
+
+_landpatch
+        IFND LAND_OFF
+        movem.l d0-d1/a0-a2/a6,-(a7)
+        move.l  #LCOPY+16,d0
+        moveq   #MEMF_FAST|MEMF_PUBLIC,d1
+        move.l  4.w,a6
+        jsr     _LVOAllocMem(a6)
+        tst.l   d0
+        beq     .x
+        add.l   #15,d0
+        and.w   #-16,d0
+        move.l  d0,a1
+        move.l  _hunk1(pc),a0
+        bsr     _landinst
+        tst.l   d0
+        beq     .x
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.x      movem.l (a7)+,d0-d1/a0-a2/a6
+        ENDC
+        rts
+
+        INCLUDE land030.s
 
 **********************************************
 ; The objects' images in fast memory (docs/performance.md, plan step 13). The 3D view's

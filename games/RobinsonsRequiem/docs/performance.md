@@ -473,8 +473,8 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
       | hunk 2 `+$5b6`, the blitter copy of the view's rectangles | 1.1 | 93% |
 
       The landscape's loop (`+$d9ba`-`+$dbac`, 3,607 samples a frame) spreads its 28 ms
-      over some 60 instructions of 0.1 to 1.0 ms each, most on its variables (`-6xx(a1)`)
-      and five absolute stores a sample (step 15). The spans and their set-up spread 20 ms
+      over some 60 instructions of 0.1 to 1.0 ms each, the dearest at the starts of its
+      16-byte instruction lines, which missed in the 68030's cache (step 15). The spans and their set-up spread 20 ms
       over 1,575 set-ups and 1,319 spans a frame. All of it is in fast memory.
 
 AGA, to 50 fps. The target is a frame every field on a CPU as fast as one likes. What the
@@ -575,25 +575,48 @@ decides only how close a real 68030 to 68060 gets.
     copy 1.0 ms and the scripts 0.7 ms there, as they run on every world pass and every
     frame is one; what decides that core is the CPU's work (step 15).
 15. **The CPU's work**, for real CPUs. It does not decide the target: it scales with the
-    clock.
-    1. An equivalence check for the AGA landscape first, which every item below needs:
-       `tools/rr_snap.py` and `tools/rr_ecsland.py` for the AGA game (snapshots at hunk 1
-       `+$d88c` [`$11d38`], Unicorn as a 68030, all memory compared).
-    2. The loop's stores, 3.9 ms a frame on the aprof core: `<+$d888>` (`+$da70`, 1.0 ms,
-       read only after the loop at `+$de4a`), `<+$a21e>` (`+$db3e`, 0.8 ms, read only by
-       `+$d712`, 11 calls a frame, and equal to `-604(a1)` there), `clr.w <+$d86e>`
-       (`+$db88`, 0.6 ms, set only at `+$e0d6`) and `<+$a220>`
-       (`+$db22`, 0.6 ms, read by `+$d712` and after the loop) can be written only where
-       they are read. `<+$a226>` (`+$db8e`, 0.9 ms) is the previous row, read by every
-       span call, and stays. About 2 to 3 ms (INFERRED).
-    3. The 68020's scaled index for the row table (`movea.l (a2,d6.w*4),a0` instead of
-       two `add.w` and `(0,a2,d0.w)`) and `lea (a0,d7.w*2),a0` for the two `adda.w`:
-       about 1 ms (INFERRED).
-    4. The loop's path within the 68030's 256-byte instruction cache. The path is about
-       330 bytes with two cold blocks inline (`+$da02`-`+$da58`, `+$dab2`-`+$db08`);
-       moved out of line, it may fit. Not estimated: to measure.
-    5. The spans and their set-up (20 ms): examined after item 1; no change identified.
-    6. On the 040 and 060, Kalms' 040/060 conversion instead of the 030's.
+    clock. Items 1, 3 and 4 done (`docs/internals.md`, "AGA improvements"), 2 not needed,
+    5 and 6 open.
+    1. The equivalence check for the AGA landscape (done): `tools/rr_snap.py` takes
+       snapshots at hunk 1 `+$d88c` [`$11d38`] (chip and the 8 MB of fast memory, d0-a6
+       from the stack after the entry's `movem`: gdb's `fp` is not the raw a6) and
+       `tools/rr_land.py` (the ECS game's `rr_ecsland.py` before) runs the landscape from
+       each under Unicorn as a 68030, as the game has it and patched, all memory and the
+       registers compared. Unicorn's run against the machine's own at the landscape's
+       return: every byte Unicorn changed (20,334 and 24,829 on two snapshots) the
+       machine's, which changed only 46 to 56 more (its interrupts' counters).
+    2. The loop's stores (not needed). Their 3.9 ms on the aprof core were the cost of
+       the loop's 16-byte instruction lines: every store measured there starts a line
+       (`+$da70`, `+$db22`, `+$db3e`, `+$db88`, `+$db8e`), and the loop's register-only
+       instructions at a line's start cost as much (`+$da60` 0.62 ms, `+$db50` 0.64).
+       `<+$d888>` is written about once a step anyway (3,474 near samples in 3,589 steps)
+       and `<+$a21e>` is `-604(a1)` only within a row, so neither store goes without the
+       bookkeeping of the map's edges.
+    3. and 4. The 68020's scaled index and the loop in the instruction cache (done). The
+       loop's common path, about 284 bytes spread over 500 with the map's edges and the
+       tile objects inline, missed in the 68030's 256-byte cache at every one of 3,600
+       steps a frame. The slave runs a copy of that path alone, 254 bytes in a 16-byte
+       aligned block (the slave's own hunk was 8 bytes off in the runs), with `movea.l
+       (a2,d6.w*4),a0` and `lea (a0,d7.w*2),a0` for the row table and the cell; every
+       other branch goes back to START's loop, whose two entries jump into the copy.
+       Checks: `tools/rr_land.py` identical on four snapshots of the walk (17,252 to 28,157
+       bytes changed by each run; a control with one constant changed differs at once);
+       with the test define `LAND_OFF` 166 frames on the setup's core and the start and
+       end screenshots pixel-identical to step 13's; the release build into the jungle,
+       its screenshot identical to step 13's. Measured: on the aprof core 140 frames
+       against 130 (14.0 fps, 71.4 ms), the landscape 30.4 → 24.7 ms a frame (the loop
+       22.0, the rest 2.7), busy 76.6 → 70.5 ms; on the setup's core 176 frames against
+       166, the drawing passes 1.26 to 2.60 fields turning against 1.70 to 3.00 (step 10.2), so 5
+       frames between world passes in 134 fields (`tools/rr_passes.py`: shown 1 field
+       apart 5 times, 2 fields 7 times, 3 fields 35 times, 4 twice; the end screenshot
+       shows a later camera); at 400 MHz 485 frames against 480, the landscape 3.5 → 2.9
+       ms, busy 15.3 → 14.6 ms. The estimate (INFERRED) was about 1 ms for the scaled
+       index and none for the cache.
+    5. The spans and their set-up (hunk 1 `+$b7ca` 13.9 ms and `+$b6ea` 6.0 ms a frame on
+       the aprof core, now the largest items): examined after item 1; no change
+       identified.
+    6. On the 040 and 060, Kalms' 040/060 conversion instead of the 030's (not measured:
+       `tools/rr_prof.py` on `a1200-060` does not reach the game, `docs/open-work.md`).
 
 Not planned: running the scripts more often in smaller steps. The engine has no step
 length: each object runs every period and its script moves it by its own constants (the
@@ -647,7 +670,7 @@ cent. The conversion is the largest item (143 ms, 25% after step 2): the blitter
 take its last exchanges in parallel with the CPU (planes and an intermediate buffer in chip
 memory). Beyond that, fewer pixels (the LOW detail and window settings), not code.
 
-`tools/rr_snap.py` and `tools/rr_ecsland.py` are the check any patch to the landscape needs:
+`tools/rr_snap.py` and `tools/rr_land.py` are the check any patch to the landscape needs:
 snapshots of the machine at its entry (hunk 1 `+$bee2`) in the walk, then the landscape run
 from each under Unicorn as the game has it and patched, all memory compared. An equivalent
 test patch at `+$c010` came out identical on four snapshots and a one-operand change did not.
@@ -735,9 +758,12 @@ python3 tools/rr_skycheck.py 2000
 # the ECS conversion and sky copy against START's loops
 python3 tools/rr_ecsc2pcheck.py 3000
 python3 tools/rr_skycheck.py ecs 2000
-# the ECS landscape: snapshots at its entry in the walk, then each run under Unicorn
-BUILD=profile python3 tools/rr_snap.py tmp/ecs/snap 4
-python3 tools/rr_ecsland.py tmp/ecs/snap
+# the landscape: snapshots at its entry in the walk, then each run under Unicorn as the
+# game has it and patched (the AGA game's src/land030.s), all memory compared
+BUILD=profile python3 tools/rr_snap.py tmp/prof/snap 4
+python3 tools/rr_land.py tmp/prof/snap
+VARIANT=RobinsonsRequiem SETUP=custom BUILD=profile python3 tools/rr_snap.py tmp/ecs/snap 4
+python3 tools/rr_land.py tmp/ecs/snap
 ```
 
 The `profile` build is the current source, every step done so far; v1.2's figures are the

@@ -337,6 +337,25 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
     `move.l d0,<+$ed60>`). Each becomes a `jsr` to the same store, which also has the cache
     emptied at its next use. All sites are checked first. `MAPCHECK` also compares each copy given with its
     image.
+15. **The landscape's inner loop in the instruction cache** (`_landpatch`, `_landinst`,
+    `_lloop` in `src/land030.s`; `docs/performance.md`, plan step 15). The landscape (hunk 1
+    `+$d88c`) takes a near and a far sample a step in its inner loop, `+$d9ba` [`$11e66`]
+    to `+$dbaf`, 3,600 steps a frame in the jungle. `_landinst` checks the loop's words (a
+    checksum, its six addresses of hunk 1 taken back to their offsets), copies `_lloop`, the
+    loop's common path alone, into a 16-byte aligned block `_landpatch` takes from the fast
+    memory list at install (none: no patch), relocates the copy's addresses of hunk 1, and
+    makes the loop's two entries jumps into it: `+$d9ba` (the step's start, from the row's
+    set-up and the loop's end) and `+$db8e` [`$1203a`] `move.w d3,<+$a226>` (the step's
+    end, from the tile objects' path `+$e0e2` and the edges' paths). The copy's 254 bytes fit
+    the 68030's 256-byte instruction cache. It uses the 68020's scaled index for the row
+    table and the cell (`movea.l (a2,d6.w*4),a0`, `lea (a0,d7.w*2),a0`) and computes the far
+    sample's larger and smaller height (`+$db44`-`+$db62`) in four bytes less. Every other
+    branch, the map's edges (`+$d9f8`, `+$da14`, `+$daa8`, `+$dac4`), the tile objects
+    (`+$db76`) and the row's end (`+$dbb0`), goes back to the same instruction in START's
+    loop, which is otherwise unchanged and comes back through the two entries. Its stores,
+    calls and flags at every branch are START's. `tools/rr_land.py` checks it against
+    START's loop from `tools/rr_snap.py`'s snapshots. The test define `LAND_OFF` leaves it
+    out.
 
 ## ECS improvements
 
