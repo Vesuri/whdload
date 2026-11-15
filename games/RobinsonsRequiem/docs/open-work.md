@@ -19,8 +19,9 @@ accesses; step 14 found the rest of that chip time to be the conversion's plane 
 landscape loop in the 68030's instruction cache (a 254-byte copy of its common path, the
 equivalence check `tools/rr_land.py` first) took the aprof core from 130 to 140 frames, the
 landscape 30.4 → 24.7 ms a frame, the setup's core from the cap's 166 to 176 (some frames
-between passes there now) and 400 MHz from 480 to 485; its spans (20 ms) and the 040/060
-conversion are open. The ECS plan for the A500 is done: steps 1 and 2 (the conversion and the
+between passes there now) and 400 MHz from 480 to 485; its spans (20 ms, the instruction
+cache's too) were examined and not changed (their calls batched out of the loop measured
+slower, 137 frames), and the 040/060 conversion is open. The ECS plan for the A500 is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
 landscape code being register-bound (about 1% each). On the AGA's 50 MHz 68030 the ECS
@@ -38,13 +39,11 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 
 Next, in order:
 
-1. The AGA plan's step 15 items 5 and 6 (`docs/performance.md`, "Plan", "AGA, to 50 fps"):
-   the spans and their set-up (hunk 1 `+$b7ca`, `+$b6ea`, 20 ms a frame on the aprof
-   core), any change checked with `tools/rr_land.py`, and Kalms' 040/060 conversion on
-   those CPUs; each measured at 400 MHz and on the setup's and the aprof cores
-   (`tools/rr_prof.py`, `tools/rr_passes.py`, `tools/rr_objects.py`). Step 15's frames
-   between passes on the setup's core to be play-checked with step 11's. Step 11's frames to be play-checked (the pointer's
-   picking between passes). Steps 7-13 also in a heavier scene than the jungle start
+1. The AGA plan's step 15 item 6 (`docs/performance.md`, "Plan", "AGA, to 50 fps"):
+   Kalms' 040/060 conversion on those CPUs, measured at 400 MHz and on the setup's and
+   the aprof cores (`tools/rr_prof.py`, `tools/rr_passes.py`, `tools/rr_objects.py`).
+   Step 15's frames between passes on the setup's core to be play-checked with step
+   11's (the pointer's picking between passes). Steps 7-13 also in a heavier scene than the jungle start
    (more trees and objects) and in other areas (other maps, shade tables, skies and
    objects; step 13's 64 KB cache held 52 KB turning in the jungle).
 2. The ECS plan's steps 5-11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"): the

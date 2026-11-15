@@ -576,7 +576,7 @@ decides only how close a real 68030 to 68060 gets.
     frame is one; what decides that core is the CPU's work (step 15).
 15. **The CPU's work**, for real CPUs. It does not decide the target: it scales with the
     clock. Items 1, 3 and 4 done (`docs/internals.md`, "AGA improvements"), 2 not needed,
-    5 and 6 open.
+    5 examined and not done, 6 open.
     1. The equivalence check for the AGA landscape (done): `tools/rr_snap.py` takes
        snapshots at hunk 1 `+$d88c` [`$11d38`] (chip and the 8 MB of fast memory, d0-a6
        from the stack after the entry's `movem`: gdb's `fp` is not the raw a6) and
@@ -612,9 +612,25 @@ decides only how close a real 68030 to 68060 gets.
        shows a later camera); at 400 MHz 485 frames against 480, the landscape 3.5 → 2.9
        ms, busy 15.3 → 14.6 ms. The estimate (INFERRED) was about 1 ms for the scaled
        index and none for the cache.
-    5. The spans and their set-up (hunk 1 `+$b7ca` 13.9 ms and `+$b6ea` 6.0 ms a frame on
-       the aprof core, now the largest items): examined after item 1; no change
-       identified.
+    5. The spans and their set-up (examined, not done): hunk 1 `+$b7ca` 13.9 ms and
+       `+$b6ea` 6.0 ms a frame on the aprof core (1,573 set-ups, 1,313 spans), 1.7 and 0.7
+       ms at 400 MHz. Like the loop's, their time is the instruction cache's: the costly
+       instructions start or cross 16-byte lines, 0.25 to 0.5 ms for 1,300 to 1,600 runs
+       each (12 to 16 cycles a line, DERIVED), and a rectangle's common path is 374 bytes
+       (the set-up `+$b6ea`-`+$b784` 132, the shade `+$ba78`-`+$bae0` 102, the rows'
+       set-up `+$bda8`-`+$be34` 140, and the fill routine); 459 spans a frame add a sloped
+       top (`+$bb0c`, two variants of about 120 bytes). Every call from the loop also
+       evicts the loop. Measured (not kept): the loop's calls recorded in a buffer and run
+       in their order before the copy goes back to START's code (the row's end, the tile
+       objects, the edges; the spans read nothing the loop writes in a row but its own
+       values, which the record holds: `tools/rr_land.py` identical on the four snapshots,
+       a control with one replayed value wrong differs). The loop went from 22.0 to 19.1 ms,
+       but recording and replaying took 5.9 ms and START's spans, still larger than the
+       cache, only 0.9 ms less (13.6 and 5.4 ms): 137 frames against 140. For a gain the
+       replay would need its own spans, the common paths and the sloped tops (about 600
+       bytes) rewritten to run in the cache, with the row's constants in registers. At best
+       about 5 ms a frame on the aprof core (INFERRED: about 250 cycles less a call at
+       50 MHz, less the recording), and under 1 ms at 400 MHz. Not done.
     6. On the 040 and 060, Kalms' 040/060 conversion instead of the 030's (not measured:
        `tools/rr_prof.py` on `a1200-060` does not reach the game, `docs/open-work.md`).
 
