@@ -2084,7 +2084,7 @@ towards Nav 1, before the asteroids (2026-11-15).
 The music driver shares the CPU, and its load depends on the song: with music on, the same
 cycles give rates about a fifth lower and varying from one stretch to another. With
 sound off the rate is steady and nearly proportional to cycles: **about 1715 cycles
-give 10 updates/s**. Ships, asteroids or other objects in view lower it
+give 10 updates/s** (1730 × 10 / 10.10). Ships, asteroids or other objects in view lower it
 (7.2 at 2000 cycles with music among enemies). This setting, sound off, in empty space, is the
 reference for measuring other PC animations; scenes paced by the PC timer instead
 of the CPU keep their speed at any setting, which a second cycle setting shows.

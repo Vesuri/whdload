@@ -351,6 +351,40 @@ displayed 200 kps corresponds to 20 km per update. This supersedes the unmeasure
 15/s prior. The experimental timing build uses this rate; it does not establish every
 animation/AI cadence. Do not transfer intro evidence to flight.
 
+**Why 10 Hz.** The game's world has no clock: each update adds every object's
+velocity to its position once, however long the update took. The HUD turns that
+per-update velocity into kps by multiplying it by ten (`E:22c2–22ca`, `E:22ee–230a`),
+and shows navpoint range in the same kilometres. A displayed 200 kps therefore means
+200 km a second, and range closing at the speed shown, only at 10 updates a second;
+any other rate makes the game's own instruments wrong. Two observations agree:
+Psygore's `Custom5=0` limiter on a stock 020 runs flight at 10.1–10.2 updates/s, and
+the PC version (WC.EXE) uses the same units (20.00 km per update at 200 kps). The
+kps figure is a designers' choice, so this is the rate their units assume, not a
+recorded design document. Details: internals, "Native speed/range anchor".
+
+**The reference PC: DOSBox at about 1715 cycles, sound off.** The PC version, like
+the Amiga original, advances its world once per drawn frame as fast as the CPU allows,
+so its pace depends on the machine. The machine its units describe is the one on
+which flight runs at 10 updates/s. In DOSBox-staging (`svga_s3`, `core = normal`,
+`cputype = 386`) that is about 1715 fixed cycles with the game's sound set to "No
+sound"; 1730 measured 10.10/s, 1% fast (internals, "PC speed calibration"). Sound
+off, because the music driver shares the CPU and its load changes with the song
+(about a fifth at 1840 cycles), so with music no single setting gives a steady rate.
+Removing it gives the game the CPU time that 10 Hz flight implies, in every scene.
+
+**Using the reference.** Run each part of the PC version at the reference setting
+and measure how its world and animations progress per second; compare with the
+slave's chosen rate. Rules:
+
+- Check each part at a second cycle setting too. A part whose speed does not change
+  is paced by the PC's timer or music, not the CPU, and its rate is read directly.
+- Measure in light scenes. Busy scenes (ships, asteroids, explosions) slow the PC
+  below its rate; that is the machine falling behind, not the design.
+- Compare progress (distance, frames, turning per second), not update counts: the
+  Amiga port may step differently per update from the PC version.
+- The PC version is a different program from the Amiga port. Its timings are
+  evidence for the intended pace, not proof that the Amiga code was meant to match.
+
 **Intro decision: 10 native world updates per second**, matching flight, with
 bounded renderer-only extrapolation between updates. The user selected this
 working target; it is not independent proof of the historical intro rate.
