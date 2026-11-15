@@ -154,8 +154,8 @@ def check(build, mutation=None):
                 'unexpected change to original slave, including cache/wait paths')
     require(hashlib.sha256(blob).hexdigest()==meta['sha256'],'stale build metadata')
     info=int.from_bytes(payload[0x28:0x2a],'big')
-    require(payload[info:].startswith(b'2.0b (14.11.2026)\n'), 'public release information missing')
-    require(b'$VER: WingCommander 2.0b (14.11.2026)\0' in payload, 'public version missing')
+    require(payload[info:].startswith(b'2.0b (15.11.2026)\n'), 'public release information missing')
+    require(b'$VER: WingCommander 2.0b (15.11.2026)\0' in payload, 'public version missing')
     config=int.from_bytes(payload[0x32:0x34],'big')
     require(payload[config:].split(b'\0',1)[0].endswith(b'C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):Original,1.0x,1.2x,1.5x,2.0x:1-3;'),'public config missing')
     if mutation:
