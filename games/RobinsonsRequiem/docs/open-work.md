@@ -32,8 +32,8 @@ Next, in order:
    shade tables).
 2. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`); in the AGA game step 10.2's swap with the
-   mouse pointer moving and the scripts drawing (inventory, messages), which the harness
-   runs do not do. The AGA game's objects' frames are in fast
+   scripts drawing (inventory, messages), which the harness runs do not do (the mouse
+   pointer moving is play-tested). The AGA game's objects' frames are in fast
    memory since step 1: check that a game saved with v1.2 loads with the new slave and the
    other way round.
 3. `tools/rr_prof.py` on `a1200-060` did not reach the game in 10 minutes (both slaves
