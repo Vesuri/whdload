@@ -319,6 +319,24 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
     `bsr.w +$7b58` (checked first) become `jsr _skyset` and a `nop`: the image set as
     before, the copy to be made again. `MAPCHECK` also compares the copy with the image at
     every drawing; `tools/rr_skycheck.py` runs every other case from the copy.
+14. **The objects' images in fast memory** (`_objpatch`, `_objimg`, `_heapadd`,
+    `_heapsub`, `_heapset`; `docs/performance.md`, plan step 13). The 3D view's sprite
+    routine (hunk 1 `+$ea3a`) finds an object's image at `+$ea4a` [`$12ef6`] (`adda.l
+    (a2),a2` on the object's `+8`): an image of the resource heap in chip (type 28 or 30
+    at `+0`, width − 1 at `+2`, height − 1 at `+4`, the pixels from `+8`), 23 of them
+    and 33 KB drawn in 27 fields of the jungle's walk. The routine reads it only through
+    `a2`: the header, the scaled pixels (`+$eb5c` [`$13008`], `+$ec88` [`$13134`]) and the
+    pick test's pixel (`+$ebf4`). `adda.l (a2),a2` and `cmpi.b #28,(a2)` become `jsr
+    _objimg`, which gives the routine a copy in fast memory with the flags of the compare:
+    a cache of up to 128 images and 64 KB from the fast memory list (taken at install),
+    each copy at its image's address modulo 16 and with 64 bytes after the image, found
+    by the image's address; a full cache is emptied, an image over 32 KB read where it
+    is. The heap changes only through its top `<+$ed60>`: an allocation (`+$9540`
+    [`$d9ec`] `add.l d1,<+$ed60>`), the compaction that moves the blocks above a freed
+    one down (`+$92ee` [`$d79a`] `sub.l d1,<+$ed60>`) and its reset (`+$8d42` [`$d1ee`]
+    `move.l d0,<+$ed60>`). Each becomes a `jsr` to the same store, which also has the cache
+    emptied at its next use. All sites are checked first. `MAPCHECK` also compares each copy given with its
+    image.
 
 ## ECS improvements
 

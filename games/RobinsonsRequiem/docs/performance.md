@@ -532,14 +532,26 @@ decides only how close a real 68030 to 68060 gets.
     (INFERRED) was under 1 ms. On the aprof core 129 frames against 122 (12.9 fps, 77.5
     ms), chip accesses 14.3 → 10.4 ms, the sky 0.8 ms; on the setup's core 165 against
     166, both at the cap.
-13. **The objects' graphics in fast memory**: the scaled sprites' pixel reads (hunk 1
-    `+$eb5c` [`$13008`] and `+$ec88` [`$13134`], `move.b (0,a0,d0.w),d2`) go to the 3D
-    objects' frames in MAIN's 256 KB block in chip, 2,119 reads a frame. First, what else
-    reads the block (Paula, the blitter, the copper). If only the CPU, the block comes
-    from the fast pool (step 3's `_fastalloc`, with room for it); otherwise a copy of the
-    frames the drawing reads, as in step 12. Estimate: 1.8 → about 0.2 ms (INFERRED).
-14. **The rest of a frame's chip time**: after 12 and 13 about 8 ms a frame at 400 MHz
-    (DERIVED: 13.7 less the sky's and the objects'). Most of it is the conversion's plane
+13. **The objects' images in fast memory** (done, `docs/internals.md`, "AGA
+    improvements"). The scaled sprites' pixel reads (hunk 1 `+$eb5c` [`$13008`] and
+    `+$ec88` [`$13134`], `move.b (0,a0,d0.w),d2`) go to the objects' images, which are not
+    in MAIN's 256 KB block (`$14c950`-`$18c950` in the jungle) but in the resource heap
+    (the reads at `$bfc44` and `$c148b`), with the sounds Paula plays: 23 images, 33 KB, in
+    27 fields of the walk. The routine now reads them from a cache of copies in fast memory
+    (64 KB, up to 128 images), found by the image's address and emptied when the heap's
+    top changes (an allocation, a compaction, a reset) or the cache is full. Checks: with
+    `MAPCHECK` every copy given equal to its image, 1,421 calls turning and 1,297 walking
+    (32 and 28 images, 52 and 44 KB; the sky's, the map's and the shade table's copies
+    still made); the setup core's start and end screenshots pixel-identical to step 12's,
+    166 frames. Measured at 400 MHz: 480 frames against 445 (48.0 fps, 20.8 ms), the
+    objects 1.4 → 0.1 ms a frame and the cache 0.1, chip accesses 9.9 → 8.7 ms (13,980 →
+    12,353 a frame), busy 16.5 → 15.3 ms, the world wait 4.8 → 4.4 ms; turning, 22 world
+    passes and 43 frames between them in 65 fields, every frame shown a field after the
+    last. The estimate (INFERRED) was 1.8 → about 0.2 ms. On the aprof core 130 frames
+    against 129 (13.0 fps, 76.9 ms), chip accesses 10.4 → 8.8 ms, the objects 2.0 → 1.1 ms
+    and the cache 0.2.
+14. **The rest of a frame's chip time**: after 12 and 13, 8.7 ms a frame at 400 MHz
+    (measured, step 13). Most of it is the conversion's plane
     writes (5.2 ms), a floor while the CPU writes the planes. The rest is the blitter copy
     (`h2+$5b6`, 0.7 ms, the CPU waiting for the blitter: to start it and go on, waiting
     only before the conversion), the pointer's background (`h2+$4ec`, 0.3) and routines
