@@ -382,6 +382,50 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    jumping into an unrolled run of `move.l (a0)+,(a1)+`. `tools/rr_skycheck.py ecs` checks
    it against START's loop under Unicorn.
 
+## The AGA's sites in the ECS game
+
+Both STARTs are one program at other offsets (`docs/performance.md`, ECS plan step 6): the
+ECS game's hunks 0-2 hold the same code as the AGA's, shorter where it draws 4 planes
+instead of 8; its hunk 3 is 4,304 bytes of code of its own, and its hunk 4 is the AGA's
+hunk 3 (4,436 bytes of zeros). `tools/rr_sites.py` finds
+the ECS site of each AGA improvement's checked bytes: the one place where they stand, with
+relocated longwords and the site's own branch displacements left out, chosen by the code
+around it when there are several, and with every relocated operand and branch target
+mapped one way over all sites. Where the checked bytes differ it checks the ECS site found
+by reading both against its own bytes. Hunk offsets, AGA → ECS; items as in "AGA
+improvements":
+
+| Item | Sites, AGA → ECS | ECS differences |
+|---|---|---|
+| 1 | hunk 0 `+$196` → none | START keeps its fast pool (hunk 0 `+$3be`-`+$406` allocates the pool it sized; nothing discards it) |
+| 3 | hunk 0 `+$36ee` → `+$2be8`, the free `+$3748` → `+$2c42`; hunk 1 `+$a2b2`, `+$a2ce`, `+$a30e` → `+$891c`, `+$8938`, `+$8978` | the free tests for a null handle first: `48e7 8080 4a80` for `48e7 8080 2040` |
+| 4 | hunk 2 `+$2e84` → none | the ECS game's own 4-plane conversion ("ECS improvements" 1) |
+| 5 | hunk 1 `+$e262` → `+$c8b8` | ("ECS improvements" 2's site) |
+| 6 | hunk 1 `+$257e`, `+$6480`, `+$250e`, `+$49e8`, `+$4b54` → `+$d22`, `+$4b44`, `+$cb2`, `+$30ac`, `+$3218` | |
+| 7 | hunk 1 `+$4b8e` → `+$3252` | |
+| 8 | hunk 1 `+$4880` → `+$2f44` | |
+| 9 | hunk 1 `+$d908`, `+$de74`, `+$df78`, `+$3b22`, `+$3b74`, `+$3540` → `+$bf5e`, `+$c4ca`, `+$c5ce`, `+$21e6`, `+$2238`, `+$1cd6` | |
+| 10 | hunk 1 `+$30b4`, `+$baac`, `+$be7e` → `+$184a`, `+$a116`, `+$a4de` | |
+| 11 | hunk 0 `+$13c0`, `+$13e0` → `+$c9e`, `+$cbe`; hunk 1 `+$4b30`, `+$49cc`, `+$4a0a`, `+$4a14`, `+$4a1a`, `+$4a2c`, `+$4a46`, `+$4a76`, `+$4a80`, `+$4ada`, `+$4b5e` → `+$31f4`, `+$3090`, `+$30ce`, `+$30d8`, `+$30de`, `+$30f0`, `+$310a`, `+$313a`, `+$3144`, `+$319e`, `+$3222`; hunk 2 `+$2e02` → `+$19ea` | |
+| 11, the back screen's loads | hunk 0 `+$184e`, `+$1896`, `+$1994`, `+$1ad8`, `+$1c26`, `+$1c66` → `+$1104`, `+$114c`, `+$12a4`, `+$1366`, `+$13d0`, `+$1404`; hunk 2 `+$3e`, `+$618`, `+$67e`, `+$884`, `+$9a4`, `+$a62` → `+$4c`, `+$3b0`, `+$416`, `+$584`, `+$6b6`, `+$786`; ECS only hunk 0 `+$1232` | `+$1366` found by hand (the loop after it uses word arithmetic where the AGA's is long). None for hunk 0 `+$1394`, `+$1b50`, `+$1b98`, `+$1bd4`, `+$1c9e`, `+$1e20`, `+$1e7e` (8-plane loops, planes 4-7, masks the ECS START does not build) or hunk 2 `+$3c1e`, `+$3d5e`, `+$4364` (the 64,000-byte chunky screens). `+$1232`, the 4-plane copy of a planar image (bit 4 or 5 of its flags), has no AGA site. Every other ECS load of `<hunk 1 +$10>` is one of these, except the VBL's pointer (hunk 2 `+$2ba`, the AGA's `+$4fc`) |
+| 12 | hunk 1 `+$4bd6` → `+$329a` | |
+| 13 | hunk 1 `+$30e0` → `+$1876` | |
+| 14 | hunk 1 `+$ea4a`, `+$9540`, `+$92ee`, `+$8d42` → `+$d0a0`, `+$7b20`, `+$78ce`, `+$7322` | the sprite routine's images are types 24 and 26 for the AGA's 28 and 30: `d5d2 0c12 0018` |
+| 15 | hunk 1 `+$d9ba`-`+$dbaf` → `+$c010`-`+$c205` | one `bsr.w` (hunk 1 `+$db68`, to `+$b6ea` → `+$9d54`), so `src/land030.s`'s checksum and its relocated addresses' offsets differ |
+
+The sites' operands, AGA → ECS: hunk 0 `+$13c0` → `+$c9e`, `+$13ce` → `+$cac`, `+$13e0` →
+`+$cbe`, `+$13f6` → `+$cd4`, `+$36ee` → `+$2be8`; hunk 1 `+$10` → `+$10`, `+$251a` →
+`+$cbe`, `+$49b2` → `+$3076`, `+$4a14` → `+$30d8`, `+$4be8` → `+$32ac`, `+$525a` →
+`+$391e`, `+$7b58` → `+$6238`, `+$a1de` → `+$8848`, `+$a20e` → `+$8878`, `+$a21e` →
+`+$8888`, `+$a220` → `+$888a`, `+$a226` → `+$8890`, `+$a3a6` → `+$8a10`, `+$b6ea` →
+`+$9d54`, `+$d86e` → `+$bec4`, `+$d888` → `+$bede`, `+$ed60` → `+$d3b6`, `+$ed86` →
+`+$d3dc`, `+$ed97` → `+$d3ed`, `+$ed99` → `+$d3ef`, `+$edcf` → `+$d425`, `+$edfe` →
+`+$d454`, `+$ee05` → `+$d45b`, `+$ee08` → `+$d45e`, `+$ee6a` → `+$d4c0`, `+$ee6c` →
+`+$d4c2`, `+$ef2a` → `+$d580`, `+$ef3c` → `+$d592`; hunk 2 `+$4ec` → `+$2aa`; hunk 3
+`+$740` → hunk 4 `+$740`. The slave's routines also use offsets outside the checked bytes
+(MAIN's object table `+$ed6c` → `+$d3c2`, `tools/rr_objects.py`; the 3D flag `+$ee03`,
+the frame routine's other entries and variables): those are found with each step's patch.
+
 ## Memory (AGA)
 
 START divides memory itself (hunk 0 `+$162`-`+$290`); the hunk 1 variables:

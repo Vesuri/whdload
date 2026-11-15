@@ -752,10 +752,19 @@ is, each step below chosen at install, and the game has to keep working correctl
    28.57, the 578 ms of step 2), no catch-up passes; every object runs once per frame (mean
    28.25 to 28.60 fields), the player (`heros`, period 7) too. The AGA game's figures are
    unchanged (176 frames on the setup's core, every interval 3 fields).
-6. **The AGA's sites in the ECS game**: both STARTs are the same program at other offsets
-   (the ECS swap, hunk 0 `+$cbe` [`$cee`], is the AGA's `+$13e0` instruction for
-   instruction). Each AGA patch's checked bytes find its ECS site, giving a table of both
-   variants' sites, each checked as now.
+6. **The AGA's sites in the ECS game** (done, `docs/internals.md`, "The AGA's sites in
+   the ECS game"). Both STARTs are the same program at other offsets (the ECS swap, hunk 0
+   `+$cbe` [`$cee`], is the AGA's `+$13e0` instruction for instruction).
+   `tools/rr_sites.py` finds each AGA patch's checked bytes in the ECS START, every
+   relocated operand mapped one way: 55 of the AGA's 67 sites, 52 with the same bytes and 3
+   found by hand where the bytes differ (the free tests for a null handle first, the sprite
+   routine's image types are 24 and 26 for 28 and 30, a back screen load whose loop uses
+   word arithmetic), and one ECS-only back screen load. No ECS site for 12: the fast pool's
+   discard (the ECS START keeps its pool), the 8-plane conversion (the ECS game has its
+   own) and ten back screen loads of 8-plane and chunky-screen code. The landscape loop is
+   the AGA's but for one `bsr.w`'s displacement, so `src/land030.s` needs the ECS checksum
+   and offsets; the objects' cache needs the ECS image types. Each step below patches its
+   ECS sites from that table, each checked first as in the AGA slave.
 7. **Memory, 68020 and up with fast memory**: START's fast pool kept with a 1 MB ExpMem
    when the machine has it (WHDLoad's optional ExpMem, a negative size, or a setting like
    the AGA's `MemConfig`), as now without it; caches on with `CACHECHIPDATA`; the chunky
@@ -814,6 +823,8 @@ BUILD=developer python3 tools/rr_objects.py tmp/prof/objects 300
 # the same for the ECS game (A500; SETUP=a3000-50 for the AGA's CPU)
 VARIANT=RobinsonsRequiem SETUP=custom python3 tools/rr_passes.py tmp/ecs/passes 120
 VARIANT=RobinsonsRequiem SETUP=custom python3 tools/rr_objects.py tmp/ecs/objects 150
+# the AGA slave's patch sites in the ECS game (ECS step 6; after make unpack)
+python3 tools/rr_sites.py
 # the AGA conversion and sky copy against START's loops (after make unpack)
 python3 tools/rr_c2pcheck.py 2000
 python3 tools/rr_skycheck.py 2000

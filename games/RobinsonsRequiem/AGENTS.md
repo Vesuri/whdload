@@ -6,8 +6,8 @@ faster (`docs/performance.md`, "Plan": the ECS plan for the A500 done; the AGA p
 world on the game's own grid, the camera and moving objects between their runs, the drawing
 up to the cap, frames between world passes, the sky and objects' images in fast memory, the
 landscape loop in the 68030's instruction cache and Kalms' 040/060 conversion on those CPUs,
-its checks in play left; the ECS plan for fast CPUs at step 6, its tools done, the 68000 to
-keep working). The original slaves are by CFou! (game.conf `AUTHOR`, `UPSTREAM`): his v1.2 install
+its checks in play left; the ECS plan for fast CPUs at step 7, its tools and the AGA's sites
+in the ECS game done, the 68000 to keep working). The original slaves are by CFou! (game.conf `AUTHOR`, `UPSTREAM`): his v1.2 install
 package from whdload.de, which ships their source.
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.
