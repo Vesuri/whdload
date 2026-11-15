@@ -101,6 +101,7 @@ timing_rate:
 ; It services at most four ticks per batch and skips drawing while catching up.
 timing_loop:
         movem.l d0-d7/a0-a6,-(sp)
+        bsr.w   timing_rate_flight
         bsr.w   timing_player_reset
         ; Load initial flight assets on the original input/world path, before
         ; enabling the producer. This initial update establishes the epoch.
@@ -125,7 +126,7 @@ timing_loop:
         bsr.w   timing_rebase
 .budget:
         move.l  timing_hz(pc),d7
-        divu.w  #10,d7
+        divu.w  timing_world_rate+2(pc),d7
         andi.l  #$ffff,d7
         lsl.w   #2,d7
 .fields:
@@ -186,6 +187,17 @@ timing_loop:
         lea     timing_abort(pc),a0
         clr.w   (a0)
 .draw:
+        ; Without the enhanced framerate, draw once per completed world tick.
+        tst.w   timing_high_framerate(pc)
+        bne.s   .picture
+        move.l  timing_completed(pc),d0
+        cmp.l   timing_drawn_tick(pc),d0
+        beq.w   .loop
+        lea     timing_drawn_tick(pc),a0
+        move.l  d0,(a0)
+.picture:
+        lea     timing_pictures(pc),a0
+        addq.l  #1,(a0)
         FSTAT   4
         lea     timing_selection_last(pc),a0
         move.w  A_4430(a4),d0
@@ -282,7 +294,7 @@ timing_rebase:
         sub.l   timing_clock(pc),d0
         lea     timing_input_dropped_fields(pc),a0
         add.l   d0,(a0)
-        mulu.l  #10,d0
+        mulu.l  timing_world_rate(pc),d0
         lea     timing_clock+16(pc),a0
         add.l   d0,(a0)
 .discarded:
@@ -322,6 +334,7 @@ timing_leave:
         bsr.w   timing_scene_geometry
 .rebasing:
         bsr.w   timing_rebase
+        bsr.w   timing_rate_native
         bsr.w   timing_player_reset
         lea     timing_active(pc),a0
         clr.w   (a0)
@@ -381,6 +394,8 @@ timing_active:    dc.w 0
 timing_abort:     dc.w 0
 timing_clock:    dcb.b 28,0
 timing_completed: dc.l 0
+timing_drawn_tick: dc.l 0
+timing_pictures:  dc.l 0          ; flight pictures drawn (diagnostic)
 
         ifne TIMING_VERIFY
 timing_verify_schedule: dc.w 0

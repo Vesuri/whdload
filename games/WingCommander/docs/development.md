@@ -4519,9 +4519,9 @@ A short eligible-machine live gate uses the existing local debugger:
 ```sh
 export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
 export SLAVE="$PWD/tmp/ocs-public-final2/WingCommander.Slave"
-WARP=1 python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --enhanced 1 \
+WARP=1 python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --enhanced 3 \
   --calibrate --output tmp/ocs-public-layout2
-WARP=1 python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --enhanced 1 \
+WARP=1 python3 tools/ocs_boot_gate.py --ownership --cpu 68020 --enhanced 3 \
   --clock-build tmp/ocs-public-final2 --baseline on --simulator --compat \
   --layout tmp/ocs-public-layout2/layout.json --output tmp/ocs-public-live2
 python3 tools/ocs_compatibility_report.py tmp/ocs-public-live2 \
@@ -4530,14 +4530,14 @@ python3 tools/ocs_publication_report.py tmp/ocs-public-live2 \
   --build tmp/ocs-public-final2 --output tmp/ocs-public-pixels2
 ```
 
-For original-mode smoke checks, use `--enhanced 0` on 68020 or `--enhanced 1`
+For original-mode smoke checks, use `--enhanced 0` on 68020 or `--enhanced 3`
 on 68000. Calibrate each configuration independently, then boot with its layout
 and `--ownership --compat`, omitting `--clock-build --baseline --simulator`.
 A clock fixture requires installed enhancements and is deliberately rejected for
 a public build with an off option or 68000. These original-mode runs stop at the
 menu, sufficient to inspect unchanged hook sites and native intro rendering.
 
-Interactive launches use `WHD_ARGS='CUSTOM5=1'` explicitly with `VARIANT=WingCommander`
+Interactive launches use `WHD_ARGS='CUSTOM5=3'` explicitly with `VARIANT=WingCommander`
 and the selected public `SLAVE`; clearing that argument selects original mode.
 The runtime preparer only enables the icon in a fresh OCS tree when a public
 slave is selected. CD32 and original OCS icon contents remain unchanged. Merely
@@ -5491,3 +5491,23 @@ Use new output names for repeated runs. Interactive acceptance: hold Right until
 simulator game over, release it, then follow the normal bar/briefing path into
 the first mission. With no steering input the ship must not initially turn.
 A direction held in the new flight must still respond normally.
+
+## World speed option
+
+Both public builds (`make build`) decode CUSTOM5 bit 0 (framerate) and bits 1-3 (world
+speed). CPU checks of the decoding and the scheduler at 10/12/15/20 Hz:
+
+```
+python3 tools/release_check.py tmp/build/release/WingCommanderCD32 --output tmp/speed-release.json --negative-controls
+python3 tools/ocs_options_check.py tmp/build/release/WingCommander --output tmp/speed-options
+python3 tools/timing_clock_check.py --output tmp/speed-clock
+```
+
+The live check boots one CUSTOM5 value (2-9) into the simulator flight and counts world
+ticks and drawn pictures over emulated fields. The simulator flight ends after about 55
+world ticks, so keep the window short (default 100 fields; 200 at 1.0x and 1.2x):
+
+```
+python3 tools/world_speed_live_check.py cd32 tmp/build/release/WingCommanderCD32 --custom5 9 --output tmp/speed-cd32-9
+python3 tools/world_speed_live_check.py ocs tmp/build/release/WingCommander --custom5 3 --fields 200 --output tmp/speed-ocs-3
+```

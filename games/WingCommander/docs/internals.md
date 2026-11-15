@@ -2140,6 +2140,36 @@ scenes reach exactly three display frames per advance at 3460 (salute, funeral,
 "The End"), which may be a frame limiter; a run at a much higher setting would
 show which scenes level off at a designed maximum.
 
+### World speed
+
+The player's World speed option (open-work, "World speed option") changes only the
+rate of the shared scheduler, `timing_advance` (`src/timing_clock.s`). It issues
+`fields * timing_world_rate / Hz` ticks and keeps the remainder as debt, with Hz debt
+units to a tick at every rate. The consumers that used the native 10 for the same
+conversion now read `timing_world_rate`: the CD32 batch budget and rebase, the OCS
+adapter's whole fields per tick (`Hz / rate`, rounded down, so one call still issues
+at most one tick), per-field player rotation and translation, and the bounded
+display-lead forecast (two fields are `2 * rate` units). The rate must be a whole
+number, which is why the option offers 1.2x rather than 1.25x.
+
+`timing_flight_rate` holds the option (10, 12, 15 or 20). The flight loops select
+it on entry and restore 10 on exit. Every scene on the shared clock enters through
+`intro_start`, which saves the current rate and selects 10, and leaves through
+`intro_stop`, which restores it: the title and credits, the autopilot fly-by inside
+flight, the launch tunnel, ejection and the room run. These scenes keep native
+timing at any world speed. Each change is followed by a rebase, so no debt crosses
+a rate change.
+
+`timing_high_framerate` holds the framerate bit. Off, the CD32 flight loop draws
+only after a completed world tick (`timing_drawn_tick`) and `timing_scene_begin`
+stages no forecast, so the picture is the tick's state. On OCS, prediction is kept
+off (`ocs_prediction_end`), so the existing draw-per-tick path runs. OCS prediction
+is otherwise allowed when a picture's measured cost plus two fields fits the native
+10 Hz period (5 PAL fields), at every world speed: overdue ticks are serviced before
+any picture, so the native budget still holds. A per-rate period would forbid
+prediction at 20 Hz (2.5 fields), which the first live check showed (20 pictures/s).
+`timing_pictures` counts CD32 flight pictures for the live check.
+
 ## Phase 6 rendering implementation
 
 Rendering work is complete; intended-speed calibration and exact duration

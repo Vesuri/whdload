@@ -43,7 +43,7 @@ def main():
     env = wc_run.run_env(out, env, SLAVE=str(slave), AMIGA_SETUP=ref['machine'],
         INTRO_STOCK_CLOCK='1' if ref['machine']=='a1200-fast' else '0',
         WC_NOMMU_CORE='1' if ref['nommu_core'] else '0',
-        WHD_ARGS='CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0 '+ref['options'],
+        WHD_ARGS='CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5='+('3 ' if fixture.get('release') else '0 ')+ref['options'],
         WARP='1', NTSC='0', WINDOW='front', JOY0='none', JOY1='none', DETERMINISTIC='1', WC_INSTANT_BLITTER='0',
         WC_OBSERVER_CONFIG=str(config), WC_OBSERVER_OUTPUT=str(out/'events.txt'),
         WC_STATE_PC=f'{h[0]+0x698:x}', WC_STATE_OUTPUT=str(out/'states.bin'))

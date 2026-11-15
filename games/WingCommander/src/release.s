@@ -1,4 +1,6 @@
-; Translate public language/pacing options once before language selection.
+; Translate public language/speed options once before language selection.
+; CUSTOM5 bit 0 enables the enhanced framerate; bits 1-3 select the world
+; speed: 0 Original (Psygore's normal game), 1-4 a 10/12/15/20 Hz world.
 ; Internal CUSTOM1=3 is enhanced; 0/1 are Psygore's English/German. German
 ; keeps 1 until Psygore's loader has chosen wing.german (S:142a), so the
 ; converter setup sees 3 only for its call; release_patchseg then maps German
@@ -11,7 +13,7 @@ release_setcpu:
         cmpi.l  #1,d2
         bhi.s   .bad
         move.l  (a1),d2
-        cmpi.l  #4,d2
+        cmpi.l  #9,d2            ; bit 0 framerate, bits 1-3 world speed 0..4
         bhi.s   .bad
         tst.l   (a0)
         beq.s   .language
@@ -20,10 +22,21 @@ release_setcpu:
         move.w  #1,(a0)
         lea     slave+$1de4(pc),a0
 .language:
+        move.l  (a1),d2
+        clr.l   (a1)             ; Psygore's normal limiter outside flight
+        lea     timing_high_framerate(pc),a1
+        clr.w   (a1)
+        lsr.l   #1,d2
+        bcc.s   .speed
+        move.w  #1,(a1)
+.speed:
         tst.l   d2
-        beq.s   .enhanced
-        subq.l  #1,(a1)          ; public 1..4 -> Psygore 0..3
-        bra.s   .ready
+        beq.s   .ready           ; Original world speed: Psygore's game
+        lea     release_rates(pc),a1
+        moveq   #0,d1
+        move.b  -1(a1,d2.l),d1
+        lea     timing_flight_rate(pc),a1
+        move.l  d1,(a1)
 .enhanced:
         tst.l   (a0)
         beq.s   .english
@@ -67,6 +80,7 @@ release_german_install:
         movem.l (sp)+,d0/a0-a1
         rts
 
+release_rates:   dc.b 10,12,15,20 ; world ticks/s for speeds 1.0x, 1.2x, 1.5x, 2.0x
 release_german:  dc.w 0          ; 1 German Psygore's modes, 2 German enhanced
 
 ; Full enhanced converter gate, including flight allocation fallback.
@@ -545,5 +559,6 @@ release_config:
         dc.b 'C2:L:Cheats:Off,Enabled,Invincible;'
         dc.b 'C3:L:System:Default,Enyo,McAuliffe,Gateway,Gimle,Brimstone,Chengdu,Dakota,Port Hedland,Kurasawa,Rostov,Hubble''s Star,Venice,Hell''s Kitchen;'
         dc.b 'C4:L:Mission:1,2,3;'
-        dc.b 'C5:L:Mode:Enhanced,Psygore normal,Psygore unlimited,Psygore relaxed,Psygore slow;',0
+        dc.b 'C5:X:Enhanced framerate:0;'
+        dc.b 'C5:M:World speed:Original,1.0x,1.2x,1.5x,2.0x:1-3;',0
         cnop 0,4

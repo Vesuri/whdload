@@ -84,9 +84,11 @@ falls back to world-tick rotation. Native CPU regressions pass; interactive
 confirmation remains. See
 [afterburner continuity](internals.md#afterburner-prediction-continuity).
 
-The OCS public-option candidate adds **Enhanced framerate (68020+Fast RAM)**,
-enabled by `CUSTOM5=1` in its generated icon. Unchecked/absent or ineligible
-hardware keeps original simulation/rendering/waits in the same slave. Earlier
+Both public slaves share one option layout in CUSTOM5: bit 0 **Enhanced framerate**,
+bits 1-3 **World speed** (Original, 1.0x, 1.2x, 1.5x, 2.0x). Icons use `CUSTOM5=3`.
+Original speed, absent options or (OCS) ineligible hardware keep original
+simulation/rendering/waits in the same slave; CD32 Original is Psygore's normal mode
+(his unlimited/relaxed/slow modes were removed). See [world speed](#world-speed-option). Earlier
 A500 enhancement results below describe diagnostic experiments, not the public
 mode policy. See [current candidate support](ocs-release.md).
 
@@ -260,7 +262,7 @@ recovery is required before release. A1/A3 measured the frame budget:
 Psygore's default limiter caps flight at 25 FPS, the emulated machines reach
 40–50 with it off, and no credible 040 model exists yet (A2). Phase 12
 release polish is paused behind it; OCS implementation is planned separately. B1 is complete:
-public CUSTOM5=0 enables uncapped English flight, 1–4 retain Psygore's modes,
+public options enabled uncapped English flight beside Psygore's modes,
 and CUSTOM1 selects language only. The cached 030 model reaches 49.920 pictures/s;
 the uncalibrated cycle-exact 040 core reaches 39.953 at the B1 gate.
 B2 is complete: queued early-VBL swaps and pre-conversion ownership waits retain
@@ -393,6 +395,25 @@ Rate choices use the following evidence before implementation:
   existing slave considers correct.
 
 If these disagree, all of them are recorded and the user chooses.
+
+## World speed option
+
+The user chose (2026-11-15) to offer the flight world's speed as a player option,
+separate from the framerate, for players used to faster animation or faster play.
+Both public slaves read CUSTOM5 as bit 0 **Enhanced framerate** and bits 1-3
+**World speed**: Original, 1.0x, 1.2x, 1.5x, 2.0x (10, 12, 15, 20 world ticks per
+second; whole rates keep the clock's debt unit, which 1.25x would not). Original is
+the original game, so the framerate bit is then ignored. A fixed speed without the
+framerate draws one picture per world tick. Only ordinary flight changes speed: the
+title, fly-by, launch, ejection and room clocks run at 10 Hz whatever the option
+(internals, "World speed"). Icons and run defaults use `CUSTOM5=3`.
+
+Measured in emulated time on the cached 030 model (`tools/world_speed_live_check.py`,
+simulator flight, 2 or 4 s windows), every combination runs at its rate exactly:
+CD32 and OCS 10.00/12.00/15.00/20.00 ticks/s, 50 pictures/s with the framerate and
+one picture per tick (10 or 20/s) without. Not measured: heavy scenes at the faster
+speeds, slower machines, and whether 1.2x-2.0x play well; the four-tick catch-up
+bound still drops (CD32) or defers (OCS) time when a machine cannot keep up.
 
 ## Plan
 

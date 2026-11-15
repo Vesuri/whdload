@@ -30,15 +30,15 @@ translation_reset:
         rts
 
 ; D0 signed full-tick increment, D7 Hz, A0 carried remainder. Quotient split
-; avoids overflowing increment*10; normalise to division toward zero.
+; avoids overflowing increment*rate; normalise to division toward zero.
 translation_fraction:
         move.l  d0,d1
         divs.l  d7,d0
         move.l  d0,d2
         muls.l  d7,d2
         sub.l   d2,d1
-        muls.l  #10,d0
-        muls.l  #10,d1
+        muls.l  timing_world_rate(pc),d0
+        muls.l  timing_world_rate(pc),d1
         add.l   (a0),d1
         move.l  d1,d2
         divs.l  d7,d1

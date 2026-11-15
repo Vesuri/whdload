@@ -82,19 +82,23 @@
   12 Venice       13 Hell's Kitchen
  CUSTOM4: 0 = mission 1, 1 = mission 2, 2 = mission 3 (cheat mode required).
 
- OCS CUSTOM5:
-   1 = Enhanced framerate (68020+Fast RAM), enabled in the installed icon.
-   0 or unset = original timing and rendering.
- A 68000/68010 or a machine without suitable Fast RAM always uses original
- behaviour, regardless of this option. Slow expansion RAM does not qualify.
-
- CD32 CUSTOM5:
-   0 or unset = Enhanced.
-   1 = Psygore normal        2 = Psygore unlimited
-   3 = Psygore relaxed       4 = Psygore slow
- Original simulation and rendering remain available with modes 1-4.
- When updating an old icon, note that the 1.0 modes 0-3 are now numbered 1-4.
- The old CUSTOM5=4 original-conversion option has been removed.
+ CUSTOM5 combines two options; add their values:
+   World speed:          0 = Original     2 = 1.0x (10 updates/s)
+                         4 = 1.2x         6 = 1.5x         8 = 2.0x
+   Enhanced framerate:  +1 = smooth in-between pictures in flight
+ The installed icon uses CUSTOM5=3: enhanced framerate at 1.0x.
+ Original speed is the original game, whose world advances once per picture,
+ so its speed depends on the processor; the framerate option is then ignored.
+ A fixed world speed keeps flight at that speed on every fast enough machine.
+ Without the enhanced framerate it draws one picture per world update.
+ World speed applies to flight only; the intro, rooms and cinematics keep
+ their own timing.
+ OCS: a 68000/68010 or a machine without suitable Fast RAM always uses the
+ original behaviour. Slow expansion RAM does not qualify.
+ CD32: Original uses Psygore's normal mode; his unlimited, relaxed and slow
+ modes and the old original-conversion option have been removed.
+ When updating an icon from 2.0b, CD32 CUSTOM5=0 is now 3 and 1-4 are now 0;
+ OCS CUSTOM5=1 is now 3.
 
  History:
  --------
@@ -103,6 +107,8 @@
    changes apply to the English SPS #1657 version; other disk versions keep
    the 1.0 behaviour.
  - Optional enhanced framerate with smoother flight, cameras and ship effects.
+ - World speed option: flight at 1.0x (10 updates per second), 1.2x, 1.5x or
+   2.0x, or at the original processor-dependent speed.
  - Consistent game speed on faster processors and smoother cinematic movement.
  - Retimed intro, room, briefing, launch, landing, death and funeral animations.
  - Improved projectile appearance and asteroid/mine hit detection.
@@ -120,8 +126,8 @@
  - Mouse flight: the mouse steers as in the PC version (thanks hexaae!).
  - Disk edition: faster arithmetic and collision checks in every mode, including
    the Amiga 500, without changing game behaviour.
- - Enhanced mode and caches enabled in newly installed icons; original modes
-   remain available.
+ - Enhanced framerate at 1.0x world speed and caches enabled in newly
+   installed icons; the original game remains available.
 
 Version 1.0 (11.01.2014) by Psygore:
  - Nice color/newicon (created by Frank/Dr.Zarkov) and BoxIcon included

@@ -31,7 +31,7 @@ def main():
     env={k:v for k,v in os.environ.items() if not k.startswith(('WC_OBSERVER_','WC_MATRIX_','WC_STATE_'))}
     env = wc_run.run_env(out, env, SLAVE=str(slave),AMIGA_SETUP=a.machine,
         INTRO_STOCK_CLOCK='1' if a.machine=='a1200-fast' else '0',WC_NOMMU_CORE='0' if a.machine=='a1200-fast' else '1',
-        WHD_ARGS='CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5=0',WARP='1',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',DETERMINISTIC='1',WC_INSTANT_BLITTER='0',
+        WHD_ARGS='CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 CUSTOM5='+('3' if fixture.get('release') else '0'),WARP='1',NTSC='0',WINDOW='front',JOY0='none',JOY1='none',DETERMINISTIC='1',WC_INSTANT_BLITTER='0',
         WC_OBSERVER_CONFIG=str(config),WC_OBSERVER_OUTPUT=str(out/'events.txt'),WC_MATRIX_CONFIG=str(matrix),WC_MATRIX_DIR=str(out),WC_MATRIX_PROFILES='0')
     if not a.no_states:env.update(WC_STATE_PC=f'{h[0]+0x698:x}',WC_STATE_OUTPUT=str(out/'states.bin'))
     g=None;windows=[];actions=[]

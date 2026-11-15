@@ -138,7 +138,7 @@ timing_player_field:
         moveq   #0,d4
 .axis:
         move.w  (a2)+,d0
-        muls.w  #10,d0
+        muls.w  timing_world_rate+2(pc),d0
         add.l   (a3),d0
         divs.w  timing_hz+2(pc),d0
         move.l  d0,d1

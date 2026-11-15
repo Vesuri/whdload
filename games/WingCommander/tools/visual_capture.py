@@ -41,7 +41,7 @@ def main():
                WC_VISUAL_OUT=str(out), WC_VISUAL_H0=format(layout['hunks'][0], 'x'),
                WC_VISUAL_H3=format(layout['hunks'][3], 'x'), WC_VISUAL_FRAMES=str(a.frames),
                SLAVE=str(a.slave.resolve()), AMIGA_SETUP='a1200-040',
-               WHD_ARGS='CUSTOM1=0 CUSTOM5=0 CACHE DCACHE'+
+               WHD_ARGS='CUSTOM1=0 CUSTOM5='+('3' if build.get('release') else '0')+' CACHE DCACHE'+
                (' CUSTOM2=2 CUSTOM3=1 CUSTOM4=0' if build.get('direct_flight') else ''), DEBUG='0', WARP='0',
                DETERMINISTIC='0', FSUAE_QUIET='1')
     try:

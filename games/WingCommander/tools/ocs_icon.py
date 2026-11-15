@@ -32,7 +32,7 @@ def enhanced_icon(original):
         raise ValueError('icon does not select OCS slave')
     if any(x.upper().lstrip(b'(').startswith(b'CUSTOM5=') for x in entries):
         raise ValueError('refusing to replace existing CUSTOM5 choice')
-    added = [b'CUSTOM5=1\0']
+    added = [b'CUSTOM5=3\0']   # enhanced framerate, 1.0x world
     if not any(x.rstrip(b'\0').upper() in (b'CACHE', b'DCACHE', b'NOCACHE') for x in entries):
         added.append(b'DCACHE\0')
     addition = b''.join(struct.pack('>I', len(entry)) + entry for entry in added)

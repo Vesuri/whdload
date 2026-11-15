@@ -23,7 +23,7 @@ def main():
  env=wc_run.run_env(out,variant=a.variant,SLAVE=str(slave.resolve()),
           WARP='1',NTSC='0',WINDOW='front',
           JOY0='none',JOY1='none',DETERMINISTIC='1',AMIGA_SETUP='a1200-030',
-          WHD_ARGS=('CUSTOM5=1' if ocs else 'CUSTOM5=0')+' DCACHE',
+          WHD_ARGS='CUSTOM5=3 DCACHE',
           WC_BASELINE_CACHE_MODEL='1',EXTRA_ARGS='')
  g=None
  def stop():

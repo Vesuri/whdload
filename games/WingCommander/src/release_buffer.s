@@ -15,12 +15,13 @@ release_predict:
         move.l  timing_clock(pc),(a0)+
         move.l  timing_clock+4(pc),(a0)+
         sub.l   timing_clock(pc),d0
-        mulu.l  #10,d0
+        mulu.l  timing_world_rate(pc),d0
         add.l   timing_clock+4(pc),d0
         move.l  d0,d6
         move.l  timing_hz(pc),d7
         move.l  d7,d0
-        addi.l  #20,d0           ; one tick plus at most two queued fields
+        add.l   timing_world_rate(pc),d0
+        add.l   timing_world_rate(pc),d0 ; one tick plus at most two queued fields
         cmp.l   d0,d6
         bls.s   .bounded
         move.l  d0,d6            ; a longer stall is not unbounded extrapolation

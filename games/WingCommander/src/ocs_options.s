@@ -3,13 +3,17 @@
 ocs_option_gate:
         lea     ocs_option_tags(pc),a0
         jsr     $34(a2)                 ; resload_Control, CUSTOM5_GET
-        lea     ocs_option_value(pc),a0
-        cmpi.l  #1,(a0)
-        bne.s   .off
+        ; CUSTOM5 bit 0 enables the enhanced framerate; bits 1-3 select the
+        ; world speed: 0 Original, 1-4 a 10/12/15/20 Hz world.
+        move.l  ocs_option_value(pc),d0
+        cmpi.l  #9,d0
+        bhi.w   .off
+        lsr.l   #1,d0
+        beq.w   .off
         movea.l 4.w,a6
         move.w  296(a6),d0              ; Exec AttnFlags
         andi.w  #$008e,d0               ; 020/030/040/060, not 68010
-        beq.s   .off
+        beq.w   .off
         ; KickEmu excludes the slave reservation from Exec's allocations, so
         ; TypeOfMem(slave) cannot certify its bank. Inspect the actual Exec
         ; memory headers instead. MEMF_FAST alone also labels trapdoor RAM.
@@ -32,8 +36,21 @@ ocs_option_gate:
         cmpi.l  #$a00000,d1             ; audited Zorro II bank
         bhi.s   .skip                  ; excludes slow/ROM/custom space
 .on:
+        move.l  ocs_option_value(pc),d0
+        lea     .on(pc),a0
+        adda.l  #timing_high_framerate-.on,a0
+        move.w  d0,(a0)
+        andi.w  #1,(a0)
+        lsr.l   #1,d0
+        move.b  .rates-1(pc,d0.w),d0
+        ext.w   d0
+        ext.l   d0
+        lea     .on(pc),a0
+        adda.l  #timing_flight_rate-.on,a0
+        move.l  d0,(a0)
         moveq   #1,d0
         rts
+.rates: dc.b    10,12,15,20
 .skip:
         movea.l (a0),a0
         bra.s   .next

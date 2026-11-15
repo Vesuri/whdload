@@ -340,6 +340,8 @@ timing_scene_begin:
         clr.w   (a0)
         lea     timing_scene_fraction(pc),a0
         clr.l   (a0)
+        tst.w   timing_high_framerate(pc)
+        beq.w   .done            ; one picture per tick: no staged forecast
         tst.w   timing_active(pc)
         ifne BUFFERED
         bne.s   .enabled
@@ -621,10 +623,12 @@ timing_scene_begin:
         move.l  d6,-(sp)
         move.l  release_render_time(pc),d6
         sub.l   timing_clock(pc),d6
-        mulu.l  #10,d6
-        cmpi.l  #20,d6
+        mulu.l  timing_world_rate(pc),d6
+        move.l  timing_world_rate(pc),d0
+        add.l   d0,d0            ; two fields
+        cmp.l   d0,d6
         bls.s   .player_bounded
-        moveq   #20,d6
+        move.l  d0,d6
 .player_bounded:
         lea     A_7534(a4),a3
         moveq   #2,d3

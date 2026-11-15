@@ -157,11 +157,11 @@ def check(build, mutation=None):
     require(payload[info:].startswith(b'2.0b (14.11.2026)\n'), 'public release information missing')
     require(b'$VER: WingCommander 2.0b (14.11.2026)\0' in payload, 'public version missing')
     config=int.from_bytes(payload[0x32:0x34],'big')
-    require(payload[config:].split(b'\0',1)[0].endswith(b'C5:B:Enhanced framerate (68020+Fast RAM);'),'public config missing')
+    require(payload[config:].split(b'\0',1)[0].endswith(b'C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):Original,1.0x,1.2x,1.5x,2.0x:1-3;'),'public config missing')
     if mutation:
         start,end=sy['ocs_option_gate'],sy['ocs_option_tags']
         segment=payload[start:end]
-        old,new={'option':(bytes.fromhex('0c9000000001'),bytes.fromhex('0c9000000000')),
+        old,new={'option':(bytes.fromhex('0c8000000009'),bytes.fromhex('0c8000000001')),
                  'cpu':(bytes.fromhex('0240008e'),bytes.fromhex('0240008f')),
                  'slow':(bytes.fromhex('0c8100a00000'),bytes.fromhex('0c8100e00000'))}[mutation]
         require(segment.count(old)==1,'mutation site missing')
@@ -183,9 +183,9 @@ def check(build, mutation=None):
     mouse_runs=set()
     for slave,kind,bank in banks:
         for flags in (0,1,2,3,4,8,128):
-            for option in (0,1,2,0xffffffff):
+            for option in (0,1,3,8,10,0xffffffff):
                 for revision in (0x1302,0x12bc,0x1348):
-                    enabled=option==1 and bool(flags&0x8e) and bank in ('z2-fast','high-fast','chip-slave-fast') and revision==0x1302
+                    enabled=2<=option<=9 and bool(flags&0x8e) and bank in ('z2-fast','high-fast','chip-slave-fast') and revision==0x1302
                     # A damaged enhancement-only site must only be examined
                     # when enabled. A damaged exact site makes original mode
                     # fall back to the untouched game instead of aborting.
@@ -232,6 +232,9 @@ def check(build, mutation=None):
                                     require(c.get(CODE+at,2)==opcode and c.get(CODE+at+2,4)==slave+sy[label],'missing enhanced hook')
                                 for at,guard,value in words:
                                     require(c.read(CODE+at,2)==(before[at:at+2] if corrupt=='word' else bytes.fromhex(value)),'word fix state')
+                                rate=struct.unpack('>I',c.read(slave+sy['timing_flight_rate'],4))[0]
+                                framerate=struct.unpack('>H',c.read(slave+sy['timing_high_framerate'],2))[0]
+                                require(rate==(10,12,15,20)[(option>>1)-1] and framerate==option&1,'world speed/framerate option not decoded')
                                 if 'enhanced' not in mouse_runs and not corrupt:
                                     mouse_scenario(c,slave,sy);mouse_runs.add('enhanced')
                             elif revision==0x1302 and corrupt!='exact':
@@ -263,7 +266,7 @@ def check(build, mutation=None):
     original=(ROOT/'tmp/game/WingCommander/WingCommander.info').read_bytes()
     icon=(build/'WingCommander.info').read_bytes()
     require(icon==enhanced_icon(original),'generated icon mismatch')
-    require(tooltypes(icon)[2][:2]==[b'CUSTOM5=1\0',b'DCACHE\0'],'icon defaults disabled')
+    require(tooltypes(icon)[2][:2]==[b'CUSTOM5=3\0',b'DCACHE\0'],'icon defaults disabled')
     rejected=0
     for bad in (icon,b'bad icon',original[:80]):
         try:enhanced_icon(bad)
@@ -281,7 +284,7 @@ def main():
     for mutation in ('option','cpu','slow'):
         try:check(Path(a.build),mutation)
         except ValueError as error:
-            require(str(error) in ('original mode modified game','original mode enhanced','missing enhancement flush'),'unexpected mutation failure: '+str(error))
+            require(str(error) in ('original mode modified game','original mode enhanced','missing enhancement flush','missing enhanced hook'),'unexpected mutation failure: '+str(error))
             rejected.append(mutation)
         else:raise ValueError('undetected gate mutation: '+mutation)
     r['negative_controls']=rejected

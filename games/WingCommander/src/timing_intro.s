@@ -1,8 +1,10 @@
-; English ship/title and asteroid-credit world. Native E:02a8 runs at 10 Hz;
+; English ship/title and asteroid-credit world. Native E:02a8 runs at 10 Hz
+; (intro_start selects it whatever the flight speed);
 ; rendering uses the same bounded display-time prediction and queue as flight.
 ; A separate flag avoids enabling flight input/player/control adapters.
 intro_start:
         movem.l d0-d7/a0-a6,-(sp)
+        bsr.w   timing_rate_scene
         bsr.w   timing_rebase
         lea     intro_active(pc),a0
         move.w  #1,(a0)
@@ -19,6 +21,7 @@ intro_stop:
         bsr.w   release_buffer_wait
         lea     intro_active(pc),a0
         clr.w   (a0)
+        bsr.w   timing_rate_restore
         bsr.w   timing_rebase
         movem.l (sp)+,d0-d7/a0-a6
         rts

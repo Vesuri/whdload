@@ -68,11 +68,11 @@ def main():
     if ocs:
         from ocs_runtime import locate
         slave = a.build/'WingCommander.Slave'
-        whd = 'CUSTOM5=0 DCACHE' if a.original_mode else 'CUSTOM5=1 DCACHE'
+        whd = 'CUSTOM5=0 DCACHE' if a.original_mode else 'CUSTOM5=3 DCACHE'
     else:
         from cd32_runtime import locate
         slave = a.build/'WingCommanderCD32.Slave'
-        whd = 'CUSTOM5=1 DCACHE' if a.original_mode else 'CUSTOM5=0 DCACHE'
+        whd = 'CUSTOM5=0 DCACHE' if a.original_mode else 'CUSTOM5=3 DCACHE'
         if a.german:
             whd = 'CUSTOM1=1 '+whd
             locate = functools.partial(locate, german=True)

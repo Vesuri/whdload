@@ -65,9 +65,9 @@ def main():
     if not re.fullmatch(r'[A-Za-z ]*', a.options):
         raise ValueError('unexpected WHDLoad options')
     if a.custom5 is None:
-        a.custom5=0 if fixture.get('release') else 1
-    if fixture.get('release') and a.custom5!=0:
-        p.error('public-option frame recorder requires enhanced CUSTOM5=0')
+        a.custom5=3 if fixture.get('release') else 1
+    if fixture.get('release') and a.custom5 not in (3,5,7,9):
+        p.error('public-option frame recorder requires the enhanced framerate and a fixed world speed (CUSTOM5=3/5/7/9)')
     if not fixture.get('release') and a.custom5==4:
         p.error('experimental timing build does not support CUSTOM5=4')
     language=0 if fixture.get('release') else 3

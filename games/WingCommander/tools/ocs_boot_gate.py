@@ -23,7 +23,7 @@ def main():
     global LENGTH
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', required=True)
-    p.add_argument('--enhanced',type=int,choices=(0,1),help='public OCS CUSTOM5 request; omitted keeps original option defaults')
+    p.add_argument('--enhanced',type=int,choices=(0,1,3),help='public OCS CUSTOM5 request (3: enhanced framerate, 1.0x world); omitted keeps original option defaults')
     p.add_argument('--layout', help='calibrated layout.json from the same slave build')
     p.add_argument('--calibrate', action='store_true')
     p.add_argument('--simulator', action='store_true', help='continue from the menu to the first name prompt')
@@ -90,8 +90,8 @@ def main():
         if a.aga:env['EXTRA_ARGS']+=' --chip_memory=2048'
     if a.clock_build:
         selected=json.loads((ROOT/a.clock_build/'build.json').read_text())
-        if selected.get('public_option') and (a.enhanced != 1 or a.cpu == '68000'):
-            raise ValueError('public clock gate requires --enhanced 1 and --cpu 68020')
+        if selected.get('public_option') and (a.enhanced != 3 or a.cpu == '68000'):
+            raise ValueError('public clock gate requires --enhanced 3 and --cpu 68020')
     if a.clock_build and a.layout:
         candidate=json.loads((ROOT/a.clock_build/'build.json').read_text())
         if candidate.get('prediction'):

@@ -5,6 +5,7 @@ intro_start:
         bsr.w timing_rate
         lea ocs_clock_hz(pc),a0
         move.l d0,(a0)
+        bsr.w timing_rate_scene
         bsr.w ocs_clock_rebase
         lea intro_active(pc),a0
         move.w #1,(a0)
@@ -19,6 +20,7 @@ intro_stop:
         jsr (a0)
         lea intro_active(pc),a0
         clr.w (a0)
+        bsr.w timing_rate_restore
         bsr.w ocs_clock_rebase
         movem.l (sp)+,d0-d7/a0-a6
         rts
@@ -34,7 +36,8 @@ intro_due:
         sub.l ocs_clock_state(pc),d0
         beq.s .done
         move.l ocs_clock_hz(pc),d1
-        divu.w #10,d1
+        divu.w timing_world_rate+2(pc),d1
+        andi.l #$ffff,d1
         cmp.l d1,d0
         bls.s .advance
         move.l d1,d0

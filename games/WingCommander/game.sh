@@ -5,7 +5,7 @@
 # src/ modules and assemble the result. Each run writes a fresh directory, kept as
 # OUT/<Variant>/ (build.json, slave.lst, payload.bin, ReadMe, the OCS icon) for the
 # checking and packaging tools; the slave and listing are copied beside it.
-#   release      CD32 --release (2.0b public options); OCS --public (2.0b, CUSTOM5 toggle)
+#   release      CD32 --release (2.0b public options); OCS --public (2.0b, CUSTOM5 options)
 #   verify       CD32 --verify, the CUSTOM1=2 diagnostic seam
 #   reconstruct  the original slave, reassembled and checked byte for byte
 #   render, render-control, render-verify   CD32 rendering adapter diagnostics
@@ -38,9 +38,10 @@ game_build() {
 }
 
 # Run defaults (they apply only to what the caller did not set):
-# - a build (no SLAVE) gets the release options: CD32 CUSTOM5=0 DCACHE, OCS CUSTOM5=1 DCACHE
-#   (the Enhanced framerate toggle; on 68000/68010 or without true Fast RAM the slave keeps
-#   the original behaviour). WHD_ARGS= (empty) selects the original behaviour;
+# - a build (no SLAVE) gets the release options: CUSTOM5=3 DCACHE (enhanced framerate, 1.0x world)
+#   (CUSTOM5 bit 0 enhanced framerate, bits 1-3 world speed; on 68000/68010 or without true
+#   Fast RAM the OCS slave keeps the original behaviour). WHD_ARGS= (empty) selects the
+#   original behaviour;
 # - an explicit OCS SLAVE (original or a diagnostic build) boots the A500 baseline, which
 #   game_setup gives 4 MB of Zorro II Fast RAM and no slow RAM;
 # - 68040 and 68060 machines use FSUAE_MMU: the pinned core takes CHIP write cache
@@ -51,8 +52,8 @@ game_prepare() {
   if [ -z "${SLAVE:-}" ]; then
     if ! user_set WHD_ARGS; then
       case "$VARIANT" in
-        WingCommanderCD32) WHD_ARGS="CUSTOM5=0 DCACHE" ;;
-        WingCommander) WHD_ARGS="CUSTOM5=1 DCACHE" ;;
+        WingCommanderCD32) WHD_ARGS="CUSTOM5=3 DCACHE" ;;
+        WingCommander) WHD_ARGS="CUSTOM5=3 DCACHE" ;;
       esac
     fi
   elif [ "$VARIANT" = WingCommander ] && ! user_set SETUP && ! user_set AMIGA_SETUP; then

@@ -3,6 +3,7 @@
 ; drop/stall policy is unreachable. Unserviced fields remain behind the cursor.
 ocs_clock_loop:
         movem.l d0-d7/a0-a6,-(sp)
+        bsr.w timing_rate_flight
         bsr.w timing_rate
         lea ocs_clock_hz(pc),a0
         move.l d0,(a0)
@@ -26,7 +27,8 @@ ocs_clock_loop_label:
         move.l -2048(a4),d0
         sub.l ocs_clock_state(pc),d0
         move.l ocs_clock_hz(pc),d1
-        divu.w #10,d1
+        divu.w timing_world_rate+2(pc),d1
+        andi.l #$ffff,d1
         cmp.l d1,d0
         bhs.s ocs_clock_loop_label
         move.l ocs_clock_dirty(pc),d0
@@ -39,6 +41,7 @@ ocs_clock_quit_label:
         move.w #5,-32596(a4)
 ocs_clock_leave_label:
         bsr.w ocs_clock_rebase
+        bsr.w timing_rate_native
         lea ocs_clock_active(pc),a0
         clr.w (a0)
         movem.l (sp)+,d0-d7/a0-a6
@@ -60,7 +63,8 @@ ocs_clock_batch:
         move.l d0,(a0)
 .bounded:
         move.l ocs_clock_hz(pc),d1
-        divu.w #10,d1
+        divu.w timing_world_rate+2(pc),d1
+        andi.l #$ffff,d1        ; whole fields: at most one tick per call
         cmp.l d1,d0
         bls.s .advance
         move.l d1,d0

@@ -38,13 +38,13 @@ def main():
             changed[sy['release_limit']:sy['release_limit']+2]=bytes.fromhex('4e75')
         else:
             at=sy['release_limit']+4
-            assert blob[at]==0x66
-            changed[at:at+4]=bytes.fromhex('4e714e71')  # remove the flight bypass
+            assert blob[at:at+2]==bytes.fromhex('66ff')  # BNE.L
+            changed[at:at+6]=bytes.fromhex('4e714e714e71')  # remove the flight bypass
         blob=bytes(changed)
     options=[]
     for model,flags in ((2,2),(4,8)):
         for custom in (0,1,2,3,4,5,0xffffffff):
-            for pace in (0,1,2,3,4,5,0xffffffff):
+            for pace in (0,1,2,3,4,5,8,9,10,0xffffffff):
                 for policy in (0,256):
                     c=CPU(blob,model);c.write(BASE+0x1de4,struct.pack('>I',custom));c.write(BASE+0x1e04,struct.pack('>I',pace))
                     c.write(BASE+0x121e,struct.pack('>I',0x80000));c.write(4,struct.pack('>I',0x2000));c.write(0x2128,struct.pack('>H',flags))
@@ -54,17 +54,22 @@ def main():
                     c.write(STACK,struct.pack('>I',STOP));c.reg(8,STACK);c.reg(3,0x80000)
                     c.reg(9,0x32a);c.reg(10,0x7f3f);c.reg(11,0x7654)
                     ck(u.uc_emu_start(c.h,BASE+sy['release_setcpu'],STOP,1000000,20000));assert c.reg(18)==STOP and c.reg(11)==0x7654
-                    rejected=custom>1 or pace>4
+                    # CUSTOM5 bit 0 framerate, bits 1-3 world speed (0 Original = Psygore's normal game).
+                    rejected=custom>1 or pace>9
+                    enhanced=pace>>1!=0
                     if rejected:assert c.read(c.reg(8),4)==struct.pack('>I',9)
                     else:
                         assert c.reg(8)==STACK+4
                         # German keeps 1 for Psygore's loader; release_patchseg maps it.
-                        assert int.from_bytes(c.read(BASE+0x1de4,4),'big')==(3 if custom==0 and pace==0 else custom)
-                        assert int.from_bytes(c.read(BASE+0x1e04,4),'big')==max(0,pace-1)
-                        assert int.from_bytes(c.read(BASE+sy['release_german'],2),'big')==(custom and (2 if pace==0 else 1))
+                        assert int.from_bytes(c.read(BASE+0x1de4,4),'big')==(3 if custom==0 and enhanced else custom)
+                        assert int.from_bytes(c.read(BASE+0x1e04,4),'big')==0
+                        assert int.from_bytes(c.read(BASE+sy['release_german'],2),'big')==(custom and (2 if enhanced else 1))
+                        if enhanced:
+                            assert int.from_bytes(c.read(BASE+sy['timing_flight_rate'],4),'big')==(10,12,15,20)[(pace>>1)-1]
+                            assert int.from_bytes(c.read(BASE+sy['timing_high_framerate'],2),'big')==pace&1
                         request=struct.unpack('>II',c.read(0x30000,8))
-                        assert request==((0,0) if pace==0 else (0x32a,0x7f3f)),request
-                        if pace==0:assert int.from_bytes(c.read(BASE+sy['render_selected'],2),'big')==(30 if policy&256 and model==2 else 0)
+                        assert request==((0,0) if enhanced else (0x32a,0x7f3f)),request
+                        if enhanced:assert int.from_bytes(c.read(BASE+sy['render_selected'],2),'big')==(30 if policy&256 and model==2 else 0)
                         # German rewrites the enhanced code to the German assembly.
                         memory=c.read(BASE,sy['german_fixups'])
                         assert all(memory[o:o+2]==(german if custom else blob)[o:o+2] for o in fixups)

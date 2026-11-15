@@ -93,7 +93,7 @@ def source(root):
         blt.w .long_fraction
         cmpi.l #32767,d0
         bgt.w .long_fraction
-        muls.w #10,d0
+        muls.w timing_world_rate+2(pc),d0
         add.l (a0),d0
         divs.w d7,d0
         move.l d0,d1

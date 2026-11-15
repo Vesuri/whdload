@@ -229,12 +229,13 @@ release_predict:
         move.l ocs_clock_state(pc),(a0)+
         move.l ocs_clock_state+4(pc),(a0)+
         sub.l ocs_clock_state(pc),d0
-        mulu.w #10,d0
+        mulu.w timing_world_rate+2(pc),d0
         add.l ocs_clock_state+4(pc),d0
         move.l d0,d6
         move.l ocs_clock_hz(pc),d7
         move.l d7,d0
-        addi.l #20,d0
+        add.l timing_world_rate(pc),d0
+        add.l timing_world_rate(pc),d0
         cmp.l d0,d6
         bls.s .bounded
         move.l d0,d6
@@ -263,14 +264,20 @@ ocs_prediction_end:
         ; Leave one field for input/world overhead; slow-path fallback retains
         ; authoritative ticks and avoids prediction until measured cost improves.
         addq.l #2,d0
+        ; Against the native 10 Hz period at every world speed: overdue
+        ; ticks are serviced before any picture, so a faster world only
+        ; needs pictures that fit the native budget.
         move.l ocs_clock_hz(pc),d1
         divu.w #10,d1
         lea ocs_prediction_wanted(pc),a0
         cmp.w d1,d0
-        blo.s .fast
-        clr.w (a0)
+        bhs.s .slow
+        ; Without the enhanced framerate, draw once per completed world tick.
+        move.w timing_high_framerate(pc),d1
+        beq.s .slow
+        move.w #1,(a0)
         rts
-.fast:  move.w #1,(a0)
+.slow:  clr.w (a0)
         rts
 
 ocs_prediction_completed:

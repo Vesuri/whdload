@@ -25,12 +25,16 @@ def invoke(c, field, hz, active):
     return c.reg(9), struct.unpack('>6IH', c.read(STATE,26))
 
 
-def check(blob):
+RATES=(10,12,15,20)   # world ticks/s for speeds 1.0x, 1.2x, 1.5x, 2.0x
+
+
+def check(blob, rates=RATES):
     cases=0
     for model in (2,4):
-        for hz in (50,60):
-            for schedule in ([1], [2,3], [5], [7,11], [1,9,3,2]):
-                c=CPU(blob,model)
+        for hz,rate in [(h,r) for h in (50,60) for r in rates]:
+            # Steps stay below the four-tick batch cap, which drops (tested below).
+            for schedule in [x for x in ([1], [2,3], [5], [7,11], [1,9,3,2]) if max(x)*rate<4*hz]:
+                c=CPU(blob,model);c.write(len(blob)-4+BASE,struct.pack('>I',rate))
                 c.write(STATE,bytes(28))
                 origin=0xfffffff0
                 assert invoke(c,origin,hz,1)[0] == 0
@@ -39,20 +43,20 @@ def check(blob):
                     fields+=schedule[i%len(schedule)]
                     n,s=invoke(c,origin+fields,hz,1)
                     issued+=n
-                    expected=fields*10//hz
-                    assert issued==expected, (hz,schedule,fields,issued,expected)
-                    assert s[1]==fields*10%hz and s[2]==fields and s[3]==issued and s[4]==0
+                    expected=fields*rate//hz
+                    assert issued==expected, (hz,rate,schedule,fields,issued,expected)
+                    assert s[1]==fields*rate%hz and s[2]==fields and s[3]==issued and s[4]==0
                     cases+=1
                 # Native modal exit + resume excludes all paused time and debt.
                 invoke(c,origin+fields,hz,0)
                 assert invoke(c,origin+fields+10000,hz,1)[0]==0
-                assert invoke(c,origin+fields+10000+hz//10,hz,1)[0]==1
+                assert invoke(c,origin+fields+10000+-(-hz//rate),hz,1)[0]==1
                 c.close()
-            c=CPU(blob,model);c.write(STATE,bytes(28));invoke(c,0,hz,1)
+            c=CPU(blob,model);c.write(len(blob)-4+BASE,struct.pack('>I',rate));c.write(STATE,bytes(28));invoke(c,0,hz,1)
             n,s=invoke(c,hz,hz,1)
-            assert n==4 and s[4]==6*hz and s[1]==0
+            assert n==4 and s[4]==(rate-4)*hz and s[1]==0
             n,s=invoke(c,3*hz,hz,1)
-            assert n==0 and s[4]==26*hz and s[5]==2
+            assert n==0 and s[4]==(rate-4)*hz+2*hz*rate and s[5]==2
             c.close()
     return cases
 
@@ -65,15 +69,18 @@ def main():
         raise ValueError('new tmp output required')
     out.mkdir(parents=True)
     subprocess.run([os.environ['VASM'],'-m68020','-spaces','-no-opt','-Fbin','-o',str(out/'clock.bin'),str(ROOT/'src/timing_clock.s')],check=True)
-    blob=(out/'clock.bin').read_bytes();cases=check(blob)
-    # A wrong world rate must fail the independent ledger, not share its oracle.
-    needle=bytes.fromhex('c6fc000a')
-    assert blob.count(needle)==1
-    damaged=blob.replace(needle,bytes.fromhex('c6fc0009'))
-    try:check(damaged)
-    except AssertionError:pass
-    else:raise AssertionError('wrong-rate sabotage passed')
-    report=dict(cases=cases,models=[68020,68040],hz=[50,60],wrap=True,modal=True,bounded_debt=True,wrong_rate_rejected=True)
+    blob=(out/'clock.bin').read_bytes()
+    assert blob[-4:]==struct.pack('>I',10), 'timing_world_rate must end the unit, defaulting to 10'
+    cases=check(blob)
+    # A wrong or ignored world rate must fail the independent ledger.
+    at=blob.index(bytes.fromhex('c6fa'))      # MULU.W timing_world_rate+2(PC),D3
+    assert blob.count(bytes.fromhex('c6fa'))==1
+    for wrong,rates in (('c6fc0009',(10,)),('c6fc000a',(12,15,20))):
+        damaged=blob[:at]+bytes.fromhex(wrong)+blob[at+4:]
+        try:check(damaged,rates)
+        except AssertionError:pass
+        else:raise AssertionError('wrong-rate sabotage passed: '+wrong)
+    report=dict(cases=cases,models=[68020,68040],hz=[50,60],rates=list(RATES),wrap=True,modal=True,bounded_debt=True,wrong_rate_rejected=True,fixed_rate_rejected=True)
     (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
 

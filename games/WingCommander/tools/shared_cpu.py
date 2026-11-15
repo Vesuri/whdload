@@ -42,8 +42,10 @@ def select(source, cpu):
             # Audited callers consume values, not MUL/DIV condition codes.
             # Their subsequent ADD/CMP defines every live arithmetic flag.
             factor, dest = [x.strip() for x in args.split(',')]
-            if dest not in ('d0', 'd1', 'd2', 'd3', 'd6') or factor not in ('d6', 'd7', '#10') or factor == dest:
+            if dest not in ('d0', 'd1', 'd2', 'd3', 'd6') or factor not in ('d6', 'd7', '#10', 'timing_world_rate(pc)') or factor == dest:
                 raise ValueError('unreviewed long arithmetic: ' + raw)
+            if factor == 'timing_world_rate(pc)':
+                factor = 'timing_world_rate+2(pc)'   # positive word rate
             macro = 'WC_DIV_RATE' if op == 'divs.l' else 'WC_MUL_SMALL'
             if macro == 'WC_DIV_RATE' and factor != 'd7':
                 raise ValueError('division requires positive rate in D7')
