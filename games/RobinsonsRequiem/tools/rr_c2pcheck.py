@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""The AGA chunky-to-planar conversion against START's: rr_c2pcheck.py [CASES] [SEED]
+"""The AGA chunky-to-planar conversions against START's: rr_c2pcheck.py [CASES] [SEED]
 
 Runs START's loop (hunk 2 +$2e84, from tmp/game/RobinsonsRequiemAGA/data-aga/START, hunk 2
-loaded at address 0 so that its own variables resolve) and src/c2p030.s's _c2p030 under
-Unicorn (68020) on the same random rectangles, chunky bytes and plane contents, and compares
-all eight planes byte for byte. Rectangles: widths of 16 to 320 pixels in 16-pixel steps
-(the odd multiples of 16 take _c2p030's way back into START's loop), 1 to 200 rows, a left
+loaded at address 0 so that its own variables resolve) and each of src/c2p030.s's _c2p030
+(Unicorn as a 68020) and src/c2p040.s's _c2p040 (as a 68040) on the same random rectangles,
+chunky bytes and plane contents, and compares all eight planes byte for byte. Rectangles:
+widths of 16 to 320 pixels in 16-pixel steps (the odd multiples of 16 take both routines'
+way back into START's loop), 1 to 200 rows, a left
 edge on 16 pixels, START's 80-byte plane rows and 16,000-byte plane pairs; planes 0-1 in a
 block of their own as in the game, planes 4-5 and 6-7 either after 2-3 (the game's layout)
 or in blocks of their own. Exit status 1 on the first difference.
@@ -22,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 START = ROOT / 'tmp/game/RobinsonsRequiemAGA/data-aga/START'
 UC_ARCH_M68K, UC_MODE_BIG_ENDIAN = 7, 1 << 30
-UC_CTL_CPU_MODEL, UC_CPU_M68K_M68000, UC_CPU_M68K_M68020 = 7, 1, 2
+UC_CTL_CPU_MODEL, UC_CPU_M68K_M68000, UC_CPU_M68K_M68020, UC_CPU_M68K_M68040 = 7, 1, 2, 4
 REG_A0, REG_D0, REG_SR, REG_PC = 1, 9, 17, 18
 MEM = 0x800000
 CODE_NEW, SENTINEL, STUB, STACK = 0x700000, 0x7F0000, 0x7E0000, 0x7D0000
@@ -70,11 +71,12 @@ def hunk(which=2, path=START):
     return hunks[which]
 
 
-def assemble():
+def assemble(entry):
     tmp = Path(tempfile.mkdtemp(dir=ROOT / 'tmp'))
     s, b = tmp / 'c2p.s', tmp / 'c2p.bin'
-    s.write_text(f'\t\tORG\t${CODE_NEW:x}\n\t\tbra.w\t_c2p030\n_hunk2\tdc.l\t0\n'
-                 f'\t\tINCLUDE\t"{ROOT / "src/c2p030.s"}"\n')
+    s.write_text(f'\t\tORG\t${CODE_NEW:x}\n\t\tbra.w\t{entry}\n_hunk2\tdc.l\t0\n'
+                 f'\t\tINCLUDE\t"{ROOT / "src/c2p030.s"}"\n'
+                 f'\t\tINCLUDE\t"{ROOT / "src/c2p040.s"}"\n')
     subprocess.run([os.environ.get('VASM', 'vasmm68k_mot'), '-m68020', '-devpac', '-Fbin',
                     '-quiet', '-o', str(b), str(s)], check=True)
     data = b.read_bytes()
@@ -144,7 +146,9 @@ class Machine:
 def main():
     cases = int(sys.argv[1]) if len(sys.argv) > 1 else 300
     rnd = random.Random(int(sys.argv[2]) if len(sys.argv) > 2 else 1)
-    code, new = hunk(2), assemble()
+    code = hunk(2)
+    news = [(name, cpu, assemble(name)) for name, cpu in
+            (('_c2p030', UC_CPU_M68K_M68020), ('_c2p040', UC_CPU_M68K_M68040))]
     fast = slow = 0
     for n in range(cases):
         w = 16 * rnd.randrange(1, 21)
@@ -164,8 +168,9 @@ def main():
         regs[11:15] = [P0 + off, P2 + off, p4 + off, p6 + off]
         regs[15] = STACK
         out = []
-        for target in (LOOP, CODE_NEW):
-            m = Machine()
+        for target, cpu, new in [(LOOP, UC_CPU_M68K_M68020, b'')] + \
+                [(CODE_NEW, cpu, new) for _, cpu, new in news]:
+            m = Machine(cpu)
             m.write(0, code)
             m.write(MODC, struct.pack('>hh', stride - w, ROWLEN - w // 8))
             m.write(CODE_NEW, new)
@@ -176,19 +181,22 @@ def main():
             out.append([m.read(a, size) for a, size in AREAS])
         if out[0] == planes:
             sys.exit(f'case {n}: the planes did not change')
-        if out[0] != out[1]:
-            for (a, _), x, y in zip(AREAS, *out):
+        for (name, _, _), got in zip(news, out[1:]):
+            if out[0] == got:
+                continue
+            for (a, _), x, y in zip(AREAS, out[0], got):
                 for i in range(len(x)):
                     if x[i] != y[i]:
                         print(f'case {n}: w {w} x0 {x0} rows {rows} y0 {y0} stride {stride} '
-                              f'{layout}: first difference at {a + i:#x}: START {x[i]:02x}, '
-                              f'new {y[i]:02x}')
+                              f'{layout}: {name}: first difference at {a + i:#x}: START '
+                              f'{x[i]:02x}, new {y[i]:02x}')
                         sys.exit(1)
         if w % 32:
             slow += 1
         else:
             fast += 1
-    print(f'{cases} cases identical ({fast} converted by _c2p030, {slow} by START\'s loop)')
+    print(f'{cases} cases identical in _c2p030 and _c2p040 ({fast} converted by them, {slow} '
+          f'by START\'s loop)')
 
 
 if __name__ == '__main__':

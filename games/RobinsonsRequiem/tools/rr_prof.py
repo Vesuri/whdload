@@ -13,8 +13,9 @@ of common/run.sh apply through the environment (SETUP, FSUAE, EXTRA_ARGS, BUILD,
 for any slave file, ...). From
 the reset it runs chunks of 10 fields until START's hunk 0 is loaded, then stops at the
 dos.library Open of avion.DO or .CO (a conditional breakpoint on hunk 0's Open, rr.py's
-LAYOUTS: +$255e AGA, +$1b0e ECS), deletes it and
-runs SETTLE fields. The window then runs with keypad 9 down:
+LAYOUTS: +$255e AGA, +$1b0e ECS; OPEN=name another file by its first four letters), deletes
+it and runs SETTLE fields. The AGA game on the 68040 and 68060 never opens avion.DO (nor
+srain, ordi and map; the same view): OPEN=human there, the open just before it on the 030. The window then runs with keypad 9 down:
 
     APROF=1   under `monitor aprof start/stop` (FSUAE=$FSUAE_APROF, a CPU without MMU:
               EXTRA_ARGS=--uae_mmu_model=0 on a1200-030), into OUT/window.prof
@@ -171,8 +172,9 @@ def main():
                 pass
         # Stop at the Open of avion.DO ('avio' at d1): a deterministic point after boot.
         open_at = base + layout(s.env['VARIANT'])['calls']['open']
+        tag = os.environ.get('OPEN', 'avio')[:4].encode('latin1')
         s.cmd(f'break *{open_at:#x}')
-        s.cmd('condition $bpnum *(unsigned int *)$d1 == 0x6176696f')
+        s.cmd(f'condition $bpnum *(unsigned int *)$d1 == {int.from_bytes(tag, "big"):#x}')
         r = s.g.cmd('continue', timeout=1200)
         pc = s.g.cmd('info registers pc')
         if f'{open_at:#x}' not in pc:

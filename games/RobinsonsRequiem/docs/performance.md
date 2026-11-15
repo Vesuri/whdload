@@ -9,9 +9,11 @@ offsets (`docs/internals.md`).
 
 `tools/rr_prof.py OUT` boots a developer-type build (`docs/development.md`, "Straight into
 the game"), stops at the open of `avion.DO`/`.CO`, runs 150 fields, then holds keypad 9
-for 500 fields, 10 s PAL, under `WARP=1 DETERMINISTIC=1`. Keypad 9 turns the player on the
-spot (AGA: its position stayed put for 182 fields while its heading went from -63 to -249
-degrees); keypad 8 walks forward.
+for 500 fields, 10 s PAL, under `WARP=1 DETERMINISTIC=1`. On the 68040 and 68060 the AGA
+game never opens `avion.DO` (nor `srain`, `ordi` and `map`; the view is the same):
+`OPEN=human` stops at `human.DO`, the open just before `avion.DO` on the 68030. Keypad 9
+turns the player on the spot (AGA: its position stayed put for 182 fields while its
+heading went from -63 to -249 degrees); keypad 8 walks forward.
 `tools/rr_report.py OUT` prints the tables below from its output; `tools/rr_passes.py OUT`
 runs the same workload under gdb breakpoints for the AGA game's drawing passes and frame
 intervals.
@@ -575,8 +577,8 @@ decides only how close a real 68030 to 68060 gets.
     copy 1.0 ms and the scripts 0.7 ms there, as they run on every world pass and every
     frame is one; what decides that core is the CPU's work (step 15).
 15. **The CPU's work**, for real CPUs. It does not decide the target: it scales with the
-    clock. Items 1, 3 and 4 done (`docs/internals.md`, "AGA improvements"), 2 not needed,
-    5 examined and not done, 6 open.
+    clock. Items 1, 3, 4 and 6 done (`docs/internals.md`, "AGA improvements"), 2 not
+    needed, 5 examined and not done.
     1. The equivalence check for the AGA landscape (done): `tools/rr_snap.py` takes
        snapshots at hunk 1 `+$d88c` [`$11d38`] (chip and the 8 MB of fast memory, d0-a6
        from the stack after the entry's `movem`: gdb's `fp` is not the raw a6) and
@@ -631,8 +633,27 @@ decides only how close a real 68030 to 68060 gets.
        bytes) rewritten to run in the cache, with the row's constants in registers. At best
        about 5 ms a frame on the aprof core (INFERRED: about 250 cycles less a call at
        50 MHz, less the recording), and under 1 ms at 400 MHz. Not done.
-    6. On the 040 and 060, Kalms' 040/060 conversion instead of the 030's (not measured:
-       `tools/rr_prof.py` on `a1200-060` does not reach the game, `docs/open-work.md`).
+    6. Kalms' 040/060 conversion on those CPUs (done): his `c2p1x1_8_c5_040`
+       (`src/c2p040.s`) instead of the 030's when WHDLoad's `AttnFlags` have the 68040 or
+       68060 bit. It converts in one pass and writes the eight planes through one pointer,
+       moved between them by deltas computed from START's plane addresses, without his
+       cache-line touches (they read up to 17 bytes past the row). Checks:
+       `tools/rr_c2pcheck.py` (Unicorn as a 68040) identical to START's loop on 1,300
+       cases, two controls (a wrong delta, a wrong mask) differing at the first case they
+       convert; aprof runs execute `_c2p040` on the 040 and the 060 (`AttnFlags` `$24f`
+       and `$28f`) and `_c2p030` with the test define `C2P040_OFF`; on `a1200-030` 176
+       frames, the start and end screenshots pixel-identical to step 15's; the release
+       build into the jungle on `a1200-060`. Measured, as the emulator models those CPUs
+       (FS-UAE's 040/060 timing is an instruction count plus chip time; a real 040 or 060
+       is not measured): on the cycle-exact cores without MMU (aprof, `--uae_mmu_model=0`
+       with the CPU, memory and blitter cycle-exact) the conversion runs 169,141
+       instructions a frame against the 030 routine's 174,408 and spends 5.71 ms in chip
+       accesses against 6.23 (060) and 6.18 (040), the same 8,064 plane writes; with the
+       cores' 69 ns an instruction (aprof's gap over all executions) that is about 17.4 ms
+       a frame against 18.3 (DERIVED). Frames: 154 against 153 on the 060 and 153 against
+       150 on the 040; on the presets' MMU cores (`a1200-040`, `a1200-060`) 164 both ways,
+       the screenshots identical. Kalms gives his routine as running at copy speed on a
+       040/40 and a 060.
 
 Not planned: running the scripts more often in smaller steps. The engine has no step
 length: each object runs every period and its script moves it by its own constants (the
@@ -707,8 +728,9 @@ CPU wait for the blitter. So the ECS game is behind for the two reasons the AGA'
 and 256 KB of ExpMem, as the AGA's v1.2 did), and it draws only on the player's runs.
 Measured with `tools/rr_prof.py`'s search for START widened to the 8 MB (step 5) and the
 frames counted from the profile's calls. The A500 path (68000, no fast memory) stays as it
-is, each step below chosen at install; on 68020 and up with fast memory nothing waits for
-the blitter.
+is, each step below chosen at install, and the game has to keep working correctly on the
+68000: each step is checked on the A500 (`custom`) as well as on the fast machines. On
+68020 and up with fast memory nothing waits for the blitter.
 
 5. **Tools for the ECS game on fast machines**: `tools/rr.py`'s search for START over the
    machine's fast memory (the A500's 2 MB ends at `$400000`, the `a3000-50`'s 8 MB at
@@ -757,6 +779,12 @@ python3 tools/rr_report.py tmp/prof/base-aprof
 BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
     EXTRA_ARGS='--uae_mmu_model=0 --uae_cpu_frequency=400000000' \
     python3 tools/rr_prof.py tmp/prof/aga-400
+# AGA on the 040 and 060 (step 15 item 6): the presets' MMU cores, frames only; aprof on the
+# cycle-exact core without MMU (C2P040_OFF in the slave for the 030 routine)
+BUILD=profile SETUP=a1200-060 OPEN=human python3 tools/rr_prof.py tmp/prof/aga-060
+BUILD=profile SETUP=a1200-060 OPEN=human APROF=1 FSUAE=$FSUAE_APROF \
+    EXTRA_ARGS='--uae_mmu_model=0 --uae_cpu_cycle_exact=true --uae_cpu_memory_cycle_exact=true --uae_blitter_cycle_exact=true' \
+    python3 tools/rr_prof.py tmp/prof/aga-060-aprof
 # ECS on the AGA's CPU ("ECS on a fast CPU"; after ECS step 5, which widens the search)
 VARIANT=RobinsonsRequiem SETUP=a3000-50 BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
     EXTRA_ARGS=--uae_mmu_model=0 python3 tools/rr_prof.py tmp/prof/ecs-a3000

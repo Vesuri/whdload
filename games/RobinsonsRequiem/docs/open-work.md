@@ -21,7 +21,10 @@ equivalence check `tools/rr_land.py` first) took the aprof core from 130 to 140 
 landscape 30.4 → 24.7 ms a frame, the setup's core from the cap's 166 to 176 (some frames
 between passes there now) and 400 MHz from 480 to 485; its spans (20 ms, the instruction
 cache's too) were examined and not changed (their calls batched out of the loop measured
-slower, 137 frames), and the 040/060 conversion is open. The ECS plan for the A500 is done: steps 1 and 2 (the conversion and the
+slower, 137 frames); on the 68040 and 68060 the slave uses Kalms' 040/060 conversion
+(about 0.9 ms a frame less as the emulator times those CPUs, by instruction count; no real
+040 or 060 measured). The AGA plan is done; its checks in play are left (below). The ECS
+plan for the A500 is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
 landscape code being register-bound (about 1% each). On the AGA's 50 MHz 68030 the ECS
@@ -39,20 +42,21 @@ WHDLoad 20.1 KickEmu instead of the 2013 one and are assembled by vasm instead o
 
 Next, in order:
 
-1. The AGA plan's step 15 item 6 (`docs/performance.md`, "Plan", "AGA, to 50 fps"):
-   Kalms' 040/060 conversion on those CPUs, measured at 400 MHz and on the setup's and
-   the aprof cores (`tools/rr_prof.py`, `tools/rr_passes.py`, `tools/rr_objects.py`).
-   Step 15's frames between passes on the setup's core to be play-checked with step
-   11's (the pointer's picking between passes). Steps 7-13 also in a heavier scene than the jungle start
-   (more trees and objects) and in other areas (other maps, shade tables, skies and
-   objects; step 13's 64 KB cache held 52 KB turning in the jungle).
+1. The AGA plan's checks in play (`docs/performance.md`, "Plan", "AGA, to 50 fps"), by
+   eye: step 15's frames between passes on the setup's core with step 11's (the pointer's
+   picking between passes, INFERRED); steps 7-13 in other areas (other maps, shade
+   tables, skies and objects) and in heavier scenes than the jungle start. The other
+   areas are reached only by playing (the forest's level program in `JUNGLE.DO`'s place
+   does not start). In the jungle, a 4,900-field walk with `MAPCHECK` found every copy
+   equal (240 drawings, 4,419 object images given) and filled step 13's cache to 63,919
+   of its 65,536 bytes (37 images) before emptying it once. The 040/060 conversion on a
+   real 040 or 060.
 2. The ECS plan's steps 5-11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"): the
    tools, the AGA's sites in the ECS game, its memory and 68020 code, the AGA's steps 7-13,
-   and the A500's own path.
+   and the A500's own path. The game has to keep working correctly on the 68000: each
+   step chosen at install and checked on the A500 as well.
 3. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`); step 10.2's swap is play-tested with the
    mouse pointer moving and the scripts drawing (inventory, messages). The AGA game's
    objects' frames are in fast memory since step 1: check that a game saved with v1.2
    loads with the new slave and the other way round.
-4. `tools/rr_prof.py` on `a1200-060` did not reach the game in 10 minutes (both slaves
-   reach the flags screen there through `tools/rr.py serve`): not looked into.

@@ -94,13 +94,19 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    The free, hunk 0 `+$3748` [`$3774`] (`48e7 8080 2040`), becomes `jmp _fastfree`, which gives a
    block back to whichever pool it is the lowest block of. The hunk 2 64,000-byte chunky
    screens (`+$380e`, `+$38b8`) are left in chip: this walk never allocates them.
-4. **The chunky-to-planar conversion** (`_c2ppatch`, `src/c2p030.s`): hunk 2 `+$2e84`
-   [`$199b8`], START's row loop, starts with `move.w d6,<hunk 2
-   +$2db6>` (`33c6`, checked first with its address), which becomes `jmp _c2p030`. It is
-   Kalms' `c2p1x1_8_c5_030_2` with each pass writing through two bases (START's planes 0-1
-   are in the slave's reserved block, 2-7 elsewhere) and a row driver with START's
-   strides; widths that are not a multiple of 32 pixels go back to START's loop.
-   `tools/rr_c2pcheck.py` checks it against START's loop byte for byte under Unicorn.
+4. **The chunky-to-planar conversion** (`_c2ppatch`, `src/c2p030.s`, `src/c2p040.s`): hunk
+   2 `+$2e84` [`$199b8`], START's row loop, starts with `move.w d6,<hunk 2 +$2db6>`
+   (`33c6`, checked first with its address), which becomes `jmp _c2p030`, or `jmp
+   _c2p040` when WHDLoad's `AttnFlags` (`WHDLTAG_ATTNFLAGS_GET`) have the 68040 or 68060
+   bit. `_c2p030` is Kalms' `c2p1x1_8_c5_030_2` with each pass writing through two bases
+   (START's planes 0-1 are in the slave's reserved block, 2-7 elsewhere) and a row driver
+   with START's strides. `_c2p040` is his one-pass `c2p1x1_8_c5_040`, its one plane
+   pointer moved by deltas computed from START's eight plane addresses at each call, run
+   once per row, without his cache-line touches (`tst.b`, which read up to 17 bytes past
+   the row: the chunky buffer is the fast pool's top block). In both, widths that are not
+   a multiple of 32 pixels go back to START's loop. `tools/rr_c2pcheck.py` checks both
+   against START's loop byte for byte under Unicorn (as a 68020 and a 68040). The test
+   define `C2P040_OFF` keeps `_c2p030` on every CPU.
 5. **The sky copy by longwords** (`_skypatch`, `src/sky030.s`): hunk 1 `+$e262`-`+$e291`
    [`$1270e`], START's row loop copying the sky (a resource in the chip heap) into the
    chunky view a word at a time, checked byte for byte (with the address of `<hunk 1

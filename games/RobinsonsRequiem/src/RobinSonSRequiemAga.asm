@@ -991,8 +991,10 @@ _hunk2          dc.l    0
 _chipalloc      dc.l    0
 
 **********************************************
-; The chunky-to-planar conversion (src/c2p030.s): START's loop at hunk 2 +$2e84 starts
-; with move.w d6,<hunk 2 +$2db6>, which becomes jmp _c2p030. After _fastblocks (_hunk2).
+; The chunky-to-planar conversion (src/c2p030.s, src/c2p040.s): START's loop at hunk 2
+; +$2e84 starts with move.w d6,<hunk 2 +$2db6>, which becomes jmp _c2p030, or jmp _c2p040
+; when WHDLoad's AttnFlags have the 68040 or 68060 bit. C2P040_OFF (a test define): the
+; 68030's on every CPU. After _fastblocks (_hunk2).
 
 _c2ppatch
         move.l  _hunk2(pc),a0
@@ -1002,14 +1004,31 @@ _c2ppatch
         lea     $2db6(a0),a0
         cmp.l   2(a1),a0
         bne     .no
-        move.w  #$4ef9,(a1)
-        pea     _c2p030(pc)
-        move.l  (a7)+,2(a1)
+        move.l  a3,-(a7)
         move.l  _resload(pc),a2
+        lea     _c2p030(pc),a3
+    IFND C2P040_OFF
+        move.l  a1,-(a7)
+        lea     _c2ptags(pc),a0
+        jsr     resload_Control(a2)
+        move.l  (a7)+,a1
+        move.l  _c2pattn(pc),d0
+        and.w   #AFF_68040|1<<7,d0      ; 1<<7: AFF_68060
+        beq     .set
+        lea     _c2p040(pc),a3
+    ENDC
+.set    move.w  #$4ef9,(a1)
+        move.l  a3,2(a1)
+        move.l  (a7)+,a3
         jsr     resload_FlushCache(a2)
 .no     rts
 
+_c2ptags        dc.l    WHDLTAG_ATTNFLAGS_GET
+_c2pattn        dc.l    0
+                dc.l    0
+
         INCLUDE c2p030.s
+        INCLUDE c2p040.s
 
 **********************************************
 ; The sky copy (src/sky030.s): hunk 1 +$e262-$e291, START's row loop, becomes jsr _skyrows
