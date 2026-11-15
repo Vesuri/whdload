@@ -457,8 +457,8 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
       `tools/rr_passes.py`, drawing passes of 1.70 to 3.00 fields turning, 2.25 to 2.48
       walking); the aprof core's intervals 3 to 6 fields, 3.93 on average (turning,
       drawing passes of 2.93 to 4.98 fields); the objects' intervals the grid's, turning
-      and walking (`tools/rr_objects.py`). The mouse pointer moving is play-tested (the
-      runs have no mouse input); not checked: the scripts' drawing (none in these runs).
+      and walking (`tools/rr_objects.py`). The mouse pointer moving and the scripts'
+      drawing (inventory, messages) are play-tested; the runs have neither.
    5. What is left is the drawing, after 10a (aprof core, 102 frames, ms per frame; after
       10d the landscape 30.6, the spans 14.1, the waits 0.3):
 
