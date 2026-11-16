@@ -36,7 +36,7 @@ the fixes alone (`internals.md`, the end of "Enhanced framerate").
   clear too, if every drawing outside the replay marked them. The retry from direct
   mode uses the last smooth frame-time average, which direct ticks do not update.
 - Before a release: gameplay tests on `SETUPS`. The slave info says "Version 3.0b
-  (14.11.2026)" and "Enhanced by Vesuri"; `release/ReadMe` has the 3.0b Features and
+  (16.11.2026)" and "Enhanced by Vesuri"; `release/ReadMe` has the 3.0b Features and
   History entries (keep them to what a player sees, and the date with the slave's).
 
 ## Later

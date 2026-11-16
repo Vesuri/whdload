@@ -91,7 +91,7 @@
  History:
  --------
 
- version 3.0b (14.11.2026) done by Vesuri:
+ version 3.0b (16.11.2026) done by Vesuri:
  - timing fix always on (CUSTOM2 no longer disables it, which ran the game
    too fast on fast machines)
  - CUSTOM2 is now "Enhanced framerate": the game, the wave select and the
@@ -102,6 +102,8 @@
    (scoring page, wave select)
  - wave select: no black box cut into the WAVE 1 text and the Death Star,
    and it no longer runs faster on fast CPUs
+ - the black background no longer stays grey after the first hit (or
+   tinted after the other flashes), a bug of the original game
 
  version 2.00 (10.08.2016) done by StingRay:
  - patch redone
