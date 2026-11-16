@@ -131,9 +131,9 @@
    screen is no longer ignored (thanks hexaae!).
  - Mouse flight: the mouse steers as in the PC version, and the left button
    fires while held (thanks hexaae!).
- - CD32 edition, enhanced framerate: rotating ships and the title logo keep
-   their centre instead of shaking as they turn, and a ship at the edge of the
-   view no longer shifts by a pixel.
+ - Enhanced framerate: rotating ships and the title logo keep their centre
+   instead of shaking as they turn, and a ship at the edge of the view no
+   longer shifts by a pixel.
  - CD32 edition, enhanced framerate: the TrainSim enemy details screen no longer
    slows down while the details appear.
  - Enhanced framerate: the TrainSim enemy details screen turns the ship one

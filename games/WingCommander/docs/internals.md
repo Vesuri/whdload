@@ -7321,7 +7321,7 @@ in scheduler arithmetic. Captures retain the logo's normal composition and the
 rotated departure. Rendering can still take more than one field on these setups.
 
 
-## Rotated bitmaps: centred tables (CD32)
+## Rotated bitmaps: centred tables (both release builds)
 
 `E:2d746` (file `2d772`) draws a TM6 frame rotated and scaled about its
 hotspot. Callers: the flight object list for a rolled or mirrored ship
@@ -7391,8 +7391,63 @@ off-centre frame comes from the shears themselves, which add and drop edge
 pixels as the angle changes. The live title check (`opening_live_check.py
 --title-only`) draws the real rotated logo through the hooks. These are
 functional checks; the hooks add a table setup call and some multiplications
-per draw, which has not been measured. The OCS renderer (`O:2d0de`) is a
-separately compiled 68000 version with another frame format and is unchanged.
+per draw, which has not been measured.
+
+**OCS (`O:2d0de`, file `2d10a`).** The same C source compiled for the 68000:
+the same context layout, the same functions in the same order, and the same
+instructions at every hook site. Only the natives, the frame record and the
+multiplies differ:
+
+| CD32 | OCS | | CD32 | OCS |
+|---|---|---|---|---|
+| setup `E:2dc9c` | `O:2d5b4` | | shear `E:2e71e` | `O:2e05c` |
+| corner / box `E:2de40` / `2e08e` | `O:2d758` / `2d9c6` | | Bresenham `E:2e77a` | `O:2e0b8` |
+| box clip `E:30722` | `O:30f9a` | | clipped origin offset `E:2e5e8` | `O:2df0e` |
+| context `E:2e374` | `O:2dc8e` | | origin `E:2e658` | `O:2df96` |
+| full / clipped tables `E:2e3fe` / `2e498` | `O:2dd18` / `2ddb2` | | row pointers / clip window `E:2e83c` / `2e872` | `O:2e17a` / `2e1b0` |
+| visible rectangle `E:2e130` | `O:2da42` | | | |
+
+- **Frame record.** The frame record (image + the long at +110 + 4·frame) holds
+  a flag word, then the box `x0, y0, x1, y1` about the hotspot, the pixel
+  offset, and row records of count, column, row step and advance (bytes when
+  both sides are under 256, words otherwise). The extents are `-x0, -y0, x1,
+  y1`. Pixels are colour runs, `colour << 2 | length` (1–3), or 0 and a length
+  byte (`O:2e5e0`); the colour selects a 4-byte pattern that `O:30276` builds
+  from a 64-entry map.
+- **Registers.** The renderer loads x and y into `d5/d6` before the setup call,
+  so `rot_setup` shifts those registers instead of the stack arguments.
+- **Hooks.** The OCS public build (`tools/ocs_memory_build.py` `ROTATION`,
+  enhanced path only) assembles `src/rotation.s` with `ROT_OCS` set. The
+  differences are macros: `ROT_MULS`/`ROT_MULU` call a 68000 32-bit multiply,
+  `ROT_TST_ON` avoids a PC-relative `tst`, and the natives are startup fixups.
+  The two 8-byte CD32 sites are hooked with 6 bytes and return past the 2 bytes
+  left (`O:2dd8a` shear, `O:2deec` clipped origin).
+
+| Hook | OCS H0 / file | | Hook | OCS H0 / file |
+|---|---|---|---|---|
+| `rot_setup` | `2d134 / 2d160` | | `rot_col_clip`, `rot_col_end` | `2ddc0 / 2ddec`, `2ddf4 / 2de20` |
+| `rot_clip`, `rot_visible` | `2d158 / 2d184`, `2d20e / 2d23a` | | `rot_row_clip`, `rot_row_end` | `2de30 / 2de5c`, `2de78 / 2dea4` |
+| `rot_col_full`, `rot_row_full` | `2dd26 / 2dd52`, `2dd4e / 2dd7a` | | `rot_shear_clip`, `rot_origin_clip` | `2ded2 / 2defe`, `2deec / 2df18` |
+| `rot_shear_full`, `rot_bres_start` | `2dd8a / 2ddb6`, `2e102 / 2e12e` | | | |
+
+How it is checked on OCS:
+- **Native.** `tools/rotation_check.py --variant ocs` runs the same cases on
+  the OCS renderer, with OCS frames and the colour map set to the identity. It
+  uses the hook list of the build, on the 68000 model (`make check`) and, with
+  `--full`, the 68000 and 68020 models. The results match CD32's:
+  - native: symmetric frames −2.8..+1.8 px, 0.74–1.02 px per degree;
+  - hooks: ±0.25 px, 0.011 px per degree, the hotspot on the requested pixel at
+    all 360 angles;
+  - 28,368 clip cases per model: identical, nothing written outside the clip.
+  The 40×24 frame's centroid against the requested centre spans ±1.76 px with
+  the hooks and −2.7..+1.7 px natively; most of that is the true rotation of
+  its off-centre mass, as on CD32.
+- **Live** (`a1200-030`, 2026-11-16):
+  - `opening_live_check.py ocs --title-only` passes with the hooks installed;
+  - a scratch TrainSim route shows the selection screen and the enemy details
+    normally, with the details' picture rhythm unchanged;
+  - a call profile of the details passes on `a1200-fast` charges `rot_mul` and
+    `rot_centre` about 0.2% of the time together.
 
 
 ## Exhaust attachments at render cadence

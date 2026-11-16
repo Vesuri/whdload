@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native CD32 rotated-bitmap draws (E:2d746) with and without src/rotation.s.
+"""Native rotated-bitmap draws (CD32 E:2d746, OCS O:2d0de) with and without src/rotation.s.
 
 Synthetic one-frame TM6 images (one pixel colour, the hotspot marked) are drawn
 into a 320x200 byte bitmap at every tested angle by the executable's own
@@ -9,7 +9,9 @@ its centre (the control); with the hooks the hotspot lands on the requested
 pixel at every angle and a symmetric image's centroid stays within a quarter
 pixel; a draw clipped by a smaller rectangle equals the unclipped draw inside
 it, and nothing is written outside the clip rectangle. --full runs the larger
-sweep recorded in docs/internals.md.
+sweep recorded in docs/internals.md. --variant ocs runs the OCS release
+slave's hooks on the OCS renderer, on the 68000 and 68020 models, with the
+OCS frame record (a box about the hotspot and one byte record per row).
 """
 import argparse, json, struct
 from pathlib import Path
@@ -23,6 +25,27 @@ from variants import get
 IMG, DST, ROWS, BUF = 0x400000, 0x410000, 0x420000, 0x430000
 W, H = 320, 200
 MARK = 9
+
+
+def image_ocs(width, height, hx, hy):
+    """OCS frame: frame count, offset table at +110; record: flag, box about
+    the hotspot, pixel offset, then (count, x, dy, advance) byte records.
+    Pixels are colour runs: colour << 2 | length 1-3, or 0 and a length byte
+    (O:2e5e0); the colour selects a pattern of the map O:30276 builds."""
+    def runs(row):
+        out = bytearray(); x = 0
+        while x < len(row):
+            n = 1
+            while x+n < len(row) and row[x+n] == row[x] and n < 255:
+                n += 1
+            out += bytes((row[x] << 2 | n,)) if n < 4 else bytes((row[x] << 2, n))
+            x += n
+        return bytes(out)
+    rows = [runs([MARK if (x, y) == (hx, hy) else 1 for x in range(width)]) for y in range(height)]
+    recs = b''.join(bytes((width, 0, 1 if y else 0, len(r))) for y, r in enumerate(rows))+b'\0'
+    head = bytearray(114); head[8:10] = word(1); head[110:114] = long(114)
+    frame = struct.pack('>hhhhhI', 1, -hx, -hy, width-1-hx, height-1-hy, 114+14+len(recs))
+    return bytes(head)+frame+recs+b''.join(rows)
 
 
 def image(width, height, hx, hy):
@@ -40,7 +63,11 @@ def image(width, height, hx, hy):
 
 
 class Renderer:
-    def __init__(self, build, model, german):
+    def __init__(self, build, model, german, ocs=False):
+        self.ocs = ocs
+        if ocs:
+            self.init_ocs(build, model)
+            return
         self.c, sy = machine(build, 'cd32', model, german)
         if german:
             import german_map
@@ -56,6 +83,29 @@ class Renderer:
                 patch = struct.pack('>HI', opcode, SLAVE+sy[label])+b'\x4e\x71'*((width-6)//2)
                 self.sites.append((at, self.c.read(at, width), patch))
         require(len(self.sites) == 13, 'rotation hook sites')
+        self.init_dst()
+
+    def init_ocs(self, build, model):
+        from ocs_clock_check import machine as ocs_machine
+        from ocs_display_check import Native
+        from ocs_reconstruct import ROOT
+        game = ROOT/'tmp/game/WingCommander/data/Wing.english'
+        self.c, sy = ocs_machine(build, model)
+        bare = Native(game, model=model)
+        meta = json.loads((build/'build.json').read_text())
+        self.sites = []
+        for offset, label, opcode in meta['hooks']:
+            if label.startswith('rot_'):
+                at = CODE+offset
+                self.sites.append((at, bare.read(at, 6), self.c.read(at, 6)))
+        bare.close()
+        require(len(self.sites) == 13, 'rotation hook sites')
+        # The colour map O:30276 makes: colour c draws pixel value c.
+        self.c.write(CODE+0x30000, b''.join(bytes([i])*4 for i in range(64)))
+        self.at = lambda e: e
+        self.init_dst()
+
+    def init_dst(self):
         c = self.c
         c.write(ROWS, b''.join(long(BUF+W*y) for y in range(H)))
         d = bytearray(32); d[0:4] = long(ROWS); d[20:22] = word(W)
@@ -68,10 +118,13 @@ class Renderer:
     def clip(self, *rect):
         self.c.write(DST+24, b''.join(word(v) for v in rect))
 
+    def put(self, w, h, hx, hy):
+        self.c.write(IMG, (image_ocs if self.ocs else image)(w, h, hx, hy))
+
     def draw(self, angle, scale, flags=0, x=160, y=100):
         c = self.c
         c.write(BUF, bytes(W*H))
-        c.run(self.at(0x2d746), long(DST)+word(x)+word(y)+long(IMG)+word(0)+word(angle)+word(scale)+word(flags))
+        c.run(0x2d0de if self.ocs else self.at(0x2d746), long(DST)+word(x)+word(y)+long(IMG)+word(0)+word(angle)+word(scale)+word(flags))
         return np.frombuffer(c.read(BUF, W*H), np.uint8).reshape(H, W)
 
 
@@ -83,7 +136,7 @@ def centroid(b, x, y):
 def steady(r, cases, angles):
     rows = []
     for (w, h, hx, hy), scale, flags in cases:
-        r.c.write(IMG, image(w, h, hx, hy))
+        r.put(w, h, hx, hy)
         out = {}
         for on in (False, True):
             r.hooks(on)
@@ -111,7 +164,7 @@ def clipped(r, images, scales, flags_set, angles, places, rects):
     r.hooks(True)
     n = differing = outside = 0
     for w, h, hx, hy in images:
-        r.c.write(IMG, image(w, h, hx, hy))
+        r.put(w, h, hx, hy)
         for scale in scales:
             for flags in flags_set:
                 for a in angles:
@@ -130,8 +183,8 @@ def clipped(r, images, scales, flags_set, angles, places, rects):
     return dict(cases=n, differing=differing, outside=outside)
 
 
-def check(build, model, german, full):
-    r = Renderer(build, model, german)
+def check(build, model, german, full, ocs=False):
+    r = Renderer(build, model, german, ocs)
     shapes = [(41, 41, 20, 20), (81, 41, 40, 20), (40, 24, 20, 12)]
     angles = range(360) if full else range(0, 360, 3)
     cases = [(s, sc, f) for s in shapes for sc in (128, 256, 400) for f in ((0, 16, 32) if full else (0, 16))]
@@ -151,15 +204,19 @@ def check(build, model, german, full):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('build', type=Path, help='CD32 release build directory')
+    p.add_argument('build', type=Path, help='release build directory of the variant')
+    p.add_argument('--variant', choices=('cd32', 'ocs'), default='cd32')
     p.add_argument('--output', required=True)
     p.add_argument('--german', action='store_true', help='the German executable')
     p.add_argument('--full', action='store_true', help='every angle and the larger edge sweep')
     a = p.parse_args()
     out = new_output(a.output); out.mkdir(parents=True)
-    rows = [check(a.build, m, a.german, a.full) for m in ((2, 4) if a.full else (2,))]
-    (out/'report.json').write_text(json.dumps(dict(complete=True, german=a.german, full=a.full, results=rows), indent=2)+'\n')
-    print(json.dumps(dict(complete=True, german=a.german, models=[r['model'] for r in rows],
+    ocs = a.variant == 'ocs'
+    require(not (ocs and a.german), 'the OCS release is English only')
+    models = ((1, 2) if ocs else (2, 4)) if a.full else ((1,) if ocs else (2,))
+    rows = [check(a.build, m, a.german, a.full, ocs) for m in models]
+    (out/'report.json').write_text(json.dumps(dict(complete=True, variant=a.variant, german=a.german, full=a.full, results=rows), indent=2)+'\n')
+    print(json.dumps(dict(complete=True, variant=a.variant, german=a.german, models=[r['model'] for r in rows],
                           clipped=sum(r['edges']['cases']+r['wide']['cases'] for r in rows))))
 
 

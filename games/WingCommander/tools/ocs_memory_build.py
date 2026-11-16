@@ -39,6 +39,24 @@ ALWAYS=EXACT+('waypoint_early','waypoint_scene')+tuple(label for _,label,_ in MO
 # Game-bug word fixes, public builds, every mode: (offset, guarded bytes, word).
 # TrainSim keys 1-4: the fly-off animation gets the stored choice (a2), not d4.
 WORDS=((0x179e2,'3f04486c3d60','3f12'),)
+# Rotated bitmaps (src/rotation.s with ROT_OCS), public builds, enhanced only:
+# the renderer O:2d0de's table starts centred on the hotspot. The sites match
+# CD32's (variants/cd32.py BUFFERED_HOOKS) instruction for instruction.
+ROTATION=((0x2d134,'rot_setup',0x4eb9),
+          (0x2d158,'rot_clip',0x4eb9),
+          (0x2d20e,'rot_visible',0x4eb9),
+          (0x2dd26,'rot_col_full',0x4eb9),
+          (0x2dd4e,'rot_row_full',0x4eb9),
+          (0x2dd8a,'rot_shear_full',0x4eb9),     # 8 bytes: returns past 2dd90
+          (0x2e102,'rot_bres_start',0x4eb9),
+          (0x2ddc0,'rot_col_clip',0x4eb9),
+          (0x2de30,'rot_row_clip',0x4eb9),
+          (0x2ddf4,'rot_col_end',0x4eb9),
+          (0x2de78,'rot_row_end',0x4eb9),
+          (0x2ded2,'rot_shear_clip',0x4eb9),
+          (0x2deec,'rot_origin_clip',0x4eb9))    # 8 bytes: returns past 2def2
+ROTATION_NATIVE=dict(OCS_ROT_SETUP=0x2d5b4,OCS_ROT_CONTEXT=0x2dc8e,OCS_ROT_BOX=0x30f9a,
+                     OCS_ROT_VISIBLE=0x2da42,OCS_ROT_SHEAR=0x2e05c,OCS_ROT_ORIGIN=0x2df96)
 HOOKS=((0x32476,'ocs_source_free',0x4ef9),
        (0x324c0,'display_create_checked',0x4ef9),
        (0x31e1e,'ocs_source_allocate',0x4eb9),
@@ -72,7 +90,8 @@ def build(out,option,exit_probe=False,changed="off", clock=False, prediction=Fal
         from ocs_intro_source import NATIVE as intro_native, HOOKS as intro_hooks
         native.update(intro_native);hooks+=intro_hooks
     if public:
-        hooks+=MOUSE
+        hooks+=MOUSE+ROTATION
+        native.update(ROTATION_NATIVE)
         hooks+=tuple((off,'cinematic_background',0x4eb9) for off in (0x1d0f2,0x1d10e,0x1d222,0x1d23e))
         native['OCS_CINEMATIC_DRAW']=0x2f9a6
     if math_fast:
@@ -485,6 +504,7 @@ ocs_mouse_params:
     if public:
         text+=(ROOT/'src/cinematic_background.s').read_text().replace(
             '        CINEMATIC_DRAW','        jmp OCS_CINEMATIC_DRAW')
+        text+='\nROT_OCS = 1\n'+(ROOT/'src/rotation.s').read_text()
     if public:
         # The enlarged payload needs a long address calculation for this call.
         text+=modal_source(ROOT,'ocs').replace('        bsr.w timing_rate', '        lea modal_room_begin(pc),a0\n        adda.l #timing_rate-modal_room_begin,a0\n        jsr (a0)')

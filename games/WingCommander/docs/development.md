@@ -4699,8 +4699,8 @@ captures each. The existing OCS launcher builds these changes automatically.
 
 ### Rotated bitmaps: centred tables
 
-The CD32 rotate/scale renderer with `src/rotation.s`
-([internals](internals.md#rotated-bitmaps-centred-tables-cd32)):
+The rotate/scale renderers with `src/rotation.s`
+([internals](internals.md#rotated-bitmaps-centred-tables-both-release-builds)):
 
 ```sh
 . ../../common/env.sh
@@ -4711,12 +4711,18 @@ python3 tools/rotation_check.py tmp/rot-cd32 --full --output tmp/rot-check-full
 python3 tools/rotation_check.py tmp/rot-cd32 --full --german --output tmp/rot-check-full-de
 export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
 python3 tools/opening_live_check.py cd32 tmp/rot-cd32 --title-only --output tmp/rot-title-live
+python3 tools/ocs_memory_build.py --public --output tmp/rot-ocs
+python3 tools/rotation_check.py tmp/rot-ocs --variant ocs --output tmp/rot-check-ocs
+python3 tools/rotation_check.py tmp/rot-ocs --variant ocs --full --output tmp/rot-check-ocs-full
+python3 tools/opening_live_check.py ocs tmp/rot-ocs --title-only --output tmp/rot-title-ocs
 ```
 
 The default run (68020, every third angle, a reduced clip sweep; part of
 `make check` in both languages) takes about half a minute. `--full` checks
-every angle, both mirror flags and the 68020 and 68040 models. It installs the
-`rot_*` entries of `BUFFERED_HOOKS` itself, so it tests the hook list the build uses.
+every angle, both mirror flags and the 68020 and 68040 models (OCS: 68000 and
+68020; the default run is the 68000). It installs the `rot_*` entries of
+`BUFFERED_HOOKS` (OCS: the build's hook list) itself, so it tests the hook list
+the build uses.
 The report keeps the native control beside each hooked result.
 
 

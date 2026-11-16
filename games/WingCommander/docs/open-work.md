@@ -6,19 +6,21 @@ The TrainSim enemy details screen now draws a picture between its passes from
 pass 30 on, in both enhanced variants: 2 pictures per 3 PAL fields instead of 1,
 with unchanged timing. On CD32 it also uses the changed-block converter, which
 keeps the `a1200-fast` model to the cadence (it took 4–5 fields per pass).
-Native checks and scratch live routes on both variants pass. Not yet done: the
-OCS rotation renderer `O:2d0de` still rounds its tables, so one-degree steps there
-can still shake, and a user look at both. See
+Native checks and scratch live routes on both variants pass. Not yet done: OCS
+on `a1200-fast` still takes 4–5 fields per pass (about 70% of it conversion),
+and a user look at both. See
 [info pacing](internals.md#trainsim-enemy-info-pacing).
 
-The CD32 enhanced framerate now centres the rotate/scale renderer's tables
-(E:2d746), so rotating ships (the TrainSim enemy selection, rolled or mirrored
-ships in flight) and the title logo no longer shake against their centre, and
-clipped draws match unclipped ones. The Unicorn check passes in English and German
-on the 68020 and 68040 models, and a live title check passes. Still open: a user
-look at the TrainSim selection and in flight, the cost per draw (not measured),
-the same fix for the OCS renderer O:2d0de (different frame format, 68000), and
-the scale-only path. See [rotated bitmaps](internals.md#rotated-bitmaps-centred-tables-cd32).
+The enhanced framerate now centres the rotate/scale renderer's tables on both
+variants (CD32 `E:2d746`, OCS `O:2d0de`), so rotating ships (the TrainSim enemy
+selection, rolled or mirrored ships in flight) and the title logo no longer
+shake against their centre, and clipped draws match unclipped ones. One source,
+`src/rotation.s`, serves both; on OCS it is 68000 code. The Unicorn check
+passes in English and German on the 68020 and 68040 models, and for OCS on the
+68000 and 68020 models; live title checks pass on both. Still open: a user look
+at the TrainSim selection and in flight, the cost per draw (not measured beyond
+a profile share), and the scale-only path. See
+[rotated bitmaps](internals.md#rotated-bitmaps-centred-tables-both-release-builds).
 
 The CD32 enhancements and waypoint order now work in German too (`CUSTOM1=1`).
 The slave carries a table of 1273 German words, built by assembling the release
