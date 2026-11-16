@@ -8,7 +8,8 @@ with unchanged timing. Both also convert the passes with a changed-block
 converter (CD32 the flight one, OCS the C6 adapter): on `a1200-fast` CD32 keeps
 the cadence (it took 4–5 fields per pass), and OCS falls from 3.9 to 3.0 fields
 per pass on average (2.4 over the last 40). Native checks and scratch live
-routes on both variants pass. Not yet done: a user look at both. See
+routes on both variants pass, and the user confirmed both variants
+(2026-11-16). See
 [info pacing](internals.md#trainsim-enemy-info-pacing).
 
 The enhanced framerate now centres the rotate/scale renderer's tables on both
@@ -17,8 +18,9 @@ selection, rolled or mirrored ships in flight) and the title logo no longer
 shake against their centre, and clipped draws match unclipped ones. One source,
 `src/rotation.s`, serves both; on OCS it is 68000 code. The Unicorn check
 passes in English and German on the 68020 and 68040 models, and for OCS on the
-68000 and 68020 models; live title checks pass on both. Still open: a user look
-at the TrainSim selection and in flight, the cost per draw (not measured beyond
+68000 and 68020 models; live title checks pass on both, and the user confirmed
+the TrainSim screens on both (2026-11-16). Still open: a user look in flight,
+the cost per draw (not measured beyond
 a profile share), and the scale-only path. See
 [rotated bitmaps](internals.md#rotated-bitmaps-centred-tables-both-release-builds).
 
