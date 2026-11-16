@@ -1878,8 +1878,9 @@ P_SWAP  equ     _pswap-_pvars
 ; path after the drawing (+$4b94: the other views and the swap), so the unchanged path's
 ; per-frame flags and countdown (+$4ba8-+$4be6: +$eef5, +$ef2b, +$ef2a) are done here for
 ; it. A change more than the interval after the one before (the object was standing) is
-; shown at once, so a key's first step is not delayed. No interpolation across a jump (a
-; position step over I_JUMP or an angle over 45 degrees), for a new view or followed object, or outside 3D mode (W not in use).
+; staged with (1 + alpha) / 2: half of it in the first frame, so a key's first step shows at
+; once, and the rest by the next run, where the next change takes over without a hold. No
+; interpolation across a jump (a position step over I_JUMP or an angle over 45 degrees), for a new view or followed object, or outside 3D mode (W not in use).
 ; INTERP_OFF (a test define): alpha always 1, the frames those of plan step 7.
 
 I_JUMP  equ     128
@@ -1917,6 +1918,11 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         move.l  I_DEN(a3),d7
         cmp.l   d7,d6
         bhs     .staged                 ; alpha 1 (or before the change: none)
+        tst.b   I_START(a3)
+        beq     .lin
+        add.l   d7,d6                   ; from standing: (1 + alpha) / 2
+        add.l   d7,d7
+.lin
         moveq   #0,d5
 .off    move.w  I_CUR(a3,d5.w),d0
         sub.w   I_PREV(a3,d5.w),d0      ; the step
@@ -2112,8 +2118,8 @@ _isample
         move.l  I_CUR(a3),I_PREV(a3)
         move.l  I_CUR+4(a3),I_PREV+4(a3)
         move.l  I_CUR+8(a3),I_PREV+8(a3)
-        move.l  d7,d0                   ; the interval: since the last change, the
-        sub.l   I_WR(a3),d0             ; period on the cap's grid when longer or none
+        move.l  d7,d0                   ; the interval: since the last change, at most
+        sub.l   I_WR(a3),d0             ; the period on the cap's grid
         move.l  W_CAP(a1),a2
         moveq   #0,d1
         move.b  (a2),d1
@@ -2129,12 +2135,16 @@ _isample
         ble     .grid
         cmp.l   d2,d0
         bls     .den
-        bra     .snap                   ; longer: from standing, shown at once
+        st      I_START(a3)             ; longer: from standing, half shown at once
+        move.l  d2,d0
+        bra     .den1
 .grid   move.l  d2,d0
-.den    move.l  d0,I_DEN(a3)
+.den    sf      I_START(a3)
+.den1   move.l  d0,I_DEN(a3)
         bra     .keep
 .snap   move.l  a0,I_OBJ(a3)            ; a jump, or a new object: no interpolation
         st      I_VALID(a3)
+        sf      I_START(a3)
         move.l  I_POSE(a3),I_PREV(a3)
         move.l  I_POSE+4(a3),I_PREV+4(a3)
         move.l  I_POSE+8(a3),I_PREV+8(a3)
@@ -3386,6 +3396,7 @@ _idrawv         dc.w    0,0,0,0,0,0     ; the last camera drawn
 _ivalid         dc.b    0               ; a pose sampled
 _idrawn         dc.b    0               ; a camera drawn
 _istaged        dc.b    0               ; the last camera drawn was staged
+_istart         dc.b    0               ; the change started from standing
         even
 I_VIEW  equ     _iview-_ivars
 I_OBJ   equ     _iobj-_ivars
@@ -3401,6 +3412,7 @@ I_DRAWV equ     _idrawv-_ivars
 I_VALID equ     _ivalid-_ivars
 I_DRAWN equ     _idrawn-_ivars
 I_STAGED equ    _istaged-_ivars
+I_START equ     _istart-_ivars
 
 
 _wvars

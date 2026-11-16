@@ -144,8 +144,10 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    new pose keeps the one before it, the world count of the change and its interval (since
    the last change, the object's period on the cap's grid when there was none, 9 fields
    for the player). A change more than that period after the last (the object was
-   standing) is shown at once, with no pose before it: the drawing in the pass that ran a
-   key's first step shows the whole step, the next run's change is eased as any other.
+   standing) is staged with (1 + alpha) / 2: the drawing in the pass that ran a key's first
+   step shows half of it, the rest comes by the next run, and that run's change is eased as
+   any other, with no hold between them (showing the whole step at once held the view
+   still until the next run, about 9 fields, seen in play).
    Before the drawing `_view` moves the camera (`+22`-`+26`, `+52`-`+56`) back by
    (new - old) x (1 - alpha), alpha = (the drawing's time - W of the change) / the
    interval, angles the
@@ -454,7 +456,7 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
      `+$30ac` (`_capwait`), and the wait for W at the frame routine's end `+$3218`
      (`_passend`).
    - The camera staged between the followed object's runs at the drawing's call `+$3252`
-     (`_view`), a start from standing shown at once, as in the AGA game. The other moving objects are staged from `+$2f44` (`_emove`), in an
+     (`_view`), a start from standing half shown at once, as in the AGA game. The other moving objects are staged from `+$2f44` (`_emove`), in an
      8-slot table from `AllocMem` at install.
    - `_swappatch`: the swap without the beam wait at `+$31f4` (`_swap`). The wait for it to
      show and the pass's block are put off (`+$3090` `_pstart`, `+$30ce` `_pblock`) to the

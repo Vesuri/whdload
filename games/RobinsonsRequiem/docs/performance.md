@@ -380,13 +380,15 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
    checked. From standing the lag was the whole delay after the player's run: the
    drawing in that pass showed the old pose and the first change came 3 fields later, 1
    of the step's 3 degrees (ECS game on `a1200-030`, keypad 9 from standing, the heading
-   at each run of `heros` and the camera at each drawing). A change after more than the
-   player's period since the last is now shown at once: the drawing in the run's pass
-   shows the whole step (turning -63 to -66, walking 14 units), the frames until the
-   next run hold it, and from the next run on the frames are as before (the same
-   cameras in the same fields, both games on `a1200-030`, turning and walking). What
-   remains is the wait for the player's run, 0 to 9 fields (the key is read only there),
-   and the drawing.
+   at each run of `heros` and the camera at each drawing). Showing the whole first step
+   at once held the view still until the next run (9 fields, seen in play), so a change
+   after more than the player's period since the last is staged with (1 + alpha) / 2:
+   walking, the drawing in the run's pass shows 7 of the step's 14 units and every
+   frame after it moves on to the next run (ECS game: 4599, 4600, 4601, 4602, 4604,
+   4605, 4606; AGA: 4599, 4602, 4605), turning 1 of 3 degrees; from the next run on
+   the frames are as before (the same cameras in the same fields, ECS game, turning
+   and walking). What remains is the wait for the player's run, 0 to 9 fields (the key
+   is read only there), and the drawing.
 9. **The other moving objects between their runs** (done, `docs/internals.md`, "AGA
    improvements"): their 3D elements (`+$4792` moves them by their object's difference at
    each run) staged the same way for the drawing (`human` here); their animation frames
