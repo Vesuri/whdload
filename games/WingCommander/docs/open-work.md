@@ -22,8 +22,9 @@ passes in English and German on the 68020 and 68040 models, and for OCS on the
 the TrainSim screens on both (2026-11-16). The published 2.0b (16.11.2026)
 crashed an A1200/040 after a close kill: its clipped-table margin grew with
 the scale, so a rotated object near the camera wrote outside the bitmap. The
-margin is now 4, and the check draws up to scale 8192 against guard memory.
-Not yet done: a user look at a close kill in flight, then a new release. Still
+margin is now 4, and the check draws up to scale 8192 against guard memory;
+2.0b (17.11.2026) replaces that release. Not yet done: a user look at a close
+kill in flight. Still
 open: a user look in flight,
 the cost per draw (not measured beyond
 a profile share), and the scale-only path. See
@@ -68,7 +69,7 @@ requirements remain; no game-heap allocation is added. See
 
 Release ReadMe/Install now follow the WHDLoad templates, retaining Psygore's
 original media handling, documentation, options and credits. Both enhanced
-slaves identify as 2.0b (16.11.2026). Installer structure/package and release
+slaves identify as 2.0b (17.11.2026). Installer structure/package and release
 option checks pass; interactive media installation and release acceptance
 remain open.
 
