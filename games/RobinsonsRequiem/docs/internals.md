@@ -462,6 +462,40 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
       `+$ed99` cleared and the position forgotten. No 0 is left to take. `PTR_OFF` (a test
       define) leaves it out.
 
+19. **The movement speed, an option** (`_speedpatch`, `_spdload` in `src/speed.s`, on every
+    CPU): the splash window's "Movement speed", `CUSTOM1` 0 Original, 1 "1X (OCS)", 2 "2X
+    (AGA)". The AGA game moves the player twice as far each run of `heros` as the ECS game,
+    in every mode, and at the same rate of runs on the same machine. Per run, from the direct
+    start on the `a1200-030` (the slaves without their other patches, keypad 8 with Shift
+    or Ctrl, or the movement panel's arrows with either button): walking 15.7 or 17.0 units
+    in the ECS game against 31.3 or 32.6 in the AGA, running 31.3 or 32.6 against 64.0,
+    crawling 7.6 to 8.9 against 15.7 or 17.0. The world is the same, in the same units.
+    Turning is the same in both, up to 9 units of heading a run.
+    - MAIN's byte `$184c` is the player's mode: 5 walking, 6 running, 3 crawling (the
+      manual's state of health screen has nine). The move itself is op `$f7`. It turns
+      frame bytes 52 and 56, the player's speed in the frame, by the heading and adds them
+      to the position. `heros`' step routine (from its header `+$258` in the AGA game,
+      `+$267` in the ECS) stores them from MAIN's `$1a90` and clears them at its end, and
+      repeats its step while running.
+    - The AGA's `heros` adds two things. Walking, the routine runs a second time from its
+      end, before the clearing (`+$901`, a flag at frame byte `$5f`). Running, two more
+      repeats (`+$7d8` and `+$897`) make four steps where the ECS game takes two. In the
+      slow modes `yoda` (slot 3), which sets `$1a90` by mode, sets 16, 16 and 8 where the
+      ECS game sets 8, 8 and 4 (crawling is one of them; the default, walking and running,
+      is 16 in both).
+    - The AGA's additions are taken only while MAIN's `$e71` is 0. That is one of the flags
+      of another platform's settings: MAIN picks them by START's platform number (hunk 0
+      `+$1ef2`, 6000; the ECS START's is 3000), so `$e71` is not a switch for this game.
+    - 1X in the AGA game: those three branches never taken (`14` to `0a`) and the three
+      speeds halved. The programs are patched as the scripts' load op (`$45`, `+$2e14`) loads
+      them. Its `bsr` to the loader (`+$2e22` [`$72ce`], checked with the loader's first
+      instruction and the name's skip after it) becomes `jmp _spdload`. That runs the loader,
+      finds the program by its slot with START's own lookup (`+$94b2` [`$d95e`], checked),
+      changes each byte only when the bytes around it are the game's, then skips the name.
+      Original and 2X patch nothing.
+    - Checked on the `a1200-030`: 1X walks 15.7/17.0 a run, runs 31.3/32.6 and crawls 7.6 to
+      8.9, the ECS game's figures; Original walks 31.3/32.6 as v1.2.
+
 ## ECS improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan:
@@ -643,6 +677,24 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
     pointer's VBL routine is `+$80aa`, its state `+$d3ed` (`+$d3f4` its position), op `$85`
     `+$5fac` (its `clr.b` `+$5fcc` [`$98c4`]), op `$84` `+$5f86`, the frame's block
     `+$30ce` and the restore hunk 2 `+$2aa`.
+
+11. **The movement speed, an option** (`_speedpatch`, `_spdload`, `_spdcall` in
+    `src/speed.s`, on every CPU): the AGA's item 19, the other way. 2X in the ECS game:
+    - `yoda`'s three slow speeds doubled (8, 8 and 4 to 16, 16 and 8).
+    - Walking and running (MAIN's `$184c` 5 or 6), `heros`' call of its step routine (its
+      header `+$195`, `07 0000ce`, checked with the routine's start `+$267` and end
+      `+$7b6`) made twice. That gives the AGA game's second walking pass and its four running
+      steps. The call op (`$07`, hunk 1 `+$dd6` [`$46ce`], checked) becomes `jmp
+      _spdcall`, START's op but for that call: the first call returns to the call itself,
+      and the second puts back the player's speed (frame bytes 52 and 56), which the
+      routine's end has cleared, as the AGA's pass keeps it. The call is recognised by its
+      return address and by the running program's slot (15).
+    - The load op's `bsr` (`+$15ba` [`$4eb2`]) and the lookup (`+$7a92` [`$b38a`]) as the
+      AGA's. Original and 1X patch nothing.
+    - Checked on the `a1200-030`: 2X walks 31.3/32.6 a run, runs 64.0 and crawls 15.7/17.0,
+      the AGA game's figures; turning is unchanged. Original walks 15.7/17.0 as v1.2. On the
+      A500 (68000, the game's `custom` setup) 2X walks 58.5 units every 50 fields against
+      Original's 29.1, and runs 117.2.
 
 ## The AGA's sites in the ECS game
 

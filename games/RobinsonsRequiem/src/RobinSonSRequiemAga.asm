@@ -103,7 +103,7 @@ slv_info        dc.b    "Coded By CFou!, improved by Vesuri",10
                 INCBIN  "T:date"
         ENDC
                 dc.b    0
-slv_config	dc.b	0
+slv_config	dc.b	"C1:L:Movement speed:Original,1X (OCS),2X (AGA);",0
         EVEN
 slv_MemConfig   dc.l    CHIPMEMSIZE,KICKSIZE+FASTMEMSIZE_V12
                 dc.l    0
@@ -318,6 +318,7 @@ _cont
             move.l  _hunk2(pc),a2
             lea     $4ec(a2),a2
             bsr _ptrpatch
+            bsr _speedpatch
             bsr _swappatch
             bsr _prespatch
 
@@ -1190,6 +1191,11 @@ _landpatch
         INCLUDE proj020.s
         INCLUDE span020.s
         INCLUDE ptr020.s
+; src/speed.s: the load op's bsr to the loader, the loader's lookup (hunk 1)
+SPD_AGA         = 1
+SPD_LOAD        = $2e22
+SPD_LOOKUP      = $94b2
+        INCLUDE speed.s
 
 **********************************************
 ; The objects' images in fast memory (docs/performance.md, plan step 13). The 3D view's

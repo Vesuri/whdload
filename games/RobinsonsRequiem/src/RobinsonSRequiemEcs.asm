@@ -107,7 +107,7 @@ slv_info        dc.b    "Coded By CFou!",10
                 dc.b    0
         EVEN
 
-slv_config	dc.b 0
+slv_config	dc.b	"C1:L:Movement speed:Original,1X (OCS),2X (AGA);",0
 	EVEN
 slv_MemConfig   dc.l    CHIPMEMSIZE,KICKSIZE+FASTMEMSIZE_V12
                 dc.l    0
@@ -281,6 +281,7 @@ _bootdos        lea     (_saveregs,pc),a0
             bsr _c2ppatch
             bsr _skypatch
             bsr _mempatch
+            bsr _speedpatch
             bsr _worldinst
 
 	move.w	#$7fff,$dff09A
@@ -950,6 +951,13 @@ _worldinst
         INCLUDE proj020.s
         INCLUDE span020.s
         INCLUDE ptr020.s
+; src/speed.s: the load op's bsr to the loader, the loader's lookup, the call op and
+; MAIN's frame pointer (hunk 1)
+SPD_LOAD        = $15ba
+SPD_LOOKUP      = $7a92
+SPD_CALL        = $dd6
+SPD_MAIN        = $d3fe
+        INCLUDE speed.s
         MC68000
 
 **********************************************
