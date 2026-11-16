@@ -46,7 +46,7 @@ audit, frame statistics, OCS candidates) call the generators directly with a new
 `--output` below `tmp/`, as the sections below show. `make check` checks the release
 build against `release/slaves.sha256`, rebuilds both reconstructions (each asserts
 byte identity with the pinned original) and runs `release_check.py`,
-`cd32_fixes_check.py` (the CD32 bunk save, TrainSim key fix, high scores, mouse and mouse
+`cd32_fixes_check.py` (the CD32 bunk save, TrainSim key and click fixes, high scores, mouse and mouse
 flight on both languages; `--sabotage store-failure|list-stub|mouse-ignored|name-ignored|scores-ignored|steer-ignored|mask-ignored`
 are its negative controls),
 `waypoint_check.py` on CD32 English and German,

@@ -34,6 +34,7 @@ GAMES = {
                     psygore=0x15e6, fix='fix_patch_en', save=0x275de, a4=0x7ffe,
                     app=-1332, prefix=-1328, name=-1296,
                     sites=dict(store=0x31498, list=0x314b0, branch=0x276b0), trainsim=0x1827e, flyoff=0x17d06,
+                    peek=dict(site=0x181e0, read=0x33dfc, record=-504),
                     scores=dict(site=0x268be, restore=0x26874, table=17664, stubs=(0x6, 0x2543c)),
                     mouse=dict(room=0x273fc, exit=0x27362, pad=0x33e78, guard=0x33de6, reset=0x33ddc, entry=0x2737c, move=0x27418,
                                leave=0x2735a, left=0x27368, pos=2696, rect=2728, flags=18116,
@@ -46,6 +47,7 @@ GAMES = {
                    psygore=0x1cf4, fix='fix_patch_de', save=0x277a0, a4=0x7ffe,
                    app=-1288, prefix=-1284, name=-1252,
                    sites=dict(store=0x3165a, list=0x31672, branch=0x27872), trainsim=0x18338, flyoff=0x17db6,
+                   peek=dict(site=0x1829a, read=0x33fbe, record=-460),
                    scores=dict(site=0x26a6a, restore=0x26a20, table=17714, stubs=(0x6, 0x255bc)),
                    mouse=dict(room=0x275be, exit=0x27524, pad=0x3403a, guard=0x33fa8, reset=0x33f9e, entry=0x2753e, move=0x275da,
                               leave=0x2751c, left=0x2752a, pos=2740, rect=2772, flags=18166,
@@ -284,6 +286,28 @@ def flyoff_choice(cfg, code, blob, choice, pointer):
     arg = struct.unpack('>h', m.read(sp+8, 2))[0]
     m.close()
     return arg
+
+
+def selection_read(cfg, code, blob, sy, clicks):
+    """The TrainSim selection loop's own pad read, from its call to the next
+    instruction, with the port-1 record's click and double-click bytes set;
+    return (the caller's copy, the port record after)."""
+    pk = cfg['peek']
+    m = Machine(code, blob, cfg, {})
+    m.write(SLAVE+sy['pad_read'], struct.pack('>I', pk['read']))
+    rec = bytes(range(0x40, 0x4f))
+    rec = rec[:6]+bytes(clicks)+rec[8:]
+    port = m.a4+pk['record']
+    m.write(port, rec); m.write(port-20, b'\x77'*15)        # port 0's record
+    sp = STACK-6; m.write(sp, struct.pack('>HI', 1, SLOTS)); m.write(SLOTS, b'\0'*16)
+    m.reg(8, sp); m.reg(5, m.a4)
+    end = pk['site']+6
+    ck(u.uc_emu_start(m.h, pk['site'], end, 0, 1000))
+    assert m.reg(18) == end and m.reg(8) == sp
+    copy, after = m.read(SLOTS, 15), m.read(port, 15)
+    assert copy == rec and m.read(port-20, 15) == b'\x77'*15
+    m.close()
+    return copy, after
 
 
 def mouse_cases(cfg, psy, fixed, blob, sy):
@@ -786,7 +810,7 @@ def main():
         apply(blob, sy[cfg['fix']], fixed, fixlog)
         mc = cfg['mouse']
         sc = cfg['scores']
-        assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']),
+        assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']), (3, cfg['peek']['site']),
                           (3, mc['room']), (3, mc['exit']), (3, mc['pad']), (3, mc['guard']), (3, mc['name']),
                           (3, mc['steer']), (3, mc['scans'][0]), (3, mc['scans'][1]), (3, sc['site'])], fixlog
         assert original[sc['site']:sc['site']+6] == bytes.fromhex('397c00018034')
@@ -808,7 +832,7 @@ def main():
         assert original[t:t+4] == bytes.fromhex('3f04486c') and original[t+6:t+8] == bytes.fromhex('4eba')
         assert fixed[t:t+2] == bytes.fromhex('3f12') and fixed[t+2:t+8] == original[t+2:t+8]
         changed = [i for i in range(len(psy)) if psy[i] != fixed[i]]
-        assert all(any(x <= i < x+6 for x in list(s.values())+[mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], sc['site']]+list(mc['scans'])) or t <= i < t+2
+        assert all(any(x <= i < x+6 for x in list(s.values())+[cfg['peek']['site'], mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], sc['site']]+list(mc['scans'])) or t <= i < t+2
                    for i in changed)
         cases = {}
         # Negative control: Psygore's list writes the file but clears the name.
@@ -882,6 +906,20 @@ def main():
             assert flyoff_choice(cfg, fixed, blob, k, -1) == k
             assert flyoff_choice(cfg, fixed, blob, k, k) == k
         cases['trainsim'] = 'pass'
+        # TrainSim selection: the loop's own pad read cleared the click the
+        # room routine reads; the fix leaves the port record as it was.
+        pk = cfg['peek']
+        assert original[pk['site']-8:pk['site']+6] == bytes.fromhex('486dffd03f3c00014eb9')+struct.pack('>I', pk['read'])
+        assert original[pk['read']:pk['read']+4] == struct.pack('>Hh', 0x41ec, pk['record']-20)
+        assert psy[pk['site']:pk['site']+6] == original[pk['site']:pk['site']+6]
+        peek = {}
+        for clicks in ((0, 1), (1, 0), (1, 1), (0, 0)):
+            copy, after = selection_read(cfg, psy, blob, sy, clicks)
+            assert after[6:8] == b'\0\0', 'control did not show the bug'
+            copy, after = selection_read(cfg, fixed, blob, sy, clicks)
+            assert after == copy, (clicks, after.hex())
+            peek[str(clicks)] = after[6:8].hex()
+        cases['selection_click'] = peek
         cases['mouse'] = mouse_cases(cfg, psy, fixed, blob, sy)
         report[lang] = cases
     out.parent.mkdir(parents=True, exist_ok=True)

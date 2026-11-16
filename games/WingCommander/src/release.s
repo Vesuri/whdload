@@ -102,6 +102,10 @@ release_limit:
 ;   save-failure branch he NOPed.
 ; - TrainSim keys 1-4 (game bug). The fly-off animation is passed the pointer
 ;   choice d4, still -1 after a key; pass the stored choice (a2) instead.
+; - TrainSim selection clicks (game bug). Each pass reads the pad record twice:
+;   the room routine looks for a click, then the loop's own read checks other
+;   buttons but clears the click too, so a click between the two was lost.
+;   The loop's read now gives the click back.
 ; - Mouse (mouse.s). The room pointer follows port-0 mouse motion, and the left
 ;   button is port-1 fire, so it also clicks hotspots and skips what fire skips.
 ;   Each screen's pad reset arms a release guard that swallowed the first fire
@@ -153,8 +157,34 @@ release_patchseg:
         add.l   NAME_STEP(a0),d0
         lea     name_step(pc),a1
         move.l  d0,(a1)
+        move.l  d7,d0
+        lsl.l   #2,d0
+        addq.l  #4,d0
+        add.l   PAD_READ(a0),d0
+        lea     pad_read(pc),a1
+        move.l  d0,(a1)
         movem.l (sp)+,d0-d1/a0-a1
         rts
+
+; TrainSim selection loop's pad read (E:181e0, G:1829a), as the native call:
+; port word, record. The native read (E:33dfc) copies the port's record and
+; clears its click and double-click bytes (6 and 7), which only the room
+; routine's read before it uses; the loop checks other buttons. Put them back,
+; ORed so a click the VBL decoder set since stays.
+PAD_READ = 34                   ; parameter table: H0 offset, native pad read
+pad_peek:
+        move.l  6(sp),-(sp)             ; record
+        move.w  8(sp),-(sp)             ; port
+        movea.l pad_read(pc),a0
+        jsr     (a0)                    ; returns a0 = the port's record
+        addq.l  #6,sp
+        movea.l 6(sp),a1
+        move.b  6(a1),d0
+        or.b    d0,6(a0)
+        move.b  7(a1),d0
+        or.b    d0,7(a0)
+        rts
+pad_read:       dc.l 0
 
 ; Port-1 pad read in the VBL server (Psygore's S:1c2e); the left mouse button
 ; (CIA-A PRA bit 6) adds the red button, which the game decodes as fire. In
@@ -283,6 +313,7 @@ mouse_params_en:
         dc.l    $2cc36
         dc.w    17716,17706
         dc.l    $16c66
+        dc.l    $33dfc
 mouse_params_de:
         dc.w    2740,2772,206,-1116
         dc.l    $318e0
@@ -290,6 +321,7 @@ mouse_params_de:
         dc.l    $2cdf8
         dc.w    17766,17756
         dc.l    $16d04
+        dc.l    $33fbe
 name_step:      dc.l 0
 name_used:      dc.w 0,0,0
 
@@ -307,6 +339,9 @@ fix_patch_en:
         dc.w    7                ; PL_W move.w (a2),-(sp): TrainSim choice
         dc.l    $1827e
         dc.w    $3f12
+        dc.w    3                ; PL_PS TrainSim selection pad read: keep clicks
+        dc.l    $181e0
+        dc.w    pad_peek-fix_patch_en
         dc.w    3                ; PL_PS room routine position stores
         dc.l    $273fc
         dc.w    mouse_room-fix_patch_en
@@ -348,6 +383,9 @@ fix_patch_de:
         dc.w    7
         dc.l    $18338
         dc.w    $3f12
+        dc.w    3
+        dc.l    $1829a
+        dc.w    pad_peek-fix_patch_de
         dc.w    3
         dc.l    $275be
         dc.w    mouse_room-fix_patch_de

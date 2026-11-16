@@ -973,6 +973,13 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   `3f12` at `O:179e2`, `E:1827e`, `G:18338`); see
   [the fix](internals.md#trainsim-enemy-selection-by-keyboard). Not covered:
   the OCS revisions `116d` and `262d`, whose files are missing.
+- **TrainSim mouse selection (game bug; CD32 English and German): fixed in the
+  release build, every mode (user report, 2026-11-16); native and live checks
+  pass, not yet confirmed in play.** It took two or three clicks to choose an
+  enemy. The selection loop's second pad read cleared the click before the
+  room routine saw it; see
+  [the fix](internals.md#trainsim-enemy-selection-by-mouse-cd32). OCS has no
+  second read.
 - **Persistent TrainSim high scores (feature): CD32 done in the release build,
   every mode and both languages; native checks pass, not yet run live.** The
   table (A4+17664) is saved to `Bed_N.hi` with each bed save and restored when

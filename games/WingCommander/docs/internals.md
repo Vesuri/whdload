@@ -9210,6 +9210,42 @@ How it is checked:
 Not yet run live. The OCS revisions `116d` and `262d` are not covered because
 their files are missing.
 
+### TrainSim enemy selection by mouse (CD32)
+
+Each pass of the CD32 selection loop (`E:181a6`, `G:18260`) reads the port-1
+pad record twice through `E:33dfc` / `G:33fbe`. That read copies the record
+(A4 `-504`, German `-460`) and clears its click and double-click bytes (6 and 7).
+- **First read:** inside the room routine (`E:27372` → `E:18d88`, call
+  `E:18d94`), whose decoder turns a click on a hotspot into the choice.
+- **Second read:** the loop's own (`E:181e0`, file `1820c`; `G:1829a`, file
+  `182c6`), after the room routine, the drawing and the publish. It checks only
+  bytes 11–13 (`-37..-35(a5)`, the pad's other buttons, which leave as Escape
+  does), but it also clears the click.
+
+A click that the VBL decoder set after the first read and before the second
+was lost, so an enemy took two or three clicks. Keys go through the key queue
+(`E:34318`) and were not affected. OCS (`O:17938`) has no second read.
+
+**Fix (CD32 release build, both languages, every mode).** A PL_PS in the fix
+list replaces the second call with `pad_peek` (`src/release.s`). It calls the
+native read through `pad_read`, which `release_patchseg` sets from the
+parameter table (offset 34). It then ORs the caller's copy of bytes 6 and 7
+back into the port record. ORing keeps a click the VBL decoder set in between.
+
+How it is checked:
+- **Native.** `tools/cd32_fixes_check.py` runs the call for both languages with
+  each combination of the two bytes. Psygore's list alone clears them (the
+  control); the fix leaves the record as it was, and the caller's copy and
+  port 0's record are unchanged.
+- **Live** (scratch probe on a route build that skips the first-run block and
+  keeps the selection, `a1200-030`, deterministic warp, 2026-11-16). Twelve
+  clicks away from the ships, at varied phases, in enhanced and in Psygore's
+  normal mode:
+  - before the fix, 6 of the 12 were seen only by the second read;
+  - with it, the room routine saw all 12.
+  One click on the first ship, at a phase where the old build lost it, selects
+  it with the fix.
+
 ### TrainSim enemy info pacing
 
 After an enemy is selected, the fly-off and info animation (CD32 `E:17d06`,
