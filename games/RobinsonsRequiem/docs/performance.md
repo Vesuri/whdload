@@ -893,11 +893,63 @@ is, each step below chosen at install, and the game has to keep working correctl
      two fields. Most of the chip time that went was the waits' polling: the beam wait
      and the wait for the swap to show (the report's cap, beam and copper waits are 0.0
      ms now). The view copy is called 0.3 times a frame, against once a frame before.
-10. **To 50 fps**: AGA steps 11 and 13 (frames between world passes and the objects'
-    graphics in fast memory; its step 12, the sky, is step 8 here, and its step 14 found
-    nothing more worth moving), shared code where the variants allow. After step 9 the
-    `a3000-50` draws at the cap, every frame 3 fields apart with drawing passes of about
-    two fields, so step 11's frames between world passes are what would go further.
+10. **To 50 fps: frames between world passes and the objects' images in fast memory**
+    (done, `docs/internals.md`, "ECS improvements", item 6). The AGA's step 12, the sky,
+    is step 8 here, and its step 14 found nothing more worth moving.
+    - **What changed**, on the 68020 and up only: the AGA's steps 11 and 13 at their ECS
+      sites.
+      - Frames between world passes (`src/world020.s`, `_prespatch`): while the next world
+        pass is not due, the frame routine runs again with the camera and the moving
+        objects staged at the field the frame will show in. The scripts' countdown runs on
+        world passes only.
+      - The objects' images in fast memory (`src/obj020.s`): the sprite routine (hunk 1
+        `+$d090`) reads its images from a 64 KB cache, emptied when the resource heap
+        changes. The ECS images have a 6-byte header, not the AGA's 8.
+      - Each variant keeps its own copy of the code. The ECS one is the AGA's at other
+        offsets.
+    - **Checks.**
+      - `tools/rr_passes.py` at 400 MHz, turning and walking: every frame shown a field
+        after the last (64 of 64 each). There were 22 world passes and 44 frames between
+        them in 64 fields, with no catch-up passes. The camera moves a field's share each
+        frame: 1 degree turning, about 1.8 units walking.
+      - On the `a3000-50`, turning: 12 frames between the 41 world passes, frame intervals
+        of 1 to 3 fields (mean 2.31). Walking, the drawing takes 1.7 to 2.0 fields, so no
+        frame fits between passes and every frame is 3 fields apart, as in step 9. The
+        camera still turns 1 degree a field.
+      - `tools/rr_objects.py` at 400 MHz, standing, turning and walking: every object on
+        step 9's grid (`MAIN` every 3 fields, `caporal` 6, `heros` 9, `human` 12, `skyjun`
+        18).
+      - With `MAPCHECK` at 400 MHz, 500 fields turning and 500 walking: all 3,321 images
+        given equal to their originals (27 images cached). The map's, the shade table's
+        and the sky's copies were equal at all 219 drawings.
+      - On the `a3000-50`, step 9's 8 poses: the same cameras and every screenshot
+        pixel-identical, with and without `PRESENT_OFF`.
+      - On the A500 (`custom`), where nothing of this is patched: step 9's 8 cameras and
+        every screenshot pixel-identical, and the release build's screenshots from the
+        reset to field 1805 too. The release build on the `a3000-50` is pixel-identical to
+        step 9's to field 1805 and reaches the language screen with its pointer.
+    - **Measured on the `a3000-50`'s aprof core**, per frame drawn:
+
+      | | Step 9 | Images in fast memory (`PRESENT_OFF`) | Step 10 |
+      |---|---|---|---|
+      | Frames in the window | 167 | 166 | 185 (18.5 fps) |
+      | Chip accesses | 5.8 ms (9,173) | 4.0 ms (6,625) | 3.8 ms (6,476) |
+      | Sprite routine (hunk 1 `+$d090`) | 2.3 ms, 83% chip | 1.3 ms | 1.1 ms, no chip |
+      | Waiting for W (`_passend`) | 22.4 ms | 23.7 ms | 18.2 ms |
+
+      The setup's core draws 390 frames in the window, against step 9's 166.
+    - **Measured with the 68030 at 400 MHz** (aprof, `--uae_cpu_frequency=400000000`):
+
+      | | Both off (`PRESENT_OFF`, `OBJCOPY_OFF`) | Images in fast memory | Step 10 |
+      |---|---|---|---|
+      | Frames in the window | 167 (the cap) | 167 | 480 (48.0 fps, 20.8 ms) |
+      | Chip accesses | 6.7 ms (9,284) | 4.5 ms (6,616) | 10.9 ms (17,423) |
+      | Busy | | | 13.6 ms, besides 7.2 ms waiting for the last swap to show |
+
+      The AGA game draws 480 frames at 400 MHz too. At step 10 the ECS game's chip time is
+      the wait for the swap to show (hunk 0 `+$c9e`, 7.2 ms) and the conversion's plane
+      writes (`_c2p020`, 2.1 ms of its 2.8). The sprite routine takes 0.1 ms and the cache
+      0.1 ms.
 11. **The A500 path**: what helps only the 68000 without fast memory: the conversion's
     last exchanges on the blitter, in parallel with the CPU (the blitter is idle there,
     0.1% of the DMA slots), and steps 3 and 4's few milliseconds.
@@ -926,6 +978,10 @@ BUILD=profile SETUP=a1200-060 OPEN=human APROF=1 FSUAE=$FSUAE_APROF \
 # ECS on the AGA's CPU ("ECS on a fast CPU")
 VARIANT=RobinsonsRequiem SETUP=a3000-50 BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
     EXTRA_ARGS=--uae_mmu_model=0 python3 tools/rr_prof.py tmp/prof/ecs-a3000
+# the same with the 68030 at 400 MHz (ECS step 10; also for rr_passes.py and rr_objects.py)
+VARIANT=RobinsonsRequiem SETUP=a3000-50 BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
+    EXTRA_ARGS='--uae_mmu_model=0 --uae_cpu_frequency=400000000' \
+    python3 tools/rr_prof.py tmp/prof/ecs-a3000-400
 # the AGA game's drawing passes, frame intervals, the fields the frames show in, catch-up
 # passes and frames between passes (gdb breakpoints, no profile; KEY=3e walking)
 BUILD=profile FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \

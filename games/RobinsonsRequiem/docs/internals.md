@@ -442,8 +442,8 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
 5. **The world on the cap's grid and a frame on every pass** (`_worldinst`,
    `src/world020.s`; `docs/performance.md`, ECS plan step 9), on the 68020 and up only:
    the AGA's items 6, 7, 8 and 11 ported at their ECS sites ("The AGA's sites in the ECS
-   game"), each checked first as in the AGA slave. Item 12's presentation frames are left
-   out (ECS plan step 10).
+   game"), each checked first as in the AGA slave. Item 12's frames between world passes
+   are item 6 below.
    - `_worldpatch`: the world count W at hunk 1 `+$d22` (`_wa3`) and `+$4b44` (`_wa0`),
      the catch-up passes at the list's end `+$cb2` (`_listend`), the cap wait's cap at
      `+$30ac` (`_capwait`), and the wait for W at the frame routine's end `+$3218`
@@ -466,6 +466,27 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    hunk 1 offsets above `$7fff` as base displacements. `WORLD_OFF` (a test define) leaves
    it out, and `INTERP_OFF` holds alpha at 1, as in the AGA slave. On the 68000 nothing of
    this is patched: START's own pacing, a frame on the player's runs.
+6. **Frames between world passes and the objects' images in fast memory**
+   (`docs/performance.md`, ECS plan step 10), on the 68020 and up only: the AGA's items 12
+   and 14 at their ECS sites, each checked first.
+   - `_prespatch` (`src/world020.s`), with item 5's patches in: after a world pass's
+     frame, while the next pass is not due, `_passend` runs START's frame routine again
+     from hunk 1 `+$3086` (past `+$3076`'s reads from the list's script stream). The
+     camera and the staged elements are placed at the field the frame will show in. The
+     scripts' countdown, `+$329a` `subq.b #1,<+$d580>` (checked with the `bne.w +$32ac`
+     after it), becomes `jsr _cdown`, which skips it in such a frame; `_view` skips it too.
+     A frame is drawn only when the last one was staged, would show in a later field, and
+     is expected to swap an eighth of a field before the next pass is due. `PRESENT_OFF`
+     (a test define) leaves this out.
+   - `_objpatch` (`src/obj020.s`, from `_mempatch`): the sprite routine (hunk 1 `+$d090`)
+     gets its image at `+$d0a0` `adda.l (a2),a2` and `cmpi.b #24,(a2)`, which become `jsr
+     _objimg`. The ECS images are types 24 and 26 with a 6-byte header (width − 1 at `+2`,
+     height − 1 at `+4`, the pixels from `+6`; the reads start at `lea (6,a2,d1.l)`,
+     `+$d18e`, checked too). `_objimg` returns a copy from a 64 KB cache of up to 128
+     images in fast memory. The resource heap's top `<+$d3b6>` changes at `+$7b20` (an
+     allocation), `+$78ce` (the compaction) and `+$7322` (its reset); each becomes a `jsr`
+     that does the same and empties the cache. `MAPCHECK` compares every copy given with
+     its image. `OBJCOPY_OFF` (a test define) leaves this out.
 
 ## The AGA's sites in the ECS game
 

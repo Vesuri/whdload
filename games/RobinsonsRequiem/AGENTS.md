@@ -6,9 +6,10 @@ faster (`docs/performance.md`, "Plan": the ECS plan for the A500 done; the AGA p
 world on the game's own grid, the camera and moving objects between their runs, the drawing
 up to the cap, frames between world passes, the sky and objects' images in fast memory, the
 landscape loop in the 68030's instruction cache and Kalms' 040/060 conversion on those CPUs,
-its checks in play left; the ECS plan for fast CPUs at step 10, its tools, the AGA's sites
-in the ECS game, its memory, its 68020 conversion and sky copy, and the world on the cap's
-grid with a frame on every pass done, the 68000 to keep working). The original slaves are by CFou! (game.conf `AUTHOR`, `UPSTREAM`): his v1.2 install
+its checks in play left; the ECS plan for fast CPUs at step 11, the A500's path: its tools,
+the AGA's sites in the ECS game, its memory, its 68020 conversion and sky copy, the world on
+the cap's grid with a frame on every pass, frames between world passes and the objects'
+images in fast memory done, the 68000 to keep working). The original slaves are by CFou! (game.conf `AUTHOR`, `UPSTREAM`): his v1.2 install
 package from whdload.de, which ships their source.
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.
@@ -24,6 +25,6 @@ Read `docs/open-work.md` first.
 
 The slave source is `src/` (`RobinsonSRequiemEcs.asm` with the chunky-to-planar
 conversions, the sky copy and the world's pacing it includes, `c2p000.s`, `c2p020.s`,
-`sky000.s` and `world020.s`; `RobinSonSRequiemAga.asm` with its conversion, sky
+`sky000.s`, `world020.s` and `obj020.s`; `RobinSonSRequiemAga.asm` with its conversion, sky
 copy and landscape loop, `c2p030.s`, `c2p040.s`, `sky030.s` and `land030.s`; the `lvo/intuition.i` bridge in `src/include/`, and CFou!'s unassembled bitplane-fix fragment
 `_fixBPL1&2-InFast-Silmarils.s`); `tools/` is the development harness and never ships.

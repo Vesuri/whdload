@@ -73,6 +73,9 @@
  - On 68020 and up: the game keeps its own pace however long the drawing takes,
    and the 3D view is drawn up to every 3 fields (16.7 per second on PAL), the
    camera and the moving objects shown between their moves
+ - On 68020 and up: the game's objects' images in Fast memory, and on a fast
+   enough CPU more frames between the game's steps, up to one every field (50
+   per second on PAL)
 
  version 1.2 (29.03.13) done by CFou!:
  - First two bitplanes memory allocation fixed for fast memory support (AGA)

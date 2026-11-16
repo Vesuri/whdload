@@ -909,12 +909,15 @@ _mempatch
         bsr     _fastblocks
         bsr     _mappatch
         bsr     _skycopy
+        bsr     _objpatch
 .no     rts
 
+        INCLUDE obj020.s
+
 **********************************************
-; The world on the cap's grid and frames between the player's runs on the 68020 and up
-; (docs/performance.md, ECS plan step 9; src/world020.s). WORLD_OFF (a test define): not
-; patched, the frames those of plan step 8.
+; The world on the cap's grid, frames between the player's runs and frames between world
+; passes on the 68020 and up (docs/performance.md, ECS plan steps 9 and 10; src/world020.s).
+; WORLD_OFF (a test define): not patched, the frames those of plan step 8.
 
 _worldinst
         IFND WORLD_OFF
@@ -923,6 +926,7 @@ _worldinst
         beq     .no
         bsr     _worldpatch
         bsr     _swappatch
+        bsr     _prespatch
 .no
         ENDC
         rts

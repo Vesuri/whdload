@@ -30,7 +30,7 @@ frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done,
 landscape code being register-bound (about 1% each). On the AGA's 50 MHz 68030 the ECS
 game draws 57 frames against the AGA's 122 (its data all in chip memory, its frames on the
 player's runs only); of its plan to 50 fps on 68020 and up with fast memory (steps 5-11,
-the A500 path apart) steps 5-9 are done: the tools find START in any machine's fast
+the A500 path apart) steps 5-10 are done: the tools find START in any machine's fast
 memory, the ECS `profile` build counts frames, `tools/rr_passes.py` and `tools/rr_objects.py`
 take the ECS game, and `tools/rr_sites.py` maps the AGA slave's patch sites to the ECS
 game's (`docs/internals.md`, "The AGA's sites in the ECS game"). Step 7 gave the slave a 1 MB
@@ -46,7 +46,13 @@ the cap's grid, staged the camera and moving objects between their runs and took
 wait out of the swap, the AGA's steps 7-9, 10.1 and 10.4 (`src/world020.s`). The
 `a3000-50` now draws 167 frames in the window, the cap (every frame 3 fields apart),
 against 55. That is 37.5 ms busy a frame, and the view copy is down to 0.4 ms. Every
-object runs on the cap's grid. The A500 is unchanged. Both developer builds boot straight
+object runs on the cap's grid. The A500 is unchanged. Step 10 added the AGA's steps 11 and
+13 (`src/world020.s`, `src/obj020.s`): frames between world passes and the objects' images
+in fast memory. With the 68030 at 400 MHz the ECS game now draws 480 frames in the window,
+as the AGA game does, against the cap's 167. Every frame comes a field after the last,
+turning and walking. On the `a3000-50` it draws 185, the frames between passes coming
+only turning (the walking drawing takes 1.7 to 2.0 fields). The A500 is again unchanged.
+Both developer builds boot straight
 into the game (the AGA one with detail and window at HIGH), and `tools/rr.py ingame` drives
 any AGA build there through the intro and menu (`docs/development.md`). The game is on the
 repository layout with CFou!'s v1.2 slave sources and the improvements; both variants build
@@ -67,11 +73,11 @@ Next, in order:
    equal (240 drawings, 4,419 object images given) and filled step 13's cache to 63,919
    of its 65,536 bytes (37 images) before emptying it once. The 040/060 conversion on a
    real 040 or 060.
-2. The ECS plan's steps 10 and 11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"):
-   the AGA's steps 11 and 13 at the sites step 6 found, and the A500's own path. Step 9's
-   staged creatures and the mouse pointer and scripts' drawing with the swap are to be
-   checked in play, as in the AGA game. The game has to keep working correctly on the 68000: each
-   step chosen at install and checked on the A500 as well.
+2. The ECS plan's step 11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"): the
+   A500's own path. To be checked in play, as in the AGA game: steps 9 and 10's staged
+   creatures, the mouse pointer and scripts' drawing with the swap, the pointer's picking
+   between world passes, and the image cache in other areas. The game has to keep working
+   correctly on the 68000: each step chosen at install and checked on the A500 as well.
 3. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`); step 10.2's swap is play-tested with the
    mouse pointer moving and the scripts drawing (inventory, messages). The AGA game's
