@@ -21,7 +21,7 @@
 ;		         - Added 2 Exotic icons (taken from http://exotica.fix.no)
 ;		05.11.11 - v1.3         
 ;		         - Supports another Tenstar pack version (thanks to Paul Vernon)
-;		11.11.26 - v2.0b (Buggy Boy Enhanced)
+;		16.11.26 - v2.0b (Buggy Boy Enhanced)
 ;		         - 68020+: caches enabled; the program, COURSES.DAT and the
 ;		           stack in fast memory when the ExpMem is (Enhanced.s)
 ; Requires:	WHDLoad 17+
@@ -74,7 +74,7 @@ _expmem		dc.l	-EXPSIZE		;ws_ExpMem (optional, Enhanced.s)
 ;============================================================================
 
 DECL_VERSION:MACRO
-	dc.b	"2.0b (11.11.2026)"
+	dc.b	"2.0b (16.11.2026)"
 	ENDM
 	dc.b	"$","VER: slave "
 	DECL_VERSION

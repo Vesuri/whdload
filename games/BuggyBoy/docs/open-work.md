@@ -1,6 +1,6 @@
 # Open work
 
-`src/` is Codetapper's 1.3 with the start of 2.0b (`$VER: slave 2.0b (11.11.2026)`): on a
+`src/` is Codetapper's 1.3 with the start of 2.0b (`$VER: slave 2.0b (16.11.2026)`): on a
 68020 or better the slave enables the caches and, when the ExpMem is fast memory, runs the
 program, COURSES.DAT and the stack from it. The race runs its logic on a fixed 12.5 Hz tick
 and draws as often as the machine manages, with each frame interpolated between the last
@@ -9,13 +9,12 @@ are the option "Enhanced framerate" (`CUSTOM2`); without it the game draws at 12
 and every screen outside the race is locked at 12.5 fps either way (1.3's default). A 68000 or 68010 and
 the disk versions run 1.3 unchanged. The 50 fps plan below is at step 4b.
 
-Released as Buggy Boy Enhanced 2.0b (11.11.2026), with steps 5 and 6 still open below: the
-slave pinned in `release/slaves.sha256`, the archive from `make dist` with `CUSTOM2=1` added
-to every shipped icon (`release/release.json`). Further work is a later version.
-Since 2.0b, unreleased: the fix for the freeze before name entry or game over on a fast
-68020 (a user's A1200 with an ACA1221; reproduced with a 28 MHz 68020, [internals.md](internals.md),
-"The clear queued to the blitter"). `release/slaves.sha256` still pins 2.0b's slave, so
-`make check` differs until the next version is set and recorded.
+Released as Buggy Boy Enhanced 2.0b (16.11.2026; it replaced the first 2.0b of 11.11.2026,
+which froze before name entry or game over on a fast 68020: a user's A1200 with an ACA1221,
+reproduced with a 28 MHz 68020, [internals.md](internals.md), "The clear queued to the
+blitter"), with steps 5 and 6 still open below: the slave pinned in `release/slaves.sha256`,
+the archive from `make dist` with `CUSTOM2=1` added to every shipped icon
+(`release/release.json`). Further work is a later version.
 
 ## 50 fps at the original game speed
 

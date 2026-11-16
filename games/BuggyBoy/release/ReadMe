@@ -26,7 +26,7 @@ FEATURES:
 - RomIcon, NewIcon and GlowIcon (all created by Frank!)
 - Quit option (default key is 'F10')
 
-Version 2.0b (11.11.2026) done by Vesuri:
+Version 2.0b (16.11.2026) done by Vesuri:
 - Enhanced framerate option (CUSTOM2=1) on 68020 and faster: the game runs
   at its normal speed and draws as many frames as the Amiga can, up to 50 fps
   on a 68030 with Fast memory; set in the supplied icons
