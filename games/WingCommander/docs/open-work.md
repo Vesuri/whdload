@@ -1069,8 +1069,9 @@ Graphics:
   field rather than once per picture. Reproduce in Original speed first.
 - **UR12 (U): edges in the alarm/running sequences.** Fixed in enhanced mode;
   see [running-pilot backgrounds](internals.md#running-pilot-cinematic-backgrounds).
-- **UR13 (U): smooth in WinUAE, choppier on FPGA and a 68030/50.** Open; all
-  evidence is emulator-only, with no real-hardware measurement.
+- **UR13 (U): smooth in WinUAE, choppier on FPGA and a 68030/50.** Not an
+  issue in itself: what users saw comes from problems fixed separately, such as
+  missing interpolation frames in the cinematics.
 
 Features for later:
 - **UR14 (H): Secret Missions on the CD32 slave.** Not implemented.
