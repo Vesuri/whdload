@@ -85,7 +85,8 @@ trainer list (commented out in the source).
 
 `_CountFrames` runs in the level-3 handler, once per field (only VERTB is enabled).
 `_LockFrameRate`, before the game writes COP1LC, waits until the count since the last swap
-reaches N and resets it. The game's own wait for the next field follows the swap, so a frame
+reaches N and resets it (in 2.0b the test is unsigned, so a count past `$7FFF` passes at
+once instead of waiting for the word to wrap). The game's own wait for the next field follows the swap, so a frame
 takes at least N fields: the cap is 50/N fps, not the 50/(N+1) the labels assume.
 
 | `CUSTOM2` | N | Label | Cap (measured on the a1200-030) |
@@ -254,7 +255,7 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
 | `$138` | `lea $DFF000,a0` (race setup, on every way into the loop) | `_RaceInit`: the first pass runs the logic, and a tick is due at once |
 | `$158` | `bsr $153E` (logic), `bsr $6716` (road), `bsr $1E2` (clear) | `_PreDraw`, then the road and the clear |
 | `$16C` | `bsr $2672` (swap), `tst.w $9874` | `_PostDraw` |
-| `$2682` | (1.3's lock) | `_SetCop`: no wait in the race loop's swap; the 12.5 fps lock everywhere else |
+| `$2682` | (1.3's lock) | `_SetCop`: no wait in the race loop's swap, which clears the lock's count instead (as 1.3's lock did at every swap); the 12.5 fps lock everywhere else |
 
 - **The tick** is due every 4 fields of the game's field counter `$66D8`. A frame that
   starts when a tick is due is a *tick frame*: it draws the committed state, writes and all,
@@ -353,7 +354,12 @@ With a 68020 or better and any ExpMem (for the buffers), `_PL_Tick` changes the 
   block in the work area instead of `$DFF000`, and its 16 waits (`$318`–`$5B6`) queue the
   blit set up so far. The blitter interrupt (`$4DB6`, in the level-3 handler, which
   otherwise counts every level-3 interrupt as a field) starts each next blit while the CPU
-  runs the logic, the pose and the road in fast memory; `_QSync` waits for the last before
+  runs the logic, the pose and the road in fast memory (a blitter request alone leaves
+  without counting: `_Level3` takes back the count `_CountFrames`, at `$4DB0` before it, has
+  made; with up to 18 such interrupts a frame the count reached `$8000` within a minute or
+  two of racing, and the first 12.5 fps lock after the race, at the bonus screen's end or
+  game over, waited minutes for it to wrap, with the next screen's colours on the bonus
+  picture); `_QSync` waits for the last before
   the objects, the next to use the blitter. All the later blit code sets every register it
   uses. The VERIFY build runs 1.3's clear after the queued one from the same horizon and
   compares rows 0 to 103 (`tools/verify.py`: no difference in 1317 frames).

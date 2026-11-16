@@ -98,7 +98,10 @@ SETUP=a1200-030 PROG_BASE=auto EXTRA_ARGS=--uae_mmu_model=0 WHD_ARGS="CUSTOM2=1"
   tick frame drawn at the smoothed position fills from that position.
 - Assembler defines for A/B runs (export `VASM_EXTRA`, since `serve` rebuilds the slave):
   `COARSE` draws at the program's 4 positions per segment instead of the 64 fine ones,
-  `NOSMOOTH` interpolates between ticks without the smoothed position.
+  `NOSMOOTH` interpolates between ticks without the smoothed position. `NOTIMEDEC` (in
+  `BuggyBoyHD.s`) stops the race timer, so the route can finish a course: Offroad ends
+  about 36000 fields after the race's start with joystick up held, then the bonus and
+  name entry (place 2).
 - `tools/plotcheck.py [DUMP] [N]` checks the merged plotters against the original loops in
   Unicorn (needs a chip dump with the program at `$400`, such as `tmp/dumps/attract.bin`).
 - `BUILD=verify` checks every frame drawn between ticks; `tools/verify.py` on its server

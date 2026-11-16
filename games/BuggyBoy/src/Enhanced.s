@@ -604,7 +604,9 @@ _QNext		move.l	a2,-(sp)
 ; In the level-3 handler (d0-d1/a0-a2/a5 saved, a0 = $dff000): returns
 ; its d0, the requests to handle, without the blitter's, which is handled
 ; here; a blitter request alone leaves through the handler's end, without
-; counting a field.
+; counting a field: neither the game's ($6AD8, after this hook) nor the
+; slave's _FrameCounter, which _CountFrames ($4DB0, before it) has already
+; counted.
 _Level3		move.w	$1e(a0),d0
 		and.w	$1c(a0),d0
 		btst	#I_BLIT,d0
@@ -614,6 +616,8 @@ _Level3		move.w	$1e(a0),d0
 		bsr.b	_QNext
 		and.w	#I_LEVEL3,d0
 		bne.b	.rts
+		lea	_FrameCounter(pc),a1
+		subq.w	#1,(a1)
 		addq.l	#4,sp
 		move.l	_ProgBase(pc),-(sp)
 		add.l	#P_L3END,(sp)
@@ -1922,9 +1926,17 @@ _PostDraw	movem.l	d0-d1/a0-a1,-(sp)
 		rts
 
 ; The swap's COP1LC write: no wait in the race loop (the swap's own wait
-; for the next field follows), 1.3's frame lock everywhere else.
+; for the next field follows), 1.3's frame lock everywhere else. The race's
+; swaps restart the lock's count as 1.3's lock did at every swap, so the
+; first lock after the race waits 4 fields from the last race frame. Left
+; counting through the race, the signed word went negative in a long race
+; and that lock waited for it to wrap round (the freeze before name entry).
 _SetCop		TSTPC	_InLoop
 		beq	_LockFrameRate
+		move.l	a0,-(sp)
+		lea	_FrameCounter(pc),a0
+		clr.w	(a0)
+		move.l	(sp)+,a0
 		move.l	(a1,d0.w),$dff080
 		rts
 

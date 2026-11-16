@@ -165,7 +165,13 @@ _DOSVersion	bsr	_EnhDest		;a1 = Destination (hunk header at $3e0, real code at $
 		move.l	a5,a1
 		jsr	resload_Patch(a2)
 
-.NoCD32		pea	_SaveHighScores(pc)	;Setup save routine to run
+.NoCD32
+	IFD NOTIMEDEC
+		lea	_PL_NoTimeDec(pc),a0	;test builds only: the time never runs out
+		move.l	a5,a1
+		jsr	resload_Patch(a2)
+	ENDC
+		pea	_SaveHighScores(pc)	;Setup save routine to run
 		move.l	(sp)+,$bc		;when trap #15 encountered
 
 		bsr	_SetupKeyboard
@@ -211,6 +217,12 @@ _PL_BugOP_Tr	PL_START
 		PL_W	$1626,$6010		;Don't decrement time: subq.w #1,-(a0) etc
 		PL_W	$1e4e,$4e71		;No lap complete bonus: add.b d0,(a2)
 		PL_END
+
+	IFD NOTIMEDEC
+_PL_NoTimeDec	PL_START
+		PL_W	$1626,$6010		;Don't decrement time
+		PL_END
+	ENDC
 
 _PL_BugOP_CD32	PL_START
 		PL_P	$2538,_CD32_Read	;move.w d0,(a0) and move.w (sp)+,d1 and move.w (sp)+,d0
@@ -403,7 +415,7 @@ _LockFrameRate	movem.l	d0-d1/a0,-(sp)
 		lea	_FrameCounter(pc),a0
 .DelayLoop	move.w	(a0),d0			;Check we've reached the
 		cmp.w	d1,d0			;correct frame number
-		blt	.DelayLoop
+		blo	.DelayLoop		;unsigned: a count past $7FFF passes
 		move.w	#0,(a0)			;Reset counter back to 0
 		movem.l	(sp)+,d0-d1/a0
 		move.l	(a1,d0.w),$dff080

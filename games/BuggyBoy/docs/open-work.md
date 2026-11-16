@@ -12,6 +12,10 @@ the disk versions run 1.3 unchanged. The 50 fps plan below is at step 4b.
 Released as Buggy Boy Enhanced 2.0b (11.11.2026), with steps 5 and 6 still open below: the
 slave pinned in `release/slaves.sha256`, the archive from `make dist` with `CUSTOM2=1` added
 to every shipped icon (`release/release.json`). Further work is a later version.
+Since 2.0b, unreleased: the fix for the freeze before name entry or game over on a fast
+68020 (a user's A1200 with an ACA1221; reproduced with a 28 MHz 68020, [internals.md](internals.md),
+"The clear queued to the blitter"). `release/slaves.sha256` still pins 2.0b's slave, so
+`make check` differs until the next version is set and recorded.
 
 ## 50 fps at the original game speed
 
