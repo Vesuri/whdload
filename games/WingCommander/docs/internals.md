@@ -7734,6 +7734,24 @@ A4−`5a44` / CD32 A4−`5a2c`; the unused slot is preserved too. Native script 
 remain responsible for committing these actors' positions and animation cursors.
 Repeated intermediate pictures therefore cannot accelerate the background actors.
 
+The native loops call the compositor only on every other iteration (odd in
+stages 0/1, even in stage 2), and it draws only when the game's frame-skip
+countdown (OCS A4−`7f50`/−`7f4e`, CD32 A4−`7f70`/−`7f6e`: working counter and
+reload, the "%d FRAMES SKIPPED" setting, 1–5) expires. A drawing call moves each
+actor by its velocity and steps its script once, so native actors change once
+per six fields. Intermediate pictures previously called the compositor on the
+live, post-draw records: every one showed the *next* native actor state, so the
+crew, tractor and pilots jumped a whole step right after each native picture
+and then stood still, and the first intermediate repeated the native picture's
+ship pose. The wait now detects a native drawing (call parity and countdown
+equal to its reload), saves the records the next drawing starts from (the
+shared 120-byte `landing_actor_previous`; landing and launch never overlap), and
+gives each intermediate those records at `velocity × elapsed / (300 × reload)`
+units, as landing does. Pictures keep the native picture's animation frame and
+move on every picture; before a stage's first native picture the live records
+lead into it. The native picture's own interval sample is not redrawn. The
+ship's whole-pixel offsets and the one-pixel hangar scroll stay as before.
+
 The cockpit tunnel's four layers start at depths 50, 40, 30 and 20. Native code
 subtracts a speed starting at one on every pass, then increases that speed at
 script indices 0, 5, 10, 15 and 20. Its 25 passes now mean 25 world updates, or
@@ -7763,6 +7781,15 @@ subfield has the expected X and Y, and mutated actor tables restore exactly.
 The previous CD32 build fails the Y assertion at the second PAL sample.
 The corresponding `tmp/launch-flicker-{ocs,cd32}-options/report.json` checks
 pass the public option/installer gates with this correction.
+`launch_clock_check.py` models the native drawing iterations and frame skip 1
+and 2 (PAL/NTSC): every intermediate actor record must equal the pre-draw
+replay at its elapsed time, no native picture is redrawn, and consecutive
+pictures move each actor forward by at most 2 pixels. Disabling the replay fails
+it. `launch_live_check.py --exterior-samples` samples 16 stage-1 compositor
+entries on the cached 030 PAL fixture: both variants' moving actors advance by
+at most their share of the elapsed fields on every picture
+(`tmp/ur3-{ocs,cd32}-live/actors.json`).
+
 The corrected cached-030 PAL launch fixtures pass through all three exterior
 stages and the cockpit tunnel in `tmp/launch-flicker-ocs-live/report.json` and
 `tmp/launch-flicker-cd32-live-final/report.json`. Their incoming-ship samples

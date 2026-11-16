@@ -79,39 +79,78 @@ def check(build,variant,model):
   countdown=data+v.A4_BASE+(-32592 if variant=='ocs' else -32624)
   actors=data+v.A4_BASE+(-0x5a44 if variant=='ocs' else -0x5a2c)
   shown=[]
+  def records():
+   raw=c.read(actors,120);return [list(struct.unpack('>4h',raw[i*24:i*24+8]))+[raw[i*24+9]] for i in range(5)]
+  def advance():
+   # The native compositor moves every actor by its velocity and steps its
+   # animation cursor (byte 9) once per drawing call.
+   raw=bytearray(c.read(actors,120))
+   for i in range(5):
+    x,y,vx,vy=struct.unpack('>4h',raw[i*24:i*24+8])
+    raw[i*24:i*24+4]=struct.pack('>2h',x+vx,y+vy);raw[i*24+9]=(raw[i*24+9]+1)&255
+   c.write(actors,bytes(raw))
+  idle=[0]
   def present():
-   shown.append(struct.unpack('>5h',c.read(pos,10)))
-   # Native exterior composition advances these actor records. Intermediate
-   # pictures must restore them, as well as the five ship-pose words.
-   c.write(actors,bytes((x+1)&255 for x in c.read(actors,120)))
-   c.write(field,long(c.get(field,4)+1));c.return_call()
+   advance();shown.append((struct.unpack('>5h',c.read(pos,10)),records(),c.get(field,4)-100))
+   c.write(field,long(c.get(field,4)+1));idle[0]=0;c.return_call()
+  def waiting():
+   # A second pass without a picture means display time passes regardless.
+   idle[0]+=1
+   if idle[0]>=2:idle[0]=0;c.write(field,long(c.get(field,4)+1))
+  c.intercept(s+sy['launch_exterior_idle'],waiting)
   c.intercept(s+sy['launch_exterior_native'],present)
   c.intercept(s+sy['launch_exterior_pose'],lambda:c.return_call())
   c.intercept(s+sy['timing_rate'],lambda:c.return_call(state['rate']))
+  def trunc(a,b):return abs(a)//b*(1 if a>=0 else -1)
   rooms=[]
   for rate in (50,60):
    state['rate']=rate
-   for stage,steps in enumerate((10,27,23)):
-    c.write(field,long(100));shown.clear()
-    for tick in range(steps):
-     c.write(pos,struct.pack('>5h',100,50,10,20,256));c.write(scroll,word(40));c.write(countdown,word(2))
-     before=c.read(data,v.HUNKS[1][2])
-     first=len(shown)
-     start=c.get(field,4)-100
-     call('launch_exterior_wait',{9:stage,11:tick})
-     samples=shown[first:]
-     for index,sample in enumerate(samples):
-      elapsed=(start+index)*50-tick*150
-      if stage<2:
-       assert sample[0]==96+4*elapsed//150,('ship X',stage,elapsed,sample)
-       expected_y=52-2*elapsed//150 if stage==0 else 50
-       assert sample[1]==expected_y,('ship Y',stage,elapsed,sample,expected_y)
-     # Only the isolated field clock can differ; presentation poses restore.
-     after=bytearray(c.read(data,len(before)));f=field-data;after[f:f+4]=before[f:f+4]
-     assert after==before,'exterior state leaked'
-    assert c.get(field,4)-100==steps*3
-    if stage<2:assert len({r[0] for r in shown})>=3
-    rooms.append(dict(hz=rate,stage=stage,fields=steps*3,pictures=len(shown)))
+   for skip in (1,2):
+    c.write(countdown+2,word(skip))
+    table=bytearray(120)
+    for i in range(5):table[i*24:i*24+8]=struct.pack('>4h',100+i,60,3+i,-2);table[i*24+9]=5
+    c.write(actors,bytes(table))
+    for stage,steps in enumerate((10,27,23)):
+     c.write(field,long(100));shown.clear();c.write(countdown,word(1))
+     last=None;timeline=[]
+     for tick in range(steps):
+      c.write(pos,struct.pack('>5h',100,50,10,20,256));c.write(scroll,word(40))
+      if stage==2 and tick==22:c.write(countdown,word(1))
+      drew=False
+      if (tick&1)==(1 if stage<2 else 0):
+       n=c.get(countdown,2)-1
+       if n<1:
+        n=skip;advance();drew=True;last=(tick*150,records());timeline.append((tick*150,last[1][0]))
+       c.write(countdown,word(n))
+      before=c.read(data,v.HUNKS[1][2])
+      first=len(shown)
+      idle[0]=0;call('launch_exterior_wait',{9:stage,11:tick})
+      samples=shown[first:]
+      for sample,actor,at in samples:
+       elapsed=at*50-tick*150
+       assert not(drew and elapsed==0),'native picture redrawn'
+       if stage<2:
+        assert sample[0]==96+4*elapsed//150,('ship X',stage,elapsed,sample)
+        expected_y=52-2*elapsed//150 if stage==0 else 50
+        assert sample[1]==expected_y,('ship Y',stage,elapsed,sample,expected_y)
+       period=300*skip;live=records()
+       if last is not None:
+        base=last[1];dt=min(tick*150+elapsed-last[0],period)
+       else:
+        base=[[r[0]+r[2],r[1]+r[3],r[2],r[3],(r[4]+1)&255] for r in live];dt=elapsed-150
+       want=[[b[0]+trunc(b[2]*dt,period),b[1]+trunc(b[3]*dt,period),b[2],b[3],b[4]] for b in base]
+       assert actor==want,('actors',stage,tick,elapsed,actor,want)
+       timeline.append((tick*150+elapsed,actor[0]))
+      # Only the isolated field clock can differ; presentation poses restore.
+      after=bytearray(c.read(data,len(before)));f=field-data;after[f:f+4]=before[f:f+4]
+      assert after==before,'exterior state leaked'
+     assert c.get(field,4)-100==steps*3,(c.get(field,4)-100,steps)
+     if stage<2:assert len({r[0][0] for r in shown})>=3
+     # Every actor picture moves forward and none jumps a whole native step.
+     timeline.sort()
+     steps_x=[b[1][0]-a[1][0] for a,b in zip(timeline,timeline[1:])]
+     assert all(0<=d<=2 for d in steps_x),('actor steps',stage,skip,steps_x)
+     rooms.append(dict(hz=rate,frame_skip=skip,stage=stage,fields=steps*3,pictures=len(shown),native=sum(1 for _ in timeline)-len(shown)))
   return dict(model=model,rejected_hooks=4,schedules=schedules,projections=projections,exterior=rooms,abort=True)
  finally:c.close()
 

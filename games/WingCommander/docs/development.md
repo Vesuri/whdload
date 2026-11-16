@@ -4853,6 +4853,11 @@ existing exterior/tunnel fixture. No instruction trace is retained. The native
 clock check asserts both coordinates at every PAL/NTSC subfield and verifies
 that compositor actor-table mutations do not escape render-only calls. This
 rejects the old partial-word dividend that sent the ship offscreen between ticks.
+With `--exterior-samples` the live check also samples 16 stage-1 compositor
+entries into `actors.json` and bounds each moving actor's per-picture step by the
+elapsed fields. Stage entry accepts the first wait of each stage (the previous
+stage's screenshot can run past `d2 = 0`) and measures durations from the
+stage epoch.
 
 
 ### Mission asteroid and mine fields

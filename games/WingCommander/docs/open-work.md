@@ -124,6 +124,8 @@ rules remain unchanged. See
 [waypoint layering](internals.md#waypoint-marker-layering).
 The exterior launch uses 50/3 Hz and the cockpit tunnel retains 10 Hz timing
 with intermediate rendering; the tunnel shares world extrapolation with the intro.
+Exterior intermediate pictures replay the bitmap actors from before the last
+native picture at fractional positions, so they move on every picture.
 The incoming-ship sampler clears the vertical dividend independently of X,
 preventing offscreen flicker, and intermediate redraws preserve bitmap actor state.
 See [mission launch timing](internals.md#mission-launch-timing).
@@ -1019,8 +1021,11 @@ Speed and pacing:
   already one picture per three fields (16.7/s PAL), unconfirmed. World speed
   excludes cutscenes by design, so this needs a separate decision.
 - **UR3 (U): launch camera less smooth than Psygore's** where the camera follows
-  the ship as the cockpit closes. Open, not investigated (exterior launch at
-  50/3 Hz, cockpit tunnel at 10 Hz).
+  the ship as the cockpit closes. Exterior launch fixed (2026-11-16):
+  intermediate pictures showed the next native actor state, so crew, tractor
+  and pilots jumped once per six fields and the first one repeated the native
+  picture; they now replay the pre-draw actors at fractional positions. Open:
+  the post-landing hangar scene (`E:1e93c`) is still native and unpaced.
 - **UR4 (H): no short pause in the simulator after the enemy ship info.** Open;
   whether the Amiga original pauses there is not yet known.
 

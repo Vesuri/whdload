@@ -110,8 +110,13 @@ def main():
             r=cmd('printf "VALUE %u\\n", '+expr)
             return int(re.search(r'VALUE (\d+)',r)[1])
         for stage,steps in enumerate((10,27,23)):
-            until(sb+sy['launch_exterior_wait'],'$d2 == 0')
-            first=number(f'*(unsigned int*){field:#x}')
+            # The previous stage's screenshot runs the emulator on; this
+            # stage's first wait may already have passed. Accept the first seen.
+            until(sb+sy['launch_exterior_wait'],f'$d0 == {stage}',timeout=180)
+            # A wait at d2 = 0 rebases the stage epoch to the current field.
+            entered=number('$d2')
+            first=number(f'*(unsigned int*){field:#x}' if entered==0 else f"*(unsigned int*){sb+sy['launch_exterior_epoch']:#x}")
+            assert entered<=2,(stage,entered)
             if a.exterior_samples and stage == 0:
                 until(sb+sy['launch_exterior_wait'],'$d2 == 4')
                 incoming=[]
@@ -130,10 +135,34 @@ def main():
                            and -2*((q[2]-p[2]+2)//3)<=q[1]-p[1]<=0
                            for p,q in zip(incoming,incoming[1:])),incoming
                 (out/'incoming.json').write_text(json.dumps(incoming)+'\n')
-            until(sb+sy['launch_exterior_wait'],f'$d2 == {steps-1}')
+            if a.exterior_samples and stage == 1:
+                # Every compositor entry, native or intermediate, draws each
+                # actor at record + velocity. Moving actors must advance by at
+                # most their share of the elapsed fields, never a whole step.
+                actors=h1+v.A4_BASE+(-0x5a44 if ocs else -0x5a2c)
+                skip=number(f'*(unsigned short*){h1+v.A4_BASE+(-32590 if ocs else -32622):#x}')
+                pictures=[]
+                for i in range(16):
+                    until(h0+(0x1d680 if ocs else 0x1e3b2))
+                    row=[]
+                    for slot in range(5):
+                        x,vx=(number(f'*(unsigned short*){actors+slot*24+o:#x}') for o in (0,4))
+                        x,vx=(q-65536 if q>=32768 else q for q in (x,vx))
+                        row.append((x+vx,vx))
+                    pictures.append((number(f'*(unsigned int*){field:#x}'),row))
+                moving=[s for s in range(5) if pictures[0][1][s][1]]
+                assert moving,pictures
+                for (f0,r0),(f1,r1) in zip(pictures,pictures[1:]):
+                    for s in moving:
+                        vx=r0[s][1];d=(r1[s][0]-r0[s][0])*(1 if vx>0 else -1)
+                        assert 0<=d<=abs(vx)*(f1-f0)//(6*skip)+1,(s,f0,f1,r0[s],r1[s])
+                fastest=max(moving,key=lambda s:abs(pictures[0][1][s][1]))
+                assert len({r[1][fastest][0] for r in pictures})>=6,pictures
+                (out/'actors.json').write_text(json.dumps(dict(frame_skip=skip,pictures=pictures))+'\n')
+            until(sb+sy['launch_exterior_wait'],f'$d2 == {steps-1}',timeout=180)
             last=number(f'*(unsigned int*){field:#x}')
-            assert (steps-1)*3<=last-first<=(steps-1)*3+10,(stage,first,last)
-            shot('exterior-'+str(stage));rows.append(dict(stage=stage,first=first,last=last,steps=steps))
+            assert (steps-1)*3<=last-first<=(steps-1)*3+10,(stage,entered,first,last)
+            shot('exterior-'+str(stage));rows.append(dict(stage=stage,entered=entered,first=first,last=last,steps=steps))
         until(sb+sy['launch_loop'])
         start=number(f'*(unsigned int*){field:#x}')
         until(sb+sy['intro_draw'],'$d2 >= 2')
