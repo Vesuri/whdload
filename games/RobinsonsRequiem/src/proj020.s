@@ -233,12 +233,15 @@ _prel   movem.l d3-d4/a4-a5,-(a7)
         asl.l   #6,d2
         tst.b   PR_CON(a5)
         beq     .ok
-        sub.w   PR_CF(a5),d0            ; less the camera's fraction (word arithmetic:
-        sub.w   PR_CF+2(a5),d1          ; the values fit in 20 bits, so extend again)
-        sub.w   PR_CF+4(a5),d2
-        ext.l   d0
-        ext.l   d1
-        ext.l   d2
+        move.w  PR_CF(a5),d3            ; less the camera's fraction (longs: 8192
+        ext.l   d3                      ; units are 19 bits in 1/64 units)
+        sub.l   d3,d0
+        move.w  PR_CF+2(a5),d3
+        ext.l   d3
+        sub.l   d3,d1
+        move.w  PR_CF+4(a5),d3
+        ext.l   d3
+        sub.l   d3,d2
         tst.l   d7
         beq     .ok
         move.w  PR_EN(a5),d3
