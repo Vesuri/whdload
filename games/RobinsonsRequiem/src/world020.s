@@ -492,8 +492,9 @@ P_SWAP  equ     _pswap-_pvars
 ; drawn, and the camera is put back. A frame drawn only for the staging takes the changed
 ; path after the drawing (+$3258: the other views and the swap), so the unchanged path's
 ; per-frame flags and countdown (+$326c-+$32aa: +$d54b, +$d581, +$d580) are done here for
-; it. No interpolation across a jump (a position step over I_JUMP or an angle over 45
-; degrees), for a new view or followed object, or outside 3D mode (W not in use).
+; it. A change more than the interval after the one before (the object was standing) is
+; shown at once, so a key's first step is not delayed. No interpolation across a jump (a
+; position step over I_JUMP or an angle over 45 degrees), for a new view or followed object, or outside 3D mode (W not in use).
 ; INTERP_OFF (a test define): alpha always 1.
 
 I_JUMP  equ     128
@@ -727,8 +728,8 @@ _isample
         move.l  I_CUR(a3),I_PREV(a3)
         move.l  I_CUR+4(a3),I_PREV+4(a3)
         move.l  I_CUR+8(a3),I_PREV+8(a3)
-        move.l  d7,d0                   ; the interval: since the last change, at most
-        sub.l   I_WR(a3),d0             ; the period on the cap's grid
+        move.l  d7,d0                   ; the interval: since the last change, the
+        sub.l   I_WR(a3),d0             ; period on the cap's grid when longer or none
         move.l  W_CAP(a1),a2
         moveq   #0,d1
         move.b  (a2),d1
@@ -744,6 +745,7 @@ _isample
         ble     .grid
         cmp.l   d2,d0
         bls     .den
+        bra     .snap                   ; longer: from standing, shown at once
 .grid   move.l  d2,d0
 .den    move.l  d0,I_DEN(a3)
         bra     .keep

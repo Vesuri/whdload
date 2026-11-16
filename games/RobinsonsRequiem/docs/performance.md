@@ -377,7 +377,16 @@ short periods run faster than the game ever runs them (`caporal` every 4 fields,
    walking up to the player; gdb at each changed drawing turning, `human`'s element was
    unmarked on 11 of 24 and its screen box unchanged, all 24 marked and moving with the
    fix). Extrapolation not tried; the pointer's picking in a staged frame not
-   checked.
+   checked. From standing the lag was the whole delay after the player's run: the
+   drawing in that pass showed the old pose and the first change came 3 fields later, 1
+   of the step's 3 degrees (ECS game on `a1200-030`, keypad 9 from standing, the heading
+   at each run of `heros` and the camera at each drawing). A change after more than the
+   player's period since the last is now shown at once: the drawing in the run's pass
+   shows the whole step (turning -63 to -66, walking 14 units), the frames until the
+   next run hold it, and from the next run on the frames are as before (the same
+   cameras in the same fields, both games on `a1200-030`, turning and walking). What
+   remains is the wait for the player's run, 0 to 9 fields (the key is read only there),
+   and the drawing.
 9. **The other moving objects between their runs** (done, `docs/internals.md`, "AGA
    improvements"): their 3D elements (`+$4792` moves them by their object's difference at
    each run) staged the same way for the drawing (`human` here); their animation frames
