@@ -522,15 +522,20 @@ decides only how close a real 68030 to 68060 gets.
     fields and more): 166 frames on the setup's core and 122 on the aprof core, as 10.2's.
 12. **The sky in fast memory** (done, `docs/internals.md`, "AGA improvements"):
     `_skyrows` read 4,196 longwords a frame from the sky's image, a resource in the chip
-    heap (width - 1 at `+2`, height at `+4`, the pixels from `+8`, 10,248 bytes in the
-    jungle; the row's source set at hunk 1 `+$e252` [`$126fe`]). It now reads a copy in a
+    heap (width - 1 at `+2`, height - 1 at `+4`, the pixels from `+8`; height + 1 rows read,
+    10,408 bytes in the jungle; the row's source set at hunk 1 `+$e252` [`$126fe`]). It now
+    reads a copy in a
     32 KB room from the fast memory list, made again when the image's address or size
     changes and after the sky's set-up (the script op `+$30bc`). Checks: with `MAPCHECK`
     the copy equal to the image at all 87 drawings of 500 fields turning and 67 walking
     (the map's and the shade table's copies still made); `tools/rr_skycheck.py` with every
     other case from the copy, 1,000 cases (a control with a stale copy taken as current
     differs at its first); the setup core's start and end screenshots pixel-identical to
-    step 11's. Measured at 400 MHz: 445 frames against 367 (44.5 fps, 22.5 ms), the sky
+    step 11's. The copy first left out the last row, which the loop then read from the
+    room's stale bytes; neither check saw it (`MAPCHECK` compared only the bytes copied,
+    and the checker's images were two rows taller than the rows read). Found in the ECS
+    game (ECS plan step 8), where that row showed black over part of the horizon; with the
+    checker's images now as tight as the rows read, the short copy fails it. Measured at 400 MHz: 445 frames against 367 (44.5 fps, 22.5 ms), the sky
     4.0 → 0.1 ms a frame, chip accesses 13.8 → 9.9 ms (18,351 → 13,980 a frame), busy 20.4
     → 16.5 ms, the world wait 5.8 → 4.8 ms; turning, 23 world passes and 42 frames between
     them in 66 fields, shown a field apart 62 times and 2 fields once. The estimate

@@ -71,7 +71,8 @@ _skyrows
 .done   rts
 
 ; The sky in fast memory (docs/performance.md, plan step 12). The image (a resource in the
-; chip heap: width - 1 at +2, height at +4, the pixels from +8) is copied into the room
+; chip heap: width - 1 at +2, height - 1 at +4, the pixels from +8: START reads height + 1
+; rows of width + 1 bytes, and the fill below from the last row) is copied into the room
 ; _skycopy took (K_BUF, 16-aligned; none: no copy) at the image's address modulo 16, so
 ; the rows' longword alignment is START's, and the rows are read from the copy. The copy
 ; is made again when the image's address or size changes and after the sky's set-up
@@ -88,9 +89,10 @@ _skyget movem.l d0-d2/a0-a2,-(a7)
         move.w  2(a0),d0
         addq.l  #1,d0                   ; a row's bytes
         moveq   #0,d1
-        move.w  4(a0),d1                ; the rows
+        move.w  4(a0),d1
+        addq.l  #1,d1                   ; the rows START reads: the height + 1 (+$e28e)
         mulu.l  d1,d0
-        addq.l  #8,d0                   ; the image's bytes
+        addq.l  #8,d0                   ; the bytes read from the image
         cmp.l   #SKYMAX,d0
         bhi     .x
         cmp.l   K_ORIG(a2),a0

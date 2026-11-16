@@ -8,7 +8,8 @@ segments, strides and bytes, and compares the view and the registers the code af
 can see: all but d3, which it sets (+$e2d8) or restores (+$e2e4) before reading, and a7.
 Sources on any alignment, odd row lengths included. Every other case _skyrows reads the
 sky from its copy in fast memory (plan step 12): an image's header placed around the rows
-(width - 1 at +2, height at +4, the pixels from +8), its address on the stack as START
+(width - 1 at +2, height - 1 at +4, as tight as the rows read allow, the pixels from +8),
+its address on the stack as START
 leaves it (+$e22a), the copy's room set (K_BUF); the copy must be made (K_ORIG) and the
 view and the registers be START's.
 
@@ -35,10 +36,10 @@ KVARS = CODE_NEW + 8        # the stub's pointer to _kvars (aga): K_BUF, K_ORIG
 SKY_SIZE, VIEW_SIZE = 0x100000, 0x100000
 GAMES = {
     'aga': dict(start=START, loop=0xe262, end=0xe292, width=0xedfe, src='sky030.s',
-                cpu=UC_CPU_M68K_M68020, opt='-m68020', even=False, copy=True),
+                cpu=UC_CPU_M68K_M68020, opt='-m68020', even=False, copy=True, hdr=8),
     'ecs': dict(start=ROOT / 'tmp/game/RobinsonsRequiem/data-ecs/START', loop=0xc8b8,
                 end=0xc8e8, width=0xd454, src='sky000.s', cpu=UC_CPU_M68K_M68000,
-                opt='-m68000', even=True, copy=False),
+                opt='-m68000', even=True, copy=False, hdr=6),
 }
 
 
@@ -81,10 +82,17 @@ def main():
         mod = ev * rnd.randrange(0, 80 // ev)
         src = SKY + 0x40000 + ev * rnd.randrange(0, 64 // ev)
         if copy:
-            img = src - 8 - row - rnd.randrange(0, 64)
-            height = (src + 2 * (abs(d0) + 1) + width + rows * row - img - 8) // row + 2
+            hdr = game['hdr']
+            img = src - hdr - row - ev * rnd.randrange(0, 64 // ev)
+            # the header's height (+4) as tight as the rows read allow: START reads height
+            # + 1 rows (its loop's dbf), so a copy of height rows leaves the last one out
+            seg1 = d0 + 1 if d0 >= 0 else 0
+            seg2 = max(width // 2 - d0 - 1, 0)
+            end = max(max(src + r * row + 2 * seg1, src + r * row + 2 * seg1 - row + 2 * seg2)
+                      for r in range(rows))
+            height = -(-(end - img - hdr) // row) - 1
             image = (struct.pack('>HHH', 0, row - 1, height) +
-                     sky[img + 6 - SKY:img + 8 - SKY])
+                     sky[img + 6 - SKY:img + hdr - SKY])
         dst = VIEW + ev * rnd.randrange(0, 64 // ev)
         regs = [rnd.getrandbits(32) for _ in range(16)]
         regs[0] = (regs[0] & 0xffff0000) | (d0 & 0xffff)
@@ -115,7 +123,7 @@ def main():
                 m.call(CODE_NEW, regs)
                 if copy:
                     if struct.unpack('>L', m.read(kvars + 4, 4))[0] != img:
-                        sys.exit(f'case {n}: no copy made (image {8 + row * height} bytes)')
+                        sys.exit(f'case {n}: no copy made (image {hdr + row * (height + 1)} bytes)')
                     copies += 1
             r = m.regs()
             keep = [r[i] for i in range(15) if i != 3]
