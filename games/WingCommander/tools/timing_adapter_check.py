@@ -71,7 +71,11 @@ def main():
                         want[off:off+6]=struct.pack('>HI',0x4eb9,s+sym[label])
                     for off,label in ((0x1fd00,'intro_title'),(0x1fe44,'intro_credits_end'),(0xc912,'projectile_gun_return'),(0xca5e,'projectile_missile_return'),(0xc316,'projectile_effect_return'),(0x9a52,'projectile_init_return'),(0x2b648,'timing_scene_allocate'),(0x3378e,'release_publish'),(0x337ea,'release_teardown'),(0x807a,'translation_velocity'),(0x80b6,'translation_position')):
                         want[off:off+6]=struct.pack('>HI',0x4ef9,s+sym[label])
-                if buffered:want[0x1fe4a:0x1fe4c]=bytes.fromhex('4e71')
+                if buffered:
+                    want[0x1fe4a:0x1fe4c]=bytes.fromhex('4e71')
+                    from opening_source import code_patches as opening_code_patches
+                    for off,width,label,op in opening_code_patches('cd32'):
+                        want[off:off+width]=struct.pack('>HI',op,s+sym[label])+bytes.fromhex('4e71')*((width-6)//2)
                 want[0x28c8c:0x28c8e]=bytes.fromhex('4e71')
                 want[0x43e:0x440]=bytes.fromhex('4e71')
                 want[0x3b94:0x3b96]=bytes.fromhex('4e71')
