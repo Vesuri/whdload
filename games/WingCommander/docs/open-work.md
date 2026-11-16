@@ -1000,6 +1000,68 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   - The right button is unused.
   - Not yet played by the user.
 
+#### User reports after 2.0b (UR1–UR15)
+
+Two reports received 2026-11-16, overlapping complaints combined: one from the
+separate-slave developer above (H), one from a player who prefers Psygore's
+modes (U, written about a build that still had them). Many points are personal
+preferences; none is accepted as a defect until it is reproduced or measured.
+Status is against the published 2.0b (15.11.2026). Refer to items by ID.
+
+Speed and pacing:
+- **UR1 (H, U): flight too slow at 10 Hz.** H finds 20 Hz right; U misses
+  Psygore's relaxed mode. Partly addressed: World speed 1.2x–2.0x exists, but
+  the icon default is 1.0x and Psygore's relaxed/slow/unlimited modes are gone.
+  Not measured: relaxed's flight rate on a 030/50, to compare with World speed.
+- **UR2 (H, U): cutscenes and animations too slow.** U: cutscenes in general;
+  H: the opening orchestra (about 16 fps, plus a pause before it) and the
+  applause (15–16 fps). Mostly open: the orchestra runs at 10 Hz (the PC
+  reference speed measures 9.0/s); the applause is probably the briefing crowd,
+  already one picture per three fields (16.7/s PAL), unconfirmed. World speed
+  excludes cutscenes by design, so this needs a separate decision.
+- **UR3 (U): launch camera less smooth than Psygore's** where the camera follows
+  the ship as the cockpit closes. Open, not investigated (exterior launch at
+  50/3 Hz, cockpit tunnel at 10 Hz).
+- **UR4 (H): no short pause in the simulator after the enemy ship info.** Open;
+  whether the Amiga original pauses there is not yet known.
+
+Firing and mouse:
+- **UR5 (H, U): firing.** U: shooting feels laggy on later ships (mass
+  drivers); H: the left button stops firing after click, wait, click and hold.
+  Open; different symptoms, investigate together. Enhanced fire is committed on
+  world ticks only (up to 100 ms at 1.0x); the Rapier, Scimitar and Raptor
+  cockpits are not checked live.
+- **UR6 (H): flight pointer briefly over the HUD or past the edges** when moved
+  fast, especially vertically; positioning less accurate than H's. Open. A
+  likely cause is the masked image and the sprite position updating a field
+  apart; the reference centre is the gunsight by choice, not the PC's window
+  middle.
+- **UR7 (H): right button for PC-style actions:** roll left/right, throttle
+  forward/back, double-click (and hold) for afterburner. Not implemented.
+- **UR8 (H): missiles on left+right together or the middle button.** Not
+  implemented.
+- **UR9 (H): mouse speed setting** (`MOUSE=nn` tooltype). Not implemented; the
+  pointer moves two counts a pixel, as the PC's.
+
+Graphics:
+- **UR10 (H): glyphs differ from the PC:** the simulator's "0", W/M missing
+  pixels in the small hull display. Open; the slaves draw the Amiga game's own
+  font data.
+- **UR11 (H): wrong palette after skipping** Game Over, ejection or the player
+  explosion (for example a red space colour in the funeral); H asks for our
+  "skip routines" to be removed. Open. The slaves add no skipping: the native
+  loops already test the game's abort flag, though some adapters poll it every
+  field rather than once per picture. Reproduce in Original speed first.
+- **UR12 (U): edges in the alarm/running sequences.** Fixed in enhanced mode;
+  see [running-pilot backgrounds](internals.md#running-pilot-cinematic-backgrounds).
+- **UR13 (U): smooth in WinUAE, choppier on FPGA and a 68030/50.** Open; all
+  evidence is emulator-only, with no real-hardware measurement.
+
+Features for later:
+- **UR14 (H): Secret Missions on the CD32 slave.** Not implemented.
+- **UR15 (H): more languages from text files, with localized fonts.** Not
+  implemented.
+
 Deferred local work: the pre-existing save/load length guard and native checks
 are preserved in stash `5237ca28782a8e1fd1f615c91232c80b2fd93391`
 (`Phase 12: deferred save-load length guard and native checks`). It contains only
