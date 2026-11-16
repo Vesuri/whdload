@@ -7580,6 +7580,21 @@ cursor, period, removal and allocation stay authoritative at 10 Hz. This smooths
 scaling, not the discrete source images themselves. Disabled enhancements retain
 the original code path.
 
+Model 49's script grows on some ticks and changes image on the others
+(image 0, grow, image 1, grow, image 2, grow, grow, …), so its native size is
+held for the tick before each image change. A receding explosion's projected
+scale (size over depth) then fell between ticks: each image grew for its growth
+ticks and shrank for the last one before the larger image replaced it. The
+native 10 Hz pictures never show this. When the native command executed last is
+growth and the next native command changes the image, the sampler now flags the
+slot. The renderer's scale store (`timing_scene_effect_scale`) then keeps a
+flagged staged picture's projected scale from falling below the previous
+picture's. The flag uses only the native state, because images are tick-owned:
+a display lead past the image command still shows the old image. Every picture
+records its scale, and the flags are cleared after each staged picture. Pure
+image animations, dwells, shrinks and removals are unaffected. A new image starts
+at its native scale.
+
 | Native operation | OCS H0 / file | CD32 H0 / file |
 |---|---|---|
 | Effect interpreter | `2800a / 28036` | `28f96 / 28fc2` |
@@ -7587,17 +7602,23 @@ the original code path.
 | Growth write | `280f8 / 28124` | `29084 / 290b0` |
 | Shrink write | `2811e / 2814a` | `290aa / 290d6` |
 | Frame write | `2812c / 28158` | `290b8 / 290e4` |
+| Projected scale store (hooked, 8 bytes) | `2931e / 2934a` | `2a2aa / 2a2d6` |
 
 `tools/effect_size_check.py` compares the preview with one or two executions of
 these original interpreters on 68000/020 (OCS) and 020/040 (CD32), including
 period waits, jump/removal, quantisation and word wrap. It also checks first
 interval staging, full data-hunk restoration, excluded classes and null scripts.
 Each model passes 7,200 native endpoint comparisons, plus exclusions and exact
-restoration. The modal-clock and public-option checks also pass on these builds.
+restoration. Ten script cases check the hold flag (growth then image, jumps,
+dwells, leads across both orders); four check the scale store; one checks that
+flags are cleared after a staged picture. The modal-clock and public-option checks also pass on these builds.
 The CD32 cached-030 PAL simulator capture replaces the old scale jump `270→292`
 with `301→303` at the corresponding script boundary. Both OCS and CD32 live
 runs record intermediate size changes, retain the Ready/Game Over deadlines
-and reach native name entry. This is a bounded
+and reach native name entry. In the Game Over capture the four hold ticks
+previously fell `338→317`, `308→293`, `300→290` and `307→299` before each new
+image; they now stay at `352`, `318`, `307` and `313`, matching on OCS and CD32.
+This is a bounded
 functional check; source-image changes remain discrete. Reproducible commands
 and live scope are in [development](development.md#explosion-size-sampling).
 

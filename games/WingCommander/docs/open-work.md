@@ -111,7 +111,9 @@ Simulator Ready/Game Over, bar/barracks and running-pilot motion now use
 CPU-independent timing in both enhanced versions; simulator world prediction,
 text zoom, running positions and bar-window motion receive intermediate samples.
 Explosion script sizes also receive intermediate samples, removing growth jumps
-against smooth camera motion; image frames and lifetime stay tick-owned.
+against smooth camera motion; image frames and lifetime stay tick-owned. On the
+tick where growth is followed by an image change the old image keeps its
+projected scale, so a receding explosion no longer shrinks before each larger image.
 The bar redraw restores the TV/foreground between ticks; bar and barracks cursor
 polling is capped at 25 Hz, preserving clicks for the native room loop. Hover
 titles are cached during input and repainted after every room composition,

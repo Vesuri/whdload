@@ -50,6 +50,27 @@ def check(build,variant,model):
         after=bytearray(c.read(DATA,data_size));after[sizeaddr-DATA:sizeaddr-DATA+2]=word(initial)
         require(bytes(after)==before,'preview changed script state')
         c.write(sizeaddr,word(initial));count+=1
+  # Native growth followed by a native image command flags the slot for the
+  # renderer's scale hold, also under a lead; other sequences and dwells do not.
+  flags=SLAVE+sy['timing_scene_effect_scales'];scaleaddr=a4+(0x227c if ocs else 0x2cee)+slot*2
+  c.write(a4+kind+slot*2,word(5))
+  for commands,at,delay,fraction,want in (((0x406,3),1,1,25,True),((3,3),1,1,25,False),
+    ((0x406,0x406),1,1,25,False),((0x406,0x803),1,1,25,False),((0x406,0xa000),1,1,25,False),
+    ((0x406,3),0,1,25,False),((0x406,3),1,2,25,False),((0x406,0x9003,0,3),1,1,25,True),
+    ((3,0x406,3),1,1,70,False),((0x406,3,0x406),1,1,70,True)):
+   c.write(script,struct.pack('>'+len(commands)*'H',*commands)+word(0)+word(0))
+   c.write(sizeaddr,word(1024));c.write(a4+period+slot*2,word(delay));c.write(a4+cursor+slot*2,word(at))
+   c.write(flags,bytes(128));before=c.read(DATA,data_size)
+   run('timing_scene_effect_size',{13:slot,15:fraction,16:50})
+   require(bool(c.get(flags+slot*2)&0x8000)==want,('hold flag',commands,at,delay,fraction))
+   require(c.read(flags,128)[:slot*2]+c.read(flags,128)[slot*2+2:]==bytes(126),'other slot flagged')
+   c.write(DATA,before);count+=1
+  for stored,shown,want in ((0x8000|100,90,100),(0x8000|100,120,120),(100,90,90),(0,90,90)):
+   c.write(flags+slot*2,word(stored));c.write(scaleaddr,word(0))
+   run('timing_scene_effect_scale',{9:slot*2,15:shown})
+   require(c.get(scaleaddr)==want and c.get(flags+slot*2)==want,('scale hold',stored,shown,c.get(scaleaddr)))
+   count+=1
+  c.write(flags,bytes(128))
   # Other classes and missing scripts must not preview an effect operation.
   for k in (0,1,2,3,4,7,8,11,12):
    c.write(a4+kind+slot*2,word(k));c.write(sizeaddr,word(1024))
@@ -74,7 +95,9 @@ def check(build,variant,model):
   put('timing_scene_valid',0);run('timing_scene_snapshot')
   before=c.read(DATA,data_size);run('timing_scene_begin')
   require(c.get(sizeaddr)==1062,('first interval did not sample growth',c.get(sizeaddr)))
+  c.write(flags+6,word(0x8000|5))
   run('timing_scene_end');require(c.read(DATA,data_size)==before,'staged effect leaked')
+  require(all(c.get(flags+2*i)<0x8000 for i in range(64)),'hold flag survived the picture')
   return dict(model=model,cases=count,first_interval_and_restoration=True)
  finally:c.close()
 

@@ -5006,7 +5006,8 @@ python3 tools/modal_live_check.py ocs tmp/effect-ocs-build --simulator-only --ou
 ```
 
 The short mode follows the actual simulator route, records 55 native/rendered
-explosion-size pairs, checks intermediate growth, verifies Ready/Game Over
+explosion-size pairs, checks intermediate growth and that the projected scale
+does not fall during a tick that holds the size before an image change, verifies Ready/Game Over
 clock durations and reaches the name prompt. It stops its own emulator. Reports
 and three screenshots stay in `tmp/`; it does not record a large instruction trace.
 This is a cached 030 PAL functional check, not a throughput or hardware claim.

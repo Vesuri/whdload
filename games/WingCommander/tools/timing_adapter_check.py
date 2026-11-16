@@ -76,6 +76,7 @@ def main():
                     from opening_source import code_patches as opening_code_patches
                     for off,width,label,op in opening_code_patches('cd32'):
                         want[off:off+width]=struct.pack('>HI',op,s+sym[label])+bytes.fromhex('4e71')*((width-6)//2)
+                    want[0x2a2aa:0x2a2b2]=struct.pack('>HI',0x4eb9,s+sym['timing_scene_effect_scale'])+bytes.fromhex('4e71')
                 want[0x28c8c:0x28c8e]=bytes.fromhex('4e71')
                 want[0x43e:0x440]=bytes.fromhex('4e71')
                 want[0x3b94:0x3b96]=bytes.fromhex('4e71')
@@ -94,7 +95,7 @@ def main():
             if custom!=3:assert c.read(layout["hunks"][3],0x1590)==opening_before
             cases.append(dict(model=model,custom=custom,exact=True));c.close()
         # A changed instruction operand must be rejected before any patch write.
-        for operand in ((0x81a6,0x81a8,0x30e,0x310,0x322,0x324,0x1398,0x139a,0x1de22,0x1de3e,0x1df52,0x1df6e,0x69a,0x2b64a,0x2b64c,0x308,0xc4e,0xc914,0xca60,0xc318,0x9a54,0x330,0x2fa,0x1fd02,0x1fddc,0x1fde2,0x1fe16,0x1fe46,0x1fe4a) if buffered else (0x69a,)):
+        for operand in ((0x81a6,0x81a8,0x30e,0x310,0x322,0x324,0x1398,0x139a,0x1de22,0x1de3e,0x1df52,0x1df6e,0x69a,0x2b64a,0x2b64c,0x308,0xc4e,0xc914,0xca60,0xc318,0x9a54,0x330,0x2fa,0x1fd02,0x1fddc,0x1fde2,0x1fe16,0x1fe46,0x1fe4a,0x2a2ac,0x2a2b0) if buffered else (0x69a,)):
             c=CPU(memory,layout,model);s=0x180000;resload=0x190000
             c.write(s,blob);c.write(s+0x1de4,struct.pack('>I',3))
             c.write(s+0x121e,struct.pack('>I',resload))

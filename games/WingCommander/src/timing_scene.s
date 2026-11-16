@@ -957,6 +957,43 @@ timing_scene_effect_size:
         lea     A_13260(a4),a2
         adda.w  d4,a2
         adda.w  d4,a2
+        ifne BUFFERED
+        ; D0 is zero only when the command executed last was growth: the word
+        ; before the cursor (a jump target is itself the executed command).
+        moveq   #1,d0
+        tst.w   d2
+        ble.s   .previous
+        move.w  d2,d0
+        ext.l   d0
+        add.l   d0,d0
+        movea.l a1,a0
+        adda.l  d0,a0
+        move.w  -2(a0),d0
+        andi.w  #$ec00,d0        ; jump/removal words are never growth
+        subi.w  #$400,d0         ; zero only after growth
+.previous:
+        ; Growth followed by an image change holds the size for a tick. The
+        ; receding effect would shrink before its larger image appears; let
+        ; the renderer hold its projected scale (timing_scene_effect_scale).
+        ; Images are tick-owned, so the native state alone decides, also
+        ; for a display lead that already samples the following command.
+        tst.w   d0
+        bne.s   .unflagged
+        bsr.w   .step            ; next native command, on local copies
+        cmpi.w  #3,d1
+        bne.s   .reload
+        lea     timing_scene_effect_scales(pc),a0
+        move.w  d4,d1
+        add.w   d1,d1
+        adda.w  d1,a0
+        bset    #7,(a0)
+.reload:
+        lea     A_16504(a4),a0
+        move.w  (a0,d4.w*2),d3
+        lea     A_16632(a4),a0
+        move.w  (a0,d4.w*2),d2
+.unflagged:
+        endif
         ; The display predictor can lead by one tick plus two fields. Walk
         ; that first tick locally before sampling the following command;
         ; clamping here would introduce a new kink at growth/dwell boundaries.
@@ -977,7 +1014,8 @@ timing_scene_effect_size:
         rts
 
 ; A read-only native script step: local cursor D2 and period D3, reset D5.
-; Return the unsigned endpoint size in D0. Never select an image or remove.
+; Return the unsigned endpoint size in D0 and the executed command in D1:
+; 0 none (dwell/removal), 1 growth, 2 shrink, 3 image. Never select or remove.
 .step:
         subq.w  #1,d3
         bgt.s   .held
@@ -1004,19 +1042,26 @@ timing_scene_effect_size:
         cmpi.w  #$400,d0
         beq.s   .grow
         cmpi.w  #$800,d0
-        bne.s   .held
+        bne.s   .image
         bsr.s   .amount
         neg.w   d0
+        moveq   #2,d1
         bra.s   .add
 .grow:
         bsr.s   .amount
+        moveq   #1,d1
 .add:
         add.w   (a2),d0
         andi.l  #$ffff,d0
         rts
+.image:
+        moveq   #3,d1
+        bra.s   .size
 .removed:
         move.w  #32767,d3
 .held:
+        moveq   #0,d1
+.size:
         moveq   #0,d0
         move.w  (a2),d0
         rts
@@ -1028,12 +1073,39 @@ timing_scene_effect_size:
         mulu.w  d1,d0
         rts
 
+        ifne BUFFERED
+; Renderer E:2a2aa: D0 = slot*2 (long), D6 = projected effect scale. Store
+; the scale as native code does. A staged picture flagged by the size sampler
+; never shows it below the previous picture; every picture records its scale.
+timing_scene_effect_scale:
+        lea     timing_scene_effect_scales(pc),a0
+        adda.l  d0,a0
+        move.w  (a0),d1
+        bpl.s   .store
+        andi.w  #$7fff,d1
+        cmp.w   d1,d6
+        bhs.s   .store
+        move.w  d1,d6
+.store:
+        move.w  d6,(a0)
+        lea     A_11502(a4),a0
+        adda.l  d0,a0
+        move.w  d6,(a0)
+        rts
+        endif
+
 timing_scene_end:
         movem.l d0-d2/a0-a2,-(sp)
         tst.w   timing_scene_staged(pc)
         beq.w   timing_scene_restored
         ifne BUFFERED
         bsr.w   timing_scene_restore_active
+        lea     timing_scene_effect_scales(pc),a0
+        moveq   #63,d0
+.unflag:
+        bclr    #7,(a0)
+        addq.l  #2,a0
+        dbra    d0,.unflag
         else
         lea     timing_scene_saved(pc),a0
         lea     timing_scene_pose_ranges(pc),a2
@@ -1090,6 +1162,9 @@ timing_scene_view: dc.w 0
 timing_scene_staged: dc.w 0
         cnop    0,4
 timing_scene_fraction: dc.l 0
+        ifne BUFFERED
+timing_scene_effect_scales: dcb.w 64,0
+        endif
 timing_scene_snapshot_data:
 timing_scene_positions: dcb.b 768,0
 timing_scene_velocities: dcb.b 768,0

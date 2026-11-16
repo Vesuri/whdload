@@ -93,7 +93,7 @@ waypoint_original_install:
     lines += ['\tlea E_6c8(a0),a1','\tlea timing_exit(pc),a3','\tmove.l a1,(a3)']
     for offset,label,opcode in patches:
         lines += [f'\tmove.w #${opcode:04x},{S.code(offset)}(a0)',f'\tlea {label}(pc),a1',f'\tmove.l a1,{S.code(offset+2)}(a0)']
-    if buffered: lines += ['\tmove.w #$4e71,E_1fe4a(a0)']
+    if buffered: lines += ['\tmove.w #$4e71,E_1fe4a(a0)','\tmove.w #$4e71,E_2a2b0(a0)']
     lines += [f'\tmove.w #$4e71,E_{o:x}(a0)' for o in (0x28c8c,0x43e,0x3b94,0x1022,0x65fa,0x4b1c,0x7bc8,0x87e)]
     lines += ['\trts',
               'timing_pause_original:',S.copy(code,0x878,0x880),

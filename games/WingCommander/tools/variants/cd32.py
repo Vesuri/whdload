@@ -22,7 +22,7 @@ BITMAP = dict(width=320, depth=8, leading_rows=0,
 SCENE = dict(title_updates=296, approach=135, departure=235,
              credit_pages=18, text_fields=220, page_fields=320)
 # Guard width applies only to non-absolute-JSR sites; JSRs guard relocated targets.
-WIDE_GUARDS = (0x28c86,0x7bc2,0x878,0x65f4,0x4b16,0x101c,0x438,0x3b8e,0x3378e,0x1fe44)
+WIDE_GUARDS = (0x28c86,0x7bc2,0x878,0x65f4,0x4b16,0x101c,0x438,0x3b8e,0x3378e,0x1fe44,0x2a2aa)
 TIMING_HOOKS = (
     (0x28c86, 'timing_debris_draw', 0x4ef9),
     (0x698, 'timing_loop', 0x4ef9),
@@ -48,6 +48,7 @@ TIMING_HOOKS = (
 )
 BUFFERED_HOOKS = (
     (0x294f0, 'effect_raster', 0x4eb9),
+    (0x2a2aa, 'timing_scene_effect_scale', 0x4eb9),
     (0x81a4, 'field_shot_query', 0x4eb9),
     (0x30c, 'waypoint_early', 0x4eb9),
     (0x320, 'waypoint_scene', 0x4eb9),

@@ -31,8 +31,8 @@ HOOKS=((0x7f1a,'field_shot_query',0x4eb9),(0x29114,'ocs_input_geometry_class',0x
  (0xc688,'ocs_projectile_gun',0x4ef9),(0xc08c,'projectile_effect_return',0x4ef9),
  (0xc7d4,'projectile_missile_return',0x4ef9),(0x97c8,'projectile_init_return',0x4ef9),
  (0x182de,'ocs_input_pad',0x4eb9),(0x182e8,'ocs_input_keys',0x4eb9),
- (0x18d2e,'ocs_input_command',0x4eb9))
-NOPS=(0x793e,)
+ (0x18d2e,'ocs_input_command',0x4eb9),(0x2931e,'timing_scene_effect_scale',0x4eb9))
+NOPS=(0x793e,0x29324)
 
 def number(v):return int(v[1:],16) if v.startswith('$') else int(v)
 

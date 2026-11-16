@@ -150,6 +150,12 @@ def main():
                 assert any(r['native_size']!=r['shown_size'] for r in effects),'no fractional size'
                 assert any(len({r['shown_size'] for r in effects if r['tick']==t})>=3
                            for t in {r['tick'] for r in effects}),'size still held between ticks'
+                # Growth then an image change holds the native size for a tick;
+                # the old image must not recede before its larger successor.
+                holds=[[r['projected_scale'] for r in effects if r['tick']==t]
+                       for t in sorted({r['tick'] for r in effects})
+                       if sum(r['tick']==t and r['shown_size']==r['native_size'] for r in effects)>=2]
+                assert holds and all(b>=a for h in holds for a,b in zip(h,h[1:])),('image hold shrinks',holds)
             until(sb+sy['intro_draw'],f'*(unsigned int*){field:#x} >= {start+(150 if label=='game-over' else 100)}')
             shot(label)
             until(sb+sy['intro_stop'])
