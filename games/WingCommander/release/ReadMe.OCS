@@ -111,6 +111,8 @@
    1.2x, 1.5x or 2.0x, or at the original processor-dependent speed.
  - Consistent game speed on faster processors and smoother cinematic movement.
  - Retimed intro, room, briefing, launch, landing, death and funeral animations.
+ - Training Simulator: the Get Ready text zooms in smoothly with the enhanced
+   framerate.
  - Improved projectile appearance and asteroid/mine hit detection; the
    player's cannon fire, asteroids and mines move evenly between updates.
  - Waypoint markers stay visible in front of nebulae in every mode.
