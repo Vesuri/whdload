@@ -8,12 +8,16 @@ installed at their BUFFERED_HOOKS sites. Checks: the native draw drifts against
 its centre (the control); with the hooks the hotspot lands on the requested
 pixel at every angle and a symmetric image's centroid stays within a quarter
 pixel; a draw clipped by a smaller rectangle equals the unclipped draw inside
-it, and nothing is written outside the clip rectangle. --full runs the larger
+it, and nothing is written outside the clip rectangle. Draws up to the
+largest object scale (8192), centred anywhere from far off screen, write
+nothing outside the clip rectangle or the bitmap, past either end of the row
+table; a slave whose clipped-table margin grows with the scale (the 2.0b
+crash) must fail this. --full runs the larger
 sweep recorded in docs/internals.md. --variant ocs runs the OCS release
 slave's hooks on the OCS renderer, on the 68000 and 68020 models, with the
 OCS frame record (a box about the hotspot and one byte record per row).
 """
-import argparse, json, struct
+import argparse, json, random, struct
 from pathlib import Path
 import numpy as np
 from field_objects_check import machine
@@ -69,6 +73,7 @@ class Renderer:
             self.init_ocs(build, model)
             return
         self.c, sy = machine(build, 'cd32', model, german)
+        self.sy = sy
         if german:
             import german_map
             self.at = german_map.get().code
@@ -91,6 +96,7 @@ class Renderer:
         from ocs_reconstruct import ROOT
         game = ROOT/'tmp/game/WingCommander/data/Wing.english'
         self.c, sy = ocs_machine(build, model)
+        self.sy = sy
         bare = Native(game, model=model)
         meta = json.loads((build/'build.json').read_text())
         self.sites = []
@@ -183,6 +189,54 @@ def clipped(r, images, scales, flags_set, angles, places, rects):
     return dict(cases=n, differing=differing, outside=outside)
 
 
+def margin(r, value):
+    """Set the clipped-table margin rot_centre loads (moveq #4,d0 before
+    lea rot_m(pc),a0) to `value` source/destination pixels."""
+    base = SLAVE+r.sy['rot_centre']
+    code = r.c.read(base, 0x400)
+    for at in range(0, len(code)-6, 2):
+        if code[at] == 0x70 and code[at+2:at+4] == b'\x41\xfa':
+            disp = struct.unpack('>h', code[at+4:at+6])[0]
+            if base+at+4+disp == SLAVE+r.sy['rot_m']:
+                r.c.write(base+at, bytes((0x70, value)))
+                return
+    raise ValueError('no clipped-table margin load in rot_centre')
+
+
+def bounds(r, cases, seed):
+    """Large and off-screen draws against guard memory: bitmap rows above
+    and below, and row pointers past both ends of the table into a guard."""
+    c = r.c; pad = 64; block = 0x440000; buf = block+pad*W; guard = 0x480000; extra = 256
+    rows = ROWS+extra*4
+    c.write(ROWS, b''.join(long(v) for v in [guard]*extra+[buf+W*y for y in range(H)]+[guard]*extra))
+    d = bytearray(32); d[0:4] = long(rows); d[20:22] = word(W); c.write(DST, bytes(d))
+    rng = random.Random(seed)
+    shapes = [(41, 41, 20, 20), (81, 41, 40, 20), (121, 81, 60, 40), (25, 61, 5, 40), (9, 5, 4, 2)]
+    rects = [(0, 0, W-1, H-1), (236, 133, 309, 198), (20, 15, 299, 184), (0, 0, 159, 99), (160, 100, 319, 199)]
+    n = outside = drawn = faults = 0
+    try:
+        r.hooks(True)
+        for _ in range(cases):
+            r.put(*rng.choice(shapes)); rect = rng.choice(rects)
+            angle, scale = rng.randrange(360), rng.choice((256, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8192))
+            flags, x, y = rng.choice((0, 16, 32, 48)), rng.randrange(-400, 720), rng.randrange(-300, 500)
+            c.write(DST+24, b''.join(word(v) for v in rect))
+            c.write(block, bytes(W*(H+2*pad))); c.write(guard, bytes(0x8000))
+            try:
+                c.run(0x2d0de if r.ocs else r.at(0x2d746), long(DST)+word(x & 0xffff)+word(y & 0xffff)+long(IMG)+word(0)+word(angle)+word(scale)+word(flags))
+            except RuntimeError:
+                faults += 1   # a stray write left the mapped memory; stop here
+                break
+            b = np.frombuffer(c.read(block, W*(H+2*pad)), np.uint8).reshape(H+2*pad, W).copy()
+            x0, y0, x1, y1 = rect; inner = b[pad:pad+H]; drawn += int(inner.astype(bool).sum())
+            inner[y0:y1+1, x0:x1+1] = 0
+            outside += int(b.astype(bool).sum())+int(np.frombuffer(c.read(guard, 0x8000), np.uint8).astype(bool).sum())
+            n += 1
+    finally:
+        r.init_dst()
+    return dict(cases=n, drawn=drawn, outside=outside, faults=faults)
+
+
 def check(build, model, german, full, ocs=False):
     r = Renderer(build, model, german, ocs)
     shapes = [(41, 41, 20, 20), (81, 41, 40, 20), (40, 24, 20, 12)]
@@ -198,6 +252,15 @@ def check(build, model, german, full, ocs=False):
     result['wide'] = clipped(r, [(121, 81, 60, 40), (9, 5, 4, 2), (64, 33, 31, 17)],
                              (40, 96, 512, 900) if full else (96, 900), (0, 16, 32, 48) if full else (16, 48),
                              range(0, 360, 11 if full else 29), places, [(20, 15, 299, 184)])
+    result['bounds'] = bounds(r, 1200 if full else 300, model)
+    require(result['bounds']['drawn'] > 0, 'bounds: nothing drawn')
+    require(result['bounds']['outside'] == 0 and result['bounds']['faults'] == 0,
+            f"bounds: {result['bounds']['outside']} pixels written outside, {result['bounds']['faults']} faults")
+    # Control: the margin of 4 + scale/256 the 2.0b release used (19 at 4000).
+    margin(r, 19)
+    control = bounds(r, 300, model)
+    require(control['outside'] > 0 or control['faults'] > 0, 'control: a scale-sized margin no longer writes outside')
+    result['bounds_control'] = control
     r.c.close()
     return result
 

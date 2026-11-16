@@ -7362,8 +7362,13 @@ from the unclipped geometry: every clipped draw equals the unclipped draw
 inside the clip. Safety is native: the box tested for "fully inside" is
 widened by two pixels, so a draw that its phases could move a pixel takes the
 clipped path, which clips every row exactly. The visible-source estimate gets
-the requested centre, its rectangle gets a margin of 4 + scale/256 at both ends
-(the native code has none at the start), and the clamps follow. The bounding box query
+the requested centre, its rectangle gets a margin of 4 at both ends (the
+native code has none at the start), and the clamps follow. The margin must not
+grow with the scale. The columns are not clipped again after their clamps, so
+a wider margin draws columns past the clip. The 2.0b (16.11.2026) release used
+4 + scale/256: an object close to the camera (scale up to 8192) wrote rows
+far outside the bitmap, which corrupted other images and crashed an A1200/040
+in the plain sprite drawer `E:2efe8` (a frame's pixel offset read `$F300058E`). The bounding box query
 `E:2d6d4`, used by the HUD (`E:346a`) and the world object loop (`E:8d7e`), is
 unchanged: its box can differ from a pinned image by up to two pixels.
 
@@ -7385,8 +7390,14 @@ With the hooks, at every angle, scales 128/256/400 and both mirror flags:
 
 The hotspot lands on the requested pixel at all 360 angles. In 28,368 clip cases
 per model (edges, corners, scales 40–900, centres off screen) clipped and unclipped draws
-are identical, and no pixel is written outside the clip rectangle. English and German
-give the same results on the 68020 and 68040 models. The remaining motion of an
+are identical, and no pixel is written outside the clip rectangle. In 1,200
+further draws per model at scales 256–8192, centred up to 400 pixels off
+screen, under five clip rectangles, nothing is written outside the clip
+rectangle, the bitmap's guard rows, or past either end of the row table. The
+control, the same slave with a margin of 19 (2.0b at scale 4000), writes
+outside on every model of both variants (1,036–12,151 pixels, most runs ending
+in a write fault). English and German give the same results on the 68020 and
+68040 models; OCS passes the same on the 68000 and 68020. The remaining motion of an
 off-centre frame comes from the shears themselves, which add and drop edge
 pixels as the angle changes. The live title check (`opening_live_check.py
 --title-only`) draws the real rotated logo through the hooks. These are

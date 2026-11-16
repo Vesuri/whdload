@@ -305,9 +305,7 @@ rot_centre:
         sub.w   d6,12(a5)               ; the hotspot lands on (x, y)
         sub.w   d7,14(a5)
         endc
-        move.w  10(a2),d0               ; clipped-table margin: 4 + scale/256
-        lsr.w   #8,d0
-        addq.w  #4,d0
+        moveq   #4,d0                   ; clipped-table margin
         lea     rot_m(pc),a0
         move.w  d0,(a0)
         lea     rot_on(pc),a0

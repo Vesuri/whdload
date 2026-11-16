@@ -4723,7 +4723,10 @@ every angle, both mirror flags and the 68020 and 68040 models (OCS: 68000 and
 68020; the default run is the 68000). It installs the `rot_*` entries of
 `BUFFERED_HOOKS` (OCS: the build's hook list) itself, so it tests the hook list
 the build uses.
-The report keeps the native control beside each hooked result.
+The report keeps the native control beside each hooked result. Every run
+also draws at scales up to 8192, centred far off screen, against guard memory
+(bitmap rows above and below, row pointers past the table), and requires a
+copy of the slave with the 2.0b scale-sized clipped-table margin to fail.
 
 
 ### Exhaust attachment motion

@@ -19,7 +19,12 @@ shake against their centre, and clipped draws match unclipped ones. One source,
 `src/rotation.s`, serves both; on OCS it is 68000 code. The Unicorn check
 passes in English and German on the 68020 and 68040 models, and for OCS on the
 68000 and 68020 models; live title checks pass on both, and the user confirmed
-the TrainSim screens on both (2026-11-16). Still open: a user look in flight,
+the TrainSim screens on both (2026-11-16). The published 2.0b (16.11.2026)
+crashed an A1200/040 after a close kill: its clipped-table margin grew with
+the scale, so a rotated object near the camera wrote outside the bitmap. The
+margin is now 4, and the check draws up to scale 8192 against guard memory.
+Not yet done: a user look at a close kill in flight, then a new release. Still
+open: a user look in flight,
 the cost per draw (not measured beyond
 a profile share), and the scale-only path. See
 [rotated bitmaps](internals.md#rotated-bitmaps-centred-tables-both-release-builds).
