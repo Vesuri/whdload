@@ -666,6 +666,12 @@ lbL00008E
 ;   intro, with MAIN's language byte ($e68) set to English (the flags screen is skipped);
 ; - in the block that loads init3d: the options menu's load and its object are branched
 ;   over. Level of detail ($383e) and 3D window ($383d) keep their boot value 0, HIGH.
+; A click during the jungle's set-up then reaches the pointer's 3D pick (hunk 1 +$afd8,
+; from yoda's script) before the view's projection is first set (+$e92e-+$e940, MAIN's
+; -940..-934 from the view's +$70..+$7a), and the point's projection (+$af4c) divides by
+; MAIN's -938, still 0 (an Integer Divide by Zero at +$af6c). Through the menu the set-up
+; comes first. +$af4c movem.l d3-d7,-(sp) / move.w d2,d4 (48e7 1f00 3802, checked first)
+; becomes jsr _pickproj, which gives the point (0,0,0) while that divisor is 0.
 
   IFD DEVELOPER
 
@@ -689,9 +695,34 @@ _directstart
         move.w  #$4eb9,$2540(a0)
         pea     _openhook(pc)
         move.l  (a7)+,$2542(a0)
-        move.l  _resload(pc),a2
+        move.l  d0,a1                   ; hunk 1: the point's projection
+        sub.l   #$eda8,a1
+        cmp.l   #$48e71f00,$af4c(a1)
+        bne     .flush
+        cmp.w   #$3802,$af50(a1)
+        bne     .flush
+        move.w  #$4eb9,$af4c(a1)
+        pea     _pickproj(pc)
+        move.l  (a7)+,$af4e(a1)
+.flush  move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
+
+; replaces +$af4c movem.l d3-d7,-(sp) / move.w d2,d4; a1 MAIN's variables plus the view's
+; offset (-938(a1) the divisor)
+_pickproj
+        tst.w   -938(a1)
+        bne     .on
+        addq.l  #4,a7                   ; to +$af4c's caller: the point (0,0,0)
+        moveq   #0,d0
+        moveq   #0,d1
+        moveq   #0,d2
+        rts
+.on     sub.w   #20,a7                  ; as movem.l d3-d7,-(sp) under the return
+        move.l  20(a7),(a7)
+        movem.l d3-d7,4(a7)
+        move.w  d2,d4
+        rts
 
 _openhook
         movem.l d0/a0-a2,-(a7)

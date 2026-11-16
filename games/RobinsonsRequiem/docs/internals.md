@@ -709,6 +709,16 @@ MAIN's bytes and writes a branch, offsets from the name (`a3`):
 | `logo.AO` | `+8` `40 0001 0839 38` (create the logo object), `+$603` `96 0000 42` (the path after an Esc in the logo) | `+8` `0a 0005f7`: that path; MAIN's `$e68` = 1 |
 | `init3d.AO` | `+$20` `2f 06 0e68 02` (load the menu by language), `+$5f` `07 00051d`, `+$97` `40 0054 0839 38` (create the menu, wait for it), `+$cc` `3d 0054` (free its slots) | `+$20` `0a 00003b` to `+$5f`; `+$97` `0a 000031` to `+$cc` |
 
+Skipping the menu changes one order: a click during the jungle's set-up reaches the
+pointer's 3D pick (hunk 1 `+$afd8`, from `yoda`'s script) before the view's projection is
+first set (`+$e92e`-`+$e940`, MAIN's `-940` to `-934` from the view's `+$70`-`+$7a`), and the
+point's projection `+$af4c` divides by MAIN's `-938`, still 0: an Integer Divide by Zero at
+`+$af6c` (a CoreDump of a user's run; reproduced with clicks from the boot, gone without
+them). Through the menu the set-up comes before any pick (gdb on both, clicks from Start
+on). So `_directstart` also makes `+$af4c` `movem.l d3-d7,-(sp)` / `move.w d2,d4` (`48e7
+1f00 3802`, checked first) a `jsr _pickproj`, which gives the point (0,0,0) while that
+divisor is 0. The ECS developer build does not crash under the same clicks.
+
 The ECS slave's `_directstart` does the same through hunk 0 `+$1af0` (`bsr.s $1a8a / bsr.w $fe`,
 `6198 6100 e60a`). Its MAIN differs: the options menu is one program (`prefs`), and the logo
 part also loads the pointer, `souris`, into slot 2, which `init3d` creates an object from.
