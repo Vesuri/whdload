@@ -1031,8 +1031,12 @@ Speed and pacing:
   and pilots jumped once per six fields and the first one repeated the native
   picture; they now replay the pre-draw actors at fractional positions. The
   post-landing hangar scene, previously unpaced, now uses the same pattern.
-- **UR4 (H): no short pause in the simulator after the enemy ship info.** Open;
-  whether the Amiga original pauses there is not yet known.
+- **UR4 (H): no short pause in the simulator after the enemy ship info.** Fixed
+  in enhanced mode (user decision, 2026-11-16). The original info animation has
+  no wait, so it ran at drawing speed, and the CD32 loop showed the finished
+  details for only 8 of its 50 passes (OCS: 21 of 70). It now steps every three
+  PAL / four NTSC fields, and CD32 runs 63 passes, holding the details for 21 as
+  on OCS: 1.26 s PAL, 1.4 s NTSC. See [enemy info pacing](internals.md#trainsim-enemy-info-pacing).
 
 Firing and mouse:
 - **UR5 (H, U): firing.** U: shooting feels laggy on later ships (mass

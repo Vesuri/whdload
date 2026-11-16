@@ -9082,6 +9082,37 @@ How it is checked:
 Not yet run live. The OCS revisions `116d` and `262d` are not covered because
 their files are missing.
 
+### TrainSim enemy info pacing
+
+After an enemy is selected, the fly-off and info animation (CD32 `E:17d06`,
+file `17d32`; OCS `O:17498`, file `174c4`) runs a fixed number of passes. Each
+pass draws, publishes (`E:31fc2` / `O:3260a`) and advances the rotation angle
+(`E:17aea` / `O:1727c`), with no wait, so the screen ran at drawing speed. The
+details appear by pass number. The last detail (the acceleration value) is drawn
+from pass 42 of 50 on CD32 and from pass 49 of 70 on OCS. The CD32 port therefore
+showed the finished details for 8 passes, about half a second in the reported
+recording, before Get Ready. The caller (`E:1827e` / `O:179e2`) frees the
+screen (`E:17afe`) and resources (`E:df2`) and does not wait either. Original mode
+keeps all of this.
+
+Enhanced mode hooks the publish call (`E:1802c` / `O:177be`, `modal_info_publish`).
+The first pass rebases a field cursor. Every pass publishes and then waits until
+three PAL or four NTSC fields have passed since the previous slot, and slower
+drawing keeps its debt. The native image script, rotation and pass thresholds
+are unchanged. On CD32 the loop limit operand at `E:18040` changes from 50 to
+63, so the details stay up for 21 passes, as on OCS (user decision, 2026-11-16).
+The hold is 63 fields on PAL (1.26 s) and 84 on NTSC (1.4 s). The whole animation
+takes 189/252 fields on CD32 and 210/280 on OCS.
+
+`tools/info_clock_check.py` runs the original routine on both variants and
+models, with the slave installed and drawing calls stubbed. Field time passes
+only inside `modal_info_idle`. The check confirms 63/70 passes, no wait before
+the first pass, the exact 3/4-field cadence, and debt retention when drawing
+takes 1 or 5 fields. `tools/timing_adapter_check.py` checks both installed CD32
+sites and rejects a changed operand at either. The live route used by the
+simulator checks enters the title's attract simulator, which skips selection
+and this animation. No live run of the real TrainSim screen has been made.
+
 ### TrainSim high scores and save records
 
 The OCS high-score table at `OD:bbcc` holds six 6-byte entries: a pilot-index

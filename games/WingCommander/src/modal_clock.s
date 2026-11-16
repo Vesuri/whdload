@@ -526,3 +526,34 @@ modal_crowd_wait:
         movem.l (sp)+,d0/a0
         rts
 modal_crowd_cursor: dc.l 0
+
+; TrainSim enemy info (E:17d06 / O:17498) has no native wait: its passes ran at
+; drawing speed. Publish, then pace one pass per 3 PAL / 4 NTSC fields from the
+; first pass, retaining debt. The native loop's image script is unchanged.
+modal_info_publish:
+        tst.w d2
+        bne.s .paced
+        move.l a0,-(sp)
+        lea modal_info_cursor(pc),a0
+        move.l MODAL_FIELD(a4),(a0)
+        movea.l (sp)+,a0
+.paced:
+        bsr.w modal_info_native
+        movem.l d0-d1/a0,-(sp)
+        ; The shared prediction payload can put the clock beyond d16(PC).
+        lea modal_info_publish(pc),a0
+        adda.l #MODAL_HZ-modal_info_publish,a0
+        moveq #3,d1
+        cmpi.l #50,(a0)
+        bls.s modal_info_idle
+        moveq #4,d1
+modal_info_idle:
+        move.l MODAL_FIELD(a4),d0
+        sub.l modal_info_cursor(pc),d0
+        cmp.l d1,d0
+        bcs.s modal_info_idle
+        lea modal_info_cursor(pc),a0
+        add.l d1,(a0)
+        movem.l (sp)+,d0-d1/a0
+        rts
+modal_info_cursor: dc.l 0

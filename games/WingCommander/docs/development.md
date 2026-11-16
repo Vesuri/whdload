@@ -4980,6 +4980,19 @@ It retains only compact reports and two additional screenshots. This exercises
 the cinematic with native assets, not docking permission, collision detection,
 mission completion or the subsequent debriefing.
 
+## TrainSim enemy info pacing
+
+```sh
+. ../../common/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/info-cd32-build
+python3 tools/ocs_memory_build.py --public --output tmp/info-ocs-build
+python3 tools/info_clock_check.py cd32 tmp/info-cd32-build --output tmp/info-cd32-check
+python3 tools/info_clock_check.py ocs tmp/info-ocs-build --output tmp/info-ocs-check
+python3 tools/timing_adapter_check.py tmp/info-cd32-build --output tmp/info-cd32-options
+```
+
+The native check needs no emulator. See [internals](internals.md#trainsim-enemy-info-pacing).
+
 ## Explosion size sampling
 
 Build separate enhanced candidates and compare their render-only size sampler

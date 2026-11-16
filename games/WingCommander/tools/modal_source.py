@@ -18,7 +18,13 @@ def specification(variant):
                 (0x19b02 if ocs else 0x1a7fe,6,'modal_death_publish')]
     for i,publish in enumerate((0x230da,0x23340,0x1c474) if ocs else (0x23f3c,0x241a2,0x1d19e)):
         patches += [(publish,6,f'modal_crowd_publish{i}')]
+    patches += [(0x177be if ocs else 0x1802c,6,'modal_info_publish')]
     return upper,feet,sim,begin,wait,patches
+
+
+# CD32 enemy-info pass limit (cmpi.w #50,d2 operand): the details appear from
+# pass 42, so 63 holds them for 21 passes as the OCS loop (49 of 70) does.
+INFO_LIMIT=(0x18040,50,63)
 
 
 def source(root, variant):
@@ -65,6 +71,8 @@ def source(root, variant):
         if label.startswith('modal_crowd_publish'):
             lines += [label+':', ' tst.w '+('d2' if label.endswith('0') else 'd4'), ' bne.s .ready', ' bsr.w modal_crowd_rebase', '.ready:', ' bsr.w '+label+'_native', ' bra.w modal_crowd_wait']
             native(label+'_native',int.from_bytes(code[off+2:off+6],'big'))
+        if label=='modal_info_publish':
+            native('modal_info_native',int.from_bytes(code[off+2:off+6],'big'))
     death=0x19a94 if ocs else 0x1a7a8
     lines += ['modal_death_begin:', ' bsr.w modal_death_rebase',
               S.copy(code,death,death+8)]
@@ -96,13 +104,18 @@ def source(root, variant):
                       ' move.l a0,d0',f' addi.l #{S.code(target)},d0',f' cmp.l {S.code(off+2)}(a0),d0',' bne.w modal_bad']
         else:
             for n in range(0,width,2):lines += [f' cmpi.w #{S.word(code,off+n)},{S.code(off+n)}(a0)',' bne.w modal_bad']
+    if not ocs:
+        at,old,_=INFO_LIMIT
+        assert int.from_bytes(code[at:at+2],'big')==old and code[at-2:at]==bytes.fromhex('0c42')
+        lines += [f' cmpi.w #{S.word(code,at)},{S.code(at)}(a0)',' bne.w modal_bad']
     lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_install:',' bsr.w funeral_install',' bsr.w landing_install',' bsr.w ejection_install',' bsr.w autopilot_install',' bsr.w launch_install',' movem.l d0-d7/a0-a6,-(sp)']
     for label,target in fix:
         lines += [' move.l a0,d0',f' addi.l #{S.code(target)},d0',f' lea {label}+2(pc),a1',' move.l d0,(a1)']
     for off,width,label in patches:
-        op=0x4eb9 if off in begin+wait or label in ('modal_room_input','modal_death_publish') or label.startswith(('modal_label_','modal_crowd_publish')) else 0x4ef9
+        op=0x4eb9 if off in begin+wait or label in ('modal_room_input','modal_death_publish','modal_info_publish') or label.startswith(('modal_label_','modal_crowd_publish')) else 0x4ef9
         lines += [f' move.w #${op:x},{S.code(off)}(a0)',f' lea {label}(pc),a1',f' move.l a1,{S.code(off+2)}(a0)']
         for n in range(6,width,2):lines += [f' move.w #$4e71,{S.code(off+n)}(a0)']
+    if not ocs:lines += [f' move.w #{INFO_LIMIT[2]},{S.code(INFO_LIMIT[0])}(a0)']
     lines+=[' movem.l (sp)+,d0-d7/a0-a6',' rts','modal_bad:',
             ' movem.l (sp)+,d0-d7/a0-a6','modal_bad_target:',' bra.w '+('wrong_revision' if ocs else 'timing_bad')]
     from launch_source import source as launch_source
