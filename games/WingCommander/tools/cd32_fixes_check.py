@@ -23,7 +23,7 @@ import argparse, ctypes as C, hashlib, json, re, struct
 from pathlib import Path
 from c2p_check import u, ck, P, I, Q, Z
 from runtime_buffers import load as load_slave
-from mouse_model import APERTURE, POINTER, KEY, Pointer, cockpit
+from mouse_model import APERTURE, POINTER, KEY, Pointer, cockpit, FIRE_SEQUENCE, fire_poll, fire_expected, fire_native_holds
 
 u.uc_emu_stop.argtypes = [P]; u.uc_emu_stop.restype = I
 
@@ -379,6 +379,7 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
     assert pads['psygore', 0] & (1 << 22) == 0 and pads['psygore', 1] == pads['psygore', 0]
     assert pads['fixed', 0] == pads['psygore', 0] and pads['fixed', 1] == pads['psygore', 0] | (1 << 22)
     out['left_button'] = 'pass'
+    out['flight_fire'] = fire_cases(cfg, psy, fixed, blob, sy)
     # Pad record reset: the release guard (counter -1) only while a fire
     # button is held; Psygore's list keeps it always.
     for name, code in (('psygore', psy), ('fixed', fixed)):
@@ -395,6 +396,48 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
     out['name_entry'] = name_cases(cfg, fixed, blob, sy)
     out['flight'] = steer_cases(cfg, psy, fixed, blob, sy)
     return out
+
+
+def fire_cases(cfg, psy, fixed, blob, sy):
+    """Left button in flight: the VBL server's port-1 read and native decode
+    (E:33e9e), field by field, then the flight poll's fire and modifier."""
+    pad = cfg['mouse']['pad']
+    assert struct.unpack('>H', fixed[pad+6:pad+8])[0] == 0x41f9 and fixed[pad+12:pad+14] == b'\x61\x18'
+    record = struct.unpack('>I', fixed[pad+8:pad+12])[0]
+    rows = {}
+    for name, code, flight in (('psygore', psy, True), ('fixed', fixed, False), ('fixed', fixed, True)):
+        m = Machine(code, blob, cfg, {})
+        for hw in (0xbfe000, 0xdff000):
+            ck(u.uc_mem_map(m.h, hw, 0x1000, 3))
+        m.write(record, bytes(20)+struct.pack('>hh', 15, 10))
+        polled = []
+        for down in FIRE_SEQUENCE:
+            if name == 'fixed':
+                fields = struct.unpack('>H', m.read(SLAVE+sy['mouse_fields'], 2))[0]
+                m.write(SLAVE+sy['stick_field'], struct.pack('>H', fields if flight else (fields-100) & 0xffff))
+            m.write(0xbfe001, bytes([0xbf if down else 0xff]))
+            m.reg(8, STACK); m.reg(17, 0x2700)
+            ck(u.uc_emu_start(m.h, pad, pad+14, 0, 100000))
+            assert m.reg(18) == pad+14
+            polled.append(fire_poll(m.read(record, 16)))
+            m.write(record+6, bytes(2))                 # the poll's read clears the click events
+        rows[name, flight] = polled
+        if name == 'fixed' and flight:
+            # The red button keeps its native scheme, and so does a reset record (guard).
+            for d1, counter in ((0xc0, 0), (0x40, -1)):
+                m.write(record, bytes(18)+struct.pack('>h', counter))
+                m.write(SLAVE+sy['stick_field'], m.read(SLAVE+sy['mouse_fields'], 2))
+                m.call(SLAVE+sy['mouse_flight_fire'], b'', [(1, record), (2, SLAVE+sy['pad_fire']), (10, d1)])
+                assert m.read(record, 20) == bytes(18)+struct.pack('>h', counter), (hex(d1), m.read(record, 20).hex())
+        m.close()
+    assert rows['psygore', True] == [(False, False)]*len(FIRE_SEQUENCE)
+    native = rows['fixed', False]
+    assert fire_native_holds(FIRE_SEQUENCE, native) > 0, 'control: a hold alone fired'
+    got, want = rows['fixed', True], fire_expected()
+    bad = [i for i, (g, w) in enumerate(zip(got, want)) if g != w]
+    assert not bad, ('flight fire', bad[:8], [got[i] for i in bad[:8]])
+    return dict(fields=len(FIRE_SEQUENCE), fired=sum(f for f, _ in got),
+                native_fired=sum(f for f, _ in native), native_modifier=sum(m for _, m in native))
 
 
 def steer_cases(cfg, psy, fixed, blob, sy):

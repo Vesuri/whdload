@@ -8759,7 +8759,8 @@ and its fire and guard hooks. Addresses:
   CD32 calls Psygore's pad read and sets the red-button bit 22 when bit 6 is
   low. Every native fire state then follows: current, held, click and double
   click. That includes the input history of the enhanced builds, which copies
-  the native record.
+  the native record. In flight the left button fires while held; see
+  [the next section](#left-button-in-flight-fire-while-held).
 - **Click release guard.** Every screen change resets the pad records
   (OCS `O:33f02`, 21 callers; CD32 `E:33dee`, 21 callers), setting the click
   counter to -1. The VBL decoder ignores the next release while it is -1, so the
@@ -8844,6 +8845,59 @@ is a linear 19-level stick deflection. The keyboard steering keys are ORed into
 the same flags by the decoder (`E:18c5e`). The original has no proportional
 (analogue) steering path; the release slaves add
 [mouse flight](#mouse-flight-both-release-builds-every-mode).
+
+### Left button in flight: fire while held
+
+User report UR5: holding the left button fired, but after a release and a
+pause holding it again did not fire. That is the game's one-button scheme,
+which the left button inherited as port-1 fire. The VBL decoder (OCS
+`O:33fa4`, CD32 `E:33e9e`, file `33fd0` / `33eca`) keeps per port: current
++4, held +5, double-click event +6, click event +7, held after a double click
++8, a double-click flag (OCS +9, CD32 +16) and a click counter (OCS +10, CD32
++18), with the hold threshold (15 fields) and the double-click window (10)
+after the record (`OD:77d4/77d6`, `D:7e1a/7e1c`). A release before the
+threshold is a click; a press within the window after one is a double click.
+The flight poll (OCS `O:182ce`, CD32 `E:18c5e`) fires on +8 or +7 (CD32 also
+on the yellow button +13, and both on Space) and sets the modifier, which
+makes the directions throttle and roll, on +5 without +8. So:
+
+| Input | Native result in flight |
+|---|---|
+| A click (under 15 fields) | One shot at the release |
+| A click, then within 10 fields a hold | Fire after 15 fields of the hold, for as long as it is held |
+| A hold alone | The modifier after 15 fields; no fire |
+
+`mouse_flight_fire` (`src/mouse.s`) runs from each variant's port-1 sampler
+before the native decode: CD32 `mouse_pad` (it finds the record from the
+server's `lea` after its call), OCS `mouse_fire`. A left button press while
+the flight controller has run in the last 25 fields, with the red button or
+stick fire up and no release guard, sets the click counter to 1, so the press
+decodes as a double click's second press, and sets +8 at once. While held it
+keeps the counter at the threshold, so +5 and +8 stay set: fire, never the
+modifier. At the release it clears +5 (the native release keeps it one more
+field, a one-field modifier) and, after a hold shorter than the threshold,
+latches the click +7. The enhanced input history carries +6/+7 to the next
+world tick, so a click shorter than a tick still fires. Outside a flight, and
+for the red button and stick fire, the native scheme is unchanged.
+
+How it is checked:
+- **Native.** `tools/cd32_fixes_check.py` (both languages) runs the VBL
+  server's port-1 read and decode, `ocs_options_check.py` the OCS sample and
+  decode after both installs, field by field through a 30-field hold, a
+  100-field release, a 60-field hold, a one-field and a three-field click,
+  taking the poll's fire and modifier as `tools/mouse_model.py` does. In flight
+  every held field fires, each short click's release fires and the modifier
+  never comes on (96 of 254 fields fire). The same build with no flight
+  is the control: the holds give the modifier for 60 fields and only the two
+  clicks fire. The red button or stick fire, and a guarded record, leave the
+  record to the native decode. Psygore's list (no left button) never fires.
+- **Live.** `tools/mouse_live_check.py --flight --fire` (CD32 English) enters
+  the simulator flight and holds the left button 60 fields, releases it 100,
+  holds it 60 and releases it, sampling every 5 fields. 16.11.2026, enhanced
+  mode: the gun energy falls from 100 to 88 in both holds (one volley at the
+  press and one 35 fields later), the modifier is never on and the controller
+  runs throughout. The committed build before the fix: energy stays 100 in both
+  holds and the modifier is on from 15 fields. OCS has no live run.
 
 ### Mouse flight (both release builds, every mode)
 
@@ -8957,8 +9011,8 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   per-field preview, and the hook acts in both. The position comes from the
   live sums, not from the per-field input history, so catch-up ticks in one
   frame share the latest position. In original modes it runs at the game's
-  frame rate. The left button is still port-1 fire (the guns); the right button
-  is unused. The mask copy runs at each aperture scan (flight start and view
+  frame rate. The left button is port-1 fire and fires while held (below);
+  the right button is unused. The mask copy runs at each aperture scan (flight start and view
   changes): the aperture's rows of 320 pixels. Its cost is not measured.
 
 How it is checked:

@@ -432,9 +432,69 @@ mouse_vbl:
         cmpi.w  #IDLE_GAP,d0
         bls.s   .done
 .hide:
-        bsr.s   stick_hide
+        bsr.w   stick_hide
 .done:
         movem.l (sp)+,d0/a0
+        rts
+
+; Left button in flight: fire while it is held, as the PC's. The game decodes
+; its one fire button per field (OCS O:33fa4, CD32 E:33e9e): a click fires
+; once at its release, a click and then a hold within the double-click window
+; fires while held, and a hold alone is the modifier (directions throttle and
+; roll) after the hold threshold (15 fields). So the left button held after a
+; pause never fired. From the variant's port-1 sampler, before the native
+; decode: a0 = the port-1 record, a1 = its offsets (bytes: double-click flag,
+; click counter, hold threshold), d1.b bit 6 = left button down, bit 7 = the
+; native button (pad red, stick fire) down. A left button press while the
+; flight controller runs, with the native button up, is decoded as the second
+; press of a double click, with held fire at once; the hold keeps the counter
+; at the threshold, so it fires and is never the modifier. A release before
+; the threshold also latches the click, so a short click that falls between
+; two world ticks still fires. Without a flight, or with the native button,
+; the native decode is unchanged. Keeps every register.
+mouse_flight_fire:
+        movem.l d0/d2-d3/a2,-(sp)
+        moveq   #0,d2
+        move.b  1(a1),d2                ; click counter
+        moveq   #0,d3
+        move.b  2(a1),d3
+        move.w  (a0,d3.w),d3            ; hold threshold
+        lea     fire_held(pc),a2
+        tst.w   (a2)
+        bne.s   .forced
+        btst    #7,d1
+        bne.s   .done                   ; the native button: its own scheme
+        btst    #6,d1
+        beq.s   .done
+        tst.b   4(a0)
+        bne.s   .done                   ; held since before: native
+        move.w  mouse_fields(pc),d0
+        sub.w   stick_field(pc),d0
+        cmpi.w  #HIDE_GAP,d0
+        bhi.s   .done                   ; no flight
+        tst.w   (a0,d2.w)
+        bmi.s   .done                   ; the screen's release guard
+        move.w  #1,(a0,d2.w)            ; the second press of a double click
+        st      8(a0)                   ; held fire now
+        move.w  #1,(a2)                 ; fields held, counting this one
+        bra.s   .done
+.forced:
+        tst.w   (a0,d2.w)
+        bmi.s   .end                    ; the record was reset: native again
+        btst    #6,d1
+        beq.s   .release
+        addq.w  #1,(a2)
+        move.w  d3,(a0,d2.w)            ; held: fire, not the modifier
+        bra.s   .done
+.release:
+        clr.b   5(a0)                   ; the release decode keeps it a field
+        cmp.w   (a2),d3
+        bls.s   .end
+        move.b  #1,7(a0)                ; a short click: its shot is latched
+.end:
+        clr.w   (a2)
+.done:
+        movem.l (sp)+,d0/d2-d3/a2
         rts
 
 ; Hide the flight pointer by clearing its image's control words, with no
@@ -753,6 +813,7 @@ stick_ptr:      dc.w 0,0                ; pointer offset from the gunsight, half
 stick_owned:    dc.w 0                  ; sprite 7: 0 not yet, 1 ours, -1 taken
 mask_top:       dc.w 0                  ; screen row of the mask's first row
 mask_rows:      dc.w 0                  ; mask rows (0: no aperture)
+fire_held:      dc.w 0                  ; left button fire: fields held (0: native)
         cnop    0,4
 stick_image:    dc.l 0                  ; Chip pointer image, 0 without one
 stick_ss:       dc.l 0                  ; SimpleSprite, then the mask

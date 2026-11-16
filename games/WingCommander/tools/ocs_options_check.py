@@ -13,7 +13,7 @@ import struct
 from ocs_display_check import Native, CODE, DATA, STARTUP, STACK, STOP, ck, u, word, long
 from ocs_reconstruct import ROOT, new_output, require
 from ocs_icon import enhanced_icon, tooltypes
-from mouse_model import APERTURE, KEY, Pointer, cockpit
+from mouse_model import APERTURE, KEY, Pointer, cockpit, FIRE_SEQUENCE, fire_poll, fire_expected, fire_native_holds
 
 
 GFX,RECT,IMAGE,EVENT,CHIP,ANY,SURFACE=0x1a0000,0x1a1000,0x1a1100,0x1a2000,0x1a3000,0x1a4000,0x1b0000
@@ -65,6 +65,25 @@ def mouse_scenario(c,slave,sy):
     for pra in (0xff,0xbf,0x7f,0x3f):
         c.write(0xbfe001,bytes([pra]));segment(0x33f88,0x33f94);fire[pra]=c.reg(9)&255
     require(fire=={0xff:0,0xbf:1,0x7f:1,0x3f:1},'left button is not port-1 fire')
+    # Left button in flight: the sample and native decode (O:33fa4) field by
+    # field, then the flight poll's fire and modifier; without a flight the
+    # native scheme (a hold alone is the modifier) is the control.
+    record=DATA+0x77c8;require(c.get(record+12,2)==15 and c.get(record+14,2)==10,'click thresholds')
+    rows={}
+    for flight in (False,True):
+        c.write(record,bytes(12));polled=[]
+        for down in FIRE_SEQUENCE:
+            fields=c.get(slave+sy['mouse_fields'],2)
+            c.write(slave+sy['stick_field'],word(fields if flight else (fields-100)&0xffff))
+            c.write(0xbfe001,bytes([0xbf if down else 0xff]));segment(0x33f82,0x33f96)
+            polled.append(fire_poll(c.read(record,9)));c.write(record+6,bytes(2))
+        rows[flight]=polled
+    require(fire_native_holds(FIRE_SEQUENCE,rows[False])>0,'control: a hold alone fired')
+    require(rows[True]==fire_expected(),'left button flight fire')
+    c.write(record,bytes(10)+word(0));c.write(0xbfe001,bytes([0x3f]))
+    c.write(slave+sy['stick_field'],word(c.get(slave+sy['mouse_fields'],2)));segment(0x33f82,0x33f96)
+    require(c.read(record,9)[8]==0,'stick fire took the mouse path')
+    c.write(record,bytes(12))
     guard={}
     for pra in (0xff,0xbf,0x7f):
         c.write(0xbfe001,bytes([pra]));c.write(a4-2114,b'\x5a'*24)

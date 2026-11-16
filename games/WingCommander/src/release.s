@@ -157,15 +157,35 @@ release_patchseg:
         rts
 
 ; Port-1 pad read in the VBL server (Psygore's S:1c2e); the left mouse button
-; (CIA-A PRA bit 6) adds the red button, which the game decodes as fire.
+; (CIA-A PRA bit 6) adds the red button, which the game decodes as fire. In
+; flight mouse_flight_fire makes it fire while held. The call returns to the
+; server's lea of the port-1 record, which it decodes next.
 mouse_pad:
         bsr.w   slave+$1c2e
         bsr.w   mouse_vbl               ; a0 is reloaded after this call
+        movem.l d1/a0-a1,-(sp)
+        moveq   #0,d1
+        btst    #22,d0
+        beq.s   .red
+        bset    #7,d1                   ; the red button
+.red:
         btst    #6,$bfe001
         bne.s   .up
         bset    #22,d0
+        bset    #6,d1                   ; the left button
 .up:
+        movea.l 12(sp),a0
+        cmpi.w  #$41f9,(a0)+            ; lea abs.l,a0
+        bne.s   .done
+        movea.l (a0),a0
+        lea     pad_fire(pc),a1
+        bsr.w   mouse_flight_fire
+.done:
+        movem.l (sp)+,d1/a0-a1
         rts
+; Pad record: double-click flag, click counter, hold threshold (E:33e9e).
+pad_fire:
+        dc.b    16,18,20,0
 
 ; Pad record reset (a0 = record): the click counter -1 ignores the next
 ; release. Keep it only for a red button or left mouse button held now.

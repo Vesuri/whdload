@@ -428,10 +428,20 @@ mouse_fire:
  move.b $bfe001,d0
  not.b d0
  andi.b #$c0,d0
+ ; In flight the left button fires while held (a0 = the port-1 record).
+ move.b d0,d1
+ move.l a1,-(sp)
+ lea ocs_pad_fire(pc),a1
+ bsr.w mouse_flight_fire
+ movea.l (sp)+,a1
+ tst.b d0
  sne d0
  neg.b d0
  addq.l #6,(sp)
  rts
+; Port-1 record: double-click flag, click counter, hold threshold (O:33fa4).
+ocs_pad_fire:
+ dc.b 9,10,12,0
 ; Port-1 record reset: the click counter -1 ignores the next release (the
 ; first click after each screen change). Keep it only while fire is held.
 ; Registers and the caller's condition codes are not used after this.

@@ -38,7 +38,7 @@ GAMES = {
                 menu=(0x1f43c, 0x1f44e), flight=(0x1869e, 3720, -18318, -4188, 0)),
     'cd32': dict(pointer=(0xa88, -1156), field=-252, intro=((0x1898a, 0x1fbba), (0x1898a, 0x20164)),
                  menu=(0x20214, 0x20226), name=(0x16fc6, 0x16fd0, 17716, 17706),
-                 flight=(0x19064, 5882, -18280, -4318, -532)),
+                 flight=(0x19064, 5882, -18280, -4318, -532), fire=(0x9546, 18120)),
     'cd32-de': dict(pointer=(2740, -1112), field=-208, intro=((0x18a44, 0x1fcbe), (0x18a44, 0x2026c)),
                     menu=(0x2031c, 0x2032e), name=(0x17064, 0x1706e, 17766, 17756),
                     flight=(0x1911e, 5926, -18236, -4274, -488)),
@@ -52,6 +52,7 @@ def main():
     p.add_argument('--setup', default='a1200-030', help='AMIGA_SETUP (OCS also a500: 68000, 4 MiB Fast)')
     p.add_argument('--name-entry', action='store_true', help='CD32: also the TrainSim name entry grid')
     p.add_argument('--flight', action='store_true', help='mouse steering and the pointer in the simulator flight')
+    p.add_argument('--fire', action='store_true', help='CD32 English --flight: instead of steering, the left button held after a pause fires')
     p.add_argument('--german', action='store_true', help='CD32: the German executable (CUSTOM1=1)')
     p.add_argument('--direct-flight', action='store_true',
                    help='CD32 English --flight only, on a tools/flight_fixture.py --release build: the mission flight, no menu')
@@ -62,6 +63,8 @@ def main():
         p.error('--german: the OCS release supports English only')
     if a.direct_flight and (a.variant != 'cd32' or a.german or a.original_mode or a.name_entry or not a.flight):
         p.error('--direct-flight: CD32 English enhanced --flight only')
+    if a.fire and (a.variant != 'cd32' or a.german or not a.flight):
+        p.error('--fire: CD32 English --flight only')
     game = GAMES['cd32-de' if a.german else a.variant]
     out = new_output(a.output); out.mkdir(parents=True)
     v = get(a.variant); ocs = a.variant == 'ocs'
@@ -181,6 +184,8 @@ def main():
             x, y = row['sprite']
             drawn = [(x+1+c, y+r) for r in range(9) for c in range(9) if row['lines'][r] >> (31-c) & 1]
             return drawn, all(image.getpixel((74+2*px, 92+2*py)) == colour for px, py in drawn)
+        if a.fire:              # the ship is destroyed about 5 s in: the steering steps do not fit too
+            return [dict(fire=fire(var))]
         rows = [dict(motion=(0, 0), **state())]
         shot('flight-before')
         top = rows[0]['aperture'][5]
@@ -223,6 +228,34 @@ def main():
         assert r[5]['sprite'] == (220-5, 0-4) and r[5]['drawn'] == 0, r[5]
         assert r[6]['sprite'] == (220-5, top) and r[6]['drawn'] > 0 and r[6]['pitch'] == 9, r[6]
         return rows
+
+    def fire(var):
+        # The left button held, released, then held again: the guns fire in
+        # both holds (gun energy D:9546 falls) and the modifier never comes
+        # on. Natively a hold alone is the modifier after 15 fields.
+        energy, modifier = game['fire']
+        first = number(f'*(short*){h1+energy:#x}')
+        def held():             # a build without the fix (a control) has no fire_held
+            try:
+                return var('fire_held')
+            except KeyError:
+                return None
+        hold = []
+        for down, n in ((1, 60), (0, 100), (1, 60), (0, 50)):
+            cmd(f'monitor input JOY1_FIRE_BUTTON {down}')
+            samples = []
+            for _ in range(n//5):
+                cmd('monitor fields 5')
+                samples.append((number(f'*(short*){h1+energy:#x}'), number(f'*(unsigned char*){a4+modifier:#x}'),
+                                [number(f'*(unsigned char*){a4-504+i:#x}') for i in range(4, 9)]+[number(f'*(short*){a4-504+18:#x}')],
+                                (held(), var('mouse_fields')-var('stick_field'))))
+            hold.append(dict(down=down, fields=n, energy=[s[0] for s in samples], modifier=sum(s[1] for s in samples),
+                             record=[s[2] for s in samples], slave=[s[3] for s in samples]))
+        # The flight controller ran throughout (the slave's in-flight test).
+        assert all(gap <= 6 for h in hold for _, gap in h['slave']), hold
+        assert min(hold[0]['energy']) < first and min(hold[2]['energy']) < hold[1]['energy'][-1], (first, hold)
+        assert hold[0]['modifier'] == hold[2]['modifier'] == 0, hold
+        return dict(energy=first, holds=hold)
 
     rows = {}
     try:

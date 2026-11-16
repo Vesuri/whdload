@@ -87,3 +87,41 @@ def cockpit(x, y):
     solid = (y < 10 or y > 114 or (x < 24 and y > 44) or (100 <= x < 220 and y >= 72)
              or (x, y) in ((158, 58), (156, 64)) or (200 <= x < 204 and y < 40))
     return 5 if solid else KEY
+
+
+# Left button in flight (mouse_flight_fire). One entry per field: the button
+# down or up. The game's flight poll fires on record +8 (held after a double
+# click) or +7 (a click's release; the read clears it) and takes the modifier
+# on +5 (held past the threshold) without +8. CD32 also fires on +13.
+FIRE_SEQUENCE = [1]*30 + [0]*100 + [1]*60 + [0]*20 + [1] + [0]*20 + [1]*3 + [0]*20
+
+
+def fire_poll(record):
+    """(fire, modifier) the flight poll takes from a decoded port-1 record."""
+    fire = bool(record[8] or record[7] or (len(record) > 13 and record[13]))
+    return fire, bool(record[5] and not record[8])
+
+
+def fire_expected(sequence=FIRE_SEQUENCE, threshold=15):
+    """In flight: fire on every held field and on the release of a hold
+    shorter than the threshold; never the modifier."""
+    want, run = [], 0
+    for i, down in enumerate(sequence):
+        if down:
+            run += 1
+            want.append((True, False))
+        else:
+            want.append((0 < run < threshold, False))
+            run = 0
+    return want
+
+
+def fire_native_holds(sequence, polled):
+    """Native control: no hold of the threshold or longer fired after its
+    first fields (a hold alone is the modifier)."""
+    run, stuck = 0, 0
+    for down, (fire, modifier) in zip(sequence, polled):
+        run = run+1 if down else 0
+        if run > 15 and modifier and not fire:
+            stuck += 1
+    return stuck

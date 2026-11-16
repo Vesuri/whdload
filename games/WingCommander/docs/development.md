@@ -54,7 +54,7 @@ are its negative controls),
 both install paths) and the installer staging check. The live mouse check is separate and bounded:
 
 ```
-python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode] [--flight] [--name-entry] [--german]
+python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode] [--flight [--fire]] [--name-entry] [--german]
 python3 tools/mouse_live_check.py ocs tmp/build/release/WingCommander --output tmp/mouse-live-ocs [--original-mode] [--flight] [--setup a500]
 ```
 
@@ -66,6 +66,12 @@ image and (CD32) both flight copper lists' BPLCON4 at the controller's ramp
 store after each. It checks the pointer, stick and image against
 `tools/mouse_model.py` and each image pixel in the screenshot `flight-*.png`,
 in the pointer colour (playfield origin (74, 92), two screen pixels a pixel).
+
+`--fire` (CD32 English, with `--flight`) runs, in place of the steering steps,
+which do not fit in the same flight before the ship is destroyed, the left button
+held, released and held again (60, 100, 60 fields). It samples the gun energy
+`D:9546`, the modifier flag, the port-1 record and `fire_held` every 5 fields;
+both holds must spend energy, with no modifier and the controller running.
 
 A real mission cockpit (the Nav-1 Hornet) needs the direct-flight fixture,
 CD32 English only: the release slave with the game's direct-flight argument.

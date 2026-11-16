@@ -1039,11 +1039,13 @@ Speed and pacing:
   on OCS: 1.26 s PAL, 1.4 s NTSC. See [enemy info pacing](internals.md#trainsim-enemy-info-pacing).
 
 Firing and mouse:
-- **UR5 (H, U): firing.** U: shooting feels laggy on later ships (mass
-  drivers); H: the left button stops firing after click, wait, click and hold.
-  Open; different symptoms, investigate together. Enhanced fire is committed on
-  world ticks only (up to 100 ms at 1.0x); the Rapier, Scimitar and Raptor
-  cockpits are not checked live.
+- **UR5 (H, U): firing.** H: the left button stops firing after click, wait,
+  click and hold. Fixed: in flight the left button now fires while held (the
+  game's one-button scheme made a hold alone the modifier; internals, "Left
+  button in flight"). Checked natively on both variants and live on CD32. U:
+  shooting feels laggy on later ships (mass drivers). Open. Enhanced fire is
+  committed on world ticks only (up to 100 ms at 1.0x); the Rapier, Scimitar
+  and Raptor cockpits are not checked live.
 - **UR6 (H): flight pointer briefly over the HUD or past the edges** when moved
   fast, especially vertically; positioning less accurate than H's. Open. A
   likely cause is the masked image and the sprite position updating a field
