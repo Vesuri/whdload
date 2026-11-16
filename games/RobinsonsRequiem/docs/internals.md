@@ -377,7 +377,8 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    the same rectangle into the same planes a longword at a time: each pair of chunky
    longwords packed into one longword of nibbles, then four exchanges into the four plane
    words. `tools/rr_ecsc2pcheck.py` checks it against START's loop byte for byte under
-   Unicorn.
+   Unicorn. On the 68000, item 7's `_c2pblit` takes the jump instead when it has its
+   memory, and on the 68020 and up, item 4's `_c2p020` does.
 2. **The sky copy by longwords** (`_skypatch`, `src/sky000.s`): hunk 1 `+$c8b8`-`+$c8e7`
    [`$101b0`], START's row loop copying the sky into the chunky view a word at a time,
    checked byte for byte (with the address of `<hunk 1 +$d454>` at `+$c8c8`), becomes
@@ -415,7 +416,8 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
        AGA's `+$2d00` does.
 
      The 68000 keeps START's allocations. With 4 low-resolution planes the chip bus
-     costs it nothing, and the copies would. The code runs only on the 68020 and up, but
+     costs it little, and the copies would cost more (while item 7's blits run, the
+     conversion's chunky reads do wait for the bus). The code runs only on the 68020 and up, but
      is assembled for the 68000: hunk 1 offsets above `$7fff` go through an index
      register. `MAPCHECK` compares both copies with the originals at every drawing, as in
      the AGA slave.
@@ -487,6 +489,30 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
      allocation), `+$78ce` (the compaction) and `+$7322` (its reset); each becomes a `jsr`
      that does the same and empties the cache. `MAPCHECK` compares every copy given with
      its image. `OBJCOPY_OFF` (a test define) leaves this out.
+7. **The conversion's last exchanges on the blitter** (`_cbinst`, `src/c2pblit.s`;
+   `docs/performance.md`, ECS plan step 11), on the 68000 only: item 1's site jumps to
+   `_c2pblit` instead of `_c2p000` when `_cbinst` got its memory at install: two 16,000-byte
+   sets of streams in chip memory and a 304-byte table and state in any memory.
+   - The CPU does `_c2p000`'s pack, and writes each 16-pixel block's four words to four
+     streams, a row of each after the other. Three blitter stages do the 8-, 1- and 2-bit
+     exchanges: two blits each for the first two (both word lanes at once, set 1 to set 2
+     and back), and four into the planes for the third. Each exchange is an ascending blit
+     (`A & ~C | B >> s & C`) and a descending one (`A & C | B << s & ~C`), with the mask in
+     `BLTCDAT`.
+   - The rows go in bands of 32, the first taking what is left over and the last two 16
+     and 8. At the end of each row, when a band is written and the blitter is idle, the
+     CPU starts the next of the band's eight blits. After the last row it starts the rest
+     as each ends, and returns with the blitter idle. START's own blits (hunk 2) start
+     without waiting for the blitter, and none of them is called from the game's
+     vertical-blank handler (hunk 0 `+$e80`; the mouse pointer, hunk 2 `+$48`-`+$34d`, is
+     drawn by the CPU). They run with `BLTPRI` set and clear it after.
+   - A rectangle with more than 16,000 bytes of streams (8 bytes a pixel row per 16
+     pixels: 320 × 100, 256 × 125) goes to `_c2p000`. `C2PBLIT_OFF` (a test define)
+     leaves this out. `tools/rr_ecsc2pcheck.py` checks `_c2pblit` against START's loop
+     under Unicorn, with a model of the blitter. `C2PCHECK` (a test define) converts each
+     rectangle again with `_c2p000` into a copy and compares the planes word for word
+     (`_ckcalls`, `_ckbad`); it saves the loop's entry registers itself, since the stack
+     holds those of START's routine (hunk 2 `+$19a2`), not the loop's.
 
 ## The AGA's sites in the ECS game
 

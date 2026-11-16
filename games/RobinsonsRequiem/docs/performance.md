@@ -222,6 +222,7 @@ slave's address recorded so that the report names the slave's routines):
 | v1.2 | 15 | 649.5 ms | 182.6 ms | 128.2 ms | 103.7 ms | 27.5 ms |
 | 1: a merge chunky-to-planar | 17 | 596.3 ms | 138.9 ms | 121.4 ms | 94.0 ms | 25.8 ms |
 | 2: the sky by unrolled longwords | 17 | 578.2 ms | 143.3 ms | 122.6 ms | 95.9 ms | 13.9 ms |
+| 11: the conversion's last exchanges on the blitter | 20 | 511.3 ms | 84.0 ms | 118.9 ms | 86.2 ms | 12.9 ms |
 
 The functions other than the step's own change between the rows with the view (the walk
 goes further with more frames).
@@ -711,9 +712,9 @@ ECS, from 666.7 ms (1.5 fps), far from both caps on a 7 MHz 68000:
 
 On the A500, stop there: the code that is left is register-bound (the landscape), unrolled already (the
 fills, 65 ms) or small (the objects, 41 ms, and the logic), each a rewrite for a few per
-cent. The conversion is the largest item (143 ms, 25% after step 2): the blitter, idle, could
-take its last exchanges in parallel with the CPU (planes and an intermediate buffer in chip
-memory). Beyond that, fewer pixels (the LOW detail and window settings), not code.
+cent. The conversion was the largest item (143 ms, 25% after step 2): step 11 puts its last
+exchanges on the blitter, idle until then, in parallel with the CPU. Beyond that, fewer
+pixels (the LOW detail and window settings), not code.
 
 `tools/rr_snap.py` and `tools/rr_land.py` are the check any patch to the landscape needs:
 snapshots of the machine at its entry (hunk 1 `+$bee2`) in the walk, then the landscape run
@@ -950,9 +951,55 @@ is, each step below chosen at install, and the game has to keep working correctl
       the wait for the swap to show (hunk 0 `+$c9e`, 7.2 ms) and the conversion's plane
       writes (`_c2p020`, 2.1 ms of its 2.8). The sprite routine takes 0.1 ms and the cache
       0.1 ms.
-11. **The A500 path**: what helps only the 68000 without fast memory: the conversion's
-    last exchanges on the blitter, in parallel with the CPU (the blitter is idle there,
-    0.1% of the DMA slots), and steps 3 and 4's few milliseconds.
+11. **The A500 path: the conversion's last exchanges on the blitter** (done,
+    `docs/internals.md`, "ECS improvements", item 7), on the 68000 only.
+    - **What changed** (`src/c2pblit.s`): the CPU keeps `_c2p000`'s pack (two 4-bit
+      exchanges and byte selects a 16-pixel block) and writes the block's four words to
+      four streams in chip memory. The blitter does the 8-, 1- and 2-bit exchanges in
+      three stages, eight blits for each band of rows, the last four into the planes. The
+      CPU starts the next blit at the end of a row when the blitter is idle, so the blitter
+      works while the CPU converts the next rows. The bands are 32 rows, shrinking to 16
+      and 8 at the end, so little is left to wait for after the last row. Its memory: 32 KB
+      of chip for the streams and 304 bytes elsewhere for the blits' table, from the system
+      at install; without them, `_c2p000` as before.
+    - **Checks.**
+      - `tools/rr_ecsc2pcheck.py 3000`: every rectangle byte-identical to START's loop
+        (2,799 through the blits, 73,432 blits; the rest larger than the streams, through
+        `_c2p000`). The blits run in a model of the blitter from the Hardware Reference
+        Manual, checked first on hand-worked blits.
+      - In the emulator, with `C2PCHECK` on the A500: every conversion's planes equal to
+        `_c2p000`'s from the same chunky rectangle (63 of 63 in 2,000 fields turning and
+        2,000 walking).
+      - On the A500 (`custom`), step 10's 8 poses: the first camera's screenshot
+        pixel-identical. With frames faster, the player turns further between the others,
+        as on the `a3000-50` in step 9.
+      - The release build from the reset on the A500: pixel-identical to step 10's to
+        field 1203. After that the logo's sparkle and the language screen's flags are at
+        other points of their animations, and it reaches the language screen with its
+        pointer. On the `a3000-50`, which runs `_c2p020`, pixel-identical to step 10's to
+        field 3611.
+      - START's blits start without waiting for the blitter, and the conversion returns
+        with it idle. None of them is called from the game's vertical-blank handler: the
+        mouse pointer is drawn by the CPU (INFERRED from the code, not traced in play).
+    - **Measured** (Barto, the walk's 500 fields, per frame drawn):
+
+      | | `_c2p000` (`C2PBLIT_OFF`) | `_c2pblit` |
+      |---|---|---|
+      | A500 (`custom`: 1 MB chip, 2 MB fast) | 17 frames, mean interval 576.9 ms, conversion 143.3 ms | 20 frames, 511.3 ms, 84.0 ms |
+      | A500 with 1.5 MB slow memory, no fast (`MemConfig=1`) | 18 frames, 583.0 ms, 136.3 ms | 19 frames, 529.4 ms, 96.5 ms |
+
+      On the `custom` A500, 75.1 ms of the conversion's 84.0 is the CPU's block loop, 280
+      cycles a block against 254 by the 68000's timings: its chunky reads wait for the bus
+      while a blit runs. The wait for the last blits after the last row takes 1.8 ms. The
+      blitter takes 4.0% of the DMA slots, against 0.2%. With slow memory the code also
+      runs on the chip bus and waits for the blits too.
+    - **Steps 3 and 4: not done.** Step 3's flag clear (hunk 1 `+$c1de`, `clr.w
+      <+$bec4>`) cannot simply go: the flag says that the previous sample was an object
+      column (hunk 1 `+$c486`, which sets it at `+$c72c` and tests it at `+$c6b2`), and the
+      next empty sample has to clear it, so leaving it out takes a second copy of the loop.
+      The reload of `-604(a1)` (`+$c1b4`) can be rewritten in place (about 1.4 ms, 0.25% of
+      a frame), less than the walk's frame intervals resolve. Step 4 found no change worth
+      making.
 
 ## Reproducing
 
@@ -964,6 +1011,10 @@ BUILD=profile APROF=1 FSUAE=$FSUAE_APROF EXTRA_ARGS=--uae_mmu_model=0 \
 BUILD=profile FSUAE=$FSUAE_ARM python3 tools/rr_prof.py tmp/prof/base-arm
 # ECS (v1.2's figures: BUILD=developer at commit a8bb6fbe)
 VARIANT=RobinsonsRequiem SETUP=custom BUILD=profile BARTO=1 python3 tools/rr_prof.py tmp/prof/ecs
+# the same on an A500 with slow memory instead of fast (ECS step 11; v1.2's 256 KB ExpMem);
+# DEFINES_<build>=... with -DC2PBLIT_OFF=1 for _c2p000
+WHD_ARGS=MEMCONFIG=1 FAST_KB=0 SLOW_KB=1536 VARIANT=RobinsonsRequiem SETUP=custom \
+    BUILD=profile BARTO=1 python3 tools/rr_prof.py tmp/prof/ecs-slow
 python3 tools/rr_report.py tmp/prof/base-aprof
 # the chip floor ("AGA, to 50 fps"): the same with the 68030 at 400 MHz
 BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
@@ -998,7 +1049,7 @@ python3 tools/rr_sites.py
 # the AGA conversion and sky copy against START's loops (after make unpack)
 python3 tools/rr_c2pcheck.py 2000
 python3 tools/rr_skycheck.py 2000
-# the ECS conversions (68000 and 68020) and sky copy against START's loops
+# the ECS conversions (68000, 68000 with the blitter, 68020) and sky copy against START's loops
 python3 tools/rr_ecsc2pcheck.py 3000
 python3 tools/rr_skycheck.py ecs 2000
 # the landscape: snapshots at its entry in the walk, then each run under Unicorn as the

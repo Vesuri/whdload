@@ -27,10 +27,14 @@ slower, 137 frames); on the 68040 and 68060 the slave uses Kalms' 040/060 conver
 plan for the A500 is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
-landscape code being register-bound (about 1% each). On the AGA's 50 MHz 68030 the ECS
-game draws 57 frames against the AGA's 122 (its data all in chip memory, its frames on the
-player's runs only); of its plan to 50 fps on 68020 and up with fast memory (steps 5-11,
-the A500 path apart) steps 5-10 are done: the tools find START in any machine's fast
+landscape code being register-bound (about 1% each). The fast-CPU plan's step 11, the
+A500's own path, put the conversion's last three exchanges on the blitter, in parallel
+with the CPU: 20 frames in the walk, the mean interval 576.9 → 511.3 ms, the conversion
+143.3 → 84.0 ms a frame (on an A500 with slow memory instead of fast, 583.0 → 529.4 ms);
+its share of steps 3 and 4 was examined again and not done. On the AGA's 50 MHz 68030 the
+ECS game draws 57 frames against the AGA's 122 (its data all in chip memory, its frames on the
+player's runs only); its plan to 50 fps on 68020 and up with fast memory (steps 5-10,
+with step 11 for the A500) is done: the tools find START in any machine's fast
 memory, the ECS `profile` build counts frames, `tools/rr_passes.py` and `tools/rr_objects.py`
 take the ECS game, and `tools/rr_sites.py` maps the AGA slave's patch sites to the ECS
 game's (`docs/internals.md`, "The AGA's sites in the ECS game"). Step 7 gave the slave a 1 MB
@@ -73,11 +77,12 @@ Next, in order:
    equal (240 drawings, 4,419 object images given) and filled step 13's cache to 63,919
    of its 65,536 bytes (37 images) before emptying it once. The 040/060 conversion on a
    real 040 or 060.
-2. The ECS plan's step 11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"): the
-   A500's own path. To be checked in play, as in the AGA game: steps 9 and 10's staged
-   creatures, the mouse pointer and scripts' drawing with the swap, the pointer's picking
-   between world passes, and the image cache in other areas. The game has to keep working
-   correctly on the 68000: each step chosen at install and checked on the A500 as well.
+2. The ECS plan's checks in play (`docs/performance.md`, "Plan", "ECS on a fast CPU"),
+   as in the AGA game: steps 9 and 10's staged creatures, the mouse pointer and scripts'
+   drawing with the swap, the pointer's picking between world passes, and the image cache
+   in other areas. On the A500, step 11's blitter conversion with the game's own blits
+   (inventory, messages) and in other areas. The game has to keep working correctly on
+   the 68000.
 3. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`); step 10.2's swap is play-tested with the
    mouse pointer moving and the scripts drawing (inventory, messages). The AGA game's

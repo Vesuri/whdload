@@ -816,8 +816,10 @@ _c2ppatch
         lea     _c2p000(pc),a2
         move.l  _attnflags(pc),d0
         and.w   #AFF_68020,d0
-        beq     .set
-        lea     _c2p020(pc),a2
+        bne     .020
+        bsr     _cbinst                 ; the 68000: _c2pblit with its chip memory
+        bra     .set
+.020    lea     _c2p020(pc),a2
 .set    lea     _c2pentry(pc),a3
         move.l  a2,(a3)
         move.w  #$4ef9,(a1)
@@ -842,6 +844,7 @@ _c2pmod         dc.l    0
 _c2pentry       dc.l    0               ; _c2p000 or _c2p020
 
         INCLUDE c2p000.s
+        INCLUDE c2pblit.s
         INCLUDE c2p020.s
 
 **********************************************

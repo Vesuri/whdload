@@ -76,6 +76,8 @@
  - On 68020 and up: the game's objects' images in Fast memory, and on a fast
    enough CPU more frames between the game's steps, up to one every field (50
    per second on PAL)
+ - On 68000: the chunky-to-planar conversion shared with the blitter, which
+   uses 32 KB of Chip memory
 
  version 1.2 (29.03.13) done by CFou!:
  - First two bitplanes memory allocation fixed for fast memory support (AGA)

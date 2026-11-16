@@ -51,9 +51,11 @@ LAYOUTS = {
 }
 # START is in the machine's Zorro II fast memory, from $200000 (the A500's 2 MB to $400000,
 # the a3000-50's and the A1200 setups' 8 MB to $a00000), where WHDLoad puts the slave's
-# ExpMem. gdb's find stops at the first unreadable byte and then reports no match at all, so
-# the search ends where fast memory does (fast_end).
+# ExpMem, or on an A500 without it in slow memory from $c00000 (to $dc0000). gdb's find stops
+# at the first unreadable byte and then reports no match at all, so the search ends where
+# the memory does (fast_end).
 FAST, FAST_MAX, FAST_STEP = 0x200000, 0xa00000, 0x40000
+SLOW, SLOW_MAX = 0xc00000, 0xdc0000
 
 
 def layout(variant=None):
@@ -106,10 +108,10 @@ def key(g, raw):
     run_fields(g, 3)
 
 
-def fast_end(g):
-    """The end of the machine's fast memory: the first unreadable 256 KB step from $200000."""
-    end = FAST
-    while end < FAST_MAX and 'Cannot access' not in g.cmd(f'x/wx {end:#x}'):
+def fast_end(g, start=FAST, limit=FAST_MAX):
+    """The end of the machine's fast (or slow) memory: the first unreadable 256 KB step."""
+    end = start
+    while end < limit and 'Cannot access' not in g.cmd(f'x/wx {end:#x}'):
         end += FAST_STEP
     return end
 
@@ -118,10 +120,12 @@ def find_hunk0(g, variant=None):
     """START's hunk 0 (the CPU is stopped on return); RuntimeError while it is not loaded."""
     lay = layout(variant)
     g.stop()
-    end = fast_end(g)
+    start, end = FAST, fast_end(g)
     if end == FAST:
-        raise RuntimeError('no fast memory at $200000')
-    out = g.cmd(f'find /h {FAST:#x}, {end - 16:#x}, {HUNK0_SIG}', timeout=120)
+        start, end = SLOW, fast_end(g, SLOW, SLOW_MAX)
+        if end == SLOW:
+            raise RuntimeError('no fast memory at $200000 nor slow memory at $c00000')
+    out = g.cmd(f'find /h {start:#x}, {end - 16:#x}, {HUNK0_SIG}', timeout=120)
     hits = [int(w, 16) for w in out.split('\n') if re.fullmatch(r'0x[0-9a-f]+', w.strip())]
     # The PRELOAD copy of the file matches too; the loaded segment is the match whose
     # segment header (the allocation size, hunk size + 8, at -8) is there.
