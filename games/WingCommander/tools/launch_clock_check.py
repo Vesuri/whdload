@@ -25,8 +25,8 @@ def check(build,variant,model):
   c.intercept(s+sy['modal_bad_target'],lambda:(rejects.append(1),c.return_call()))
   for off,w,_ in specification(variant):
    old=c.read(code+off,w);c.write(code+off+w-1,bytes([old[-1]^1]));call('launch_guard',{1:code});c.write(code+off,old)
-  assert len(rejects)==4
-  call('launch_guard',{1:code});assert len(rejects)==4
+  hooks=len(specification(variant));assert len(rejects)==hooks
+  call('launch_guard',{1:code});assert len(rejects)==hooks
   call('modal_install',{1:code})
   state={'rate':50,'gap':1,'ticks':0,'draws':0,'abort':False}
   def start():
@@ -90,7 +90,9 @@ def check(build,variant,model):
     raw[i*24:i*24+4]=struct.pack('>2h',x+vx,y+vy);raw[i*24+9]=(raw[i*24+9]+1)&255
    c.write(actors,bytes(raw))
   idle=[0]
+  shown_extra=[]
   def present():
+   shown_extra.append(struct.unpack('>2h',c.read(pos+0x28,4))+(c.get(pos+10,2),))
    advance();shown.append((struct.unpack('>5h',c.read(pos,10)),records(),c.get(field,4)-100))
    c.write(field,long(c.get(field,4)+1));idle[0]=0;c.return_call()
   def waiting():
@@ -99,7 +101,9 @@ def check(build,variant,model):
    if idle[0]>=2:idle[0]=0;c.write(field,long(c.get(field,4)+1))
   c.intercept(s+sy['launch_exterior_idle'],waiting)
   c.intercept(s+sy['launch_exterior_native'],present)
-  c.intercept(s+sy['launch_exterior_pose'],lambda:c.return_call())
+  poses=[]
+  def pose():poses.append(c.get(c.reg(8)+4,2));c.return_call()
+  c.intercept(s+sy['launch_exterior_pose'],pose)
   c.intercept(s+sy['timing_rate'],lambda:c.return_call(state['rate']))
   def trunc(a,b):return abs(a)//b*(1 if a>=0 else -1)
   rooms=[]
@@ -151,7 +155,72 @@ def check(build,variant,model):
      steps_x=[b[1][0]-a[1][0] for a,b in zip(timeline,timeline[1:])]
      assert all(0<=d<=2 for d in steps_x),('actor steps',stage,skip,steps_x)
      rooms.append(dict(hz=rate,frame_skip=skip,stage=stage,fields=steps*3,pictures=len(shown),native=sum(1 for _ in timeline)-len(shown)))
-  return dict(model=model,rejected_hooks=4,schedules=schedules,projections=projections,exterior=rooms,abort=True)
+  # Post-landing hangar arrival: each pass owns three fields; pictures between
+  # native drawings sample the last drawn pass and replay its actors.
+  arrivals=[]
+  c.intercept(s+sy['arrival_idle'],waiting)
+  def signed(q):return q-65536 if q>=32768 else q
+  for rate in (50,60):
+   state['rate']=rate
+   for skip in (1,2):
+    c.write(countdown+2,word(skip));period=150*skip
+    table=bytearray(120)
+    for i in range(5):table[i*24:i*24+8]=struct.pack('>4h',100+i,60,2*i-3,1);table[i*24+9]=5
+    c.write(actors,bytes(table))
+    c.write(pos,struct.pack('>6h',150,120,0,0,0,7));c.write(pos+0x28,struct.pack('>2h',200,60))
+    last=None;timeline=[];native=0
+    def draw(tick,stage):
+     nonlocal last,native
+     n=c.get(countdown,2)-1
+     if n<1:
+      # A drawing is replayed only if a wait saved the records it started from.
+      n=skip;advance();last=(tick*150,records(),not(stage==0 and tick==0))
+      timeline.append((tick*150+(0 if stage==0 else 30*150),last[1][0][0]));native+=1
+     c.write(countdown,word(n))
+    for stage in (0,1):
+     c.write(field,long(100));c.write(countdown,word(1));frame=7
+     for tick in range(30):
+      if stage==0:
+       draw(tick,stage);y=signed(c.get(pos+2,2));c.write(pos+2,word((y-2)&0xffff))
+      drawn=frame;pending=c.get(countdown,2)
+      before=c.read(data,v.HUNKS[1][2]);first=len(shown);poses.clear()
+      idle[0]=0;call('arrival_wait',{9:stage,11:tick})
+      samples=shown[first:];assert len(poses)==len(samples)
+      if stage==1 and tick==0:assert not samples
+      k=tick if stage==0 else tick-1
+      for (sample,actor,at),arg in zip(samples,poses):
+       elapsed=at*50;into=elapsed-k*150
+       assert 0<into<150 or (into==0 and (last is None or last[0]!=k*150)),('arrival time',stage,tick,elapsed)
+       assert elapsed<(k+1)*150
+       if stage==0:
+        assert arg==0 and signed(sample[1])==signed(c.get(pos+2,2))+2-2*into//150,('arrival Y',tick,into,sample)
+       else:
+        assert arg==(k*150+into)*128//4500,('arrival pose',tick,into,arg)
+        extra=struct.unpack('>2h',c.read(pos+0x28,4))
+        assert shown_extra[len(shown_extra)-len(samples)+samples.index((sample,actor,at))]==(extra[0]+4-4*into//150,extra[1]+1-into//150,drawn_frame)
+       if last is not None and last[2]:
+        base=last[1];dt=min(elapsed-last[0],period)
+        want=[[b[0]+trunc(b[2]*dt,period),b[1]+trunc(b[3]*dt,period),b[2],b[3],b[4]] for b in base]
+       else:
+        live=records();dt=max(-period,elapsed-(k+pending)*150)
+        want=[[r[0]+r[2]+trunc(r[2]*dt,period),r[1]+r[3]+trunc(r[3]*dt,period),r[2],r[3],(r[4]+1)&255] for r in live]
+       assert actor==want,('arrival actors',stage,tick,elapsed,actor,want)
+       timeline.append((elapsed+(0 if stage==0 else 30*150),actor[0][0]))
+      after=bytearray(c.read(data,len(before)));f=field-data;after[f:f+4]=before[f:f+4]
+      assert after==before,'arrival state leaked'
+      if stage==1:
+       drawn_frame=frame
+       if tick==29:c.write(countdown,word(1))
+       draw(tick,stage)
+       x,y=struct.unpack('>2h',c.read(pos+0x28,4));c.write(pos+0x28,struct.pack('>2h',x-4,y-1))
+       if tick>6:frame=100+tick;c.write(pos+10,word(frame))
+     assert c.get(field,4)-100==(30 if stage==0 else 29)*3,(stage,c.get(field,4)-100)
+    # Loop 1 replays loop 0's last native actor pass at its first picture.
+    timeline.sort()
+    steps_x=[b[1]-a[1] for a,b in zip(timeline,timeline[1:]) if b[0]-a[0]<=150]
+    assert all(abs(d)<=3 for d in steps_x),('arrival actor steps',skip,steps_x)
+    arrivals.append(dict(hz=rate,frame_skip=skip,native=native,pictures=len(timeline)-native))
+  return dict(model=model,rejected_hooks=hooks,arrival=arrivals,schedules=schedules,projections=projections,exterior=rooms,abort=True)
  finally:c.close()
 
 

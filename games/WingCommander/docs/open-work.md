@@ -125,7 +125,10 @@ rules remain unchanged. See
 The exterior launch uses 50/3 Hz and the cockpit tunnel retains 10 Hz timing
 with intermediate rendering; the tunnel shares world extrapolation with the intro.
 Exterior intermediate pictures replay the bitmap actors from before the last
-native picture at fractional positions, so they move on every picture.
+native picture at fractional positions, so they move on every picture. The
+post-landing hangar scene, which ran at drawing speed, now paces each pass at
+three fields with the same intermediate pictures; see
+[hangar arrival](internals.md#post-landing-hangar-arrival).
 The incoming-ship sampler clears the vertical dividend independently of X,
 preventing offscreen flicker, and intermediate redraws preserve bitmap actor state.
 See [mission launch timing](internals.md#mission-launch-timing).
@@ -1024,8 +1027,8 @@ Speed and pacing:
   the ship as the cockpit closes. Exterior launch fixed (2026-11-16):
   intermediate pictures showed the next native actor state, so crew, tractor
   and pilots jumped once per six fields and the first one repeated the native
-  picture; they now replay the pre-draw actors at fractional positions. Open:
-  the post-landing hangar scene (`E:1e93c`) is still native and unpaced.
+  picture; they now replay the pre-draw actors at fractional positions. The
+  post-landing hangar scene, previously unpaced, now uses the same pattern.
 - **UR4 (H): no short pause in the simulator after the enemy ship info.** Open;
   whether the Amiga original pauses there is not yet known.
 

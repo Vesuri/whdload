@@ -8,7 +8,9 @@ def specification(variant):
     ocs=variant=='ocs'
     tunnel=(0x1a4e2,6,0x1a544) if ocs else (0x1b22a,6,0x1b28c)
     exterior=(0x1d9e4,0x1da38,0x1dada) if ocs else (0x1e71c,0x1e770,0x1e812)
-    return [tunnel]+[(off,6,None) for off in exterior]
+    # Post-landing hangar arrival (OCS H0 1dc04, CD32 H0 1e93c): input polls.
+    arrival=(0x1ddac,0x1de18) if ocs else (0x1eae6,0x1eb52)
+    return [tunnel]+[(off,6,None) for off in exterior+arrival]
 
 
 def source(root, variant):
@@ -25,6 +27,8 @@ def source(root, variant):
     for label,_ in fix:lines.append(label+': jmp $0')
     for i in range(3):
         lines += [f'launch_entry{i+1}:',' move.l d0,-(sp)',f' moveq #{i},d0',' bsr.w launch_exterior_wait',' move.l (sp)+,d0',' bra.w modal_input']
+    for i in range(2):
+        lines += [f'launch_entry{i+4}:',' move.l d0,-(sp)',f' moveq #{i},d0',' bsr.w arrival_wait',' move.l (sp)+,d0',' bra.w modal_input']
     lines+=['launch_entry0: bra.w launch_loop','launch_guard:',' movem.l d0-d7/a0-a6,-(sp)']
     for off,width,_ in specification(variant):
         assert code[off:off+2]==bytes.fromhex('4eb9')

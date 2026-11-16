@@ -24,6 +24,7 @@ def main():
     p.add_argument('--autopilot',action='store_true',help='continue through the native waypoint fly-by after launch')
     p.add_argument('--ejection',action='store_true',help='continue through all three native ejection stages')
     p.add_argument('--landing',action='store_true',help='continue through native carrier return and hangar arrival')
+    p.add_argument('--arrival',action='store_true',help='continue through the post-landing hangar scene (two 30-pass loops)')
     a=p.parse_args();out=new_output(a.output);out.mkdir(parents=True)
     v=get(a.variant)
     if a.variant=='ocs':
@@ -99,7 +100,7 @@ def main():
             ' addq.l #4,sp',f' jsr ${h0+exterior:x}',
             ' move.w #1,-(sp)',' move.w #1,-(sp)',f' jsr ${h0+mission:x}',' addq.l #4,sp',
             f' jsr ${h0+tunnel:x}',
-            *([f' jsr ${h0+(0xf56 if ocs else 0x101c):x}'] if a.autopilot else []), *([f' jsr ${h0+(0x19e9e if ocs else 0x1ab76):x}'] if a.ejection else []), *([f' jsr ${h0+(0x2a6a6 if ocs else 0x2b632):x}',' move.w d0,d2',' move.w #-1,-(sp)',' move.w #8,-(sp)',' move.w d2,-(sp)',f' jsr ${h0+(0x9868 if ocs else 0x9af2):x}',' addq.l #6,sp',' move.w d2,-(sp)',f' jsr ${h0+(0x1ab60 if ocs else 0x1b8a8):x}',' addq.l #2,sp'] if a.landing else []), ' movem.l (sp)+,d0-d7/a0-a6',' rts'])+'\n')
+            *([f' jsr ${h0+(0xf56 if ocs else 0x101c):x}'] if a.autopilot else []), *([f' jsr ${h0+(0x19e9e if ocs else 0x1ab76):x}'] if a.ejection else []), *([f' jsr ${h0+(0x2a6a6 if ocs else 0x2b632):x}',' move.w d0,d2',' move.w #-1,-(sp)',' move.w #8,-(sp)',' move.w d2,-(sp)',f' jsr ${h0+(0x9868 if ocs else 0x9af2):x}',' addq.l #6,sp',' move.w d2,-(sp)',f' jsr ${h0+(0x1ab60 if ocs else 0x1b8a8):x}',' addq.l #2,sp'] if a.landing else []), *([f' jsr ${h0+(0xac4 if ocs else 0xb7e):x}',' move.w d0,-(sp)',f' jsr ${h0+(0x1dc04 if ocs else 0x1e93c):x}',' addq.l #2,sp'] if a.arrival else []), ' movem.l (sp)+,d0-d7/a0-a6',' rts'])+'\n')
         subprocess.run([os.environ['VASM'],'-m68020','-Fbin','-o',str(binary),str(src)],check=True)
         old=out/'original-stub.bin';cmd(f'dump binary memory {old.relative_to(ROOT)} {stub:#x} {stub+binary.stat().st_size:#x}')
         original=out/'original-call.bin';cmd(f'dump binary memory {original.relative_to(ROOT)} {callsite:#x} {callsite+6:#x}')
@@ -267,11 +268,56 @@ def main():
                 assert all(0<=f<5 for f in fractions) and any(f>0 for f in fractions),fractions
                 landing.append(dict(stage=stage,first=first,last=last,samples=samples,fractions=fractions,actor_frames=actor_frames,
                     multiple_pictures_per_tick=any(x[1]==y[1] and x[2:]!=y[2:] for x,y in zip(samples,samples[1:]))))
+        arrival=[]
+        if a.arrival:
+            actors=h1+v.A4_BASE+(-0x5a44 if ocs else -0x5a2c)
+            pose=h1+v.A4_BASE+(0x407e if ocs else 0x488e)
+            def signed(q):return q-65536 if q>=32768 else q
+            for stage in (0,1):
+                until(sb+sy['arrival_wait'],f'$d0 == {stage}',timeout=180)
+                entered=number('$d2')
+                first=number(f'*(unsigned int*){field:#x}' if entered==0 else f"*(unsigned int*){sb+sy['arrival_epoch']:#x}")
+                # Every compositor entry, native or intermediate, draws each
+                # actor at record + velocity and the ship from the pose words.
+                pictures=[]
+                for i in range(16):
+                    until(h0+(0x1d680 if ocs else 0x1e3b2),timeout=180)
+                    row=[]
+                    for slot in range(5):
+                        x,vx=(signed(number(f'*(unsigned short*){actors+slot*24+o:#x}')) for o in (0,4))
+                        row.append((x+vx,vx))
+                    pictures.append(dict(field=number(f'*(unsigned int*){field:#x}'),actors=row,
+                        ship=[signed(number(f'*(unsigned short*){pose+o:#x}')) for o in (0,2,4,6,0x28,0x2a)]))
+                    if i==8:shot('arrival-'+str(stage))
+                skip=number(f'*(unsigned short*){h1+v.A4_BASE+(-32590 if ocs else -32622):#x}')
+                # A late native picture shortens its pass's remaining wait, so
+                # bound each step by one native pass and require fractions:
+                # the old behaviour moved actors only by 0 or a whole step.
+                moving=[s for s in range(5) if pictures[0]['actors'][s][1]]
+                fastest=max(moving,key=lambda s:abs(pictures[0]['actors'][s][1]))
+                fractional=set()
+                for p0,p1 in zip(pictures,pictures[1:]):
+                    assert p1['field']>=p0['field'],(p0,p1)
+                    for s in moving:
+                        vx=p0['actors'][s][1];d=(p1['actors'][s][0]-p0['actors'][s][0])*(1 if vx>0 else -1)
+                        assert 0<=d<=abs(vx),('arrival actor',stage,s,p0,p1)
+                        if s==fastest and 0<d<abs(vx):fractional.add('actor')
+                    # Ship Y rises 2 per pass in loop 0; loop 1 moves the second bitmap 4 per pass.
+                    word,step=(1,2) if stage==0 else (4,4)
+                    d=p0['ship'][word]-p1['ship'][word]
+                    assert 0<=d<=step,('arrival ship',stage,p0,p1)
+                    if 0<d<step:fractional.add('ship')
+                assert fractional=={'actor','ship'} if abs(pictures[0]['actors'][fastest][1])>1 else 'ship' in fractional,(fractional,pictures)
+                until(sb+sy['arrival_wait'],'$d2 == 29',timeout=180)
+                last=number(f'*(unsigned int*){field:#x}')
+                passes=29 if stage==0 else 28
+                assert passes*3<=last-first<=passes*3+10,('arrival duration',stage,entered,first,last)
+                arrival.append(dict(stage=stage,entered=entered,first=first,last=last,frame_skip=skip,pictures=pictures))
         until(ret)
         cmd(f'monitor ocs-load {callsite:x} "{original}"');cmd(f'monitor ocs-load {stub:x} "{old}"')
         (out/'report.json').write_text(json.dumps(dict(complete=True,variant=a.variant,
             slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(),exterior=rows,
-            tunnel=dict(start=start,end=end,fields=end-start,samples=tunnel_samples),autopilot=autopilot,ejection=ejection,landing=landing,
+            tunnel=dict(start=start,end=end,fields=end-start,samples=tunnel_samples),autopilot=autopilot,ejection=ejection,landing=landing,arrival=arrival,
             scope='native first-mission setup/launch fixture; not a briefing or campaign traversal'),indent=2)+'\n')
     finally:stop()
 

@@ -7807,6 +7807,45 @@ checks, not hardware performance or full campaign acceptance; live NTSC remains
 outside this gate.
 
 
+### Post-landing hangar arrival
+
+After the carrier return (`E:154c8` calls it with the value from `E:0b7e`; OCS
+`15264` / `0ac4`), a hangar exterior scene sets up four bitmap actors and runs
+two 30-pass loops on the same pose/compositor routines as the exterior launch.
+Neither loop waits on time: the only per-pass call is the input poll `E:1898a`
+(OCS `180c4`), so the scene ran at drawing speed. Loop 0 draws with pose 0,
+then raises the ship 2 pixels and polls. Loop 1 polls, then draws the departure
+pose `pass*128/30`, moves the second bitmap (A4+`48b6`/`48b8`, OCS `40a6`/`40a8`)
+by (−4, −1) and from pass 7 steps the ship frame (A4+`4898`, OCS `4088`) from a
+table. The compositor is called on every pass and draws when its frame-skip
+countdown expires.
+
+| Operation | OCS H0 / file | CD32 H0 / file |
+|---|---|---|
+| Scene entry | `1dc04 / 1dc30` | `1e93c / 1e968` |
+| Loop 0 poll (hooked) | `1ddac / 1ddd8` | `1eae6 / 1eb12` |
+| Loop 1 poll (hooked) | `1de18 / 1de44` | `1eb52 / 1eb7e` |
+
+`arrival_wait` (`src/launch_clock.s`) gives each pass three fields from a
+per-loop epoch (90 fields for loop 0, 87 for loop 1 at PAL and NTSC) and draws
+the pictures between native ones. Each samples the last drawn pass forward:
+ship Y in whole pixels, the departure pose as `(pass + fraction)*128/30`, the
+second bitmap's position, and the native frame held until the next native
+picture. Actors use the launch's replay of the records saved before the last
+native drawing (the shared `exterior_actor_sample`), with a native period of
+`150 × reload` units; loop 0's first pass, which has no saved records, leads into
+the next drawing instead. The native picture is not redrawn, and the poll still
+runs once per pass through `modal_input`.
+
+`launch_clock_check.py` drives both loops for PAL/NTSC and frame skip 1 and 2,
+checks every intermediate ship, pose, bitmap, frame and actor record against
+the model, data-hunk restoration and loop durations, and fails with the actor
+sampling removed. `launch_live_check.py --arrival` runs the scene after the
+tunnel on the cached 030 PAL fixture: in both variants, 16 compositor entries
+per loop move the ship/bitmap and fastest actor by fractions of a pass, never
+more than one pass, and the loops take 89 and 86 fields
+(`tmp/ur3-{ocs,cd32}-arrival/report.json`).
+
 ## Waypoint autopilot fly-by
 
 The visible autopilot sequence previously bypassed the flight scheduler. Its

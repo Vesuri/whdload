@@ -4858,6 +4858,8 @@ entries into `actors.json` and bounds each moving actor's per-picture step by th
 elapsed fields. Stage entry accepts the first wait of each stage (the previous
 stage's screenshot can run past `d2 = 0`) and measures durations from the
 stage epoch.
+`--arrival` continues through the post-landing hangar scene after the tunnel
+and checks its two loops' pacing and fractional ship, bitmap and actor motion.
 
 
 ### Mission asteroid and mine fields

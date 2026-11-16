@@ -176,13 +176,7 @@ launch_exterior_idle:
         cmpi.w #1,MODAL_COUNTDOWN(a4)
         bgt.s .exit
 .save:
-        lea EXT_ACTORS(a4),a0
-        lea launch_exterior_stage(pc),a1
-        adda.l #landing_actor_previous-launch_exterior_stage,a1
-        moveq #29,d0
-.copy:
-        move.l (a0)+,(a1)+
-        dbra d0,.copy
+        bsr.w exterior_actor_save
         lea launch_exterior_saved(pc),a0
         move.w #1,(a0)
 .exit:
@@ -201,30 +195,46 @@ launch_exterior_call:
         rts
 
 ; D2 iteration, D5 elapsed units (x50). Live actor records are already saved by
-; the caller. Replace them with the records the native compositor advances into
-; the last native picture, offset by velocity * time since it / native period.
-; Before a stage's first native picture, the live records lead into the next.
+; the caller. Native drawings are 300 units apart (every other iteration).
 launch_exterior_actors:
-        movem.l d0-d4/a0-a1,-(sp)
+        ; Not d0-d3: its $f000 mask would read as an OCS native-fixup sentinel.
+        movem.l d0-d4,-(sp)
         moveq #0,d3
         move.w MODAL_COUNTDOWN+2(a4),d3
         bgt.s .period
         moveq #1,d3
 .period:
         mulu.w #300,d3
-        lea EXT_ACTORS(a4),a1
         move.w d5,d1
-        tst.w launch_exterior_valid(pc)
+        move.w launch_exterior_valid(pc),d0
         bne.s .replay
         subi.w #150,d1
-        bra.s .clamp
+        bra.s .sample
 .replay:
         move.w d2,d0
         mulu.w #150,d0
         add.w d0,d1
         sub.w launch_exterior_last(pc),d1
-        lea launch_exterior_stage(pc),a0
-        adda.l #landing_actor_previous-launch_exterior_stage,a0
+        moveq #1,d0
+.sample:
+        bsr.w exterior_actor_sample
+        movem.l (sp)+,d0-d4
+        rts
+
+; Shared by the exterior launch and the hangar arrival; their callers have
+; saved the live actor records. D0 nonzero: replace them with the records the
+; native compositor advances into the last native picture (saved in
+; landing_actor_previous; landing never overlaps these scenes), D1 = signed
+; units since it. D0 zero: the live records lead into the next native picture,
+; D1 = signed units relative to it. D3 native drawing period in units. The
+; compositor adds each velocity once, so positions get velocity * D1 / D3.
+exterior_actor_sample:
+        movem.l d0-d4/a0-a1,-(sp)
+        lea EXT_ACTORS(a4),a1
+        tst.w d0
+        beq.s .clamp
+        lea exterior_actor_sample(pc),a0
+        adda.l #landing_actor_previous-exterior_actor_sample,a0
         moveq #29,d0
 .copy:
         move.l (a0)+,(a1)+
@@ -254,6 +264,19 @@ launch_exterior_actors:
         lea 24(a1),a1
         dbra d4,.pose
         movem.l (sp)+,d0-d4/a0-a1
+        rts
+
+; Save the live actor records as the start of the next native drawing.
+exterior_actor_save:
+        movem.l d0/a0-a1,-(sp)
+        lea EXT_ACTORS(a4),a0
+        lea exterior_actor_save(pc),a1
+        adda.l #landing_actor_previous-exterior_actor_save,a1
+        moveq #29,d0
+.copy:
+        move.l (a0)+,(a1)+
+        dbra d0,.copy
+        movem.l (sp)+,d0/a0-a1
         rts
 
 ; D5 elapsed field units (x50), D6 units/tick (150). Save the five pose words, scroll and
@@ -331,3 +354,189 @@ launch_exterior_epoch: dc.l 0
 launch_exterior_last: dc.w 0
 launch_exterior_valid: dc.w 0
 launch_exterior_saved: dc.w 0
+
+; Post-landing hangar arrival: two native 30-pass loops (OCS H0 1dc04, CD32 H0
+; 1e93c) that only poll input, so they ran at drawing speed. Each pass now owns
+; three fields from a per-loop epoch. Loop 0 draws, raises the ship 2 and polls;
+; loop 1 polls, then draws the departure pose pass*128/30, moves the second
+; bitmap (-4,-1) and from pass 7 steps the ship frame. Every pass calls the
+; compositor, which draws when the frame-skip countdown expires. Pictures
+; between native ones sample the last drawn pass forward and replay its actors.
+; D0 loop, D2 pass.
+arrival_wait:
+        movem.l d0-d7/a0-a6,-(sp)
+        lea arrival_stage(pc),a0
+        move.w d0,(a0)
+        tst.w d2
+        bne.s .ready
+        lea arrival_epoch(pc),a0
+        move.l MODAL_FIELD(a4),(a0)
+        lea arrival_valid(pc),a0
+        clr.w (a0)
+        ; Loop 1's first picture starts from the records saved after loop 0.
+        tst.w arrival_stage(pc)
+        bne.s .ready
+        lea arrival_saved(pc),a0
+        clr.w (a0)
+.ready:
+        ; D3 = last drawn pass of this loop (-1 before loop 1's first).
+        move.w d2,d3
+        tst.w arrival_stage(pc)
+        beq.s .last
+        subq.w #1,d3
+.last:
+        moveq #0,d4
+        tst.w d3
+        bmi.s .schedule
+        move.w MODAL_COUNTDOWN(a4),d0
+        cmp.w MODAL_COUNTDOWN+2(a4),d0
+        bne.s .schedule
+        moveq #1,d4
+        lea arrival_valid(pc),a0
+        move.w arrival_saved(pc),(a0)
+        lea arrival_saved(pc),a0
+        clr.w (a0)
+        move.w d3,d0
+        mulu.w #150,d0
+        lea arrival_last(pc),a0
+        move.w d0,(a0)
+.schedule:
+        moveq #0,d7
+        move.w d3,d7
+        addq.w #1,d7
+        mulu.w #150,d7
+        moveq #-1,d5
+        tst.w d4
+        beq.s arrival_idle
+        move.w d3,d5
+        mulu.w #150,d5          ; the native picture is its pass's first sample
+; Global so the native check can advance its field clock while waiting.
+arrival_idle:
+        move.l MODAL_FIELD(a4),d0
+        sub.l arrival_epoch(pc),d0
+        mulu.w #50,d0
+        cmp.l d7,d0
+        bcc.s .done
+        cmp.w d5,d0
+        beq.s arrival_idle
+        move.w d0,d5
+        bsr.w arrival_draw
+        bra.s arrival_idle
+.done:
+        ; The next native picture shows this frame and starts from these actors.
+        lea arrival_frame(pc),a0
+        move.w EXT_POSITION+10(a4),(a0)
+        cmpi.w #1,arrival_stage(pc)
+        bne.s .countdown
+        cmpi.w #29,d2
+        beq.s .save
+.countdown:
+        cmpi.w #1,MODAL_COUNTDOWN(a4)
+        bgt.s .exit
+.save:
+        bsr.w exterior_actor_save
+        lea arrival_saved(pc),a0
+        move.w #1,(a0)
+.exit:
+        movem.l (sp)+,d0-d7/a0-a6
+        rts
+
+; D3 last drawn pass, D5 elapsed units since the loop epoch.
+arrival_draw:
+        movem.l d0-d7/a0-a6,-(sp)
+        lea EXT_ACTORS(a4),a0
+        moveq #29,d0
+.save_actors:
+        move.l (a0)+,-(sp)
+        dbra d0,.save_actors
+        movem.l EXT_POSITION(a4),d0-d2
+        movem.l d0-d2,-(sp)
+        move.l EXT_POSITION+$28(a4),-(sp)
+        move.w MODAL_COUNTDOWN(a4),-(sp)
+        moveq #0,d6
+        move.w d3,d6
+        mulu.w #150,d6
+        moveq #0,d1
+        move.w d5,d1
+        sub.w d6,d1
+        bpl.s .elapsed
+        moveq #0,d1
+.elapsed:
+        move.w d1,d7            ; D7 units into the pass (0..149)
+        ; Actors: replay the last native drawing, or lead into the next one.
+        movem.l d1/d3,-(sp)
+        moveq #0,d3
+        move.w MODAL_COUNTDOWN+2(a4),d3
+        bgt.s .period
+        moveq #1,d3
+.period:
+        mulu.w #150,d3
+        move.w d5,d1
+        move.w arrival_valid(pc),d0
+        beq.s .lead
+        sub.w arrival_last(pc),d1
+        bra.s .actors
+.lead:
+        ; The next drawing is the pass whose call expires the countdown.
+        move.w 6(sp),d0
+        add.w MODAL_COUNTDOWN(a4),d0
+        mulu.w #150,d0
+        sub.w d0,d1
+        moveq #0,d0
+.actors:
+        bsr.w exterior_actor_sample
+        movem.l (sp)+,d1/d3
+        tst.w arrival_stage(pc)
+        bne.s .depart
+        ; Live Y is already the next pass's; the drawn pass is 2 lower.
+        moveq #0,d0
+        move.w d7,d0
+        add.w d0,d0
+        divu.w #150,d0
+        neg.w d0
+        addq.w #2,d0
+        add.w d0,EXT_POSITION+2(a4)
+        clr.w -(sp)
+        bra.s .pose
+.depart:
+        move.w arrival_frame(pc),EXT_POSITION+10(a4)
+        moveq #0,d0
+        move.w d7,d0
+        lsl.w #2,d0
+        divu.w #150,d0
+        neg.w d0
+        addq.w #4,d0
+        add.w d0,EXT_POSITION+$28(a4)
+        moveq #0,d0
+        move.w d7,d0
+        divu.w #150,d0
+        neg.w d0
+        addq.w #1,d0
+        add.w d0,EXT_POSITION+$2a(a4)
+        move.w d6,d0
+        add.w d7,d0
+        mulu.w #128,d0
+        divu.w #4500,d0
+        move.w d0,-(sp)
+.pose:
+        bsr.w launch_exterior_pose
+        addq.l #2,sp
+        move.w #1,MODAL_COUNTDOWN(a4)
+        bsr.w launch_exterior_native
+        move.w (sp)+,MODAL_COUNTDOWN(a4)
+        move.l (sp)+,EXT_POSITION+$28(a4)
+        movem.l (sp)+,d0-d2
+        movem.l d0-d2,EXT_POSITION(a4)
+        lea EXT_ACTORS+120(a4),a0
+        moveq #29,d0
+.restore_actors:
+        move.l (sp)+,-(a0)
+        dbra d0,.restore_actors
+        movem.l (sp)+,d0-d7/a0-a6
+        rts
+arrival_stage: dc.w 0
+arrival_epoch: dc.l 0
+arrival_valid: dc.w 0
+arrival_last: dc.w 0
+arrival_saved: dc.w 0
+arrival_frame: dc.w 0
