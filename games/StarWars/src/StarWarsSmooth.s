@@ -446,9 +446,10 @@ SmBpl
 	clr.l	sv_ready(a2)
 	tst.b	sv_exact(a2)
 	beq.b	.s
-	move.w	-26438(a4),d0		; the fade
+	tst.w	-26438(a4)		; the fade, as PLFIX403 fixes it: ends on 0
 	beq.b	.s
 	subq.w	#1,-26438(a4)
+	move.w	-26438(a4),d0
 	muls	-26436(a4),d0
 	move.l	-26434(a4),a0
 	move.w	d0,(a0)

@@ -9,6 +9,12 @@
 ; wait for the blitter first: with the game's code in Chip RAM and the blitter nasty,
 ; a 68000 could not touch Chip RAM while a blit ran, but a CPU in Fast RAM can.
 ;
+; The flash fade in the VBL server ($0078-$009e) wrote the counter -26438(a4) times the
+; step -26436(a4) into colours 0 and 8 and then counted down, so its last write was one
+; step: the black background stayed $111 (dark grey) after the first hit, $100 or $001
+; after the other flashes. It now counts down first, and each flash starts one higher:
+; the same steps as before, then 0.
+;
 ; The colour setter at $1840 also rewrote the four bset/bclr instructions (one per
 ; bitplane) of the plot at $1b70 and of the horizontal line at $1bb0 for every colour:
 ; with an instruction cache (8 KB on a 68060) the CPU kept drawing with the stale
@@ -53,6 +59,12 @@ PLFIX403
 	PL_GA	$59e6,SelectCannons
 	PL_PSS	$270c,SelectEnd,2	; jsr $59e6(pc); jsr -32694(a4) (the loop enters at
 					; $2714, so that stays)
+	PL_L	$007e,$536c98ba		; the flash fade: subq.w #1,-26438(a4) before
+	PL_L	$0082,$302c98ba		; move.w -26438(a4),d0, so its last step is 0
+	PL_W	$50fc,16		; and each flash starts one higher: move.w #15,
+	PL_W	$5112,11		; #10, #15, #12,-26438(a4)
+	PL_W	$bfba,16
+	PL_W	$c6ee,13
 	PL_NEXT	PLSMOOTH403		; StarWarsSmooth.s (CUSTOM2)
 
 ; Paces the wave select loop on fast CPUs, a wait an A500 never reaches (it is slower):
