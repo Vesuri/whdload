@@ -129,6 +129,9 @@
    screen is no longer ignored (thanks hexaae!).
  - Mouse flight: the mouse steers as in the PC version, and the left button
    fires while held (thanks hexaae!).
+ - CD32 edition, enhanced framerate: rotating ships and the title logo keep
+   their centre instead of shaking as they turn, and a ship at the edge of the
+   view no longer shifts by a pixel.
  - Disk edition: faster arithmetic and collision checks in every mode, including
    the Amiga 500, without changing game behaviour.
  - Enhanced framerate at 1.0x world speed and caches enabled in newly

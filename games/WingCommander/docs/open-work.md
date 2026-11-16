@@ -2,6 +2,15 @@
 
 ## Current state
 
+The CD32 enhanced framerate now centres the rotate/scale renderer's tables
+(E:2d746), so rotating ships (the TrainSim enemy selection, rolled or mirrored
+ships in flight) and the title logo no longer shake against their centre, and
+clipped draws match unclipped ones. The Unicorn check passes in English and German
+on the 68020 and 68040 models, and a live title check passes. Still open: a user
+look at the TrainSim selection and in flight, the cost per draw (not measured),
+the same fix for the OCS renderer O:2d0de (different frame format, 68000), and
+the scale-only path. See [rotated bitmaps](internals.md#rotated-bitmaps-centred-tables-cd32).
+
 The CD32 enhancements and waypoint order now work in German too (`CUSTOM1=1`).
 The slave carries a table of 1273 German words, built by assembling the release
 again with German addresses from a checked code/data map, and applies it at

@@ -22,7 +22,8 @@ BITMAP = dict(width=320, depth=8, leading_rows=0,
 SCENE = dict(title_updates=296, approach=135, departure=235,
              credit_pages=18, text_fields=220, page_fields=320)
 # Guard width applies only to non-absolute-JSR sites; JSRs guard relocated targets.
-WIDE_GUARDS = (0x28c86,0x7bc2,0x878,0x65f4,0x4b16,0x101c,0x438,0x3b8e,0x3378e,0x1fe44,0x2a2aa)
+WIDE_GUARDS = (0x28c86,0x7bc2,0x878,0x65f4,0x4b16,0x101c,0x438,0x3b8e,0x3378e,0x1fe44,0x2a2aa,
+               0x2e470,0x2e5c6)
 TIMING_HOOKS = (
     (0x28c86, 'timing_debris_draw', 0x4ef9),
     (0x698, 'timing_loop', 0x4ef9),
@@ -74,4 +75,18 @@ BUFFERED_HOOKS = (
     (0x80b6, 'translation_position', 0x4ef9),
     (0x3378e, 'release_publish', 0x4ef9),
     (0x337ea, 'release_teardown', 0x4ef9),
+    # Rotated bitmaps (src/rotation.s): centred tables, pinned hotspot.
+    (0x2d7d6, 'rot_setup', 0x4eb9),
+    (0x2d7fe, 'rot_clip', 0x4eb9),
+    (0x2d85c, 'rot_visible', 0x4eb9),
+    (0x2e40c, 'rot_col_full', 0x4eb9),
+    (0x2e434, 'rot_row_full', 0x4eb9),
+    (0x2e470, 'rot_shear_full', 0x4eb9),
+    (0x2e7c4, 'rot_bres_start', 0x4eb9),
+    (0x2e4a6, 'rot_col_clip', 0x4eb9),
+    (0x2e512, 'rot_row_clip', 0x4eb9),
+    (0x2e4d6, 'rot_col_end', 0x4eb9),
+    (0x2e556, 'rot_row_end', 0x4eb9),
+    (0x2e5ac, 'rot_shear_clip', 0x4eb9),
+    (0x2e5c6, 'rot_origin_clip', 0x4eb9),
 )

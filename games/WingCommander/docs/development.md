@@ -4697,6 +4697,29 @@ Both live runs pass in `tmp/title-{ocs,cd32}-live/report.json`, with two PNG
 captures each. The existing OCS launcher builds these changes automatically.
 
 
+### Rotated bitmaps: centred tables
+
+The CD32 rotate/scale renderer with `src/rotation.s`
+([internals](internals.md#rotated-bitmaps-centred-tables-cd32)):
+
+```sh
+. ../../common/env.sh
+python3 tools/reconstruct.py --variant cd32 --release --output tmp/rot-cd32
+python3 tools/rotation_check.py tmp/rot-cd32 --output tmp/rot-check
+python3 tools/rotation_check.py tmp/rot-cd32 --german --output tmp/rot-check-de
+python3 tools/rotation_check.py tmp/rot-cd32 --full --output tmp/rot-check-full
+python3 tools/rotation_check.py tmp/rot-cd32 --full --german --output tmp/rot-check-full-de
+export FSUAE="$PWD/tmp/p13d3-debugger/fs-uae"
+python3 tools/opening_live_check.py cd32 tmp/rot-cd32 --title-only --output tmp/rot-title-live
+```
+
+The default run (68020, every third angle, a reduced clip sweep; part of
+`make check` in both languages) takes about half a minute. `--full` checks
+every angle, both mirror flags and the 68020 and 68040 models. It installs the
+`rot_*` entries of `BUFFERED_HOOKS` itself, so it tests the hook list the build uses.
+The report keeps the native control beside each hooked result.
+
+
 ### Exhaust attachment motion
 
 Build the public OCS candidate and check native placement/restoration:

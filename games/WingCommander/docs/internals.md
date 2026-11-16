@@ -7321,6 +7321,80 @@ in scheduler arithmetic. Captures retain the logo's normal composition and the
 rotated departure. Rendering can still take more than one field on these setups.
 
 
+## Rotated bitmaps: centred tables (CD32)
+
+`E:2d746` (file `2d772`) draws a TM6 frame rotated and scaled about its
+hotspot. Callers: the flight object list for a rolled or mirrored ship
+(`E:2cb48`), the title logo's departure, and the TrainSim Select Enemy screen
+(`E:17c0c`: four ships, one degree per draw). It rotates by shears, not per
+pixel:
+
+| Step | Native | File |
+|---|---|---|
+| Octant, reduced angle 0–45, sin/cos × scale, direction codes | `E:2dc9c` | `2dcc8` |
+| Rotated corner of the frame and its box, rounded down | `E:2de40`, `2e08e` | `2de6c`, `2e0ba` |
+| sin·cos, tan, sec−1 (A4 `-3590/-3498/-3406`) | `E:2e374` | `2e3a0` |
+| Columns `floor(i·C)`, rows `floor(j·scale·sec)` | `E:2e3fe` (unclipped), `2e498` (clipped) | `2e42a`, `2e4c4` |
+| Horizontal shear per row `floor(r·sin·cos)`, filled backwards in some octants | `E:2e71e` | `2e74a` |
+| Vertical shear: a Bresenham of tan over the columns, starting at −1.0 | `E:2e77a` | `2e7a6` |
+| Origin, row pointers; clipped: visible source rectangle, per-row clip window | `E:2e658`, `2e83c`; `2e130`, `2e872`, `2db66` | `2e684`, `2e868`; `2e15c`, `2e89e`, `2db92` |
+
+Every table starts at phase 0 on the frame's edge, and the image is placed
+from the separately rounded corner. As the angle changes, the image moves
+against its centre. In the native code, at every angle and scales 128/256/400, a symmetric image's
+centroid wanders over about 4.5 pixels per axis (−2.8..+1.8) and moves 0.75–1.02
+pixels per degree on average. There is a bias per octant of about 1.4 pixels,
+with jumps at 45° and 90°. The size of the image doesn't matter (11 to 121 pixels).
+The clipped path rounds its own corner offset and table starts, so a ship
+crossing a view edge moves by a pixel (404 of 832 clip cases differ natively);
+its column and row clamps also end one short at 0°, dropping the last column.
+
+`src/rotation.s` (enhanced framerate, CD32 English and German) keeps the native
+renderer and starts each table at the phase that rounds it symmetrically
+about the hotspot's centre. For a table `floor(k·step + p)`, `p` is
+`−(2h+1)·step/2 mod 1` for the hotspot index `h`. The shear and the Bresenham
+are centred on the hotspot's row and column the same way. The centre handed
+to the native code is then shifted so that the hotspot lands on the requested pixel. The shift is the
+hotspot's position predicted from the same tables, including the reversed-shear
+origin terms of `E:2e658`. The clipped path's tables differ from the unclipped
+ones only by constants, so its shear phase, Bresenham phase and origin are set
+from the unclipped geometry: every clipped draw equals the unclipped draw
+inside the clip. Safety is native: the box tested for "fully inside" is
+widened by two pixels, so a draw that its phases could move a pixel takes the
+clipped path, which clips every row exactly. The visible-source estimate gets
+the requested centre, its rectangle gets a margin of 4 + scale/256 at both ends
+(the native code has none at the start), and the clamps follow. The bounding box query
+`E:2d6d4`, used by the HUD (`E:346a`) and the world object loop (`E:8d7e`), is
+unchanged: its box can differ from a pinned image by up to two pixels.
+
+| Hook (BUFFERED_HOOKS) | CD32 English H0 / file |
+|---|---|
+| `rot_setup` after `jsr E:2dc9c` | `2d7d6 / 2d802` |
+| `rot_clip` (box widened), `rot_visible` | `2d7fe / 2d82a`, `2d85c / 2d888` |
+| `rot_col_full`, `rot_row_full`, `rot_shear_full` (8 bytes) | `2e40c / 2e438`, `2e434 / 2e460`, `2e470 / 2e49c` |
+| `rot_col_clip`, `rot_col_end`, `rot_row_clip`, `rot_row_end` | `2e4a6 / 2e4d2`, `2e4d6 / 2e502`, `2e512 / 2e53e`, `2e556 / 2e582` |
+| `rot_shear_clip`, `rot_origin_clip` (8 bytes), `rot_bres_start` | `2e5ac / 2e5d8`, `2e5c6 / 2e5f2`, `2e7c4 / 2e7f0` |
+
+`tools/rotation_check.py` runs the executable's renderer on synthetic frames.
+With the hooks, at every angle, scales 128/256/400 and both mirror flags:
+
+| Frame | Native centroid / step per degree | Centred |
+|---|---|---|
+| Symmetric (41×41, 81×41) | −2.8..+1.8 px / 0.75–1.02 px | ±0.25 px / 0.011 px |
+| Hotspot off the frame's centre (40×24) | −2.7..+1.7 px / 0.59–1.02 px | ±0.65 px from its true rotation / 0.13–0.39 px |
+
+The hotspot lands on the requested pixel at all 360 angles. In 28,368 clip cases
+per model (edges, corners, scales 40–900, centres off screen) clipped and unclipped draws
+are identical, and no pixel is written outside the clip rectangle. English and German
+give the same results on the 68020 and 68040 models. The remaining motion of an
+off-centre frame comes from the shears themselves, which add and drop edge
+pixels as the angle changes. The live title check (`opening_live_check.py
+--title-only`) draws the real rotated logo through the hooks. These are
+functional checks; the hooks add a table setup call and some multiplications
+per draw, which has not been measured. The OCS renderer (`O:2d0de`) is a
+separately compiled 68000 version with another frame format and is unchanged.
+
+
 ## Exhaust attachments at render cadence
 
 OCS prediction previously rebuilt ship geometry each picture but left class-7
