@@ -103,7 +103,8 @@ slv_info        dc.b    "Coded By CFou!, improved by Vesuri",10
                 INCBIN  "T:date"
         ENDC
                 dc.b    0
-slv_config	dc.b	"C1:L:Movement speed:Original,1X (ECS),2X (AGA);",0
+slv_config	dc.b	"C1:L:Movement speed:Original,1X (ECS),2X (AGA);"
+		dc.b	"C2:B:Smooth landscape;",0
         EVEN
 slv_MemConfig   dc.l    CHIPMEMSIZE,KICKSIZE+FASTMEMSIZE_V12
                 dc.l    0
@@ -1168,7 +1169,10 @@ _skyset move.l  d2,164(a0)
 _landpatch
         IFND LAND_OFF
         movem.l d0-d1/a0-a2/a6,-(a7)
-        move.l  #LCOPY+16,d0
+        lea     _landtags(pc),a0
+        move.l  _resload(pc),a2
+        jsr     resload_Control(a2)
+        move.l  #LCOPYMAX+16,d0
         moveq   #MEMF_FAST|MEMF_PUBLIC,d1
         move.l  4.w,a6
         jsr     _LVOAllocMem(a6)
@@ -1178,6 +1182,7 @@ _landpatch
         and.w   #-16,d0
         move.l  d0,a1
         move.l  _hunk1(pc),a0
+        move.l  _landopt(pc),d0         ; Smooth landscape: _bloop
         bsr     _landinst
         tst.l   d0
         beq     .x
@@ -1186,6 +1191,9 @@ _landpatch
 .x      movem.l (a7)+,d0-d1/a0-a2/a6
         ENDC
         rts
+_landtags       dc.l    WHDLTAG_CUSTOM2_GET
+_landopt        dc.l    0
+                dc.l    0
 
         INCLUDE land030.s
         INCLUDE proj020.s

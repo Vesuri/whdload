@@ -69,6 +69,9 @@
    (Custom1=0), 1X (ECS) (Custom1=1) or 2X (AGA) (Custom1=2). The AGA game moves
    you twice as far as the ECS game walking, running and crawling; 1X moves you
    as the ECS game does
+ - Option "Smooth landscape" (splash window, or the tooltype Custom2): the
+   ground's heights blended between the map's cells, so hills keep their shape as
+   you turn instead of changing at every step
  ECS:
  - Faster chunky-to-planar conversion
  - Faster sky drawing

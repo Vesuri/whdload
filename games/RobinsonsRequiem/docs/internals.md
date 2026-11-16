@@ -495,6 +495,32 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
       Original and 2X patch nothing.
     - Checked on the `a1200-030`: 1X walks 15.7/17.0 a run, runs 31.3/32.6 and crawls 7.6 to
       8.9, the ECS game's figures; Original walks 31.3/32.6 as v1.2.
+20. **The landscape's heights blended, an option** (`_bloop` in `src/land030.s`, through
+    item 15's `_landinst`): the splash window's "Smooth landscape", `CUSTOM2`. The landscape
+    (hunk 1 `+$d88c`) walks two map rows a step, `d6`/`d7` and `d4`/`d5`, each a cell in
+    the low word and a 16-bit fraction in the high word. Along a row one axis steps by
+    whole cells and the other by a fraction that depends on the heading (the row's steps
+    `a4`/`a5`, the set-up at `+$dbcc` takes one of them as ±1). START takes each sample's
+    height from the cell its position falls in (`move.b 1(a0)`, `+$da6c`; the word at
+    `(a0)`, `+$db1e`) and throws the fraction away. So turning moves most samples to the
+    neighbouring cell at once, and the hills' outlines and the spans' heights change at
+    every heading.
+    - `_bloop` is item 15's `_lloop` with each sample's screen height (START's table at
+      `a6`, with `-602(a1)` for the `d6`/`d7` row) taken for the cell and for the next cell
+      along the axis with a fraction, then put between them by the fraction, rounded. A
+      sample with no fraction, or whose next cell is past the map's last row or column
+      (`-658`, `-660`), is START's. The colour, the stores of the cell and its height
+      (`+$d888`, `+$a220`), the edges' and tile objects' paths in START's loop and the
+      calls are as before. `_landinst` copies `_lloop` with `d0` 0 and `_bloop` otherwise,
+      into a block of `LCOPYMAX` (`_bloop`'s 466 bytes, more than the 68030's 256-byte
+      instruction cache) bytes.
+    - Checked under Unicorn (`tools/rr_land.py`'s run with the installer's `d0` 1) on 16
+      snapshots, 12 consecutive frames turning on a hillside: it returns with START's
+      registers, and only the view and four bytes of the landscape's height variables
+      (`+$a23d`, from the drawn height) differ. On the same 12 frames, 42% of the view
+      changes from one frame to the next after the best sideways shift, against 32% with
+      the option. The colour still comes from one cell a span and still jumps when a
+      sample moves to the next cell. Its cost is not measured.
 
 ## ECS improvements
 
