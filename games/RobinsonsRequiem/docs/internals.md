@@ -510,14 +510,16 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
       along the axis with a fraction, then put between them by the fraction, rounded. A
       sample with no fraction, or whose next cell is past the map's last row or column
       (`-658`, `-660`), is START's. The colour, the stores of the cell and its height
-      (`+$d888`, `+$a220`), the edges' and tile objects' paths in START's loop and the
+      (`+$d888`, `+$a220`), the cell in `a0` at the span call (the span takes its slope
+      shading from it and its neighbours, `+$ba7c`-`+$ba92`), the edges' and tile objects' paths in START's loop and the
       calls are as before. `_landinst` copies `_lloop` with `d0` 0 and `_bloop` otherwise,
       into a block of `LCOPYMAX` (`_bloop`'s 466 bytes, more than the 68030's 256-byte
       instruction cache) bytes.
     - Checked under Unicorn (`tools/rr_land.py`'s run with the installer's `d0` 1) on 16
       snapshots, 12 consecutive frames turning on a hillside: it returns with START's
       registers, and only the view and four bytes of the landscape's height variables
-      (`+$a23d`, from the drawn height) differ. On the same 12 frames, 42% of the view
+      (`+$a23d`, from the drawn height) differ; on flat ground (the walk's snapshots)
+      nothing does. On the same 12 frames, 42% of the view
       changes from one frame to the next after the best sideways shift, against 32% with
       the option. The colour still comes from one cell a span and still jumps when a
       sample moves to the next cell. Its cost is not measured.

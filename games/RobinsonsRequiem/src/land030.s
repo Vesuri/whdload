@@ -26,7 +26,8 @@
 ; a6) of both the cell and the next one along the axis with the fraction, and puts the
 ; sample between them by the fraction. A sample with no fraction, or whose next cell is
 ; past the map's last row or column, is START's. The colour, the stores of the cell and its
-; height (+$d888, +$a220) and every other path are START's.
+; height (+$d888, +$a220), the cell the spans take their shading from (a0) and every
+; other path are START's.
 ;
 ; _landinst: d0 0 for _lloop, else _bloop; a0 START's hunk 1, a1 LCOPYMAX bytes, 16-byte
 ; aligned, for the copy. Checks the loop's words (a checksum with the relocated addresses
@@ -302,6 +303,7 @@ _bloop                                  ; +$d9ba
         lsr.w   #3,d1
         addi.w  #-3072,d1
         swap    d1
+        move.l  a0,-(a7)                ; the cell, for the span's shading
         move.l  d5,d2                   ; the next cell along the axis with the fraction
         swap    d2
         tst.w   d2
@@ -336,7 +338,8 @@ _bloop                                  ; +$d9ba
         bra.s   .y2
 .fn     add.w   d0,d0
         move.w  (0,a6,d0.w),d0
-.y2     add.w   -630(a1),d0
+.y2     movea.l (a7)+,a0
+        add.w   -630(a1),d0
         move.w  d0,($a21e).l
 .a3     move.w  d0,-582(a1)             ; the new height
         move.w  -604(a1),d2             ; the last
