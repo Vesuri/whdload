@@ -5028,10 +5028,16 @@ pilot, then asks for a name and goes to the bar. The CD32 live measurement used 
 scratch copy of the game directory whose English fix list (`src/release.s`,
 `fix_patch_en`) gained two PL_W entries, `$18464` = `$6000` (skip the first-run
 block, as the bar's visit does) and `$18530` = `$6002` (keep the enemy
-selection). Following `mouse_live_check.py`'s intro skip and menu click, the
+selection). The OCS copy adds the same two words to `WORDS` in
+`tools/ocs_memory_build.py`: `O:17bca` `677a`→`607a` and `O:17c60` `6702`→`6002`
+(guards `677a397c0002`, `670274004a42`); OCS first moves the pointer up to Vega,
+as `mouse_live_check.py` does. Following `mouse_live_check.py`'s intro skip and menu click, the
 cockpit then cycles the high scores and the squadron list until port-1 fire;
-key `1` picks the first enemy. Stop at the publish call `E:1802c` to read the
-field clock each pass, and at `flight_render_work_done` to dump the source
+key `1` picks the first enemy (hold it for a few fields, and set the publish
+breakpoint after it: the entry `E:17d06`/`O:17498` passes during the hold). Stop
+at the publish call `E:1802c`/`O:177be` to read the field clock each picture, at the
+loop top `E:17d64`/`O:174f6` for the drawing time, and (CD32) at
+`flight_render_work_done` to dump the source
 (saved `a0`, 32(sp)) and planar destination (saved `a1`, 36(sp)) for an
 independent comparison. Keep the copy under `tmp/`; never ship those words.
 

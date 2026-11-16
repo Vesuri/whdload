@@ -63,7 +63,7 @@ def main():
                     from modal_source import specification
                     _,_,_,begins,waits,modal=specification('cd32')
                     for off,width,label in modal:
-                        op=0x4eb9 if off in begins+waits or label in ('modal_room_input','modal_death_publish','modal_info_publish') or label.startswith(('modal_label_','modal_crowd_publish')) else 0x4ef9
+                        op=0x4eb9 if off in begins+waits or label in ('modal_room_input','modal_death_publish','modal_info_publish','modal_info_step') or label.startswith(('modal_label_','modal_crowd_publish')) else 0x4ef9
                         want[off:off+width]=struct.pack('>HI',op,s+sym[label])+bytes.fromhex('4e71')*((width-6)//2)
                     from modal_source import INFO_LIMIT
                     want[INFO_LIMIT[0]:INFO_LIMIT[0]+2]=struct.pack('>H',INFO_LIMIT[2])
@@ -103,7 +103,7 @@ def main():
             if custom!=3:assert c.read(layout["hunks"][3],0x1590)==opening_before
             cases.append(dict(model=model,custom=custom,exact=True));c.close()
         # A changed instruction operand must be rejected before any patch write.
-        for operand in ((0x81a6,0x81a8,0x30e,0x310,0x322,0x324,0x1398,0x139a,0x1de22,0x1de3e,0x1df52,0x1df6e,0x69a,0x2b64a,0x2b64c,0x308,0xc4e,0xc914,0xca60,0xc318,0x9a54,0x330,0x2fa,0x1fd02,0x1fddc,0x1fde2,0x1fe16,0x1fe46,0x1fe4a,0x2a2ac,0x2a2b0,0x1802e,0x18040) if buffered else (0x69a,)):
+        for operand in ((0x81a6,0x81a8,0x30e,0x310,0x322,0x324,0x1398,0x139a,0x1de22,0x1de3e,0x1df52,0x1df6e,0x69a,0x2b64a,0x2b64c,0x308,0xc4e,0xc914,0xca60,0xc318,0x9a54,0x330,0x2fa,0x1fd02,0x1fddc,0x1fde2,0x1fe16,0x1fe46,0x1fe4a,0x2a2ac,0x2a2b0,0x1802e,0x18040,0x18034,0x18038) if buffered else (0x69a,)):
             c=CPU(memory,layout,model);s=0x180000;resload=0x190000
             c.write(s,blob);c.write(s+0x1de4,struct.pack('>I',3))
             c.write(s+0x121e,struct.pack('>I',resload))

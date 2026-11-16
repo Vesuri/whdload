@@ -18,8 +18,17 @@ def specification(variant):
                 (0x19b02 if ocs else 0x1a7fe,6,'modal_death_publish')]
     for i,publish in enumerate((0x230da,0x23340,0x1c474) if ocs else (0x23f3c,0x241a2,0x1d19e)):
         patches += [(publish,6,f'modal_crowd_publish{i}')]
-    patches += [(0x177be if ocs else 0x1802c,6,'modal_info_publish')]
+    patches += [(0x177be if ocs else 0x1802c,6,'modal_info_publish'),
+                (0x177c4 if ocs else 0x18032,8,'modal_info_step')]
     return upper,feet,sim,begin,wait,patches
+
+
+# Enemy info: the pass loop's top, its angle step (two calls after each publish)
+# and the first pass from which only the chosen ship turns (no wipe, fly-off or
+# zoom state changes), so a picture between two passes can be drawn by running
+# the pass again one degree on.
+INFO_LOOP=dict(ocs=(0x174f6,0x1727c),cd32=(0x17d64,0x17aea))
+INFO_BETWEEN=30
 
 
 # CD32 enemy-info pass limit (cmpi.w #50,d2 operand): the details appear from
@@ -45,6 +54,7 @@ def source(root, variant):
     lines=[*(f'{k} equ {S.a4(n)}' for k,n in fields.items()),
            'MODAL_CLOCK equ '+('ocs_clock_state' if ocs else 'timing_clock'),
            'MODAL_HZ equ '+('ocs_clock_hz' if ocs else 'timing_hz'),
+           f'MODAL_INFO_BETWEEN equ {INFO_BETWEEN}',
            (root/'src/modal_clock.s').read_text()]
     room_tables=[S.a4(n) for n in ((-0x4b78,-0x4ab8) if ocs else (-0x4b8a,-0x4aca))]
     fix=[]
@@ -63,7 +73,9 @@ def source(root, variant):
                           ('modal_text',0x13c32 if ocs else 0x13ebc),
                           ('modal_input',0x180c4 if ocs else 0x1898a),
                           ('modal_context_begin',0x13b30 if ocs else 0x13dba),
-                          ('modal_context_end',0x13bc8 if ocs else 0x13e52)]:native(label,target)
+                          ('modal_context_end',0x13bc8 if ocs else 0x13e52),
+                          ('modal_info_top',INFO_LOOP[variant][0]),
+                          ('modal_info_angle',INFO_LOOP[variant][1])]:native(label,target)
     for name,off in [('upper',upper),('feet',feet)]:
         lines+=['modal_'+name+'_resume:',S.copy(code,off,off+6)]
         native('modal_'+name+'_tail',off+6)
@@ -78,11 +90,13 @@ def source(root, variant):
             else:
                 # CD32: the info passes' conversions may use the flight
                 # changed-block converter (src/flight_render.s) while this is set.
-                # The loop has no early exit; after its last pass (d2 = limit-1)
-                # the screen is freed, so the histories are dropped there.
+                # The loop has no early exit; after its last picture (the last
+                # pass's picture between, d2 = limit-1) the screen is freed, so
+                # the histories are dropped there.
                 lines += ['modal_info_native:',' move.l a0,-(sp)',' lea modal_info_changed(pc),a0',' move.w #1,(a0)',
                           ' move.l (sp)+,a0',' bsr.w modal_info_target',' move.l a0,-(sp)',' lea modal_info_changed(pc),a0',
-                          ' clr.w (a0)',f' cmpi.w #{INFO_LIMIT[2]-1},d2',' bne.s .kept',' lea flight_destinations(pc),a0',
+                          ' clr.w (a0)',f' cmpi.w #{INFO_LIMIT[2]-1},d2',' bne.s .kept',' tst.w modal_info_between(pc)',
+                          ' beq.s .kept',' lea flight_destinations(pc),a0',
                           ' clr.l (a0)+',' clr.l (a0)','.kept:',' move.l (sp)+,a0',' rts','modal_info_changed: dc.w 0']
                 native('modal_info_target',target)
     death=0x19a94 if ocs else 0x1a7a8
@@ -124,7 +138,7 @@ def source(root, variant):
     for label,target in fix:
         lines += [' move.l a0,d0',f' addi.l #{S.code(target)},d0',f' lea {label}+2(pc),a1',' move.l d0,(a1)']
     for off,width,label in patches:
-        op=0x4eb9 if off in begin+wait or label in ('modal_room_input','modal_death_publish','modal_info_publish') or label.startswith(('modal_label_','modal_crowd_publish')) else 0x4ef9
+        op=0x4eb9 if off in begin+wait or label in ('modal_room_input','modal_death_publish','modal_info_publish','modal_info_step') or label.startswith(('modal_label_','modal_crowd_publish')) else 0x4ef9
         lines += [f' move.w #${op:x},{S.code(off)}(a0)',f' lea {label}(pc),a1',f' move.l a1,{S.code(off+2)}(a0)']
         for n in range(6,width,2):lines += [f' move.w #$4e71,{S.code(off+n)}(a0)']
     if not ocs:lines += [f' move.w #{INFO_LIMIT[2]},{S.code(INFO_LIMIT[0])}(a0)']

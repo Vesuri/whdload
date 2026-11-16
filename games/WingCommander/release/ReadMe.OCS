@@ -134,6 +134,8 @@
    view no longer shifts by a pixel.
  - CD32 edition, enhanced framerate: the TrainSim enemy details screen no longer
    slows down while the details appear.
+ - Enhanced framerate: the TrainSim enemy details screen turns the ship one
+   degree at a time with twice as many pictures, keeping its timing.
  - Disk edition: faster arithmetic and collision checks in every mode, including
    the Amiga 500, without changing game behaviour.
  - Enhanced framerate at 1.0x world speed and caches enabled in newly

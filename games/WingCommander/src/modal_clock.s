@@ -530,12 +530,17 @@ modal_crowd_cursor: dc.l 0
 ; TrainSim enemy info (E:17d06 / O:17498) has no native wait: its passes ran at
 ; drawing speed. Publish, then pace one pass per 3 PAL / 4 NTSC fields from the
 ; first pass, retaining debt. The native loop's image script is unchanged.
+; From pass MODAL_INFO_BETWEEN on, modal_info_step draws a picture between two
+; passes, one degree on: the pass's picture waits 2 fields and the one between
+; takes the rest of the slot (1 PAL, 2 NTSC).
 modal_info_publish:
         tst.w d2
         bne.s .paced
         move.l a0,-(sp)
         lea modal_info_cursor(pc),a0
         move.l MODAL_FIELD(a4),(a0)
+        lea modal_info_between(pc),a0
+        clr.w (a0)
         movea.l (sp)+,a0
 .paced:
         bsr.w modal_info_native
@@ -545,8 +550,22 @@ modal_info_publish:
         adda.l #MODAL_HZ-modal_info_publish,a0
         moveq #3,d1
         cmpi.l #50,(a0)
-        bls.s modal_info_idle
+        bls.s .slot
         moveq #4,d1
+.slot:
+        cmpi.w #MODAL_INFO_BETWEEN,d2
+        blt.s modal_info_idle
+        tst.w modal_info_between(pc)
+        bne.s modal_info_idle
+        ; The pass's own picture: a picture between follows.
+        moveq #2,d1
+modal_info_first:
+        move.l MODAL_FIELD(a4),d0
+        sub.l modal_info_cursor(pc),d0
+        cmp.l d1,d0
+        bcs.s modal_info_first
+        movem.l (sp)+,d0-d1/a0
+        rts
 modal_info_idle:
         move.l MODAL_FIELD(a4),d0
         sub.l modal_info_cursor(pc),d0
@@ -557,3 +576,29 @@ modal_info_idle:
         movem.l (sp)+,d0-d1/a0
         rts
 modal_info_cursor: dc.l 0
+
+; Replaces the pass's two angle steps (one degree each) after its publish. From
+; MODAL_INFO_BETWEEN on, the first step is followed by the pass body again (the
+; same d2: only the ship's angle differs), whose publish is the picture between;
+; the second step follows that. The body's 4-byte argument for the call before
+; the publish is still on the stack here, as is this call's return address.
+modal_info_step:
+        cmpi.w #MODAL_INFO_BETWEEN,d2
+        blt.s .both
+        move.l a0,-(sp)
+        lea modal_info_between(pc),a0
+        tst.w (a0)
+        bne.s .second
+        move.w #1,(a0)
+        movea.l (sp)+,a0
+        bsr.w modal_info_angle
+        addq.l #8,sp
+        bra.w modal_info_top
+.second:
+        clr.w (a0)
+        movea.l (sp)+,a0
+        bra.w modal_info_angle
+.both:
+        bsr.w modal_info_angle
+        bra.w modal_info_angle
+modal_info_between: dc.w 0

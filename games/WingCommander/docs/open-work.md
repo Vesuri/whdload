@@ -2,10 +2,13 @@
 
 ## Current state
 
-The CD32 TrainSim enemy details screen now uses the changed-block converter in
-enhanced mode, so on the `a1200-fast` model its passes keep their 3-field cadence
-instead of 4–5 fields. Native checks and a scratch live route pass. The OCS screen
-is still slow (reported by the user); its conversion has not been profiled. See
+The TrainSim enemy details screen now draws a picture between its passes from
+pass 30 on, in both enhanced variants: 2 pictures per 3 PAL fields instead of 1,
+with unchanged timing. On CD32 it also uses the changed-block converter, which
+keeps the `a1200-fast` model to the cadence (it took 4–5 fields per pass).
+Native checks and scratch live routes on both variants pass. Not yet done: the
+OCS rotation renderer `O:2d0de` still rounds its tables, so one-degree steps there
+can still shake, and a user look at both. See
 [info pacing](internals.md#trainsim-enemy-info-pacing).
 
 The CD32 enhanced framerate now centres the rotate/scale renderer's tables
