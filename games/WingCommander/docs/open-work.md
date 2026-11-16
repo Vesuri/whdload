@@ -1009,10 +1009,8 @@ preferences; none is accepted as a defect until it is reproduced or measured.
 Status is against the published 2.0b (15.11.2026). Refer to items by ID.
 
 Speed and pacing:
-- **UR1 (H, U): flight too slow at 10 Hz.** H finds 20 Hz right; U misses
-  Psygore's relaxed mode. Partly addressed: World speed 1.2x–2.0x exists, but
-  the icon default is 1.0x and Psygore's relaxed/slow/unlimited modes are gone.
-  Not measured: relaxed's flight rate on a 030/50, to compare with World speed.
+- **UR1 (H, U): flight too slow at 10 Hz. Closed (user decision, 2026-11-16):**
+  World speed 1.2x–2.0x addresses it; the icon default stays 1.0x.
 - **UR2 (H, U): cutscenes and animations too slow.** U: cutscenes in general;
   H: the opening orchestra (about 16 fps, plus a pause before it) and the
   applause (15–16 fps). Mostly open: the orchestra runs at 10 Hz (the PC
