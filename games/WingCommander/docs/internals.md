@@ -7195,11 +7195,27 @@ particle interpolation. The two zooms instead sample elapsed display fields:
   each of the ten pieces at `start + s*v` with scale `256 + 4*s*vy`; a whole-number
   `s` held the first steps (s rises by 1 per tick) for five fields, then jumped.
   The loop's three multiplies (`$10f8`, `$1102`, `$1130`–`$1137` with its `asl #2`)
-  now use `s` in 1/128 units, equal to the native products on whole steps, so the
-  pieces move and scale on every picture from the first. The native `s` and its
-  end at 120 are unchanged. Live on the cached 030 model a separation picture
-  takes about four fields; each now differs (CD32 piece 0 at fields 566, 571,
-  575: x 57, 56, 55, scale 260, 263, 266; before, 566 and 571 were identical).
+  now use `s` in 1/128 units, equal to the native products on whole steps.
+  The draw call (`$115e`) goes through a wrapper that gives the scaled renderer
+  8.8 x/y from the same `s`: the renderer's two integer loads (CD32 `E:2ecd2`,
+  OCS `O:2f3d6`, 16 bytes) take them only during that call, so the pieces'
+  edges are the floor of their exact place and never step back (separately
+  rounded x/y and scale made the conductor's head bob by a pixel). OCS's
+  dither phase still uses the pushed integer x/y.
+- The separation starts at `s = 0`, the expression's picture: the scaled
+  renderer at 256 places a piece exactly as the unscaled one (CD32 `E:2efe8`),
+  so only the conductor's arms change, as natively. The native recurrence from 0
+  gives 1, 2, 3…, so the first tick also moves gradually instead of jumping to
+  `s = 1` in one picture; the separation takes one tick (0.1 s) longer, absorbed
+  by the flight's wait for music cue 9. The native `s` and its end at 120 follow
+  one tick later.
+- Live on the cached 030 model a separation picture takes about four fields;
+  each differs, and every piece edge moves one way (CD32 conductor top 27, 27,
+  28, 29, 30, 31, 33, 35 from scale 256). Before, the right edge of piece 0 went
+  112, 112, 112, 111, 112, 111. The OCS build's fixup scan treats any
+  `$f000xxxx`–`$f003xxxx` longword in the payload as a native operand: a
+  `movem.l d0-d3,-(sp)` (mask `$f000`) before a `bsr` was relocated and crashed;
+  avoid such encodings in OCS payload code.
 - Planet/logo flight treats 100 native depth units as one 10 Hz step: depth
   travels from 5000 to 1000 in four seconds. This is the requested motion policy,
   not a newly established historical rate. Both projections are recalculated for

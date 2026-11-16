@@ -12,7 +12,7 @@ from pathlib import Path
 from cd32_static import HunkReader
 from ocs_display_check import Native, CODE, DATA, BSS, STARTUP, STOP, u, ck, long, word
 from ocs_reconstruct import ROOT, new_output, require
-from opening_source import specification
+from opening_source import specification, code_patches, renderer
 from variants import get
 
 
@@ -46,14 +46,16 @@ def check(build, variant):
         def reject():
             rejected.append(True);c.reg(18,STOP);ck(u.uc_emu_stop(c.h))
         c.intercept(slave+sy['opening_bad'],reject)
-        guards=[(off,width) for off,width,_,_ in patches]+nops
-        for off,width in guards:
+        guards=[(STARTUP,off,width) for off,width,_,_ in patches]+[(STARTUP,off,width) for off,width in nops]
+        guards+=[(CODE,off,width) for off,width,_,_ in code_patches(variant)]
+        for base,off,width in guards:
             for at in range(off,off+width,2):
-                c.write(STARTUP+at,word(int.from_bytes(before[at:at+2],'big')^1))
+                was=c.read(base+at,2)
+                c.write(base+at,word(int.from_bytes(was,'big')^1))
                 previous=len(rejected)
                 run('opening_guard',{1:CODE})
                 require(len(rejected)==previous+1,'damaged opening instruction accepted')
-                c.write(STARTUP+at,before[at:at+2])
+                c.write(base+at,was)
         run('opening_install',{1:CODE})
         stages,patches,nops=specification(variant)
         want=bytearray(before)
@@ -61,6 +63,8 @@ def check(build, variant):
             want[off:off+width]=word(op)+long(slave+sy[label])+bytes.fromhex('4e71')*((width-6)//2)
         for off,width in nops:want[off:off+width]=bytes.fromhex('4e71')*(width//2)
         require(c.read(STARTUP,len(before))==want,'unexpected hunk-3 changes')
+        for off,width,label,op in code_patches(variant):
+            require(c.read(CODE+off,width)==word(op)+long(slave+sy[label])+bytes.fromhex('4e71')*((width-6)//2),'renderer patch')
         for off,width,name in stages:
             resume=slave+sy['opening_resume_'+name]
             require(c.read(resume-width,width)==before[off:off+width],'displaced instructions changed')
@@ -113,22 +117,24 @@ def check(build, variant):
                 require(c.reg(9)==1 and polls[0]==1,'fireworks skip delayed')
                 c.write(field,long(epoch));run('opening_rebase')
                 samples=[];fines=[]
-                require(c.get(slave+sy['opening_sep_s'])==128,'separation s not reset to 1')
+                require(c.get(slave+sy['opening_sep_s'])==0,'separation s not reset to 0')
                 for elapsed in range(1,hz*2+1):
                     c.write(field,long(epoch+elapsed));run('opening_separation_sample')
                     steps,frac=divmod(elapsed*10,hz);value=1
+                    first=steps==0;steps=max(0,steps-1)  # one tick from s = 0 first
                     for _ in range(steps):
                         value+=value//4+1
                         if value>=120:break
-                    if value<120:value+=(value//4+1)*frac//hz
+                    if value<120 and not first:value+=(value//4+1)*frac//hz
                     require(c.reg(11)&65535==value,'separation trajectory')
                     samples.append(value)
                     # Fractional s (1/128) for the piece positions and scale.
                     steps,frac=divmod(elapsed*10,hz);whole=1
-                    for _ in range(steps):
+                    for _ in range(max(0,steps-1)):
                         if whole>=120:break
                         whole+=whole//4+1
-                    fine=whole<<7 if whole>=120 else (whole<<7)+(((whole//4+1)<<7)*frac)//hz
+                    if steps==0:fine=(frac<<7)//hz
+                    else:fine=whole<<7 if whole>=120 else (whole<<7)+(((whole//4+1)<<7)*frac)//hz
                     require(c.get(slave+sy['opening_sep_s'])==fine,('fractional separation',elapsed,fine))
                     fines.append(fine)
                 require(len(set(samples))>20,'zoom remains at 10 Hz')
@@ -146,6 +152,32 @@ def check(build, variant):
                             require(c.reg(9)&0xffff==want&0xffff,(name,fine,vel,c.reg(9)))
                             native=(fine>>7)*vel*(4 if shift_==5 else 1)
                             if fine%128==0:require(want==native,'whole step differs from native')
+                # The draw wrapper hands the renderer 8.8 x/y from the fractional
+                # s; other callers keep the native integer loads.
+                entry,load,xarg=renderer(variant)
+                after=load+16
+                exit_=0x2f476 if variant=='ocs' else 0x2ed84
+                image=0x188000
+                if variant=='ocs':
+                    c.write(image,long(0x544d3500)+bytes(4)+word(4)+bytes(110-10)+long(200)*4)
+                    c.write(image+200,word(1))
+                else:
+                    c.write(image,long(0x544d3600)+bytes(2)+word(4)+bytes(8)+long(200)*4)
+                seen=[]
+                def at_load():
+                    seen.append((c.reg(11),c.reg(12)));c.reg(18,CODE+exit_)
+                c.intercept(CODE+after,at_load)
+                def args(x,y):return long(0x18c000)+word(x&0xffff)+word(y&0xffff)+long(image)+word(1)+word(300)
+                c.write(record,word(58)+word(94)+word(0xffff)+word(1))  # piece 0: x 58, y 94, v (-1, 1)
+                for fine in (0,25,64,128,1000):
+                    c.write(slave+sy['opening_sep_s'],word(fine))
+                    seen.clear();c.run(slave-CODE+sy['opening_sep_draw'],args(1,2),{3:record})
+                    fx,fy=(58<<8)-2*fine,(94<<8)+2*fine
+                    require(set(seen)=={(fx&0xffffffff,fy)},('subpixel draw',fine,seen))
+                    require(c.reg(3)==record and c.get(slave+sy['opening_sep_on'])==0,'draw wrapper state')
+                    if fine%128==0:require((fx,fy)==((58-fine//128)<<8,(94+fine//128)<<8),'whole step differs from native')
+                seen.clear();c.run(entry,args(-7,40))
+                require(set(seen)=={((-7<<8)&0xffffffff,40<<8)},('native renderer loads',seen))
                 c.write(field,long(epoch));run('opening_rebase')
                 for elapsed in range(1,hz*4+2):
                     c.write(field,long(epoch+elapsed));run('opening_flight_sample')

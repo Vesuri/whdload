@@ -183,9 +183,21 @@ def main():
                             until(h3+0x115e-shift,f'($d3 & 65535) == {piece}')
                             r=cmd(f'printf "PIECE %u %d %d %d\\n", *(unsigned int*){field:#x}, *(short*)($sp+4), *(short*)($sp+6), *(short*)($sp+14)')
                             shown.append([int(x) for x in re.search(r'PIECE (\d+) (-?\d+) (-?\d+) (-?\d+)',r).groups()])
+                            # The renderer's computed left/top/right/bottom for this piece.
+                            if 'opening_sep_on' in sy:edge_cond=f'*(unsigned short*){base+sy["opening_sep_on"]:#x} == 1'
+                            else:edge_cond=f'*(unsigned int*)($sp+{56 if a.variant=="ocs" else 60}) == {h3+0x1164-shift}'
+                            until(h0+(0x2f44a if a.variant=='ocs' else 0x2ed46),edge_cond)
+                            r=cmd('printf "EDGES %d %d %d %d\\n", *(short*)($sp+8), *(short*)($sp+10), *(short*)($sp+12), *(short*)($sp+14)')
+                            shown[-1]+= [int(x) for x in re.search(r'EDGES (-?\d+) (-?\d+) (-?\d+) (-?\d+)',r).groups()]
                         pieces.append(shown)
+                for piece in range(10):
+                    for edge in range(4,8):
+                        track=[p[piece][edge] for p in pieces]
+                        steps_=[b-a for a,b in zip(track,track[1:])]
+                        if any(d>0 for d in steps_) and any(d<0 for d in steps_):
+                            raise ValueError(f'separation piece {piece} edge {edge-4} steps back: {track}')
                 for before,after in zip(pieces,pieces[1:]):
-                    if before[0][0]!=after[0][0] and [p[1:] for p in before]==[p[1:] for p in after]:
+                    if before[0][0]!=after[0][0] and [p[1:4] for p in before]==[p[1:4] for p in after]:
                         raise ValueError('separation start holds a picture: '+str((before[0],after[0])))
                 if pieces:samples['separation_pieces']=pieces
                 samples[name]=rows;shot(name)

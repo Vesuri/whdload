@@ -25,7 +25,7 @@ opening_rebase:
         move.l d0,(a0)+
         move.l d0,(a0)+          ; last sampled field
         move.l d0,(a0)+          ; next animation cursor
-        move.w #1<<SEP_BITS,(a0) ; separation s = 1 before its first sample
+        clr.w (a0)               ; separation s = 0 before its first sample
         movem.l (sp)+,d0/a0
         rts
 
@@ -91,6 +91,18 @@ opening_separation_sample:
         swap d0
         move.w d0,d4            ; fractional numerator in fields*10
         moveq #1,d2
+        ; Begin at s = 0, the picture before the separation, so the first tick
+        ; also moves gradually (the native recurrence from 0 gives 1, 2, 3...).
+        ; The separation takes one tick longer; the native s is one tick later.
+        tst.w d3
+        bne.s .later
+        moveq #0,d5
+        move.w d4,d5
+        lsl.l #SEP_BITS,d5
+        divu.w opening_hz(pc),d5
+        bra.s .store
+.later:
+        subq.w #1,d3
 .steps:
         tst.w d3
         beq.s .fraction
@@ -147,6 +159,56 @@ opening_sep_scale:
         asr.l #SEP_BITS-2,d0
         rts
 
+; The piece draw call: give the renderer subpixel x/y (8.8) from the fractional
+; s, so edges are the floor of the exact place and never step back. The pushed
+; integer x/y (the floor) remain for anything else the renderer derives.
+opening_sep_draw:
+        movem.l d0-d3/a0,-(sp)
+        move.w opening_sep_s(pc),d1
+        lea opening_sep_fx(pc),a0
+        moveq #0,d3
+.axis:  move.w (a2,d3.w),d0     ; start x, then y
+        ext.l d0
+        asl.l #8,d0
+        move.w 4(a2,d3.w),d2    ; velocity
+        muls.w d1,d2
+        add.l d2,d2             ; s*v in 1/256 (s is 1/128)
+        add.l d2,d0
+        move.l d0,(a0)+
+        addq.w #2,d3
+        cmpi.w #4,d3
+        bne.s .axis
+        move.w #1,(a0)          ; opening_sep_on
+        ; Repush the native call's 16 argument bytes. Not with movem d0-d3,-(sp):
+        ; its mask word $f000 reads as an OCS build fixup sentinel.
+        lea 40(sp),a0
+        move.l -(a0),-(sp)
+        move.l -(a0),-(sp)
+        move.l -(a0),-(sp)
+        move.l -(a0),-(sp)
+        bsr.w opening_sep_renderer
+        lea 16(sp),sp
+        lea opening_sep_on(pc),a0
+        clr.w (a0)
+        movem.l (sp)+,d0-d3/a0
+        rts
+; Replaces the renderer's two `move.w arg,dN; ext.l; asl.l #8` loads (x, y).
+; Every other caller keeps the native integer arguments.
+opening_sep_fixed:
+        move.w opening_sep_on(pc),d2
+        bne.s .fixed
+        move.w SEP_XARG+4(sp),d2
+        ext.l d2
+        asl.l #8,d2
+        move.w SEP_XARG+6(sp),d3
+        ext.l d3
+        asl.l #8,d3
+        rts
+.fixed: move.l opening_sep_fx(pc),d2
+        move.l opening_sep_fy(pc),d3
+        rts
+opening_sep_renderer: jmp $0
+
 ; Native flight projects depth in 100-unit logo / 200-unit planet samples.
 ; One 100-unit step is one 10 Hz motion tick. Recompute the original projection
 ; each displayed field instead of repeating stale projected coordinates.
@@ -201,5 +263,8 @@ opening_hz: dc.w 50
 opening_epoch: dc.l 0
 opening_last: dc.l 0
 opening_cursor: dc.l 0
-opening_sep_s: dc.w 1<<SEP_BITS
+opening_sep_s: dc.w 0
+opening_sep_fx: dc.l 0
+opening_sep_fy: dc.l 0
+opening_sep_on: dc.w 0
         even
