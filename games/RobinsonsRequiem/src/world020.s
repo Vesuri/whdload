@@ -1185,9 +1185,30 @@ _swappatch
         cmp.l   8(a4),a5
         bne     .no
         move.l  a5,B_PTRS(a2)
+        cmp.w   #$247c,4(a5)            ; movea.l #<the copper list's pointers>,a2
+        bne     .no
+        cmp.l   #$323c0003,10(a5)       ; move.w #3,d1: four sets
+        bne     .no
+        move.l  6(a5),B_CTAB(a2)
+        cmp.w   #$4eb9,$e8a(a1)         ; the VBL's jsr <hunk 1 +$7fca>
+        bne     .no
+        lea     $7fca(a0),a5
+        cmp.l   $e8c(a1),a5
+        bne     .no
+        move.l  a5,B_VBLGO(a2)
         cmp.l   #$33fc0010,12(a4)
         bne     .no
         cmp.l   #$00dff09a,16(a4)
+        bne     .no
+        lea     $c(a0),a5               ; the screens exchanged before it
+        cmp.w   #$23c9,$31e8(a0)        ; move.l a1,<+$c>
+        bne     .no
+        cmp.l   $31ea(a0),a5
+        bne     .no
+        lea     $10(a0),a5
+        cmp.w   #$23c8,$31ee(a0)        ; move.l a0,<+$10>
+        bne     .no
+        cmp.l   $31f0(a0),a5
         bne     .no
         cmp.w   #$4eb9,$31f4(a0)        ; the 3D swap
         bne     .no
@@ -1249,6 +1270,10 @@ _swappatch
         bsr     .jsr
         lea     $31f4(a0),a1
         lea     _swap(pc),a4
+        bsr     .jsr
+        move.l  _hunk0(pc),a1
+        lea     $e8a(a1),a1
+        lea     _vblseg(pc),a4
         bsr     .jsr
         lea     $3222(a0),a1
         lea     _viewent(pc),a4
@@ -1345,27 +1370,153 @@ _gsites dc.w    0,$1104,$2c79,0,$114c,$2c79,0,$1232,$2879,0,$12a4,$2879,0,$1366,
         dc.w    2,$786,$2c79
         dc.w    -1
 
-; +$31f4: the 3D swap without the beam wait
-_swap   movem.l d0/a0,-(a7)
-.wait   move.l  $dff004,d0              ; not while the copper takes the pointers
-        lsr.l   #8,d0
-        and.w   #$1ff,d0
-        cmp.w   #2,d0
+; +$31f4: the 3D swap without the beam wait. START's +$cd4 writes the pointers into four
+; sets in the copper lists, each taken where the copper reaches it: the 3D view's at the
+; list's start, the panel's after its wait (line 186). Written at once, a set the beam has
+; not reached yet would show the new screen in this field, before the VBL draws the mouse
+; pointer into it, while the view shows it in the next: the panel flickers. So a set the
+; beam has passed is written now, for the next field, and one it has not at the next VBL
+; (_vblseg, hunk 0 +$e8a), before the copper reaches it; within lines 300 to 1, where the
+; copper takes the first sets and the VBL could come before START marks the pointer as
+; left on the old screen, the swap waits for line 2.
+; START has exchanged the screens (+$31dc-+$31f3, <+$c> and <+$10>) and holds the
+; pointer's lock (<+$d3ee>); it marks the pointer as left on the old screen (<+$d3ef>)
+; after this. The wait can take in a VBL, whose pointer hiding (+$80b4) runs without the
+; lock and would restore the background on the new screen, leaving the pointer on the
+; old one: so while waiting the screens are exchanged back.
+SWAPEND equ     300
+_swap   movem.l d0-d3/a0-a2,-(a7)
+        bsr     _segflush               ; a VBL's sets still waiting (not expected)
+        bsr     _clines
+        bsr     _sline
+        move.w  d0,d2                   ; d2 the beam's line
+        cmp.w   #2,d2
         blo     .wait
-        cmp.w   #310,d0
-        bhs     .wait
-        move.l  _bvars+B_PTRS(pc),a0
-        jsr     (a0)
+        cmp.w   #SWAPEND,d2
+        blo     .go
+.wait   bsr     _sxchg
+.w      bsr     _sline
+        move.w  d0,d2
+        cmp.w   #2,d2
+        blo     .w
+        cmp.w   #SWAPEND,d2
+        bhs     .w
+        bsr     _sxchg
+.go     lea     _bvars(pc),a2
+        move.l  _hunk1(pc),a0
+        move.l  $c(a0),B_SEGSCR(a2)
+        moveq   #0,d1                   ; the set
+        moveq   #0,d3                   ; those for the VBL
+.set    cmp.w   B_SLN(a2,d1.w*2),d2
+        bhi     .now                    ; passed: taken in the next field
+        bset    d1,d3
+        bra     .nx
+.now    bsr     _cset
+.nx     addq.w  #1,d1
+        cmp.w   #4,d1
+        blo     .set
+        move.b  d3,B_SEGP(a2)
         move.w  #$10,$dff09a
-        lea     _bvars(pc),a0
-        st      B_UNSHOWN(a0)
-        move.l  _wvars+W_VBL(pc),d0
-        move.l  d0,a0
-        move.l  (a0),d0
-        lea     _bvars(pc),a0
-        move.l  d0,B_SVBL(a0)
+        st      B_UNSHOWN(a2)
+        move.l  _wvars+W_VBL(pc),a0
+        move.l  (a0),B_SVBL(a2)
         bsr     _ptswap
-        movem.l (a7)+,d0/a0
+        movem.l (a7)+,d0-d3/a0-a2
+        rts
+
+; set d1 (0-3) of +$cd4's table written for the screen B_SEGSCR, as +$cd4 writes it: five
+; planes, each its pointer plus the set's rows times the row's bytes (<+$16>); all kept
+_cset   movem.l d0/d2-d4/a0-a2,-(a7)
+        lea     _bvars(pc),a2
+        move.l  B_SEGSCR(a2),a0
+        move.l  B_CTAB(a2),a1
+        move.w  d1,d0
+        lsl.w   #4,d0
+        add.w   d0,a1
+        move.l  12(a1),d2               ; the rows
+        move.l  (a1),a1                 ; the first move's data word
+        move.l  _hunk1(pc),a2
+        mulu.w  $16(a2),d2
+        moveq   #4,d4
+.p      move.l  (a0)+,d3
+        add.l   d2,d3
+        move.w  d3,4(a1)
+        swap    d3
+        move.w  d3,(a1)
+        addq.l  #8,a1
+        dbf     d4,.p
+        movem.l (a7)+,d0/d2-d4/a0-a2
+        rts
+
+; the sets left for the VBL written, when the screen is still the one swapped to; all kept
+_segflush
+        movem.l d1/a0-a1,-(a7)
+        lea     _bvars(pc),a1
+        tst.b   B_SEGP(a1)
+        beq     .x
+        move.l  _hunk1(pc),a0
+        move.l  $c(a0),a0
+        cmp.l   B_SEGSCR(a1),a0
+        bne     .clr
+        moveq   #3,d1
+.s      btst    d1,B_SEGP(a1)
+        beq     .n
+        bsr     _cset
+.n      dbf     d1,.s
+.clr    sf      B_SEGP(a1)
+.x      movem.l (a7)+,d1/a0-a1
+        rts
+
+; hunk 0 +$e8a in the VBL handler (jsr <hunk 1 +$7fca>, which counts the field): the sets
+; left by the swap first
+_vblseg bsr     _segflush
+        move.l  _bvars+B_VBLGO(pc),-(a7)
+        rts
+
+; d0 the beam's line, read twice until both agree: a long is two word reads, and at the
+; field's end V8 can come from line 311 and the rest from line 0; d1 used
+_sline  move.l  $dff004,d0
+        move.l  $dff004,d1
+        lsr.l   #8,d0
+        lsr.l   #8,d1
+        and.w   #$1ff,d0
+        and.w   #$1ff,d1
+        cmp.w   d0,d1
+        bne     _sline
+        rts
+
+; <+$c> and <+$10> exchanged, by one instruction each way (the VBL reads them); d0, d1
+; and a0 used
+_sxchg  move.l  _hunk1(pc),a0
+        movem.l $c(a0),d0-d1
+        exg     d0,d1
+        movem.l d0-d1,$c(a0)
+        rts
+
+; B_SLN: each set's line, the copper's wait before it (0 when the set starts its list,
+; after the one before ends); d0, d1, a0 and a1 used
+_clines lea     _bvars+B_SLN(pc),a1
+        move.l  _bvars+B_CTAB(pc),a0
+        moveq   #3,d1
+.set    movem.l a0/a1,-(a7)
+        move.l  (a0),a0                 ; the set's first move's data word
+        subq.l  #2,a0
+        clr.w   (a1)
+        moveq   #63,d0
+.back   subq.l  #4,a0
+        btst    #0,1(a0)
+        beq     .next                   ; a move
+        cmp.l   #$fffffffe,(a0)
+        beq     .done                   ; the list before ends: the set starts its list
+        moveq   #0,d0
+        move.b  (a0),d0
+        move.w  d0,(a1)
+        bra     .done
+.next   dbf     d0,.back
+.done   movem.l (a7)+,a0/a1
+        lea     16(a0),a0
+        addq.l  #2,a1
+        dbf     d1,.set
         rts
 
 ; +$3090 in 3D mode: the wait for the swap and the block put off, both now with <+$d426>
@@ -1529,6 +1680,11 @@ _brects         dc.l    0               ; hunk 1 +$391e, the rectangles' copy
 _bptrbg         dc.l    0               ; hunk 2 +$2aa, the pointer's background
 _blist          dc.l    0               ; the rectangle list's start
 _bsvbl          dc.l    0               ; the VBL count at the swap
+_bctab          dc.l    0               ; the copper lists' pointer sets (+$cd4's table)
+_bsegscr        dc.l    0               ; the screen swapped to
+_bvblgo         dc.l    0               ; hunk 1 +$7fca, the VBL's call
+_bsln           dc.w    0,0,0,0         ; each set's line
+_bsegp          dc.b    0               ; the sets left for the VBL (bits 0-3)
 _bpend          dc.b    0               ; the wait and the block put off
 _bunshown       dc.b    0               ; a swap not yet shown
 _bon            dc.b    0               ; patched
@@ -1539,6 +1695,11 @@ B_RECTS equ     _brects-_bvars
 B_PTRBG equ     _bptrbg-_bvars
 B_LIST  equ     _blist-_bvars
 B_SVBL  equ     _bsvbl-_bvars
+B_CTAB  equ     _bctab-_bvars
+B_SEGSCR equ    _bsegscr-_bvars
+B_VBLGO equ     _bvblgo-_bvars
+B_SLN   equ     _bsln-_bvars
+B_SEGP  equ     _bsegp-_bvars
 B_PEND  equ     _bpend-_bvars
 B_UNSHOWN equ   _bunshown-_bvars
 B_ON    equ     _bon-_bvars

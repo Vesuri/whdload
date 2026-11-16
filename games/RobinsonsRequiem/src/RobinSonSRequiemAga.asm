@@ -3036,6 +3036,16 @@ _swappatch
         bne     .no
         cmp.l   #$00dff09a,16(a4)
         bne     .no
+        lea     $c(a0),a5               ; the screens exchanged before it
+        cmp.w   #$23c9,$4b24(a0)        ; move.l a1,<+$c>
+        bne     .no
+        cmp.l   $4b26(a0),a5
+        bne     .no
+        lea     $10(a0),a5
+        cmp.w   #$23c8,$4b2a(a0)        ; move.l a0,<+$10>
+        bne     .no
+        cmp.l   $4b2c(a0),a5
+        bne     .no
         cmp.w   #$4eb9,$4b30(a0)        ; the 3D swap
         bne     .no
         cmp.l   $4b32(a0),a4
@@ -3198,15 +3208,24 @@ _gsites dc.w    0,$1394,$2479,0,$184e,$2c79,0,$1896,$2c79,0,$1994,$2879,0,$1ad8,
         dc.w    2,$a62,$2c79,2,$3c1e,$2279,2,$3d5e,$2a79,2,$4364,$2a79
         dc.w    -1
 
-; +$4b30: the 3D swap without the beam wait
-_swap   movem.l d0/a0,-(a7)
-_swait  move.l  $dff004,d0              ; not while the copper takes the pointers
-        lsr.l   #8,d0
-        and.w   #$1ff,d0
+; +$4b30: the 3D swap without the beam wait. START has exchanged the screens (+$4b18-
+; +$4b2f, <+$c> and <+$10>) and holds the pointer's lock (<+$ed98>); it marks the pointer
+; as left on the old screen (<+$ed99>) after this. A wait can take in a VBL, whose pointer
+; hiding runs without the lock and would restore the background on the new screen, leaving
+; the pointer on the old one: so while waiting the screens are exchanged back.
+_swap   movem.l d0-d1/a0,-(a7)
+_swait  bsr     _sline                  ; not while the copper takes the pointers
         cmp.w   #2,d0
-        blo     _swait
+        blo     .wait
         cmp.w   #310,d0
-        bhs     _swait
+        blo     _swaitend
+.wait   bsr     _sxchg
+.w      bsr     _sline
+        cmp.w   #2,d0
+        blo     .w
+        cmp.w   #310,d0
+        bhs     .w
+        bsr     _sxchg
 _swaitend
         move.l  _bvars+B_13F6(pc),a0
         jsr     (a0)
@@ -3219,7 +3238,27 @@ _swaitend
         lea     _bvars(pc),a0
         move.l  d0,B_SVBL(a0)
         bsr     _ptswap
-        movem.l (a7)+,d0/a0
+        movem.l (a7)+,d0-d1/a0
+        rts
+
+; d0 the beam's line, read twice until both agree: a long is two word reads, and at the
+; field's end V8 can come from line 311 and the rest from line 0; d1 used
+_sline  move.l  $dff004,d0
+        move.l  $dff004,d1
+        lsr.l   #8,d0
+        lsr.l   #8,d1
+        and.w   #$1ff,d0
+        and.w   #$1ff,d1
+        cmp.w   d0,d1
+        bne     _sline
+        rts
+
+; <+$c> and <+$10> exchanged, by one instruction each way (the VBL reads them); d0, d1
+; and a0 used
+_sxchg  move.l  _hunk1(pc),a0
+        movem.l $c(a0),d0-d1
+        exg     d0,d1
+        movem.l d0-d1,$c(a0)
         rts
 
 ; +$49cc in 3D mode: the wait for the swap and the block put off, both now with <+$edd0>

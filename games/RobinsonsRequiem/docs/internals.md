@@ -252,7 +252,13 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
     line of the swap does not change the field the frame shows in. All checked first,
     with `_view` (item 8):
     - `+$4b30` [`$8fdc`] becomes `jsr _swap`: the pointers are written at once, except
-      within lines 310 to 1, where the copper takes them; then the bit is cleared.
+      within lines 310 to 1, where the copper takes them; then the bit is cleared. The
+      line is read twice until both reads agree (a longword read of `VPOSR` is two word
+      reads, and at the field's end V8 can come from line 311 and the rest from line 0).
+      START has exchanged the screens before the call (`+$4b18`-`+$4b2f`, `<+$c>` and
+      `<+$10>`, checked) and marks the pointer as left on the old screen after it; a wait
+      can take in a VBL, whose pointer hiding runs without START's lock, so while it waits
+      `_swap` exchanges them back (`_sxchg`, one `movem.l` each way).
     - `+$49cc` [`$8e78`] becomes `jsr _pstart`, which puts off the wait and the block
       (with `<+$edd0>` set, the palette's turn at `+$35a4`, both run as before), and
       `+$4a0a` [`$8eb6`] `tst.b <+$ed97>` becomes `jmp _pblock`: the block then, unless it
@@ -503,6 +509,18 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
      first access to the back screen: the conversion's load (hunk 2 `+$19ea`), a 2D
      view's (`+$3222`), the drawing's end, and the views' end (`+$319e`). The 13 other
      loads of the back screen wait for the swap to show (`_gsites`).
+   - Unlike the AGA game's, the ECS copper lists take the plane pointers in four sets
+     (hunk 0 `+$cd4`, its table checked with `movea.l #<table>,a2` and `move.w #3,d1`),
+     each where the copper reaches it: in the 3D view's list the view's at the list's
+     start and the panel's after a wait for line 186. Written at once by a swap above
+     that line, the panel showed the new screen a field before the view, without the
+     mouse pointer, which the VBL draws into it at the next field: the pointer flickered
+     over the panel. `_swap` writes a set the beam has passed at once (taken in the next
+     field) and leaves one it has not to the VBL (`_vblseg`: hunk 0 `+$e8a` `jsr <hunk 1
+     +$7fca>`, the handler's first call, checked), which writes it before the copper
+     reaches it (`_cset`, as `+$cd4` writes a set; each set's line from the copper wait
+     before it, `_clines`). From line 300 to line 1 it waits for line 2, the screens
+     exchanged back while it waits and the line read twice, as in the AGA's item 11.
 
    The variables these use are the AGA's less `$19aa` (the VBL count `+$d4c2`, the cap
    `+$d4c0`, the 3D flag `+$d459`, the element table `+$d3dc`, the heading before a run

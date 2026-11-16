@@ -77,13 +77,24 @@ Next, in order:
    equal (240 drawings, 4,419 object images given) and filled step 13's cache to 63,919
    of its 65,536 bytes (37 images) before emptying it once. The 040/060 conversion on a
    real 040 or 060.
-2. The ECS plan's checks in play (`docs/performance.md`, "Plan", "ECS on a fast CPU"),
-   as in the AGA game: steps 9 and 10's staged creatures, the mouse pointer and scripts'
-   drawing with the swap, the pointer's picking between world passes, and the image cache
-   in other areas. On the A500, step 11's blitter conversion with the game's own blits
-   (inventory, messages) and in other areas. The game has to keep working correctly on
+2. The ECS game on the 68020 and up crashes turning left from the direct start: with
+   keypad 4 held from field 250 (pointer over the inventory), an Illegal Instruction at
+   hunk 1 `+$b34a` about 110 fields later, a computed jump into a word table (A6 hunk 1
+   `+$b346`) from the landscape's spans (`+$c1be` `bsr.w +$9d54`, under the drawing's
+   `+$8a10`). Not with `WORLD_OFF`; with `PROJ_OFF` and with the slave before the
+   objects' places from fractions too. Staged angles of exactly ±360 were tried and are
+   not the cause. Find it before the checks below.
+3. The ECS plan's checks in play (`docs/performance.md`, "Plan", "ECS on a fast CPU"),
+   as in the AGA game: steps 9 and 10's staged creatures, the scripts' drawing with the
+   swap, the pointer's picking between world passes, and the image cache in other areas.
+   The mouse pointer with the swap is checked walking: over the inventory in all of 250
+   fields (it was missing from 2 in 3 before `_swap` left the panel's pointer set to the
+   VBL), and over the 3D view in every tenth of 150. A pointer left behind when an object
+   is picked up (seen in play) is not reproduced; `_swap` now exchanges the screens back
+   while it waits, which closes the one way found for it. On the A500, step 11's blitter
+   conversion with the game's own blits (inventory, messages) and in other areas. The game has to keep working correctly on
    the 68000.
-3. Play-test both variants further (loading and saving) with the rebuilt slaves, against
+4. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`); step 10.2's swap is play-tested with the
    mouse pointer moving and the scripts drawing (inventory, messages). The AGA game's
    objects' frames are in fast memory since step 1: check that a game saved with v1.2
