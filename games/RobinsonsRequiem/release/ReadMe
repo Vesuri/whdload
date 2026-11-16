@@ -62,8 +62,9 @@
  - Faster sky drawing
  - Walking, the 3D view keeps the game's own pace: a new frame every 8 fields
    (6.25 per second on PAL) instead of every 9 to 12
- - The objects in the 3D view keep their place and size from frame to frame:
-   their screen edges are rounded once instead of jumping back and forth by a pixel
+ - The objects in the 3D view move smoothly between frames instead of jumping
+   back and forth by a pixel or more: placed from the in-between positions of the
+   camera and the moving objects with their fractions, their edges rounded once
  ECS:
  - Faster chunky-to-planar conversion
  - Faster sky drawing
@@ -78,8 +79,8 @@
  - On 68020 and up: the game's objects' images in Fast memory, and on a fast
    enough CPU more frames between the game's steps, up to one every field (50
    per second on PAL)
- - On 68020 and up: the objects in the 3D view keep their place and size from
-   frame to frame, their screen edges rounded once
+ - On 68020 and up: the objects in the 3D view move smoothly between frames
+   instead of jumping back and forth by a pixel or more
  - On 68000: the chunky-to-planar conversion shared with the blitter, which
    uses 32 KB of Chip memory
 

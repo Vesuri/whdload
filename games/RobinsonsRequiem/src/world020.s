@@ -509,6 +509,7 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         clr.l   (a4)+
         clr.l   (a4)+
         clr.l   (a4)
+        bsr     _pcclr
         cmp.l   I_VIEW(a3),a2
         beq     .same
         move.l  a2,I_VIEW(a3)
@@ -554,7 +555,23 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         bra     .part
 .pos    btst    #0,132(a2)
 .part   beq     .next
-        move.w  d0,d1
+        cmp.w   #6,d5
+        bhs     .ang
+        move.w  d0,d1                   ; a position: in 1/64 units
+        ext.l   d1
+        muls.l  d6,d1
+        asl.l   #6,d1
+        divs.l  d7,d1
+        ext.l   d0
+        asl.l   #6,d0
+        sub.l   d0,d1                   ; step x alpha - step
+        move.l  d1,d0
+        asr.l   #6,d0
+        move.w  d0,I_OFF(a3,d5.w)       ; whole units, down
+        and.w   #63,d1
+        bsr     _pcam                   ; the fraction, for the projection (src/proj020.s)
+        bra     .next
+.ang    move.w  d0,d1
         muls.w  d6,d1
         divs.w  d7,d1
         sub.w   d0,d1                   ; step x alpha - step
@@ -587,6 +604,9 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         addq.w  #2,d5
         cmp.w   #12,d5
         blo     .stage
+        bsr     _pcst                   ; the fractions: staged, changed
+        or.w    d0,d3
+        or.b    d1,d4
         tst.b   I_DRAWN(a3)
         bne     .known
         st      d4
@@ -619,10 +639,12 @@ _view   movem.l d0-d7/a0-a1/a3-a4,-(a7)
         st      I_DRAWN(a3)
         tst.w   d3
         sne     I_STAGED(a3)
+        bsr     _pcon
         bsr     _eapply
         move.l  _wvars+W_DRAW(pc),a0
         jsr     (a0)
         bsr     _eundo
+        bsr     _pcoff
         moveq   #0,d5                   ; the camera back
 .back   move.w  (a1,d5.w),d0
         move.w  I_SAVE(a3,d5.w),(a2,d0.w)
@@ -793,10 +815,11 @@ _isample
 ; drawing, so a freed object is dropped. No interpolation across a jump (as _isample's).
 
 ESLOTS  equ     8
-ESIZE   equ     36
+ESIZE   equ     40
 ; a slot: +0 the object (0 free), +4 W of the move, +8 the interval, +12/14/16 the position's
 ; step, +18 the heading's, +20 the heading after it, +22 staged in the last frame drawn,
-; +24/26/28/30 the offsets (position, heading), +32 the staged heading
+; +24/26/28/30 the offsets (position, heading; whole units, down), +32 the staged heading,
+; +34/36/38 the position offsets' fractions (1/64 units)
 
 ; at +$2f44: a6 the object, d4-d6 the step, d7 the heading; a1 START's element table out
 _emove  move.l  _wvars+W_ELEM(pc),a1
@@ -916,6 +939,8 @@ _eplan  movem.l d1-d7/a0-a1/a3-a4,-(a7)
         clr.l   24(a3)
         clr.l   28(a3)
         clr.w   32(a3)
+        clr.l   34(a3)
+        clr.w   38(a3)
         tst.b   W_ON(a0)
         beq     .done
         move.l  W_DRAWT(a0),d5
@@ -926,13 +951,32 @@ _eplan  movem.l d1-d7/a0-a1/a3-a4,-(a7)
         moveq   #0,d3                   ; any offset
         moveq   #0,d2
 .off    move.w  12(a3,d2.w),d1
-        move.w  d1,d4
+        cmp.w   #6,d2
+        bhs     .offh
+        move.w  d1,d4                   ; a position: in 1/64 units
+        ext.l   d4
+        muls.l  d5,d4
+        asl.l   #6,d4
+        divs.l  d6,d4
+        ext.l   d1
+        asl.l   #6,d1
+        sub.l   d1,d4                   ; step x alpha - step
+        move.l  d4,a4
+        asr.l   #6,d4
+        move.w  d4,24(a3,d2.w)          ; whole units, down
+        or.w    d4,d3
+        move.l  a4,d4
+        and.w   #63,d4
+        move.w  d4,34(a3,d2.w)          ; the fraction
+        or.w    d4,d3
+        bra     .onext
+.offh   move.w  d1,d4
         muls.w  d5,d4
         divs.w  d6,d4
         sub.w   d1,d4                   ; step x alpha - step
         move.w  d4,24(a3,d2.w)
         or.w    d4,d3
-        addq.w  #2,d2
+.onext  addq.w  #2,d2
         cmp.w   #8,d2
         blo     .off
         tst.w   d3
@@ -1002,7 +1046,8 @@ _elive  movem.l d0/a0,-(a7)
         rts
 
 ; the offsets in (d0 0) or out (d0 1) for the slots _eplan gave offsets
-_eapply moveq   #0,d0
+_eapply bsr     _pfclr                  ; the fractions' table (src/proj020.s)
+        moveq   #0,d0
         bra     _estage
 _eundo  moveq   #1,d0
 _estage movem.l d0-d7/a0-a1/a3-a4,-(a7)
@@ -1015,7 +1060,21 @@ _estage movem.l d0-d7/a0-a1/a3-a4,-(a7)
         moveq   #ESLOTS-1,d7
 .slot   tst.l   (a3)
         beq     .next
-        movem.w 24(a3),d2-d5            ; the offsets
+        tst.b   d0                      ; in: the elements' fractions to the table
+        bne     .nof
+        movem.w 34(a3),d2-d4
+        move.w  d2,d6
+        or.w    d3,d6
+        or.w    d4,d6
+        beq     .nof
+        move.l  (a3),a4
+        move.w  -24(a4),d1
+.fe     beq     .nof
+        lea     (a1,d1.w),a4
+        bsr     _pfadd
+        move.w  4(a4),d1
+        bra     .fe
+.nof    movem.w 24(a3),d2-d5            ; the offsets
         move.w  d2,d6
         or.w    d3,d6
         or.w    d4,d6

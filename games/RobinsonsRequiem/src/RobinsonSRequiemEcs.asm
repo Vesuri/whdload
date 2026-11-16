@@ -932,6 +932,8 @@ _worldinst
         bsr     _prespatch
         move.l  #$8ef2,a1
         move.l  #$d484,d1
+        move.l  #$bda6,d2
+        move.l  #$beb6,d3
         bsr     _projpatch
 .no
         ENDC
