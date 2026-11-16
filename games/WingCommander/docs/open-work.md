@@ -4,11 +4,11 @@
 
 The TrainSim enemy details screen now draws a picture between its passes from
 pass 30 on, in both enhanced variants: 2 pictures per 3 PAL fields instead of 1,
-with unchanged timing. On CD32 it also uses the changed-block converter, which
-keeps the `a1200-fast` model to the cadence (it took 4–5 fields per pass).
-Native checks and scratch live routes on both variants pass. Not yet done: OCS
-on `a1200-fast` still takes 4–5 fields per pass (about 70% of it conversion),
-and a user look at both. See
+with unchanged timing. Both also convert the passes with a changed-block
+converter (CD32 the flight one, OCS the C6 adapter): on `a1200-fast` CD32 keeps
+the cadence (it took 4–5 fields per pass), and OCS falls from 3.9 to 3.0 fields
+per pass on average (2.4 over the last 40). Native checks and scratch live
+routes on both variants pass. Not yet done: a user look at both. See
 [info pacing](internals.md#trainsim-enemy-info-pacing).
 
 The enhanced framerate now centres the rotate/scale renderer's tables on both

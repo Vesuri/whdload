@@ -8488,8 +8488,9 @@ Its `O:2be50` (file `2be7c`) requests 42,511 bytes; `O:2be58` (file `2be84`)
 stores the result at `OD:6fae`. The native compositor `O:2bf74` (file `2bfa0`)
 skips when that pointer is zero. The failing snapshot has 11,696 free Fast bytes
 (largest block 10,696) and 41,056 free Chip bytes (largest block 21,832).
-OCS changed-block histories already use separate slave storage, and the public
-candidate has them disabled: this is independent native-pool fragmentation.
+OCS changed-block histories use separate slave storage (the public build keeps
+them only for the TrainSim enemy details): this is independent native-pool
+fragmentation.
 
 The public OCS candidate adds 64 KiB of pool headroom, retaining native image
 allocation, registration and cleanup. `OS:0020` (slave file `0040`) changes the
@@ -9355,7 +9356,28 @@ The loop has no early exit; after its last picture (the picture between of the
 last pass, `d2` = 62) the wrapper drops the converter's destination records,
 because the caller then frees the screen.
 On the same model the passes then keep the 3-field cadence (the first two,
-full conversions, take 4–5 fields). OCS is unchanged.
+full conversions, take 4–5 fields).
+
+**Conversion (OCS).** On the `a1200-fast` model a 40-field profile of the
+passes had 70% in the CPU converter (`c2p1x1_4_c5_bm` 39.8%, `ocs_c2p_common`
+29.7%), and a pass took 3.9 fields on average. The public build now always
+includes the C6 changed-block adapter (`src/ocs_changed.s`, its two 64,000-byte
+destination histories in the slave's workspace tail: 128,000 more bytes of
+slave memory). Its OCS `modal_info_native` sets `modal_info_changed` around the
+native publish; the conversion call (`ocs_info_word`/`ocs_info_long`, the INFO
+dispatcher in `tools/ocs_memory_build.py`) takes the adapter while it is set.
+Any other conversion, and any the adapter refuses, drops both histories and
+converts the whole image, so the next details screen starts full and nothing
+outside it reads a history. The scratch-loan and drain invalidations of C6
+apply as before. On the same model a pass then takes 3.0 fields on average, 2.4
+over the last 40 passes; the first ten, mostly full conversions, take 4.5
+(against 4.2). Only CPU conversion uses it: on `a500-1.5m` with 4 MiB Fast the
+build converts with the blitter, and a control without the dispatcher gave
+identical fields per pass.
+`tools/ocs_info_check.py` runs the release slave's dispatcher on the 68000 and
+68020 models: every call against an independent conversion, stores following
+the history on both destinations, and a flag-clear conversion dropping it.
+Mutated slaves that ignore the flag or keep the histories fail.
 
 `tools/info_clock_check.py` runs the original routine on both variants and
 models, with the slave installed and drawing calls stubbed. Field time passes
@@ -9375,7 +9397,9 @@ simulator, which skips selection and this animation. A scratch live route
 ([development](development.md#trainsim-enemy-info-pacing)) reaches the real
 screen. On it, all 49 changed-block conversions of the passes and the first two
 flight conversions after them equalled an independent conversion of their source,
-and with the pictures between, all 71 checked on the `a1200-030` model. There the
+and with the pictures between, all 71 checked on the `a1200-030` model. On OCS
+`a1200-fast`, all 115 conversions (109 with the flag set, two destinations, then
+six after the screen) equalled it. There the
 fields between pictures were 3 before pass 30 and then alternately 2 and 1, on
 both variants.
 

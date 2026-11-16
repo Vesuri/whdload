@@ -33,7 +33,8 @@ conversion. Individual source allocation still requires the converter's audited
 Fast bank; failure retains the native blitter safely. This per-source fallback
 is distinct from selecting original behaviour at startup. Unknown high-memory
 converter placements retain native conversion; high Fast admission to timing
-is not a new performance claim. Optional C6 changed-block histories stay off.
+is not a new performance claim. C6 changed-block histories are used only for the
+TrainSim enemy details ([info pacing](internals.md#trainsim-enemy-info-pacing)).
 
 The public slave reserves 1 MiB of expansion memory: 256 KiB for Kickstart and
 768 KiB for the native game pool. This adds 64 KiB of pool headroom for saved
@@ -122,6 +123,7 @@ Backend choice is currently a **build option**, not a WHDLoad tooltype:
   reconstruction remains a separate byte-identical control. `--changed` defaults to `off` in these exact
   E2 candidates. C6's optional two-history changed-block experiment is not part
   of this hand-off; enabling it changes the binary and adds 128,000 bytes.
+  `--public` enables it for the TrainSim enemy details only.
 - `--exit-probe` is diagnostic-only and absent from both hand-off binaries.
 
 Original OCS CUSTOM1–4 tooltypes remain unchanged; the public build adds CUSTOM5:

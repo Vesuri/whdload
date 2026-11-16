@@ -134,8 +134,9 @@
  - Enhanced framerate: rotating ships and the title logo keep their centre
    instead of shaking as they turn, and a ship at the edge of the view no
    longer shifts by a pixel.
- - CD32 edition, enhanced framerate: the TrainSim enemy details screen no longer
-   slows down while the details appear.
+ - Enhanced framerate: the TrainSim enemy details screen no longer slows down
+   while the details appear (on the disk edition, with a 68020 or better and
+   Fast memory).
  - Enhanced framerate: the TrainSim enemy details screen turns the ship one
    degree at a time with twice as many pictures, keeping its timing.
  - Disk edition: faster arithmetic and collision checks in every mode, including

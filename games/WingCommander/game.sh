@@ -277,7 +277,8 @@ game_check() {
     python3 tools/rotation_check.py tmp/build/release/WingCommanderCD32 --output tmp/check/rotation-cd32-de --german > /dev/null &&
     python3 tools/rotation_check.py tmp/build/release/WingCommander --variant ocs --output tmp/check/rotation-ocs > /dev/null &&
     python3 tools/ocs_options_check.py tmp/build/release/WingCommander --output tmp/check/options-ocs &&
+    python3 tools/ocs_info_check.py tmp/build/release/WingCommander --output tmp/check/info-ocs > /dev/null &&
     python3 tools/release_install.py --cd32 tmp/build/release/WingCommanderCD32 \
       --ocs tmp/build/release/WingCommander --output tmp/check/package > /dev/null &&
-    echo "WingCommander: reconstructions identical; release option, conversion, CD32 fix, rotation and installer checks pass")
+    echo "WingCommander: reconstructions identical; release option, conversion, CD32 fix, rotation, OCS details and installer checks pass")
 }

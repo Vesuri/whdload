@@ -86,7 +86,13 @@ def source(root, variant):
         if label=='modal_info_publish':
             target=int.from_bytes(code[off+2:off+6],'big')
             if ocs:
-                native('modal_info_native',target)
+                # OCS: the info passes' conversions use the changed-block
+                # adapter (src/ocs_changed.s) while this is set; any other
+                # conversion drops the histories (ocs_memory_build.py INFO).
+                lines += ['modal_info_native:',' move.l a0,-(sp)',' lea modal_info_changed(pc),a0',' move.w #1,(a0)',
+                          ' move.l (sp)+,a0',' bsr.w modal_info_target',' move.l a0,-(sp)',' lea modal_info_changed(pc),a0',
+                          ' clr.w (a0)',' move.l (sp)+,a0',' rts','modal_info_changed: dc.w 0']
+                native('modal_info_target',target)
             else:
                 # CD32: the info passes' conversions may use the flight
                 # changed-block converter (src/flight_render.s) while this is set.

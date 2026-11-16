@@ -4499,7 +4499,7 @@ referenced by reports while they remain the evidence for this hand-off.
 
 The user-facing build is now distinct from the preserved ungated diagnostic
 builds used by P13C–E. `--public` implies all E1 enhancements, defaults to the CPU
-backend, leaves changed-block histories off, and emits an OCS launch icon with
+backend, uses changed-block histories only for the TrainSim enemy details, and emits an OCS launch icon with
 `CUSTOM5=1` plus an OCS ReadMe. An absent or zero option means original behaviour;
 the icon, not an implicit slave default, requests enhancements. CPU and true-Fast
 checks always apply. Existing original/CD32 input trees are not modified.
@@ -5024,9 +5024,10 @@ python3 tools/ocs_memory_build.py --public --output tmp/info-ocs-build
 python3 tools/info_clock_check.py cd32 tmp/info-cd32-build --output tmp/info-cd32-check
 python3 tools/info_clock_check.py ocs tmp/info-ocs-build --output tmp/info-ocs-check
 python3 tools/timing_adapter_check.py tmp/info-cd32-build --output tmp/info-cd32-options
+python3 tools/ocs_info_check.py tmp/info-ocs-build --output tmp/info-ocs-convert
 ```
 
-The native check needs no emulator. `tools/flight_render_check.py BUILD --output
+The native checks need no emulator. `tools/flight_render_check.py BUILD --output
 tmp/info-cd32-render.json` covers the converter side.
 
 No tracked live route reaches this screen: the first-run simulator kills the
@@ -5045,7 +5046,9 @@ at the publish call `E:1802c`/`O:177be` to read the field clock each picture, at
 loop top `E:17d64`/`O:174f6` for the drawing time, and (CD32) at
 `flight_render_work_done` to dump the source
 (saved `a0`, 32(sp)) and planar destination (saved `a1`, 36(sp)) for an
-independent comparison. Keep the copy under `tmp/`; never ship those words.
+independent comparison. On OCS, break at `converted` and dump `a0` (width × height
+from `(a2)`) and `a1` (four planes of width/8 × (height+2)), reading
+`modal_info_changed` for the flag. Keep the copy under `tmp/`; never ship those words.
 
 See [internals](internals.md#trainsim-enemy-info-pacing).
 

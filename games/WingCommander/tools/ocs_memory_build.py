@@ -55,6 +55,43 @@ ROTATION=((0x2d134,'rot_setup',0x4eb9),
           (0x2de78,'rot_row_end',0x4eb9),
           (0x2ded2,'rot_shear_clip',0x4eb9),
           (0x2deec,'rot_origin_clip',0x4eb9))    # 8 bytes: returns past 2def2
+# The TrainSim enemy details (modal_source.py modal_info_native sets the flag
+# around each pass's publish): conversions while it is set use the changed-block
+# adapter; any other conversion, or one the adapter refuses, drops both
+# histories and converts the whole image, so the next details screen starts
+# full and nothing else ever reads a history.
+INFO='''
+ocs_info_word:
+ bsr.s ocs_info_set
+ beq.s .full
+ bsr.w ocs_changed_word
+ tst.l d0
+ beq.s .done
+.full:
+ bsr.w ocs_changed_invalidate
+ bra.w ocs_c2p_word
+.done:
+ rts
+ocs_info_long:
+ bsr.s ocs_info_set
+ beq.s .full
+ bsr.w ocs_changed_long
+ tst.l d0
+ beq.s .done
+.full:
+ bsr.w ocs_changed_invalidate
+ bra.w ocs_c2p_long
+.done:
+ rts
+; Z clear while the details flag is set.
+ocs_info_set:
+ move.l a0,-(sp)
+ lea ocs_info_set(pc),a0
+ adda.l #modal_info_changed-ocs_info_set,a0
+ tst.w (a0)
+ movea.l (sp)+,a0
+ rts
+'''
 ROTATION_NATIVE=dict(OCS_ROT_SETUP=0x2d5b4,OCS_ROT_CONTEXT=0x2dc8e,OCS_ROT_BOX=0x30f9a,
                      OCS_ROT_VISIBLE=0x2da42,OCS_ROT_SHEAR=0x2e05c,OCS_ROT_ORIGIN=0x2df96)
 HOOKS=((0x32476,'ocs_source_free',0x4ef9),
@@ -72,6 +109,8 @@ HOOKS=((0x32476,'ocs_source_free',0x4ef9),
 
 def build(out,option,exit_probe=False,changed="off", clock=False, prediction=False, intro=False, math_fast=False, public=False):
     math_fast = math_fast or public
+    # Public: the C6 changed-block adapter for the TrainSim enemy details only.
+    if public and changed == 'off': changed = 'info'
     hooks=HOOKS+(((0x16992,'exit_probe_entry',0x4eb9),(0x18d14,'view_probe_entry',0x4ef9)) if exit_probe else ())
     if changed != 'off': hooks+=((0x3250c,'ocs_changed_borrow',0x4ef9),)
     native=dict(NATIVE)
@@ -328,7 +367,13 @@ game_base: dc.l 0
         if changed == 'blocks':
             text=text.replace(' bsr.w ocs_c2p_word', ' bsr.w ocs_changed_word')
             text=text.replace(' bsr.w ocs_c2p_long', ' bsr.w ocs_changed_long')
-        text+='\n'+(ROOT/'src/ocs_changed.s').read_text()+'''
+        elif changed == 'info':
+            text=text.replace(' bsr.w ocs_c2p_word', ' bsr.w ocs_info_word')
+            text=text.replace(' bsr.w ocs_c2p_long', ' bsr.w ocs_info_long')
+            text+=INFO
+        # One section with one origin (see prediction_clock): a second
+        # section line would turn its PC-relative leaf references absolute.
+        text+='\n'+(ROOT/'src/ocs_changed.s').read_text().replace('        section code,code\n','')+'''
 ; Native O:32504 lends inactive display storage to general scratch consumers.
 ; Its six displaced bytes follow the original final-conversion/field wait.
 ocs_changed_borrow:
