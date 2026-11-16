@@ -522,7 +522,9 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
       nothing does. On the same 12 frames, 42% of the view
       changes from one frame to the next after the best sideways shift, against 32% with
       the option. The colour still comes from one cell a span and still jumps when a
-      sample moves to the next cell. Its cost is not measured.
+      sample moves to the next cell.
+    - Measured with `tools/rr_prof.py` (keypad 9, 500 fields) on the `a1200-030`: 162
+      frames with the option, 174 without.
 
 ## ECS improvements
 
