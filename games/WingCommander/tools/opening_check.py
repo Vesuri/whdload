@@ -112,7 +112,8 @@ def check(build, variant):
                 skip[0]=True;polls[0]=0;run('opening_fireworks_input');skip[0]=False
                 require(c.reg(9)==1 and polls[0]==1,'fireworks skip delayed')
                 c.write(field,long(epoch));run('opening_rebase')
-                samples=[]
+                samples=[];fines=[]
+                require(c.get(slave+sy['opening_sep_s'])==128,'separation s not reset to 1')
                 for elapsed in range(1,hz*2+1):
                     c.write(field,long(epoch+elapsed));run('opening_separation_sample')
                     steps,frac=divmod(elapsed*10,hz);value=1
@@ -122,7 +123,29 @@ def check(build, variant):
                     if value<120:value+=(value//4+1)*frac//hz
                     require(c.reg(11)&65535==value,'separation trajectory')
                     samples.append(value)
+                    # Fractional s (1/128) for the piece positions and scale.
+                    steps,frac=divmod(elapsed*10,hz);whole=1
+                    for _ in range(steps):
+                        if whole>=120:break
+                        whole+=whole//4+1
+                    fine=whole<<7 if whole>=120 else (whole<<7)+(((whole//4+1)<<7)*frac)//hz
+                    require(c.get(slave+sy['opening_sep_s'])==fine,('fractional separation',elapsed,fine))
+                    fines.append(fine)
                 require(len(set(samples))>20,'zoom remains at 10 Hz')
+                # From the very first field the pieces move: s rises every field.
+                require(all(a<b for a,b in zip(fines,fines[1:40])),('separation start still steps',fines[:12]))
+                # The hooked multiplies: exact native s*v on whole steps, fractional between.
+                record=0x180000
+                for vx,vy in ((7,-3),(-12,5),(0,1)):
+                    c.write(record,word(0)+word(0)+word(vx&0xffff)+word(vy&0xffff))
+                    for fine in (128,192,640,1000,15232):
+                        c.write(slave+sy['opening_sep_s'],word(fine))
+                        for name,vel,shift_ in (('opening_sep_x',vx,7),('opening_sep_y',vy,7),('opening_sep_scale',vy,5)):
+                            run(name,{3:record})
+                            want=(fine*vel)>>shift_
+                            require(c.reg(9)&0xffff==want&0xffff,(name,fine,vel,c.reg(9)))
+                            native=(fine>>7)*vel*(4 if shift_==5 else 1)
+                            if fine%128==0:require(want==native,'whole step differs from native')
                 c.write(field,long(epoch));run('opening_rebase')
                 for elapsed in range(1,hz*4+2):
                     c.write(field,long(epoch+elapsed));run('opening_flight_sample')

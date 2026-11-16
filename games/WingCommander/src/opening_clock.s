@@ -2,6 +2,7 @@
 ; generated from pinned inputs into tmp/, never copied into this source.
 ; Orchestra steps every three PAL / four NTSC fields (16.7 / 15 Hz), expression
 ; 10 Hz, fireworks every three fields. Zooms sample per field.
+SEP_BITS equ 7                  ; s < 136, so s<<7 fits a signed word
 opening_begin:
         movem.l d0-d7/a0-a6,-(sp)
         bsr.w timing_rate
@@ -24,6 +25,7 @@ opening_rebase:
         move.l d0,(a0)+
         move.l d0,(a0)+          ; last sampled field
         move.l d0,(a0)+          ; next animation cursor
+        move.w #1<<SEP_BITS,(a0) ; separation s = 1 before its first sample
         movem.l (sp)+,d0/a0
         rts
 
@@ -104,12 +106,45 @@ opening_separation_sample:
         move.w d2,d0
         lsr.w #2,d0
         addq.w #1,d0
+        move.w d0,d1
         mulu.w d4,d0
         divu.w opening_hz(pc),d0
+        ; Fractional s for the pieces' positions and scale: whole steps give
+        ; exactly the native s, the first unit steps still move every field.
+        lsl.w #SEP_BITS,d1
+        mulu.w d4,d1
+        divu.w opening_hz(pc),d1
+        move.w d2,d5
+        lsl.w #SEP_BITS,d5
+        add.w d1,d5
         add.w d0,d2
+        bra.s .store
 .done:
+        move.w d2,d5
+        lsl.w #SEP_BITS,d5
+.store:
+        lea opening_sep_s(pc),a0
+        move.w d5,(a0)
         move.w #1,OPEN_COUNTDOWN(a4)
         movem.l (sp)+,d0-d1/d3-d7/a0
+        rts
+
+; The native piece loop multiplies s by each velocity: x, y for the position,
+; and 4*s*vy for the scale (its asl #2 is included in the replaced span, so the
+; scale moves in single units). Use the fractional s. A2 = piece record.
+opening_sep_x:
+        move.w 4(a2),d0
+        bra.s opening_sep_mul
+opening_sep_y:
+        move.w 6(a2),d0
+opening_sep_mul:
+        muls.w opening_sep_s(pc),d0
+        asr.l #SEP_BITS,d0
+        rts
+opening_sep_scale:
+        move.w 6(a2),d0
+        muls.w opening_sep_s(pc),d0
+        asr.l #SEP_BITS-2,d0
         rts
 
 ; Native flight projects depth in 100-unit logo / 200-unit planet samples.
@@ -166,3 +201,5 @@ opening_hz: dc.w 50
 opening_epoch: dc.l 0
 opening_last: dc.l 0
 opening_cursor: dc.l 0
+opening_sep_s: dc.w 1<<SEP_BITS
+        even

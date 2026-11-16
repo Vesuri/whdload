@@ -171,10 +171,23 @@ def main():
             until(h3+off-shift);stages.append(dict(name=name,values=values()))
             print('reached '+name,flush=True)
             if name in ('separation','flight'):
-                rows=[]
+                rows=[];pieces=[]
                 for i in range(20):
                     until(h3+(0x10d8 if name=='separation' else 0x11ca)-shift)
                     rows.append(values())
+                    if name=='separation' and i<12:
+                        # The pieces' drawn place and scale (native draw call
+                        # arguments) must change on every picture from the start.
+                        shown=[]
+                        for piece in range(10):
+                            until(h3+0x115e-shift,f'($d3 & 65535) == {piece}')
+                            r=cmd(f'printf "PIECE %u %d %d %d\\n", *(unsigned int*){field:#x}, *(short*)($sp+4), *(short*)($sp+6), *(short*)($sp+14)')
+                            shown.append([int(x) for x in re.search(r'PIECE (\d+) (-?\d+) (-?\d+) (-?\d+)',r).groups()])
+                        pieces.append(shown)
+                for before,after in zip(pieces,pieces[1:]):
+                    if before[0][0]!=after[0][0] and [p[1:] for p in before]==[p[1:] for p in after]:
+                        raise ValueError('separation start holds a picture: '+str((before[0],after[0])))
+                if pieces:samples['separation_pieces']=pieces
                 samples[name]=rows;shot(name)
             elif name in ('orchestra','fireworks'):
                 until(h3+(0xf20 if name=='orchestra' else 0x13e4)-shift);shot(name)
@@ -182,6 +195,7 @@ def main():
         active=cmd(f'printf "ACTIVE %u\\n", *(unsigned short*){base+sy["opening_active"]:#x}')
         if 'ACTIVE 0' not in active:raise ValueError('opening state leaked into title')
         for name,rows in samples.items():
+            if name=='separation_pieces':continue
             column=1 if name=='separation' else 2
             if len(set(row[column] for row in rows))<3:raise ValueError('motion stalled')
             if name=='flight' and not any(row[2]%100 for row in rows):raise ValueError('zoom lacks intermediate depths')

@@ -24,6 +24,9 @@ def specification(variant):
     patches += [(0x1194-shift,10,'opening_separation_sample',0x4eb9),
                 (0x11ca-shift,6,'opening_flight_prepare',0x4eb9),
                 (0x129a-shift,6,'opening_flight_sample',0x4eb9)]
+    # Separation piece loop: s*vx, s*vy (position) and s*vy<<2 (scale).
+    patches += [(0x10f8-shift,6,'opening_sep_x',0x4eb9),(0x1102-shift,6,'opening_sep_y',0x4eb9),
+                (0x1130-shift,8,'opening_sep_scale',0x4eb9)]
     return stages,patches,[(0x1200-shift,14)]
 
 

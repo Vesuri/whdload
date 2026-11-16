@@ -7191,8 +7191,15 @@ retain the native combined update/draw routine at the three-field cadence; this 
 particle interpolation. The two zooms instead sample elapsed display fields:
 
 - Separation follows the native `s -> s + floor(s/4) + 1` trajectory at 10 Hz,
-  interpolating the current interval for rendering. Integer coordinates can still
-  repeat at the small beginning of the curve.
+  interpolating the current interval for rendering. The native piece loop draws
+  each of the ten pieces at `start + s*v` with scale `256 + 4*s*vy`; a whole-number
+  `s` held the first steps (s rises by 1 per tick) for five fields, then jumped.
+  The loop's three multiplies (`$10f8`, `$1102`, `$1130`–`$1137` with its `asl #2`)
+  now use `s` in 1/128 units, equal to the native products on whole steps, so the
+  pieces move and scale on every picture from the first. The native `s` and its
+  end at 120 are unchanged. Live on the cached 030 model a separation picture
+  takes about four fields; each now differs (CD32 piece 0 at fields 566, 571,
+  575: x 57, 56, 55, scale 260, 263, 266; before, 566 and 571 were identical).
 - Planet/logo flight treats 100 native depth units as one 10 Hz step: depth
   travels from 5000 to 1000 in four seconds. This is the requested motion policy,
   not a newly established historical rate. Both projections are recalculated for
