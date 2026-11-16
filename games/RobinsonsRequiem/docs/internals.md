@@ -439,6 +439,29 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
     - Measured with `tools/rr_prof.py` (keypad 9, 500 fields) on the `a1200-030`: 174 frames
       with and without it, the start and end screenshots identical.
 
+18. **The mouse pointer hidden at once** (`_ptrpatch`, `_phide` in `src/ptr020.s`). START
+    draws the pointer in software at each VBL (hunk 1 `+$9aa6`) into the shown screen and
+    keeps the background under it. Its state `+$ed97` is -1 off, 0 to be hidden, 1 on or 2
+    to be drawn without putting the background back; `+$ed98` is its lock, `+$ed99` is set
+    while it is still on the old screen after a swap, and `+$ed9e` is its last position.
+    The scripts' op `$85` (`+$78c6`) hides it by setting 0, and the next VBL puts the
+    background back (`+$9b34`).
+    - Two other places take a 0 before the VBL does. The frame's block (`+$4a0a`, item 11's
+      `_bblock`) puts the background back into the back screen only (for the pointer it has
+      just copied there) and sets -1. Op `$84` (`+$78a0`, the new image shown) sets 2, so
+      the VBL draws the new image without putting back the old one. Either way part of the
+      arrow stays in one screen where the new image does not cover it. Below the 3D view
+      nothing redraws it, and it flickers there every other frame: seen picking up what a
+      fallen character drops. In START a VBL nearly always comes first; with items 11 and 12
+      it often does not.
+    - Op `$85`'s `clr.b <+$ed97>` (`+$78e6` [`$bd92`], `4239`, checked with the `rts`
+      after it and the restore's first instructions) becomes `jsr _phide`. That hides the
+      pointer at once as the VBL does: the state set to -1 first, so the VBL leaves the
+      pointer alone (the frame's block and the scripts are both the main program's), the
+      background put back with hunk 2 `+$4ec` (into the old screen while `+$ed99` is set),
+      `+$ed99` cleared and the position forgotten. No 0 is left to take. `PTR_OFF` (a test
+      define) leaves it out.
+
 ## ECS improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan:
@@ -614,6 +637,12 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    crashed at VBL 813 with an edge at -132; with it, the same run goes on past VBL 2,200.
    `tools/rr_prof.py` (keypad 9, 500 fields): 368 frames, 370 without it, on both the
    `a1200-030` and the `a3000-50`, the start and end screenshots identical.
+
+10. **The mouse pointer hidden at once** (`_ptrpatch`, `src/ptr020.s`, from `_worldinst`),
+    on the 68020 and up only: the AGA's item 18 at its ECS sites, checked first. The
+    pointer's VBL routine is `+$80aa`, its state `+$d3ed` (`+$d3f4` its position), op `$85`
+    `+$5fac` (its `clr.b` `+$5fcc` [`$98c4`]), op `$84` `+$5f86`, the frame's block
+    `+$30ce` and the restore hunk 2 `+$2aa`.
 
 ## The AGA's sites in the ECS game
 

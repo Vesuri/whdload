@@ -937,6 +937,11 @@ _worldinst
         bsr     _projpatch
         move.l  #$a254,a1
         bsr     _spanpatch
+        move.l  #$5fcc,a1
+        move.l  #$d3ed,d1
+        move.l  _hunk2(pc),a2
+        lea     $2aa(a2),a2
+        bsr     _ptrpatch
 .no
         ENDC
         rts
@@ -944,6 +949,7 @@ _worldinst
         INCLUDE world020.s
         INCLUDE proj020.s
         INCLUDE span020.s
+        INCLUDE ptr020.s
         MC68000
 
 **********************************************

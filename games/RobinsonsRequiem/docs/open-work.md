@@ -82,9 +82,11 @@ Next, in order:
    swap, the pointer's picking between world passes, and the image cache in other areas.
    The mouse pointer with the swap is checked walking: over the inventory in all of 250
    fields (it was missing from 2 in 3 before `_swap` left the panel's pointer set to the
-   VBL), and over the 3D view in every tenth of 150. A pointer left behind when an object
-   is picked up (seen in play) is not reproduced; `_swap` now exchanges the screens back
-   while it waits, which closes the one way found for it. On the A500, step 11's blitter
+   VBL), and over the 3D view in every tenth of 150. The pointer's leftover below the view
+   after picking up the beaten `human`'s things is fixed (`src/ptr020.s`): on the
+   `a1200-030`, four pickup timings each left 48 pixels of the arrow in every other frame
+   without it (and with `PTR_OFF`), none with it. The AGA game has the same patch, its
+   pickup not yet reproduced there. On the A500, step 11's blitter
    conversion with the game's own blits (inventory, messages) and in other areas. The game has to keep working correctly on
    the 68000.
 3. Play-test both variants further (loading and saving) with the rebuilt slaves, against
