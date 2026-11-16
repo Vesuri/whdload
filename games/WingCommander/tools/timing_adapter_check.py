@@ -79,6 +79,12 @@ def main():
                     for off,width,label,op in opening_code_patches('cd32'):
                         want[off:off+width]=struct.pack('>HI',op,s+sym[label])+bytes.fromhex('4e71')*((width-6)//2)
                     want[0x2a2aa:0x2a2b2]=struct.pack('>HI',0x4eb9,s+sym['timing_scene_effect_scale'])+bytes.fromhex('4e71')
+                    # src/rotation.s: the rotated-bitmap table hooks (tools/rotation_check.py).
+                    from variants import get as variant
+                    for off,label,op in variant('cd32').BUFFERED_HOOKS:
+                        if label.startswith('rot_'):
+                            width=8 if off in variant('cd32').WIDE_GUARDS else 6
+                            want[off:off+width]=struct.pack('>HI',op,s+sym[label])+bytes.fromhex('4e71')*((width-6)//2)
                 want[0x28c8c:0x28c8e]=bytes.fromhex('4e71')
                 want[0x43e:0x440]=bytes.fromhex('4e71')
                 want[0x3b94:0x3b96]=bytes.fromhex('4e71')
