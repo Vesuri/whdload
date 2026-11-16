@@ -91,6 +91,19 @@ def check(build, variant):
                     require(c.get(slave+sy['opening_cursor'],4)==(epoch+step*(hz//10))&0xffffffff,'lost animation debt')
                 skip[0]=True;polls[0]=0;run('opening_tick_input');skip[0]=False
                 require(c.reg(9)==1 and polls[0]==1,'skip delayed')
+                # Orchestra: four PAL fields, five NTSC, retaining debt and skip.
+                fields=4 if hz==50 else 5
+                c.write(field,long(epoch));run('opening_rebase')
+                for step in range(1,21):
+                    run('opening_orchestra_input')
+                    require(c.get(field,4)==(epoch+step*fields)&0xffffffff,'orchestra cadence')
+                    require(c.get(count)==1,'orchestra countdown not armed')
+                c.write(field,long(epoch+23*fields))
+                for step in range(21,24):
+                    run('opening_orchestra_input')
+                    require(c.get(slave+sy['opening_cursor'],4)==(epoch+step*fields)&0xffffffff,'lost orchestra debt')
+                skip[0]=True;polls[0]=0;run('opening_orchestra_input');skip[0]=False
+                require(c.reg(9)==1 and polls[0]==1,'orchestra skip delayed')
                 c.write(field,long(epoch));run('opening_rebase')
                 for step in range(1,21):
                     run('opening_fireworks_input')

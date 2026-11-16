@@ -7180,7 +7180,11 @@ world/title/asteroid scheduler; music-cue checks, audio and the native drawing
 routines remain in control of scene transitions.
 
 Native animation indices, random choices and particle updates were advanced per
-loop. Orchestra steps advance at 10 Hz; fireworks advance once per three
+loop, so the original orchestra runs as fast as the machine draws; it loops
+until music cue 2 at any rate. Its forward and backward loops (`$f1a`, `$f88`)
+now step every four fields on PAL and five on NTSC (12.5 and 12 per second, a
+user choice, not a measured target); the expression (`$1010`) keeps 10 Hz.
+Fireworks advance once per three
 display fields (50/3 Hz PAL, 20 Hz NTSC), with input polled while waiting and
 overdue steps retained. The orchestra countdown is rearmed for each logical step. Fireworks
 retain the native combined update/draw routine at the three-field cadence; this change does not add
