@@ -1060,8 +1060,8 @@ Firing and mouse:
 
 Graphics:
 - **UR10 (H): glyphs differ from the PC:** the simulator's "0", W/M missing
-  pixels in the small hull display. Open; the slaves draw the Amiga game's own
-  font data.
+  pixels in the small hull display. Won't fix: the slaves keep the Amiga game's
+  own font data and need not match the PC glyphs.
 - **UR11 (H): wrong palette after skipping** Game Over, ejection or the player
   explosion (for example a red space colour in the funeral); H asks for our
   "skip routines" to be removed. Open. The slaves add no skipping: the native
