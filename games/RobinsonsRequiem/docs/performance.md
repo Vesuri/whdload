@@ -805,19 +805,58 @@ is, each step below chosen at install, and the game has to keep working correctl
 
      The conversion is 9.1 ms, 46% chip. Of the chip time now, 23 ms is the waits' (beam
      and copper) reads of the beam position and INTREQ.
-8. **68020 code without the blitter**: a conversion for the 68020 and up from the
-   chunky buffer in fast memory with longword plane writes (`c2p000.s`'s packing of the
-   dither, then the exchanges; Kalms' 4-plane conversions cannot start from the dithered
-   bytes, step 1), the sky copied from fast memory, and the view's blitter copy (`+$34e`)
-   started without waiting: the blit runs while the CPU draws into the fast chunky
-   buffer, with a wait only before the conversion writes the planes. Chosen at install
-   from `AttnFlags`; the 68000 keeps today's code.
+8. **68020 code** (done, `docs/internals.md`, "ECS improvements", item 4).
+   - **What changed**, on the 68020 and up only (`AttnFlags` at install):
+     - `src/c2p020.s`: the conversion with longword plane writes. Each 16 pixels are
+       worked out as `c2p000.s` does. A 16-bit exchange then joins each pair of blocks into
+       one longword per plane. A row whose planes start off a longword begins with one
+       block written as words, and an odd block at the end is written as words too.
+     - The sky read from a copy in fast memory: the AGA's step 12 at its ECS site (item 13),
+       in a 32 KB room from the fast memory list. START reads the image's height + 1
+       rows, its header holding the height - 1. The first copy left the last row out, which
+       showed as a black line over part of the horizon in two of eight screenshots. The
+       AGA's copy had the same fault (fixed in commit `809b86d1`).
+     - The view's blitter copy (hunk 2 `+$34e`) is left as it is. It is not drawn into
+       during the drawing: it runs once per frame, from hunk 1 `+$8bb8`, on the pass after
+       the drawing (`<+$8869>`, set at the drawing), and copies the new view (x 0-255, rows
+       0-124, 4 planes) from the shown screen into the back one. The rectangle list's copy
+       (`+$3944`, a 28 × 7 panel strip) is the other call. Step 9 draws on every pass, which
+       leaves the view copy almost nothing to do (the AGA's step 8: 13.3 → 1.7 ms a frame).
+       Starting its four blits without waiting would need every blit routine and every CPU
+       access to the back screen to wait for them first, for time the cap wait now absorbs.
+   - **Checks.**
+     - `tools/rr_ecsc2pcheck.py`: START's loop, `_c2p000` (68000) and `_c2p020` (68020)
+       byte-identical on 800 random rectangles (two seeds), every plane alignment.
+       Mutations in the pair path and the word path each fail at the first case.
+     - `tools/rr_skycheck.py ecs`: 1,000 cases each with two seeds, every other one from
+       the copy, the images as tight as the rows read; the short copy fails it.
+     - On the `a3000-50`: 8 poses turning with the same cameras as step 7, every
+       screenshot pixel-identical. With `MAPCHECK`, the sky's, the map's and the shade
+       table's copies equal to the originals at all 56 drawings of 250 fields turning and
+       250 walking.
+     - On the A500 (`custom`), where nothing of this runs: the same 8 cameras as step 7
+       and every screenshot pixel-identical.
+   - **Measured on the `a3000-50`'s aprof core**, per frame drawn:
+
+     | | Step 7 | Step 8 |
+     |---|---|---|
+     | Frames in the window (on the player's runs) | 55 | 55 |
+     | Busy | 54.5 ms | 48.6 ms |
+     | Chip accesses | 44.6 ms (59,547) | 30.6 ms (38,613) |
+     | Conversion | 9.1 ms, 8,000 chip writes | 8.0 ms, 4,000 |
+     | Sky | 5.4 ms | 0.6 ms |
+     | View copy (hunk 2 `+$34e`) | 6.7 ms | 6.5 ms |
+
+     With the two blocks of a pair in calls (`bsr`, 170 bytes in the instruction cache)
+     the conversion took 8.4 ms; inline (268 bytes) it takes 8.0 ms. Its non-chip time grew
+     from 5.0 to 6.2 ms (the pair's exchange and the per-row set-up). The plane writes are
+     what is left of its chip time: 1.8 ms.
 9. **The world on the cap's grid and frames between the player's runs**: AGA steps 7, 8,
    9 and 10a through step 6's sites, then 10d, the swap without the beam wait (7.1 ms a
    swap at 400 MHz).
-10. **To 50 fps**: AGA steps 11-13 (frames between world passes, the sky and the
-    objects' graphics in fast memory; step 14 found nothing more worth moving), shared
-    code where the variants allow.
+10. **To 50 fps**: AGA steps 11 and 13 (frames between world passes and the objects'
+    graphics in fast memory; its step 12, the sky, is step 8 here, and its step 14 found
+    nothing more worth moving), shared code where the variants allow.
 11. **The A500 path**: what helps only the 68000 without fast memory: the conversion's
     last exchanges on the blitter, in parallel with the CPU (the blitter is idle there,
     0.1% of the DMA slots), and steps 3 and 4's few milliseconds.
@@ -862,7 +901,7 @@ python3 tools/rr_sites.py
 # the AGA conversion and sky copy against START's loops (after make unpack)
 python3 tools/rr_c2pcheck.py 2000
 python3 tools/rr_skycheck.py 2000
-# the ECS conversion and sky copy against START's loops
+# the ECS conversions (68000 and 68020) and sky copy against START's loops
 python3 tools/rr_ecsc2pcheck.py 3000
 python3 tools/rr_skycheck.py ecs 2000
 # the landscape: snapshots at its entry in the walk, then each run under Unicorn as the

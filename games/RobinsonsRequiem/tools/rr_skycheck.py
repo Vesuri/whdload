@@ -16,6 +16,8 @@ view and the registers be START's.
 `ecs`: the ECS game's loop (hunk 1 +$c8b8 to +$c8e8, data-ecs/START) against
 src/sky000.s on a 68000: sources, row lengths, the view and its modulo even, as the
 68000's word moves need; d3 is not compared either (set at +$c92e before it is read).
+Every other case from the copy as above (ECS plan step 8), the ECS image's pixels from +6
+and its address on the stack as +$c880 leaves it.
 Exit status 1 on the first difference.
 """
 import os
@@ -39,7 +41,7 @@ GAMES = {
                 cpu=UC_CPU_M68K_M68020, opt='-m68020', even=False, copy=True, hdr=8),
     'ecs': dict(start=ROOT / 'tmp/game/RobinsonsRequiem/data-ecs/START', loop=0xc8b8,
                 end=0xc8e8, width=0xd454, src='sky000.s', cpu=UC_CPU_M68K_M68000,
-                opt='-m68000', even=True, copy=False, hdr=6),
+                opt='-m68000', even=True, copy=True, hdr=6),
 }
 
 

@@ -419,6 +419,26 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
      is assembled for the 68000: hunk 1 offsets above `$7fff` go through an index
      register. `MAPCHECK` compares both copies with the originals at every drawing, as in
      the AGA slave.
+4. **68020 code** (`docs/performance.md`, ECS plan step 8), on the 68020 and up only:
+   - **The conversion with longword writes** (`src/c2p020.s`): `_c2ppatch` jumps to
+     `_c2p020` instead of `_c2p000` at the same site. Each 16 pixels are worked out as in
+     `_c2p000`, and each pair of blocks is joined by a 16-bit exchange into one longword
+     per plane, half the plane writes. A row whose planes start off a longword begins
+     with one block written as words, and an odd last block is written as words.
+     `tools/rr_ecsc2pcheck.py` checks both routines against START's loop.
+   - **The sky in fast memory** (`_skycopy`, `_skyset`, `_skyget` in `src/sky000.s`): the
+     AGA's item 13 at the ECS sites. The image is a resource in the chip heap: width − 1 at
+     `+2`, height − 1 at `+4`, the pixels from `+6`. START's loop reads height + 1 rows,
+     its `dbf` at `+$c8e4` counting the difference of the rows' bounds, and takes the fill
+     below from the last row (`+$c91a`): 60 rows of 256 bytes, 15,366 bytes with the
+     header, in the jungle. The image's address is pushed at `+$c880`. `_skyrows` reads the rows from a
+     copy that `_skyget` makes when the image's address or size changes, at the image's
+     address modulo 16, in a 32 KB room `_skycopy` takes from the fast memory list (none:
+     the image itself, as for images over 32 KB). Hunk 1 `+$1876` [`$516e`]
+     `move.l d2,164(a0)` and `bsr.w +$6238` (checked first) become `jsr _skyset` and a
+     `nop`: the image set as before, the copy to be made again. `MAPCHECK` compares the copy
+     with the image at every drawing, and `tools/rr_skycheck.py ecs` runs every other case
+     from the copy.
 
 ## The AGA's sites in the ECS game
 
@@ -505,7 +525,9 @@ lower in hunk 1:
 In the jungle on the 68020 and up ("ECS improvements" item 3), the fast pool also holds
 the chunky buffer (32 KB) and the renderer's tables (34,608 bytes). It also holds
 `_rowalloc`'s 76 KB block: the row table, the fast row table, the shade table's copy (4 KB
-of its 8 KB room used) and the map's copy. The map is 256 rows of 128 cells, 64 KB.
+of its 8 KB room used) and the map's copy. The map is 256 rows of 128 cells, 64 KB. The
+sky's copy ("ECS improvements" item 4) is outside the pool, in a 32 KB room the slave
+takes from the fast memory list at install, before START sizes its pool.
 
 ## The script interpreter (AGA)
 

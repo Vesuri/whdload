@@ -30,14 +30,18 @@ frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done,
 landscape code being register-bound (about 1% each). On the AGA's 50 MHz 68030 the ECS
 game draws 57 frames against the AGA's 122 (its data all in chip memory, its frames on the
 player's runs only); of its plan to 50 fps on 68020 and up with fast memory (steps 5-11,
-the A500 path apart) steps 5-7 are done: the tools find START in any machine's fast
+the A500 path apart) steps 5-8 are done: the tools find START in any machine's fast
 memory, the ECS `profile` build counts frames, `tools/rr_passes.py` and `tools/rr_objects.py`
 take the ECS game, and `tools/rr_sites.py` maps the AGA slave's patch sites to the ECS
 game's (`docs/internals.md`, "The AGA's sites in the ECS game"). Step 7 gave the slave a 1 MB
 ExpMem (`MemConfig=1`: v1.2's 256 KB) and the caches, and on the 68020 and up it puts the
 renderer's buffers and the map's and shade table's copies in fast memory. That halved the
 time a frame takes on the `a3000-50` (busy 107.7 → 54.5 ms, chip 88.0 → 44.6 ms), but the
-frames still come on the player's runs (55 against 57); the A500 is unchanged. Both developer builds boot straight
+frames still come on the player's runs (55 against 57); the A500 is unchanged. Step 8's
+68020 conversion with longword plane writes and the sky read from fast memory took busy
+to 48.6 ms and chip to 30.6 ms a frame, still 55 frames. The view's blitter copy was
+left as it is: it runs on the pass after each drawing, which step 9 removes. Step 8 also
+found the AGA's sky copy leaving out the image's last row, fixed. Both developer builds boot straight
 into the game (the AGA one with detail and window at HIGH), and `tools/rr.py ingame` drives
 any AGA build there through the intro and menu (`docs/development.md`). The game is on the
 repository layout with CFou!'s v1.2 slave sources and the improvements; both variants build
@@ -58,8 +62,8 @@ Next, in order:
    equal (240 drawings, 4,419 object images given) and filled step 13's cache to 63,919
    of its 65,536 bytes (37 images) before emptying it once. The 040/060 conversion on a
    real 040 or 060.
-2. The ECS plan's steps 8-11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"): its
-   68020 code, the AGA's steps 7-13 at the sites step 6 found, and the A500's own path. The game has to keep working correctly on the 68000: each
+2. The ECS plan's steps 9-11 (`docs/performance.md`, "Plan", "ECS on a fast CPU"): the
+   AGA's steps 7-11 and 13 at the sites step 6 found, and the A500's own path. The game has to keep working correctly on the 68000: each
    step chosen at install and checked on the A500 as well.
 3. Play-test both variants further (loading and saving) with the rebuilt slaves, against
    the shipped ones (`make run SLAVE=original`); step 10.2's swap is play-tested with the

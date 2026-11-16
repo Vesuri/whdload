@@ -26,6 +26,8 @@ PARADOX_CRACK
         INCLUDE whdload.i
        INCLUDE whdmacros.i
        INCLUDE lvo/dos.i
+       INCLUDE lvo/exec.i
+       INCLUDE exec/memory.i
 
 
         IFD BARFLY
@@ -793,9 +795,10 @@ PROFILE_FRAMES  = $10c
 PROFILE_SLAVE   = $110
 
 **********************************************
-; The chunky-to-planar conversion (src/c2p000.s): hunk 2 +$1a5e, START's loop, starts with
-; move.w d6,a4 / move.w a4,d6 (checked first, with the routine's end at +$1b98 and the
-; chunky modulo's address at +$1b8c), which becomes jmp _c2p000.
+; The chunky-to-planar conversion (src/c2p000.s, and src/c2p020.s on the 68020 and up, ECS
+; plan step 8): hunk 2 +$1a5e, START's loop, starts with move.w d6,a4 / move.w a4,d6
+; (checked first, with the routine's end at +$1b98 and the chunky modulo's address at
+; +$1b8c), which becomes jmp _c2p000 or jmp _c2p020.
 
 _c2ppatch
         move.l  _hunk2(pc),a0
@@ -809,13 +812,20 @@ _c2ppatch
         bne     .no
         lea     _c2pmod(pc),a3
         move.l  a2,(a3)
+        lea     _c2p000(pc),a2
+        move.l  _attnflags(pc),d0
+        and.w   #AFF_68020,d0
+        beq     .set
+        lea     _c2p020(pc),a2
+.set    lea     _c2pentry(pc),a3
+        move.l  a2,(a3)
         move.w  #$4ef9,(a1)
    IFD PROFILE
         pea     _framehook(pc)
-   ELSE
-        pea     _c2p000(pc)
-   ENDC
         move.l  (a7)+,2(a1)
+   ELSE
+        move.l  a2,2(a1)
+   ENDC
         move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
@@ -823,12 +833,15 @@ _c2ppatch
    IFD PROFILE
 _framehook
         addq.l  #1,PROFILE_FRAMES.w
-        bra     _c2p000
+        move.l  _c2pentry(pc),-(a7)
+        rts
    ENDC
 
 _c2pmod         dc.l    0
+_c2pentry       dc.l    0               ; _c2p000 or _c2p020
 
         INCLUDE c2p000.s
+        INCLUDE c2p020.s
 
 **********************************************
 ; The sky copy (src/sky000.s): hunk 1 +$c8b8-$c8e7, START's row loop, becomes jsr _skyrows
@@ -894,7 +907,55 @@ _mempatch
         beq     .no
         bsr     _fastblocks
         bsr     _mappatch
+        bsr     _skycopy
 .no     rts
+
+**********************************************
+; The sky in fast memory (ECS plan step 8; the AGA's plan step 12, its sites in the ECS game
+; item 13): a room from the fast memory list for _skyrows's copy of the image (src/sky000.s,
+; _skyget), and the sky's set-up, hunk 1 +$1876 move.l d2,164(a0) and bsr.w +$6238,
+; becoming jsr _skyset and a nop, after a check of their bytes. No room: _skyrows reads the
+; image itself.
+
+_skycopy
+        IFND SKYCOPY_OFF
+        movem.l d0-d1/a0-a1/a6,-(a7)
+        move.l  _hunk1(pc),a0
+        cmp.l   #$214200a4,$1876(a0)
+        bne     .x
+        cmp.l   #$610049bc,$187a(a0)
+        bne     .x
+        move.l  #SKYMAX+40,d0
+        moveq   #MEMF_FAST|MEMF_PUBLIC,d1
+        move.l  4.w,a6
+        jsr     _LVOAllocMem(a6)
+        move.l  _hunk1(pc),a0
+        tst.l   d0
+        beq     .x
+        add.l   #15,d0
+        and.w   #-16,d0
+        lea     _kvars(pc),a1
+        move.l  d0,K_BUF(a1)
+        move.w  #$4eb9,$1876(a0)
+        pea     _skyset(pc)
+        move.l  (a7)+,$1878(a0)
+        move.w  #$4e71,$187c(a0)        ; nop
+        move.l  _resload(pc),a1
+        jsr     resload_FlushCache(a1)
+.x      movem.l (a7)+,d0-d1/a0-a1/a6
+        ENDC
+        rts
+
+; +$1876: the view's image set as before, the copy to be made again, on to +$6238 (its rts
+; returning to the nop after the jsr, as the bsr.w did)
+_skyset move.l  d2,164(a0)
+        move.l  a1,-(a7)
+        lea     _kvars(pc),a1
+        clr.l   K_ORIG(a1)
+        move.l  (a7)+,a1
+        move.l  _hunk1(pc),-(a7)
+        add.l   #$6238,(a7)
+        rts
 
 **********************************************
 ; The renderer's buffers in fast memory (the AGA's plan step 3). START's block allocator
