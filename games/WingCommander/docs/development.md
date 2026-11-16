@@ -5020,7 +5020,22 @@ python3 tools/info_clock_check.py ocs tmp/info-ocs-build --output tmp/info-ocs-c
 python3 tools/timing_adapter_check.py tmp/info-cd32-build --output tmp/info-cd32-options
 ```
 
-The native check needs no emulator. See [internals](internals.md#trainsim-enemy-info-pacing).
+The native check needs no emulator. `tools/flight_render_check.py BUILD --output
+tmp/info-cd32-render.json` covers the converter side.
+
+No tracked live route reaches this screen: the first-run simulator kills the
+pilot, then asks for a name and goes to the bar. The CD32 live measurement used a
+scratch copy of the game directory whose English fix list (`src/release.s`,
+`fix_patch_en`) gained two PL_W entries, `$18464` = `$6000` (skip the first-run
+block, as the bar's visit does) and `$18530` = `$6002` (keep the enemy
+selection). Following `mouse_live_check.py`'s intro skip and menu click, the
+cockpit then cycles the high scores and the squadron list until port-1 fire;
+key `1` picks the first enemy. Stop at the publish call `E:1802c` to read the
+field clock each pass, and at `flight_render_work_done` to dump the source
+(saved `a0`, 32(sp)) and planar destination (saved `a1`, 36(sp)) for an
+independent comparison. Keep the copy under `tmp/`; never ship those words.
+
+See [internals](internals.md#trainsim-enemy-info-pacing).
 
 ## Explosion size sampling
 

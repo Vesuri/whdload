@@ -72,7 +72,19 @@ def source(root, variant):
             lines += [label+':', ' tst.w '+('d2' if label.endswith('0') else 'd4'), ' bne.s .ready', ' bsr.w modal_crowd_rebase', '.ready:', ' bsr.w '+label+'_native', ' bra.w modal_crowd_wait']
             native(label+'_native',int.from_bytes(code[off+2:off+6],'big'))
         if label=='modal_info_publish':
-            native('modal_info_native',int.from_bytes(code[off+2:off+6],'big'))
+            target=int.from_bytes(code[off+2:off+6],'big')
+            if ocs:
+                native('modal_info_native',target)
+            else:
+                # CD32: the info passes' conversions may use the flight
+                # changed-block converter (src/flight_render.s) while this is set.
+                # The loop has no early exit; after its last pass (d2 = limit-1)
+                # the screen is freed, so the histories are dropped there.
+                lines += ['modal_info_native:',' move.l a0,-(sp)',' lea modal_info_changed(pc),a0',' move.w #1,(a0)',
+                          ' move.l (sp)+,a0',' bsr.w modal_info_target',' move.l a0,-(sp)',' lea modal_info_changed(pc),a0',
+                          ' clr.w (a0)',f' cmpi.w #{INFO_LIMIT[2]-1},d2',' bne.s .kept',' lea flight_destinations(pc),a0',
+                          ' clr.l (a0)+',' clr.l (a0)','.kept:',' move.l (sp)+,a0',' rts','modal_info_changed: dc.w 0']
+                native('modal_info_target',target)
     death=0x19a94 if ocs else 0x1a7a8
     lines += ['modal_death_begin:', ' bsr.w modal_death_rebase',
               S.copy(code,death,death+8)]

@@ -7,7 +7,12 @@ flight_render_entry:
         cmpi.l  #3,d7
         bne.w   flight_render_original
         tst.w   timing_active(pc)
+        bne.s   .scene
+        ; The TrainSim enemy info passes (tools/modal_source.py) redraw a
+        ; mostly unchanged screen, so they take the changed blocks too.
+        tst.w   modal_info_changed(pc)
         beq.w   flight_render_invalidate
+.scene:
         cmpi.w  #200,d3
         bne.w   flight_render_invalidate
         cmpi.w  #320,d0

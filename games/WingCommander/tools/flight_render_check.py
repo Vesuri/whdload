@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Whole-output native c2p comparisons across alternating buffers and invalidation."""
+"""Whole-output native c2p comparisons across alternating buffers and invalidation.
+
+Frames 2-8 run with the flight clock off and modal_info_changed set (the
+TrainSim enemy info passes, when the build has them): they must still match the
+original converter and reuse unchanged blocks. Frame 30 (both off) invalidates."""
 import argparse, hashlib, json, random, re, struct
 from pathlib import Path
 from cd32_runtime import ROOT
@@ -26,7 +30,8 @@ def main():
         # inactive same-height conversion, and allocation-failure fallback.
         for i in range(36):
             height=128 if i==27 else 166 if i==28 else 200
-            active=int(i!=30);custom=0 if i==31 else 3
+            info=int(2<=i<9 and 'modal_info_changed' in sym)
+            active=int(i!=30 and not info);custom=0 if i==31 else 3
             dst=(0x50000,0x60000)[i%2] if i<24 else (0x60000,0x70000)[i%2]
             if i%5!=0 and i not in (4,6):
                 for _ in range(40 if i%7 else 10000):source[rng.randrange(64000)]=rng.randrange(256)
@@ -35,7 +40,9 @@ def main():
             ref=CPU(blob,model);gold,_=ref.run({128:0x17f6,166:0x195e,200:0x1ac6}[height],src,height)
             assert gold==want;ref.close()
             c.write(SRC,src+b'\x5a'*64);c.write(STACK,struct.pack('>I',STOP))
-            c.write(BASE+sym['timing_active'],struct.pack('>H',active));c.write(BASE+0x1de4,struct.pack('>I',custom))
+            c.write(BASE+sym['timing_active'],struct.pack('>H',active))
+            if 'modal_info_changed' in sym:c.write(BASE+sym['modal_info_changed'],struct.pack('>H',info))
+            c.write(BASE+0x1de4,struct.pack('>I',custom))
             if i==34:c.write(BASE+sym['flight_history'],bytes.fromhex('ffffffff'))
             for r in range(1,17):c.reg(r,0x12340000+r)
             c.reg(1,SRC);c.reg(2,dst);c.reg(5,0x30000);c.reg(8,STACK);c.reg(9,320);c.reg(12,height)
@@ -52,7 +59,7 @@ def main():
             if 'flight_reference' in sym:allowed.append((0xc0000,0xc0000+64000))
             for addr,n in c.writes:
                 assert any(lo<=addr and addr+n<=hi for lo,hi in allowed),hex(addr)
-            results.append(dict(model=model,frame=i,height=height,identical=True,planar_stores=sum(dst<=x<dst+len(src) for x,n in c.writes)))
+            results.append(dict(model=model,frame=i,height=height,info=bool(info),identical=True,planar_stores=sum(dst<=x<dst+len(src) for x,n in c.writes)))
         c.close()
     negative=[]
     if 'flight_verified' in sym and not control:
@@ -72,6 +79,8 @@ def main():
             negative.append(dict(model=model,corrupted_output_rejected=True));c.close()
     # Repeated pictures must actually exercise zero-store reuse.
     if not control:assert any(r['planar_stores']==0 for r in results), 'unchanged-buffer case missing'
+    if 'modal_info_changed' in sym and not control:
+        assert any(r['info'] and r['planar_stores']==0 for r in results), 'info passes did not reuse unchanged blocks'
     a.output.parent.mkdir(parents=True,exist_ok=True)
     a.output.write_text(json.dumps(dict(sha256=hashlib.sha256(blob).hexdigest(),cases=results,negative_controls=negative),indent=2)+'\n')
     print(f'PASS: {len(results)} whole-output native comparisons on 020/040')
