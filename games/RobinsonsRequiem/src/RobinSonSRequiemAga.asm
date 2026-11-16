@@ -311,6 +311,8 @@ _cont
             move.l  #$d750,d2
             move.l  #$d860,d3
             bsr _projpatch
+            move.l  #$bbf4,a1
+            bsr _spanpatch
             bsr _swappatch
             bsr _prespatch
 
@@ -1181,6 +1183,7 @@ _landpatch
 
         INCLUDE land030.s
         INCLUDE proj020.s
+        INCLUDE span020.s
 
 **********************************************
 ; The objects' images in fast memory (docs/performance.md, plan step 13). The 3D view's

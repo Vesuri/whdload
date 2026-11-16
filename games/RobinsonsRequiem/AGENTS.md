@@ -26,6 +26,6 @@ Read `docs/open-work.md` first.
 
 The slave source is `src/` (`RobinsonSRequiemEcs.asm` with the chunky-to-planar
 conversions, the sky copy and the world's pacing it includes, `c2p000.s`, `c2p020.s`,
-`c2pblit.s`, `sky000.s`, `world020.s`, `obj020.s` and `proj020.s`, which the AGA slave includes too; `RobinSonSRequiemAga.asm` with its conversion, sky
+`c2pblit.s`, `sky000.s`, `world020.s`, `obj020.s`, `proj020.s` and `span020.s`, the last two of which the AGA slave includes too; `RobinSonSRequiemAga.asm` with its conversion, sky
 copy and landscape loop, `c2p030.s`, `c2p040.s`, `sky030.s` and `land030.s`; the `lvo/intuition.i` bridge in `src/include/`, and CFou!'s unassembled bitplane-fix fragment
 `_fixBPL1&2-InFast-Silmarils.s`); `tools/` is the development harness and never ships.

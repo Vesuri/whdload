@@ -935,12 +935,15 @@ _worldinst
         move.l  #$bda6,d2
         move.l  #$beb6,d3
         bsr     _projpatch
+        move.l  #$a254,a1
+        bsr     _spanpatch
 .no
         ENDC
         rts
 
         INCLUDE world020.s
         INCLUDE proj020.s
+        INCLUDE span020.s
         MC68000
 
 **********************************************

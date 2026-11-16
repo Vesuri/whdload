@@ -416,6 +416,28 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
       frame, 0 for steady motion, is 2 pixels or more in 8% of steps, before 27% (mean 0.58
       pixels, before 1.65); the ECS game on the `a1200-030`, its frames closer together: 3.3%,
       before 7.8%. `PROJ_OFF` (a test define) leaves the patches out.
+17. **The landscape's spans clipped at the left edge without a limit** (`_spanpatch`,
+    `_sp0e`, `_sp0o`, `_sp1e`, `_sp1o` in `src/span020.s`). The span drawing (hunk 1
+    `+$b6ea`) fills a span's rows through two jump tables (`+$ccf0`, `+$d302`, built at
+    `+$c1f6` and `+$c25e`). A row's left edge x, counted from the clipped left, picks the
+    entry, and the entry picks where in an unrolled run of stores to jump. Left of the clip
+    all entries are the same, but there are only 129 of them. An edge further left reads
+    past them, a zero, and jumps into the table itself: an Illegal Instruction. The game's
+    own camera keeps its edges inside the limit; item 7's staged camera, between two of the
+    player's steps, can take one past it. Seen in the ECS game turning left from the direct
+    start: an edge at -132.
+    - The left-clipped rows run in two blocks of two loops, `+$bbf4` [`$100a0`] and
+      `+$bd00` [`$101ac`], $78 bytes each and leaving at their `+$78`: the even address's
+      loop (`move.w (0,a6,d7.w),d7`), then the odd address's (`(-2,a6,d7.w)`, at `+$36`:
+      `+$bc2a` [`$100d6`], `+$bd36` [`$101e2`]). Each loop's first instruction, `movea.l
+      #<its return>,a5` (`2a7c`), becomes a `jmp` to a copy of the loop in the slave that
+      clamps x at the table's first entry, -129 (-128 with the -2). Every row further left
+      gets the same entry, as if the table went on, for a compare and a branch a row.
+    - Both blocks are checked first, word for word, with the relocated returns and the odd
+      loop's `move.b d4,-(a0)` (`1104`, the first block) or `(a0)+` (`10c4`) on their own.
+      `SPAN_OFF` (a test define) leaves them out.
+    - Measured with `tools/rr_prof.py` (keypad 9, 500 fields) on the `a1200-030`: 174 frames
+      with and without it, the start and end screenshots identical.
 
 ## ECS improvements
 
@@ -583,6 +605,15 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
    +$9408` becomes `jsr _proj`, which returns at `+$8fd6` with the box at `+$d484`-`+$d492`
    or goes back to `+$8efa`; `+$bda6` becomes `jsr _cproj`, and `+$beb6` `jsr _cbox` and a
    `nop`.
+9. **The landscape's spans clipped at the left edge without a limit** (`_spanpatch`,
+   `src/span020.s`, from `_worldinst`), on the 68020 and up only: the AGA's item 17 at its
+   ECS sites, checked first. The span drawing is `+$9d54`, its tables `+$b346` and `+$b958`
+   (built at `+$a84c` and `+$a8b4`), and the blocks `+$a254` [`$db4c`] (its odd loop
+   `+$a28a` [`$db82`]) and `+$a360` [`$dc58`] (`+$a396` [`$dc8e`]). Without it, keypad 4
+   held from field 250 of the direct start (pointer over the inventory) on the `a1200-030`
+   crashed at VBL 813 with an edge at -132; with it, the same run goes on past VBL 2,200.
+   `tools/rr_prof.py` (keypad 9, 500 fields): 368 frames, 370 without it, on both the
+   `a1200-030` and the `a3000-50`, the start and end screenshots identical.
 
 ## The AGA's sites in the ECS game
 
