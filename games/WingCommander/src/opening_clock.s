@@ -1,6 +1,6 @@
 ; Shared opening motion policy. Variant offsets and displaced instructions are
 ; generated from pinned inputs into tmp/, never copied into this source.
-; Orchestra steps every four PAL / five NTSC fields (12.5 / 12 Hz), expression
+; Orchestra steps every three PAL / four NTSC fields (16.7 / 15 Hz), expression
 ; 10 Hz, fireworks every three fields. Zooms sample per field.
 opening_begin:
         movem.l d0-d7/a0-a6,-(sp)
@@ -35,11 +35,11 @@ opening_fireworks_input:
         bra.s opening_tick_wait
 opening_orchestra_input:
         movem.l d1-d7/a0-a6,-(sp)
-        moveq #4,d2
+        moveq #3,d2
         move.w opening_hz(pc),d1
         cmpi.w #50,d1
         bls.s opening_tick_wait
-        moveq #5,d2
+        moveq #4,d2
         bra.s opening_tick_wait
 opening_tick_input:
         movem.l d1-d7/a0-a6,-(sp)

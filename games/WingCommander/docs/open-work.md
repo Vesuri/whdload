@@ -92,7 +92,7 @@ simulation/rendering/waits in the same slave; CD32 Original is Psygore's normal 
 A500 enhancement results below describe diagnostic experiments, not the public
 mode policy. See [current candidate support](ocs-release.md).
 
-Enhanced OCS and CD32 openings step the orchestra every four PAL / five NTSC fields and fireworks every three fields and
+Enhanced OCS and CD32 openings step the orchestra every three PAL / four NTSC fields and fireworks every three fields and
 sample the planet/Origin FX zooms between ticks. Music cues and original modes
 remain native. Both unskipped opening gates pass through to the world intro; see
 [opening timing](internals.md#opening-animation-speed-and-default-caches).
@@ -1013,8 +1013,8 @@ Speed and pacing:
   World speed 1.2x–2.0x addresses it; the icon default stays 1.0x.
 - **UR2 (H, U): cutscenes and animations too slow.** U: cutscenes in general;
   H: the opening orchestra (about 16 fps, plus a pause before it) and the
-  applause (15–16 fps). Mostly open: the orchestra now steps every four PAL /
-  five NTSC fields (12.5/12 per second; user decision, 2026-11-16), with no
+  applause (15–16 fps). Mostly open: the orchestra now steps every three PAL /
+  four NTSC fields (16.7/15 per second; user decision, 2026-11-16), with no
   pause added before it; the applause is probably the briefing crowd,
   already one picture per three fields (16.7/s PAL), unconfirmed. World speed
   excludes cutscenes by design, so this needs a separate decision.

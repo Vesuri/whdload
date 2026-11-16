@@ -7182,7 +7182,7 @@ routines remain in control of scene transitions.
 Native animation indices, random choices and particle updates were advanced per
 loop, so the original orchestra runs as fast as the machine draws; it loops
 until music cue 2 at any rate. Its forward and backward loops (`$f1a`, `$f88`)
-now step every four fields on PAL and five on NTSC (12.5 and 12 per second, a
+now step every three fields on PAL and four on NTSC (16.7 and 15 per second, a
 user choice, not a measured target); the expression (`$1010`) keeps 10 Hz.
 Fireworks advance once per three
 display fields (50/3 Hz PAL, 20 Hz NTSC), with input polled while waiting and

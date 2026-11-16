@@ -91,8 +91,8 @@ def check(build, variant):
                     require(c.get(slave+sy['opening_cursor'],4)==(epoch+step*(hz//10))&0xffffffff,'lost animation debt')
                 skip[0]=True;polls[0]=0;run('opening_tick_input');skip[0]=False
                 require(c.reg(9)==1 and polls[0]==1,'skip delayed')
-                # Orchestra: four PAL fields, five NTSC, retaining debt and skip.
-                fields=4 if hz==50 else 5
+                # Orchestra: three PAL fields, four NTSC, retaining debt and skip.
+                fields=3 if hz==50 else 4
                 c.write(field,long(epoch));run('opening_rebase')
                 for step in range(1,21):
                     run('opening_orchestra_input')
