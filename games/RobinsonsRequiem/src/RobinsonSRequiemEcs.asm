@@ -281,6 +281,7 @@ _bootdos        lea     (_saveregs,pc),a0
             bsr _c2ppatch
             bsr _skypatch
             bsr _mempatch
+            bsr _worldinst
 
 	move.w	#$7fff,$dff09A
 	move.w	#$e028,$dff09A
@@ -909,6 +910,24 @@ _mempatch
         bsr     _mappatch
         bsr     _skycopy
 .no     rts
+
+**********************************************
+; The world on the cap's grid and frames between the player's runs on the 68020 and up
+; (docs/performance.md, ECS plan step 9; src/world020.s). WORLD_OFF (a test define): not
+; patched, the frames those of plan step 8.
+
+_worldinst
+        IFND WORLD_OFF
+        move.l  _attnflags(pc),d0
+        and.w   #AFF_68020,d0
+        beq     .no
+        bsr     _worldpatch
+        bsr     _swappatch
+.no
+        ENDC
+        rts
+
+        INCLUDE world020.s
 
 **********************************************
 ; The sky in fast memory (ECS plan step 8; the AGA's plan step 12, its sites in the ECS game

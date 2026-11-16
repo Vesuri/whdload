@@ -851,12 +851,53 @@ is, each step below chosen at install, and the game has to keep working correctl
      the conversion took 8.4 ms; inline (268 bytes) it takes 8.0 ms. Its non-chip time grew
      from 5.0 to 6.2 ms (the pair's exchange and the per-row set-up). The plane writes are
      what is left of its chip time: 1.8 ms.
-9. **The world on the cap's grid and frames between the player's runs**: AGA steps 7, 8,
-   9 and 10a through step 6's sites, then 10d, the swap without the beam wait (7.1 ms a
-   swap at 400 MHz).
+9. **The world on the cap's grid and frames between the player's runs** (done,
+   `docs/internals.md`, "ECS improvements", item 5).
+   - **What changed**, on the 68020 and up only: the AGA's steps 7, 8, 9, 10.1 and 10.4
+     at step 6's sites (`src/world020.s`).
+     - The world count W on the cap's grid, with catch-up passes.
+     - The camera and the other moving objects staged between their runs, so every pass
+       draws.
+     - The wait for W at the pass's end.
+     - The swap without the beam wait, the next pass's waits put off to its first access
+       to the back screen.
+   - **Checks.**
+     - On the `a3000-50`, with `tools/rr_passes.py`, turning and walking: every frame
+       interval 3 fields (47 of 47 each) and no catch-up passes. The camera moves evenly:
+       3 degrees a frame turning, about 5.4 units a frame walking.
+     - `tools/rr_objects.py`, standing, turning and walking: every object on the cap's
+       grid, as the game runs them when it keeps up. `MAIN` and the period-0 objects run
+       every 3 fields, `caporal` every 6, `heros` every 9, `human` every 12 and `skyjun`
+       every 18.
+     - The screenshot at the start, and the first two of step 8's 8 poses (the same
+       cameras), pixel-identical to step 8's. The other poses turn further between
+       screenshots, and their views look right.
+     - On the A500 (`custom`), where nothing of this is patched: step 8's 8 cameras, every
+       screenshot pixel-identical, and the release build's screenshots from the reset to
+       field 1805 too.
+     - The release build on the `a3000-50` reaches the language screen with its pointer.
+     - As in the AGA game, staged creatures are checked only through the camera's
+       staging: no creature comes into view in the jungle start's window.
+   - **Measured on the `a3000-50`'s aprof core**, per frame drawn:
+
+     | | Step 8 | Step 9 |
+     |---|---|---|
+     | Frames in the window | 55 (on the player's runs) | 167 (16.7 fps, the cap: every frame 3 fields apart) |
+     | Drawing pass | | 1.21 to 2.91 fields turning, 1.81 to 2.30 walking |
+     | Busy | 48.6 ms | 37.5 ms, besides 22.4 ms waiting for W |
+     | Chip accesses | 30.6 ms (38,613) | 5.8 ms (9,173) |
+     | View copy (hunk 2 `+$34e`) | 6.5 ms | 0.4 ms |
+
+     The setup's core draws 166 frames, also at the cap. Before, a frame came with each of
+     the player's runs. Now every 3-field pass draws one, and the drawing fits in about
+     two fields. Most of the chip time that went was the waits' polling: the beam wait
+     and the wait for the swap to show (the report's cap, beam and copper waits are 0.0
+     ms now). The view copy is called 0.3 times a frame, against once a frame before.
 10. **To 50 fps**: AGA steps 11 and 13 (frames between world passes and the objects'
     graphics in fast memory; its step 12, the sky, is step 8 here, and its step 14 found
-    nothing more worth moving), shared code where the variants allow.
+    nothing more worth moving), shared code where the variants allow. After step 9 the
+    `a3000-50` draws at the cap, every frame 3 fields apart with drawing passes of about
+    two fields, so step 11's frames between world passes are what would go further.
 11. **The A500 path**: what helps only the 68000 without fast memory: the conversion's
     last exchanges on the blitter, in parallel with the CPU (the blitter is idle there,
     0.1% of the DMA slots), and steps 3 and 4's few milliseconds.

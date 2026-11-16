@@ -439,6 +439,33 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
      `nop`: the image set as before, the copy to be made again. `MAPCHECK` compares the copy
      with the image at every drawing, and `tools/rr_skycheck.py ecs` runs every other case
      from the copy.
+5. **The world on the cap's grid and a frame on every pass** (`_worldinst`,
+   `src/world020.s`; `docs/performance.md`, ECS plan step 9), on the 68020 and up only:
+   the AGA's items 6, 7, 8 and 11 ported at their ECS sites ("The AGA's sites in the ECS
+   game"), each checked first as in the AGA slave. Item 12's presentation frames are left
+   out (ECS plan step 10).
+   - `_worldpatch`: the world count W at hunk 1 `+$d22` (`_wa3`) and `+$4b44` (`_wa0`),
+     the catch-up passes at the list's end `+$cb2` (`_listend`), the cap wait's cap at
+     `+$30ac` (`_capwait`), and the wait for W at the frame routine's end `+$3218`
+     (`_passend`).
+   - The camera staged between the followed object's runs at the drawing's call `+$3252`
+     (`_view`). The other moving objects are staged from `+$2f44` (`_emove`), in an
+     8-slot table from `AllocMem` at install.
+   - `_swappatch`: the swap without the beam wait at `+$31f4` (`_swap`). The wait for it to
+     show and the pass's block are put off (`+$3090` `_pstart`, `+$30ce` `_pblock`) to the
+     first access to the back screen: the conversion's load (hunk 2 `+$19ea`), a 2D
+     view's (`+$3222`), the drawing's end, and the views' end (`+$319e`). The 13 other
+     loads of the back screen wait for the swap to show (`_gsites`).
+
+   The variables these use are the AGA's less `$19aa` (the VBL count `+$d4c2`, the cap
+   `+$d4c0`, the 3D flag `+$d459`, the element table `+$d3dc`, the heading before a run
+   `+$d40e`, the view flags `+$d54b`, `+$d581` and `+$d580`, the pointer's state
+   `+$d3ed`-`+$d3ef`, the drawing's rectangle `+$d430`-`+$d439`). The frame routine is the
+   AGA's less `$193c`. The 3D view, the objects' frames and the element table have the
+   AGA's layout. The code is assembled for the 68020 (`MC68020` in the include), with
+   hunk 1 offsets above `$7fff` as base displacements. `WORLD_OFF` (a test define) leaves
+   it out, and `INTERP_OFF` holds alpha at 1, as in the AGA slave. On the 68000 nothing of
+   this is patched: START's own pacing, a frame on the player's runs.
 
 ## The AGA's sites in the ECS game
 
