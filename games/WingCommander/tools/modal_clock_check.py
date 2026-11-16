@@ -196,6 +196,8 @@ def check(build,variant,model):
      require(scales[0]<=first,('text starts too close',delay,scales[:3],first))
      require(all(a<=b for a,b in zip(scales,scales[1:])),('text zoom recedes',scales))
      require(scales[-1]==512,('text zoom end',scales[-1]))
+     # Amiga original: Game Over's 20-tick delay outlasts its zoom; it appears full size.
+     if delay:require(set(scales)=={512},('Game Over must appear full size',scales[:3]))
      if delay==0 and gap==1:require(len(set(scales))>14,'zoom still steps at 10 Hz')
      require(c.get(s+sy['intro_active'])==0,'modal owner leaked')
      sims.append(dict(hz=rate,gap=gap,delay=delay,ticks=state['ticks'],pictures=state['pictures']))

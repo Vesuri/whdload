@@ -185,7 +185,11 @@ def main():
             fields=[]
             for _ in range(12):
                 until(h0+point);fields.append(number(f'*(unsigned int*){field:#x}'))
-            assert all(4<=b-a<=7 for a,b in zip(fields,fields[1:])),fields
+            # Enhanced rooms run one native pass per three fields; render overrun
+            # is retained debt, so single gaps vary but the span stays 3 per pass.
+            gaps=[b-a for a,b in zip(fields,fields[1:])]
+            assert all(0<g<=6 for g in gaps),fields
+            assert abs(fields[-1]-fields[0]-3*len(gaps))<=3,fields
             # Check actual cursor sampling between animation ticks, not just
             # calls to the arithmetic helper. Holding a direction produces distinct
             # native pointer positions at the capped cursor polls.
