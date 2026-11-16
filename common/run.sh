@@ -108,7 +108,7 @@ for f in "$DH1"/.whdl_*; do
   [ -n "$dumps" ] || { dumps="$GAME_ROOT/tmp/dumps/$(date +%Y%m%d-%H%M%S)"; mkdir -p "$dumps"; }
   mv "$f" "$dumps/"
 done
-[ -z "$dumps" ] || echo "The previous run's WHDLoad core dump is in $dumps"
+[ -z "$dumps" ] || echo "The previous run's WHDLoad core dump is in $dumps (python3 -m amigaxdev.whdldump $dumps)"
 rm -rf "$DH0" "$DH1"
 mkdir -p "$DH0/s" "$DH0/devs/Kickstarts" "$FSUAE_RUN/state"
 cp -R "$GAME_PATH" "$DH1"

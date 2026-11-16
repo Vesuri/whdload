@@ -87,6 +87,7 @@ there), never into the installed copy. This repository keeps what is specific to
 | Disk images | `xdftool`, `xdfscan`, `rdbtool` (amitools, on `PATH` from the shared venv); `python3 -m amigaxdev.adf DISK` |
 | Static analysis | Ghidra in `~/.local/share/ghidra/ghidra_<version>_PUBLIC/` (`support/analyzeHeadless`), with the shared scripts `$AMIGA_GHIDRA_SCRIPTS` (`ExportListing`, `DumpCallGraph`, ...) |
 | Debug, trace, profile | `m68k-amiga-elf-gdb` against the FS-UAE gdb stub, through `common/tools/game_server.py` (`amigaxdev.gdbserve`: `stop`, `cont`, `shot`, `profile`, `wait`, `until`); traces through `amigaxdev.barto`, `callprofile` and `aprof` |
+| A WHDLoad exception or crash | `make run` passes `COREDUMP`; the next boot moves the dump to `games/<Game>/tmp/dumps/<time>/`. Read it with `python3 -m amigaxdev.whdldump DIR` before trying to reproduce the crash (`docs/running.md`) |
 | Emulators | `fs-uae` (`$FSUAE_ARM`), the cycle profiler `$FSUAE_APROF`, the 040/060 MMU fix `$FSUAE_MMU`; the other `$AMIGA_SHARE/fs-uae-*` are diagnostic builds (`reference/headless-fsuae.md`, "Which FS-UAE"), and `fs-uae-src/` is the source |
 | Release archives | `$LHA` (LHa for UNIX); `amigaxdev.release` |
 | Python with Pillow, numpy, capstone, amitools and `amigaxdev` | the shared `python3` |

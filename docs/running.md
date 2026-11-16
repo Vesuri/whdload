@@ -68,7 +68,11 @@ Kickstart 3.1 and the Workbench 2.04 floppy boot `DH0`, whose startup-sequence r
 `tmp/game/<GAME_DIR>` with WHDLoad and the selected slave, so saves and preferences never
 reach the pristine install. `COREDUMP` makes WHDLoad write its register and memory dump
 (`.whdl_*`) to `DH1` on every exit, so a crash under `NOREQ` still leaves the state behind;
-the next boot moves it to `games/<Game>/tmp/dumps/<time>/` before replacing `DH1`. `KICKS` names the Kickstart images the slave needs in
+the next boot moves it to `games/<Game>/tmp/dumps/<time>/` before replacing `DH1`. A crash
+in a run someone started by hand is debugged from that dump, not from a reproduction: read
+it with `python3 -m amigaxdev.whdldump <dump dir>` (the exception, PC and return addresses
+as slave or hunk offsets with `--hunk0`/`--seg`, the registers, `read ADDR` and `dis` into
+the dumped memory). `KICKS` names the Kickstart images the slave needs in
 `DEVS:Kickstarts` (`kick34005.A500` for kick13 slaves); their `.RTB` comes along.
 
 Each game and instance runs in `games/<Game>/tmp/run/<instance>/`. AmigaXDev's launcher
