@@ -103,8 +103,9 @@ slv_info        dc.b    "Coded By CFou!, improved by Vesuri",10
                 INCBIN  "T:date"
         ENDC
                 dc.b    0
-slv_config	dc.b	"C1:L:Movement speed:Original,1X (ECS),2X (AGA);"
-		dc.b	"C2:B:Smooth landscape;",0
+slv_config	dc.b	"C2:B:Enhanced framerate;"
+		dc.b	"C1:L:Movement speed:Original,1X (ECS),2X (AGA);"
+		dc.b	"C3:B:Smooth landscape;",0
         EVEN
 slv_MemConfig   dc.l    CHIPMEMSIZE,KICKSIZE+FASTMEMSIZE_V12
                 dc.l    0
@@ -296,10 +297,10 @@ _cont
             move.l  d7,a1
             add.l   a1,a1
             add.l   a1,a1
+            bsr _hunks
+            bsr _enhget
+            beq .orig
             bsr _fastpool
-            move.l  d7,a1
-            add.l   a1,a1
-            add.l   a1,a1
             bsr _fastblocks
             bsr _c2ppatch
             bsr _skypatch
@@ -322,6 +323,11 @@ _cont
             bsr _speedpatch
             bsr _swappatch
             bsr _prespatch
+            bra .go
+.orig       bsr _cpu12
+            bsr _landpatch
+            bsr _speedpatch
+.go
 
         ;call
                 move.l  d7,a1
@@ -910,17 +916,6 @@ _fastpool
 ; only when it is the lowest one of its pool.
 
 _fastblocks
-        move.l  (a1),d0
-        lsl.l   #2,d0
-        move.l  d0,a2                   ; hunk 1 - 4
-        move.l  (a2),d0
-        lsl.l   #2,d0
-        addq.l  #4,d0
-        lea     _hunk2(pc),a0
-        move.l  d0,(a0)
-        addq.l  #4,a2
-        lea     _hunk1(pc),a0
-        move.l  a2,(a0)
         lea     4(a1),a1                ; hunk 0
         lea     $36ee(a1),a0
         cmp.l   #$48e74080,(a0)         ; movem.l d1/a0,-(a7)
@@ -1033,6 +1028,46 @@ _fastfree
 
 _hunk1          dc.l    0
 _hunk2          dc.l    0
+
+; _hunks: a1 START's segment list (its first hunk's link); _hunk1 and _hunk2 set, a1 kept
+_hunks
+        move.l  (a1),d0
+        lsl.l   #2,d0
+        move.l  d0,a2                   ; hunk 1 - 4
+        move.l  (a2),d0
+        lsl.l   #2,d0
+        addq.l  #4,d0
+        lea     _hunk2(pc),a0
+        move.l  d0,(a0)
+        addq.l  #4,a2
+        lea     _hunk1(pc),a0
+        move.l  a2,(a0)
+        rts
+
+; Enhanced framerate (CUSTOM2): Z clear, all of "AGA improvements" (docs/internals.md); Z
+; set, the game as version 1.2 had it: none of them but the options' own patches, and
+; _cpu12 for v1.2's caches. All registers kept.
+_enhget
+        movem.l d0-d1/a0-a2,-(a7)
+        lea     _enhtags(pc),a0
+        move.l  _resload(pc),a2
+        jsr     resload_Control(a2)
+        movem.l (a7)+,d0-d1/a0-a2
+        tst.l   _enh(pc)
+        rts
+_enhtags        dc.l    WHDLTAG_CUSTOM2_GET
+_enh            dc.l    0
+                dc.l    0
+
+; v1.2's caches: its CACHE option's, the KickEmu's CACHECHIPDATA undone. All registers kept.
+_cpu12
+        movem.l d0-d1/a0-a2,-(a7)
+        move.l  #WCPUF_Base_NC|WCPUF_Exp_CB|WCPUF_Slave_CB|WCPUF_IC|WCPUF_DC|WCPUF_BC|WCPUF_SS|WCPUF_SB,d0
+        move.l  #WCPUF_All,d1
+        move.l  _resload(pc),a2
+        jsr     resload_SetCPU(a2)
+        movem.l (a7)+,d0-d1/a0-a2
+        rts
 _chipalloc      dc.l    0
 
 **********************************************
@@ -1172,6 +1207,9 @@ _landpatch
         lea     _landtags(pc),a0
         move.l  _resload(pc),a2
         jsr     resload_Control(a2)
+        move.l  _landopt(pc),d0         ; without Enhanced framerate only for Smooth landscape
+        or.l    _enh(pc),d0
+        beq     .x
         move.l  #LCOPYMAX+16,d0
         moveq   #MEMF_FAST|MEMF_PUBLIC,d1
         move.l  4.w,a6
@@ -1191,7 +1229,7 @@ _landpatch
 .x      movem.l (a7)+,d0-d1/a0-a2/a6
         ENDC
         rts
-_landtags       dc.l    WHDLTAG_CUSTOM2_GET
+_landtags       dc.l    WHDLTAG_CUSTOM3_GET
 _landopt        dc.l    0
                 dc.l    0
 

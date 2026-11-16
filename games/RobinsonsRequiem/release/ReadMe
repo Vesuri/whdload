@@ -53,6 +53,9 @@
  and    aminet:game/patch/
 
  version 2.0b (14.11.2026) done by Vesuri:
+ - Option "Enhanced framerate" (splash window, or the tooltype Custom2=1, which
+   the installer sets): the improvements below but the other options. Without
+   it the game runs as version 1.2 did
  AGA:
  - Uses 1 MB of Fast memory for the game's objects (WHDLoad 20 or newer); with
    the tooltype MemConfig=1 it runs in 256 KB of Fast memory as version 1.2 did
@@ -69,7 +72,7 @@
    (Custom1=0), 1X (ECS) (Custom1=1) or 2X (AGA) (Custom1=2). The AGA game moves
    you twice as far as the ECS game walking, running and crawling; 1X moves you
    as the ECS game does
- - Option "Smooth landscape" (splash window, or the tooltype Custom2): the
+ - Option "Smooth landscape" (splash window, or the tooltype Custom3): the
    ground's heights blended between the map's cells, so hills keep their shape as
    you turn instead of changing at every step
  ECS:

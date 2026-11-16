@@ -31,6 +31,10 @@ for the 512 KB Kickstart image, so it runs with fast memory (the plain `a1200` w
 tried). Only these two machines have been
 booted.
 
+Runs have Enhanced framerate on (`CUSTOM2=1` in `game.conf`'s `WHD_DEFAULTS`, as the
+installed icon); `ENHANCED=0` runs the game as v1.2 had it. Smooth landscape is
+`WHD_ARGS=CUSTOM3=1` (AGA).
+
 ## Builds
 
 The default vasm build with the repository's flags (`-m68000 -x -devpac -Fhunkexe -nosym`),

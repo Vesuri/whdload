@@ -107,7 +107,8 @@ slv_info        dc.b    "Coded By CFou!",10
                 dc.b    0
         EVEN
 
-slv_config	dc.b	"C1:L:Movement speed:Original,1X (ECS),2X (AGA);",0
+slv_config	dc.b	"C2:B:Enhanced framerate;"
+		dc.b	"C1:L:Movement speed:Original,1X (ECS),2X (AGA);",0
 	EVEN
 slv_MemConfig   dc.l    CHIPMEMSIZE,KICKSIZE+FASTMEMSIZE_V12
                 dc.l    0
@@ -278,11 +279,17 @@ _bootdos        lea     (_saveregs,pc),a0
             move.l  (a7)+,PROFILE_SLAVE.w
             clr.l   PROFILE_FRAMES.w
    ENDC
+            bsr _enhget
+            beq .orig
             bsr _c2ppatch
             bsr _skypatch
             bsr _mempatch
             bsr _speedpatch
             bsr _worldinst
+            bra .go
+.orig       bsr _cpu12
+            bsr _speedpatch
+.go
 
 	move.w	#$7fff,$dff09A
 	move.w	#$e028,$dff09A
@@ -787,6 +794,32 @@ _hunks
         rts
 
 _hunk0          dc.l    0
+
+; Enhanced framerate (CUSTOM2): d0 and Z clear, all of "ECS improvements" (docs/internals.md);
+; Z set, the game as version 1.2 had it: none of them but the option's own patches, and
+; _cpu12 for v1.2's caches. The other registers kept.
+_enhget
+        movem.l d1/a0-a2,-(a7)
+        lea     _enhtags(pc),a0
+        move.l  _resload(pc),a2
+        jsr     resload_Control(a2)
+        movem.l (a7)+,d1/a0-a2
+        move.l  _enh(pc),d0
+        rts
+_enhtags        dc.l    WHDLTAG_CUSTOM2_GET
+_enh            dc.l    0
+                dc.l    0
+
+; v1.2's caches: off, as with no cache option; the KickEmu's CACHECHIPDATA undone. All
+; registers kept.
+_cpu12
+        movem.l d0-d1/a0-a2,-(a7)
+        moveq   #0,d0
+        move.l  #WCPUF_All,d1
+        move.l  _resload(pc),a2
+        jsr     resload_SetCPU(a2)
+        movem.l (a7)+,d0-d1/a0-a2
+        rts
 _hunk1          dc.l    0
 _hunk2          dc.l    0
 

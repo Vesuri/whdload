@@ -6,7 +6,8 @@
       "replace": {
         "RobinsonsRequiemHd/RobinsonSRequiemECS.Slave": "build:RobinsonsRequiem",
         "RobinsonsRequiemHd/RobinsonSRequiemAga.Slave": "build:RobinsonsRequiemAGA",
-        "RobinsonsRequiemHd/ReadMe": "release/ReadMe"
+        "RobinsonsRequiemHd/ReadMe": "release/ReadMe",
+        "RobinsonsRequiemHd/Install": "release/Install"
       },
       "add": {},
       "remove": [],

@@ -76,7 +76,12 @@ The low-memory jumps at `$100` and `$106` sit in the CPU vector table (user vect
 
 ## AGA improvements
 
-The changes after v1.2, in the order of `docs/performance.md`'s plan:
+The changes after v1.2, in the order of `docs/performance.md`'s plan. All but the two options
+(items 19 and 20) are the splash window's "Enhanced framerate", `CUSTOM2` (`_enhget`), on in
+the installed icon. Without it `_bootdos` installs none of them and puts v1.2's caches back
+(`_cpu12`: `resload_SetCPU` with v1.2's `CACHE` value over the KickEmu's `CACHECHIPDATA`), so
+the game runs as v1.2 did, with START's fast pool given up as before (item 1). The two options
+work either way. `_hunks` finds START's hunks 1 and 2 for all of them.
 
 1. **START's fast pool kept** (`_fastpool`): with the 1 MB ExpMem (not with `MemConfig=1`),
    hunk 0 `+$196` [`$1c2`], `move.l #0,<hunk 1 +$f4>` (`23fc 0000 0000`, checked first),
@@ -496,7 +501,8 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
     - Checked on the `a1200-030`: 1X walks 15.7/17.0 a run, runs 31.3/32.6 and crawls 7.6 to
       8.9, the ECS game's figures; Original walks 31.3/32.6 as v1.2.
 20. **The landscape's heights blended, an option** (`_bloop` in `src/land030.s`, through
-    item 15's `_landinst`): the splash window's "Smooth landscape", `CUSTOM2`. The landscape
+    item 15's `_landinst`): the splash window's "Smooth landscape", `CUSTOM3`; without
+    Enhanced framerate `_landpatch` installs the loop's copy for it alone. The landscape
     (hunk 1 `+$d88c`) walks two map rows a step, `d6`/`d7` and `d4`/`d5`, each a cell in
     the low word and a 16-bit fraction in the high word. Along a row one axis steps by
     whole cells and the other by a fraction that depends on the heading (the row's steps
@@ -532,7 +538,12 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
 
 ## ECS improvements
 
-The changes after v1.2, in the order of `docs/performance.md`'s plan:
+The changes after v1.2, in the order of `docs/performance.md`'s plan. All but the option (item
+11) are the splash window's "Enhanced framerate", `CUSTOM2` (`_enhget`), on in the installed
+icon. Without it `_bootdos` installs none of them and turns the caches off again as v1.2 had
+them (`_cpu12`: `resload_SetCPU` with 0 over the KickEmu's `CACHECHIPDATA`). START's own fast
+pool (item 3) is the game's and stays, as v1.2 had it with fast memory. The option works
+either way.
 
 1. **The chunky-to-planar conversion** (`_c2ppatch`, `src/c2p000.s`): hunk 2 `+$1a5e`
    [`$1606e`], the start of START's row loop, `move.w d6,a4 / move.w a4,d6` (`3846 3c0c`,
