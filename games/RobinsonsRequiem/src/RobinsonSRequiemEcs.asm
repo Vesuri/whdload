@@ -107,7 +107,7 @@ slv_info        dc.b    "Coded By CFou!",10
                 dc.b    0
         EVEN
 
-slv_config	dc.b	"C1:L:Movement speed:Original,1X (OCS),2X (AGA);",0
+slv_config	dc.b	"C1:L:Movement speed:Original,1X (ECS),2X (AGA);",0
 	EVEN
 slv_MemConfig   dc.l    CHIPMEMSIZE,KICKSIZE+FASTMEMSIZE_V12
                 dc.l    0

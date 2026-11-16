@@ -463,7 +463,7 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
       define) leaves it out.
 
 19. **The movement speed, an option** (`_speedpatch`, `_spdload` in `src/speed.s`, on every
-    CPU): the splash window's "Movement speed", `CUSTOM1` 0 Original, 1 "1X (OCS)", 2 "2X
+    CPU): the splash window's "Movement speed", `CUSTOM1` 0 Original, 1 "1X (ECS)", 2 "2X
     (AGA)". The AGA game moves the player twice as far each run of `heros` as the ECS game,
     in every mode, and at the same rate of runs on the same machine. Per run, from the direct
     start on the `a1200-030` (the slaves without their other patches, keypad 8 with Shift

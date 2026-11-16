@@ -103,7 +103,7 @@ slv_info        dc.b    "Coded By CFou!, improved by Vesuri",10
                 INCBIN  "T:date"
         ENDC
                 dc.b    0
-slv_config	dc.b	"C1:L:Movement speed:Original,1X (OCS),2X (AGA);",0
+slv_config	dc.b	"C1:L:Movement speed:Original,1X (ECS),2X (AGA);",0
         EVEN
 slv_MemConfig   dc.l    CHIPMEMSIZE,KICKSIZE+FASTMEMSIZE_V12
                 dc.l    0

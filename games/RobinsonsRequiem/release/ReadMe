@@ -66,7 +66,7 @@
    back and forth by a pixel or more: placed from the in-between positions of the
    camera and the moving objects with their fractions, their edges rounded once
  - Option "Movement speed" (splash window, or the tooltype Custom1): Original
-   (Custom1=0), 1X (OCS) (Custom1=1) or 2X (AGA) (Custom1=2). The AGA game moves
+   (Custom1=0), 1X (ECS) (Custom1=1) or 2X (AGA) (Custom1=2). The AGA game moves
    you twice as far as the ECS game walking, running and crawling; 1X moves you
    as the ECS game does
  ECS:
@@ -88,7 +88,7 @@
  - On 68000: the chunky-to-planar conversion shared with the blitter, which
    uses 32 KB of Chip memory
  - Option "Movement speed" (splash window, or the tooltype Custom1): Original
-   (Custom1=0), 1X (OCS) (Custom1=1) or 2X (AGA) (Custom1=2); 2X moves you as the
+   (Custom1=0), 1X (ECS) (Custom1=1) or 2X (AGA) (Custom1=2); 2X moves you as the
    AGA game does, twice as far walking, running and crawling
 
  version 1.2 (29.03.13) done by CFou!:

@@ -1,5 +1,5 @@
 ; The player's movement speed, an option for both games on every CPU (docs/internals.md,
-; "Movement speed"; the splash window's "Movement speed", CUSTOM1: 0 Original, 1 1X (OCS),
+; "Movement speed"; the splash window's "Movement speed", CUSTOM1: 0 Original, 1 1X (ECS),
 ; 2 2X (AGA)).
 ;
 ; The AGA game moves the player twice as far a run of its program (heros) as the ECS game,
