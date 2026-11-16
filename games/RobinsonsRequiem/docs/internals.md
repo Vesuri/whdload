@@ -525,18 +525,10 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
       sample moves to the next cell.
     - Measured with `tools/rr_prof.py` (keypad 9, 500 fields) on the `a1200-030`: 162
       frames with the option, 174 without.
-    - The spans split at the far cell's edge (`_bspan`, `_bsplit`, `_bh`, `_bshade`): START's
-      span paints the strip between two lines of the map, one cell apart, all in the far
-      line's cell's colour, though from that cell's edge on the map holds the next cell
-      along the axis with the fraction. After START's span, the strip's part from that
-      edge (its height at both ends, between the two lines' heights by the fraction) is
-      painted again with the near cell, moved a row down when its top row's parity is not
-      that of START's span (the dither's phase, `+$bba4`). Not while the span looks up the
-      cell under the pointer (`+$a248`, `+$b8f2`), nor when both cells have the same tile
-      and slope shading (some tiles' fill, `+$b980`, also takes a pattern from the cell, 0
-      to 68 pixels a frame). 109 frames, against 162 with the heights alone; turning on a
-      hillside, 31% of the view changes from frame to frame against 32%: the strips' sides
-      are still upright at the samples' x, a strip near the camera over 100 pixels wide.
+    - Also splitting the spans at the far cell's edge, so that a span's colour follows the
+      map's cells along the axis with the fraction, was tried in commit 181fd616 and taken
+      out: 109 frames against 162, and close to a hill whole strips still change colour
+      from frame to frame, their sides upright at the samples' x.
 
 ## ECS improvements
 
