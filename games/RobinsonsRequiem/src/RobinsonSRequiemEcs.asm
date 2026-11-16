@@ -930,11 +930,16 @@ _worldinst
         bsr     _worldpatch
         bsr     _swappatch
         bsr     _prespatch
+        move.l  #$8ef2,a1
+        move.l  #$d484,d1
+        bsr     _projpatch
 .no
         ENDC
         rts
 
         INCLUDE world020.s
+        INCLUDE proj020.s
+        MC68000
 
 **********************************************
 ; The sky in fast memory (ECS plan step 8; the AGA's plan step 12, its sites in the ECS game

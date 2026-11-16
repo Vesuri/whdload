@@ -306,6 +306,9 @@ _cont
             bsr _worldpatch
             bsr _mappatch
             bsr _landpatch
+            move.l  #$a888,a1
+            move.l  #$ee2e,d1
+            bsr _projpatch
             bsr _swappatch
             bsr _prespatch
 
@@ -1175,6 +1178,7 @@ _landpatch
         rts
 
         INCLUDE land030.s
+        INCLUDE proj020.s
 
 **********************************************
 ; The objects' images in fast memory (docs/performance.md, plan step 13). The 3D view's

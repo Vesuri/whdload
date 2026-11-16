@@ -371,6 +371,30 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
     START's loop from `tools/rr_snap.py`'s snapshots. The test define `LAND_OFF` leaves it
     out.
 
+16. **The objects' screen boxes rounded once** (`_projpatch`, `_proj` in `src/proj020.s`).
+    The 3D view's element projection (hunk 1 `+$a7d4`) projects an element through
+    `+$ad9e`, which gives the screen x and y and the scale as truncated quotients. It then
+    sizes the image from the scale rounded up, and moves it by its hotspot's offset times
+    the scale rounded down. Each rounding moves one edge of the box by up to a pixel on its
+    own, so an object and its parts jump back and forth by a pixel between frames as it or
+    the camera comes closer, seen in play with the frames between runs (items 7, 8 and 12).
+    `+$a888` [`$ed34`] `bsr.w +$ad9e` (`6100 0514`, checked with the `add.w 10(a2),d3`
+    after it and `+$a96c`'s `movem.l`) becomes `jsr _proj`. `_proj` calls the projection,
+    then works out x, y and the scale again from its dividends with 8 bits of fraction
+    (`divsl.l`, the remainder divided again: no 64-bit division, which the 68060 lacks).
+    It rounds each edge once: the first at the centre less the hotspot's offset times m,
+    the second at the first edge plus the image's size times m, where m is the image's
+    pixels per source pixel (the scale with its doubling, bit 5 of the image's `+1`, and
+    the element's shift `+28`, as `+$a8a6`-`+$a8e2`). It sets the depth, the scale words and
+    the box (`+$ee2e`-`+$ee3c`) as the game does and returns at `+$a96c`. An element clipped
+    behind the view, a quotient the projection clamped, or a scale over 2048 goes back to
+    the game's own path at `+$a890`. Measured walking in the jungle from the direct start (the
+    projection's inputs and boxes logged at `+$a888` and `+$a96c`, the exact edges worked
+    out from the inputs with the game's sine tables): the box's edges are within 0.51
+    pixels of the exact projection, before up to 2.57 (239 boxes; the ECS game on the
+    `a1200-030`, 643 boxes: 0.50, before 2.68). `PROJ_OFF`
+    (a test define) leaves this out.
+
 ## ECS improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan:
@@ -519,6 +543,11 @@ The changes after v1.2, in the order of `docs/performance.md`'s plan:
      (`_ckcalls`, `_ckbad`); it saves the loop's entry registers itself, since the stack
      holds those of START's routine (hunk 2 `+$19a2`), not the loop's.
 
+8. **The objects' screen boxes rounded once** (`_projpatch`, `src/proj020.s`, from
+   `_worldinst`), on the 68020 and up only: the AGA's item 16 at its ECS sites, checked
+   first. `+$8ef2` `bsr.w +$9408` becomes `jsr _proj`, which returns at `+$8fd6` with the
+   box at `+$d484`-`+$d492`, or goes back to `+$8efa`.
+
 ## The AGA's sites in the ECS game
 
 Both STARTs are one program at other offsets (`docs/performance.md`, ECS plan step 6): the
@@ -549,6 +578,7 @@ improvements":
 | 13 | hunk 1 `+$30e0` → `+$1876` | |
 | 14 | hunk 1 `+$ea4a`, `+$9540`, `+$92ee`, `+$8d42` → `+$d0a0`, `+$7b20`, `+$78ce`, `+$7322` | the sprite routine's images are types 24 and 26 for the AGA's 28 and 30: `d5d2 0c12 0018` |
 | 15 | hunk 1 `+$d9ba`-`+$dbaf` → `+$c010`-`+$c205` | one `bsr.w` (hunk 1 `+$db68`, to `+$b6ea` → `+$9d54`), so `src/land030.s`'s checksum and its relocated addresses' offsets differ |
+| 16 | hunk 1 `+$a888`, `+$a890`, `+$a96c`, `+$ad9e`, `+$ee2e`-`+$ee3c` → `+$8ef2`, `+$8efa`, `+$8fd6`, `+$9408`, `+$d484`-`+$d492` | |
 
 The sites' operands, AGA → ECS: hunk 0 `+$13c0` → `+$c9e`, `+$13ce` → `+$cac`, `+$13e0` →
 `+$cbe`, `+$13f6` → `+$cd4`, `+$36ee` → `+$2be8`; hunk 1 `+$10` → `+$10`, `+$251a` →
