@@ -305,6 +305,7 @@ def main():
             c = d['counters']
             assert c['shown'] > 0 and c['lof_other'] == 0 and c['unpatched'] == 0 and c['attach'] == 0, d
             assert c['lof_list0'] > 0 and c['lof_list1'] > 0, d
+            assert d['sprite']['image_aligned_8'], d['sprite']
         rows.append(dict(stripes=stripes, sprite=row['sprite'], lines=row['lines']))
         print('stripes', stripes, flush=True)
         assert stripes == [[(255, 0, 0)], [(0, 255, 0)], [(0, 0, 255)]], stripes

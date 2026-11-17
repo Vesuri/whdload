@@ -49,6 +49,7 @@ def decode(raw):
     ss, = struct.unpack_from('>I', raw, 112)
     last, bad = struct.unpack_from('>HH', raw, 116)
     maxcount = struct.unpack_from('>2H', raw, 120)
+    image, = struct.unpack_from('>I', raw, 124)
     lists = []
     for i in range(2):
         data = raw[HEADER+i*LIST:HEADER+(i+1)*LIST]
@@ -63,7 +64,7 @@ def decode(raw):
                 lists=lists, copinit_bplcon4=bplcon4(ci),
                 vbl_bplcon4=dict(last=f'{last:04x}', last_without_bank=f'{bad:04x}'),
                 sprite=dict(pos=f'{pos:04x}', ctl=f'{ctl:04x}', attach=bool(ctl & 0x80), line0=f'{line0:08x}',
-                            simple_sprite=f'{ss:08x}'))
+                            simple_sprite=f'{ss:08x}', image=f'{image:08x}', image_aligned_8=image % 8 == 0))
 
 
 def verdict(d):

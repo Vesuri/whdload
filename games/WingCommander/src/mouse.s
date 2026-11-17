@@ -105,6 +105,7 @@ D_IMAGE = 104                   ; the sprite image's control words, then line 0
 D_LASTCON4 = 116                ; last BPLCON4 value seen in the VBL (word)
 D_BADCON4 = 118                 ; last value without our bank (word)
 D_MAXCOUNT = 120                ; the cprlists' MaxCount words
+D_IMAGEAT = 124                 ; the sprite image's address
 D_HEADER = 128
 D_LIST_SIZE = 4096
 D_COPINIT_SIZE = 1024
@@ -188,9 +189,21 @@ mouse_init:
         lea     stick_ss(pc),a1
         move.l  d0,(a1)
         beq.s   .ready
+    ifd BANK_DIAG
+        ; The test: the image on an 8-byte boundary, whatever AllocMem gives.
+        moveq   #POINTER_SIZE+8,d0
+        move.l  #$10002,d1              ; MEMF_CHIP!MEMF_CLEAR
+        jsr     -198(a6)                ; AllocMem
+        tst.l   d0
+        beq.s   .aligned
+        addq.l  #7,d0
+        andi.w  #$fff8,d0
+.aligned:
+    else
         moveq   #POINTER_SIZE,d0
         move.l  #$10002,d1              ; MEMF_CHIP!MEMF_CLEAR
         jsr     -198(a6)                ; AllocMem
+    endc
         lea     stick_image(pc),a1
         move.l  d0,(a1)
 .ready:
@@ -1628,6 +1641,7 @@ diag_save:
         move.l  (a0)+,D_IMAGE(a2)
         move.l  (a0),D_IMAGE+4(a2)
         move.l  stick_ss(pc),D_IMAGE+8(a2)
+        move.l  stick_image(pc),D_IMAGEAT(a2)
         lea     diag_name(pc),a0
         movea.l a2,a1
         move.l  #DIAG_SIZE,d0
