@@ -16,9 +16,11 @@ Rendering (17.11.2026, `internals.md`, "Display" and "Game time"): with an optio
 the slave redraws only the cells whose map word changed or that a shape covered, and copies
 the other buffer with the blitter when the view scrolled (`NewDraw`, `ShapeHook`); draw-only
 passes skip $4fd0 between steps; the instruction cache is on for BaseMem. Frames a second
-with the pointer moving: `a500` 9.25 to 46.5, `a1200` 13.25 to 57.5, the 68030 setups 60
-(one a field). The verify build found no cell differing from its tile on every CPU from
-68000 to 68060, with `DCACHE` too. The debug option `CUSTOM1=N` starts every game on hole
+with the pointer moving: `a500` 9.25 to 37, `a1200` 13.25 to 58.5, the 68030 setups 57 to 60
+(one a field). No buffer is drawn into while it is on screen (`Hidden`): a frame that ends
+while the playfield shows waits for its end, which costs the `a500` a fifth of its frames.
+The verify build found no cell differing from its tile on every CPU from 68000 to 68060,
+with `DCACHE` too. The debug option `CUSTOM1=N` starts every game on hole
 N+1, for measuring the later holes (`internals.md`, "Slave patches").
 
 ## Next
@@ -45,6 +47,8 @@ N+1, for measuring the later holes (`internals.md`, "Slave patches").
    - $48d4 as native code in the slave: it must build the same draw list ($46a2-$4782) and
      call the drawer as the game does;
    - steps (10 a second, about 1.2 fields each) are threaded code throughout.
+   - a third buffer: with two, a frame that ends while the playfield shows waits for its
+     end (`Hidden`); with three the next frame could start at once (32 KB more chip RAM).
    A 68000 must still draw correctly whatever the 68020+ path does.
 3. **Fast memory.** In fast memory now: the slave's code (the renderer, `Split`), the
    renderer's caches and the tile copy (ExpMem). What cannot move: `FILE1` is the 65xx

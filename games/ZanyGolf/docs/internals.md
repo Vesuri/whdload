@@ -32,10 +32,11 @@ The loader, first hunk:
 | Offset | Original | Patch | Why |
 |---|---|---|---|
 | $1f38 | `move.w #300,d0; dbf d0,*` (the keyboard handshake delay, a CPU loop) | `nop; jsr FixKey` | a delay on the beam, and the trainer |
-| $14a4 | the flip's `move.w d0,$2312(a4); move.w #$8000,d0` | `jsr FrameCap; nop` | ours: at most one frame a field ("Game time") |
+| $14a4 | the flip's `move.w d0,$2312(a4); move.w #$8000,d0` | `jsr FrameCap; nop` | ours: at most one frame a field, the flip off the copper's pointer loads ("Game time", "Display") |
+| $14bc | the renderer's `move.l $1462(a4),d0; move.w $2326(a4),d0` (the back buffer) | `jsr Hidden; nop` | ours: no drawing into a buffer still on screen ("Display") |
 | $5238 | the main loop's `LDA $0ea0; BEQ $524c` (threaded) | primitive $0138, `jmp Split` | ours: a world step each 6 fields, draw-only passes between ("Game time") |
 | $1de2 | the input's `move.b $bfe001,d1` | `jsr ReadButton` | ours: a click between two steps is not lost ("Game time") |
-| $14bc | the renderer's tile redraw ($14bc-$15dd) | `jmp NewDraw` | ours, with ExpMem: only the cells that changed ("Display") |
+| $14c4 | the renderer's tile redraw ($14c4-$15dd) | `jmp NewDraw` | ours, with ExpMem: only the cells that changed ("Display") |
 | $173c | the shape drawer's `addq.w #8,a3; movea.l $32(a4),a0` | `jsr ShapeHook` | ours, with ExpMem: marks the cells a shape covers ("Display") |
 | $7a9c | a game's start: the immediate of `LDY #0` (threaded), the position in the hole order | `CUSTOM1` | ours, debug, only with `CUSTOM1`=1-9: start on that hole (below) |
 
@@ -100,8 +101,15 @@ BPLCON1 at $2312.
 The renderer ($147a, entered from the threaded code once a frame):
 
 1. $14a8: flips bit 15 of the four pointer words, which shows the frame drawn last time, and
-   writes the fine scroll to BPLCON1. There is no wait for a field: the copper list changes
-   at once, so frames are not quantised to fields.
+   writes the fine scroll to BPLCON1. There is no wait for a field. The copper list loads
+   the pointers and BPLCON1 after its wait for line $4a and shows the playfield from line
+   $52 to $f4 (DIWSTOP), so a flip on lines $4a-$f4 shows only from the next field, and
+   until line $f4 the buffer the renderer now draws into is still on screen. The game took
+   6 fields a frame, so its drawing seldom met the beam; at a frame a field it does, a
+   plane at a time when the blitter copies (the flicker this slave had). `FrameCap` keeps
+   the flip off lines $48-$4b (the copper loading some planes before it and some after)
+   and writes BPLCON1 with the flip rather than before its wait, and `Hidden`, after the
+   flip, waits for line $f4 to pass when the flip fell on lines $4a-$f4.
 2. Draws the next frame into the other buffer from the tile map (pointer at $0eb4) at the
    view position ($0e9c x, $0e9e y, little-endian): 20 rows ($151e) of 40 tiles ($153a),
    each tile 8x8 pixels, 32 bytes at $21d0a + its map word (pointer at $146a), copied with
@@ -249,15 +257,16 @@ fell between two steps.
 
 The putt (900 fields from the press, `track`) and hole 1 with the pointer moving and the
 view scrolling (`frames 240 5 3`, and `frames 240 10 8 20` for more scrolling), NTSC,
-17.11.2026, this slave. Game speed is the clock's advance over the real fields; the "before"
+17.11.2026, this slave with `Hidden` (no drawing into a buffer on screen; without it, which
+flickered, the `a500` had 46.5 and 48.25 and the `a1200` 57.5 and 58.5 a second). Game speed is the clock's advance over the real fields; the "before"
 column is the slave with the steps split but the game's renderer:
 
 | Machine | WHDLoad option | Putt: frames a second | Game speed | Pointer moving | More scrolling | Before |
 |---|---|---:|---:|---:|---:|---:|
-| `a500` | | 47.7 | 1.00x | 46.5 | 48.25 | 9.25 |
-| `a1200` | | | | 57.5 | 58.5 | 13.25 |
-| `a1200-030` | | | | 60 | 60 | 14.75 |
-| `a1200-030`, no MMU model | | | | 60 | 60 | |
+| `a500` | | 36.6 | 1.00x | 37.0 | 37.5 | 9.25 |
+| `a1200` | | 44.2 | 1.00x | 58.5 | 39.0 | 13.25 |
+| `a1200-030` | | 60 | 1.00x | 57.0 | 60 | 14.75 |
+| `a1200-030`, no MMU model | | 60 | 1.00x | 60 | 60 | |
 | `a1200-030`, no MMU model | `CACHE` | 60 | 1.00x | 60 | 60 | 24.75 |
 
 Steps run exactly 6 fields apart on both (a pass is now shorter than a field). Before the

@@ -103,6 +103,10 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		pea	FrameCap		;each FRAME_FIELDS fields
 		move.l	(sp)+,$14a6(a3)
 		move.w	#$4e71,$14aa(a3)
+		move.l	#$4eb94e71,$14bc(a3)	;after the flip: jsr Hidden, nop
+		pea	Hidden
+		move.l	(sp)+,$14be(a3)
+		move.w	#$4e71,$14c2(a3)
 
 		move.l	#$01384ef9,$5238(a3)	;the main loop: step the world each
 		pea	Split			;STEP_FIELDS fields, draw in between
@@ -115,9 +119,9 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		lea	(_v,pc),a0
 		tst.l	V_EXP(a0)
 		beq.b	.norender
-		move.w	#$4ef9,$14bc(a3)	;the renderer's tiles: jmp NewDraw
+		move.w	#$4ef9,$14c4(a3)	;the renderer's tiles: jmp NewDraw
 		pea	NewDraw
-		move.l	(sp)+,$14be(a3)
+		move.l	(sp)+,$14c6(a3)
 		move.w	#$4eb9,$173c(a3)	;the shape drawer: jsr ShapeHook
 		pea	ShapeHook
 		move.l	(sp)+,$173e(a3)
@@ -141,13 +145,17 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 ; this only keeps the flips to at most one a field. Replaces the flip's first two
 ; instructions (FILE1 $14a4: the fine scroll into the copper list, and d0 = $8000) and
 ; first waits until FRAME_FIELDS fields have passed since the previous flip, by the game's
-; field counter (FILE1 $145c, low byte). The counter advances at the copper interrupt
-; (line $90), after the copper has loaded the field's plane pointers, so a flip there
-; shows from the top of the next field. No wait while the interrupts are off (the counter
-; would not move). a4 is FILE1's base here.
+; field counter (FILE1 $145c, low byte), which advances at the copper interrupt (line $90).
+; No wait while the interrupts are off (the counter would not move). a4 is FILE1's base.
+; The copper list loads the playfield's plane pointers and fine scroll ($2312-$2326) at
+; line $4a and shows the playfield from line $52 to $f4. The flip (the four eor.w after
+; this) is kept off lines $48-$4b, so the copper never loads some planes before it and
+; some after, and the fine scroll is written with it, not before the wait. _flipline
+; keeps the flip's line for Hidden.
+FLIP_LOAD	= $4a		;the copper loads the plane pointers
+SHOW_END	= $f4		;DIWSTOP: the playfield's last line
 FRAME_FIELDS	= 1
-FrameCap	move.w	d0,$2312(a4)		;displaced: the fine scroll
-		movem.l	d1/a0,-(sp)
+FrameCap	movem.l	d1/a0,-(sp)
 		lea	(_lastflip,pc),a0
 		move.w	$dff01c,d1		;INTENAR: master, COPER and VERTB on?
 		and.w	#$4030,d1
@@ -158,10 +166,44 @@ FrameCap	move.w	d0,$2312(a4)		;displaced: the fine scroll
 		cmp.b	#FRAME_FIELDS,d1
 		bcs.b	.wait
 .go		move.b	$145c(a4),(a0)
+.load		bsr.b	BeamLine		;not while the copper loads them
+		cmp.w	#FLIP_LOAD-2,d1
+		bcs.b	.flip
+		cmp.w	#FLIP_LOAD+2,d1
+		bcs.b	.load
+.flip		move.w	d1,_flipline-_lastflip(a0)
+		move.w	d0,$2312(a4)		;displaced: the fine scroll
 		movem.l	(sp)+,d1/a0
 		move.w	#$8000,d0		;displaced
 		rts
 
+BeamLine	move.l	$dff004,d1		;d1: the beam's line (VPOSR, VHPOSR)
+		lsr.l	#8,d1
+		and.w	#$1ff,d1
+		rts
+
+; After the flip ($14bc, both renderers). A flip on lines FLIP_LOAD to SHOW_END shows
+; from the next field's line FLIP_LOAD; until SHOW_END of this field the display still
+; shows the buffer the renderer is about to draw into (and the blitter to copy into, a
+; plane at a time). Wait until the beam has passed SHOW_END (or the next field began).
+; Replaces move.l $1462(a4),d0; move.w $2326(a4),d0 (the back buffer) at $14bc.
+Hidden		movem.l	d1-d2,-(sp)
+		move.w	(_flipline,pc),d2
+		cmp.w	#FLIP_LOAD,d2
+		bcs.b	.done
+		cmp.w	#SHOW_END,d2
+		bhi.b	.done
+.wait		bsr.b	BeamLine
+		cmp.w	#SHOW_END,d1
+		bhi.b	.done
+		cmp.w	d2,d1
+		bcc.b	.wait
+.done		movem.l	(sp)+,d1-d2
+		move.l	$1462(a4),d0		;displaced
+		move.w	$2326(a4),d0
+		rts
+
+_flipline	dc.w	0
 _lastflip	dc.b	0
 		even
 
