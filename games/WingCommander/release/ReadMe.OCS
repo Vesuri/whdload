@@ -97,24 +97,24 @@
  CUSTOM4: 0 = mission 1, 1 = mission 2, 2 = mission 3 (cheat mode required).
 
  CUSTOM5 combines three options; add their values:
-   World speed:          0 = Original     2 = 1.0x (10 updates/s)
-                         4 = 1.2x         6 = 1.5x         8 = 2.0x
+   World speed:          0 = CPU-dependent    2 = 1.0x (10 updates/s)
+                         4 = 1.2x    6 = 1.5x    8 = 2.0x
    Enhanced framerate:  +1 = smooth in-between pictures in flight
    Mouse speed:          0 = 1.0x        16 = off         32 = 0.5x
                         48 = 0.75x       64 = 1.5x        80 = 2.0x
                         96 = 3.0x       112 = 4.0x
  The installed icon uses CUSTOM5=3: enhanced framerate at 1.0x, mouse at 1.0x.
  For example CUSTOM5=67 is the same with the mouse at 1.5x.
- Original speed is the original game, whose world advances once per picture,
+ CPU-dependent is the original game, whose world advances once per picture,
  so its speed depends on the processor. The enhanced framerate needs a fixed
- speed: with Original it runs at 1.0x (CUSTOM5=1 is the same as 3).
+ speed: with CPU-dependent it runs at 1.0x (CUSTOM5=1 is the same as 3).
  A fixed world speed keeps flight at that speed on every fast enough machine.
  Without the enhanced framerate it draws one picture per world update.
  World speed applies to flight and to the intro's battle and asteroid field;
  credit text and music keep their timing, as do rooms and cinematics.
  OCS: a 68000/68010 or a machine without suitable Fast RAM always uses the
  original behaviour. Slow expansion RAM does not qualify.
- CD32: Original uses Psygore's normal mode; his unlimited, relaxed and slow
+ CD32: CPU-dependent uses Psygore's normal mode; his unlimited, relaxed and slow
  modes and the old original-conversion option have been removed.
  When updating an icon from 2.0b, CD32 CUSTOM5=0 is now 3 and 1-4 are now 0;
  OCS CUSTOM5=1 is now 3.
@@ -127,7 +127,7 @@
    the 1.0 behaviour.
  - Optional enhanced framerate with smoother flight, cameras and ship effects.
  - World speed option: flight and the intro at 1.0x (10 updates per second),
-   1.2x, 1.5x or 2.0x, or at the original processor-dependent speed.
+   1.2x, 1.5x or 2.0x, or CPU-dependent as in the original.
  - Consistent game speed on faster processors and smoother cinematic movement.
  - Retimed intro, room, briefing, launch, landing, death and funeral animations.
  - Training Simulator: the Get Ready text zooms in smoothly with the enhanced

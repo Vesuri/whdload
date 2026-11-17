@@ -13,7 +13,7 @@ in docs/ocs-release.md. A500 coasting sustains
 10 Hz; asteroid credits and sustained fire remain overloaded, with low display
 throughput.
 Both public slaves take CUSTOM5 bit 0 (enhanced framerate) and bits 1-3 (world
-speed: Original, 1.0x/1.2x/1.5x/2.0x = 10/12/15/20 Hz flight); icons use 3. OCS
+speed: CPU-dependent (the original), 1.0x/1.2x/1.5x/2.0x = 10/12/15/20 Hz flight); icons use 3. OCS
 enhancements need a fixed speed and verified 68020+/true Fast memory. Original/ineligible
 keeps original behaviour; only E1's bit-exact arithmetic/collision shortcuts,
 the waypoint marker order, the TrainSim key fix and the mouse hooks run on every path. Legacy diagnostic candidates remain reproducible.

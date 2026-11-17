@@ -118,7 +118,7 @@ confirmation remains. See
 [afterburner continuity](internals.md#afterburner-prediction-continuity).
 
 Both public slaves share one option layout in CUSTOM5: bit 0 **Enhanced framerate**,
-bits 1-3 **World speed** (Original, 1.0x, 1.2x, 1.5x, 2.0x). Icons use `CUSTOM5=3`.
+bits 1-3 **World speed** (CPU-dependent, the original; 1.0x, 1.2x, 1.5x, 2.0x). Icons use `CUSTOM5=3`.
 Original speed, absent options or (OCS) ineligible hardware keep original
 simulation/rendering/waits in the same slave; CD32 Original is Psygore's normal mode
 (his unlimited/relaxed/slow modes were removed). See [world speed](#world-speed-option). Earlier
@@ -441,7 +441,7 @@ If these disagree, all of them are recorded and the user chooses.
 The user chose (2026-11-15) to offer the flight world's speed as a player option,
 separate from the framerate, for players used to faster animation or faster play.
 Both public slaves read CUSTOM5 as bit 0 **Enhanced framerate** and bits 1-3
-**World speed**: Original, 1.0x, 1.2x, 1.5x, 2.0x (10, 12, 15, 20 world ticks per
+**World speed**: CPU-dependent (the original game), 1.0x, 1.2x, 1.5x, 2.0x (10, 12, 15, 20 world ticks per
 second; whole rates keep the clock's debt unit, which 1.25x would not). Original is
 the original game. The framerate needs a fixed speed, so with Original it selects
 1.0x: `CUSTOM5=1` is `3` (the user's choice, 2026-11-17; before, the checkbox
