@@ -14,8 +14,9 @@ Read `docs/open-work.md` first.
 | Doc | Read it for |
 |---|---|
 | `docs/open-work.md` | where the work stands and the ordered next items |
-| `docs/development.md` | what differs from the shared workflow: inputs, the byte-identical build, running |
-| `docs/internals.md` | how the game loads, memory, every slave patch |
+| `docs/development.md` | what differs from the shared workflow: inputs, the byte-identical build, the harness and its traps |
+| `docs/internals.md` | how the game loads, every slave patch, the program, display and time, measurements |
 
-The slave source is `src/`. There is no `tools/` harness yet; `make serve` and
-`make server` drive a boot.
+The slave source is `src/`. `tools/` is the harness and never ships: `boot.sh`, `route.py`
+(routes into play), `zanygolf.py` (the gdb-stub server, with `frames`), `bench.py` (traced
+benchmark) and `profile.py` ([development.md](docs/development.md), "Harness").
