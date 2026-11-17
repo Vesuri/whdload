@@ -33,6 +33,14 @@
 ; The pointer appears only once the mouse moves and hides after 10 seconds
 ; without motion; the variant's VBL hook calls mouse_vbl, which also hides it
 ; once the controller has stopped running.
+;
+; The other buttons in flight, as the PC version's reference card: the right
+; button held makes mouse motion the stick with fire held (forward and back
+; change speed, left and right roll) and holds the pointer still; a double
+; click of the right button, held, is the afterburner; both buttons at once,
+; or the middle button, fire the selected missile. mouse_vbl reads the
+; buttons every field; mouse_poll, after the native flight poll, sets its
+; direction and modifier flags and queues the native keys (Tab, Enter).
 
 MP_POS = 0                      ; A4 offset: native pointer x.w, y.w
 MP_RECT = 2                     ; A4 offset: room rectangle pointer (+24..+30)
@@ -45,6 +53,10 @@ MP_FLAGS = 16                   ; A4 offset: left, right, up, down, modifier byt
 MP_APERTURE = 18                ; A4 offset: aperture width, height, centre x, y, left, top
 MP_COPPER = 20                  ; A4 offset: the two flight copper lists (0: no colour bank)
 MP_SCAN = 22                    ; H0 offset: native aperture scan (long)
+                                ; 26-37: the variant's own (CD32 name entry)
+MP_KEYS = 38                    ; A4 offset: key FIFO read index; the write index follows
+MP_KEYBUF_A4 = 40               ; A4 offset: the FIFO's 64 bytes, when MP_KEYBUF is 0
+MP_KEYBUF = 42                  ; H0 offset: the FIFO's 64 bytes (long), or 0
 
 STICK_LEVEL = 9                 ; stick units per PC step: steps 1-5 and 8 give ramps 1-5 and 9
 STICK_STEP = 8                  ; stick units per ramp step: ramps reach +-9
@@ -56,6 +68,10 @@ SPRITE_BANK = 12                ; odd sprites' colours from 192: sprite 7 colour
 MASK_STRIDE = 44                ; bytes per mask row: a pad byte, 40, three pad bytes
 MASK_SIZE = 200*MASK_STRIDE     ; the aperture's rows at most
 SS_SIZE = 12                    ; SimpleSprite: posctldata.l, height, x, y, num
+RIGHT_STEP = 4                  ; counts in the last four fields: a direction
+CLICK_MAX = 15                  ; fields: a shorter right press is a click
+DCLICK_GAP = 15                 ; fields from a click's release to a double click
+BURN_REPEAT = 5                 ; fields between the afterburner's Tabs (key repeat)
 
 ; a0 = parameter table, d0 = game H0 base.
 mouse_init:
@@ -70,6 +86,12 @@ mouse_init:
         movea.l (sp)+,a1
         movem.l d0-d1/a0-a2/a6,-(sp)
         sub.l   MP_MOVE(a0),d0          ; H0
+        move.l  MP_KEYBUF(a0),d1
+        beq.s   .keybuf
+        add.l   d0,d1
+.keybuf:
+        lea     mouse_keybuf(pc),a1
+        move.l  d1,(a1)
         add.l   MP_SCAN(a0),d0
         lea     mouse_scan_native(pc),a1
         move.l  d0,(a1)
@@ -282,6 +304,12 @@ mouse_steer:
         tst.l   (a4,d1.w)
         bne.w   .centre                 ; the stick or keys steer
 .mouse:
+        move.w  btn(pc),d6
+        btst    #BT_RIGHT,d6
+        beq.s   .free
+        moveq   #0,d0                   ; the right button: the motion throttles
+        moveq   #0,d4                   ; and rolls, the pointer holds
+.free:
         move.w  d0,d6
         or.w    d4,d6                   ; moved at all
         beq.s   .still
@@ -420,6 +448,7 @@ mouse_vbl:
         movem.l d0/a0,-(sp)
         lea     mouse_fields(pc),a0
         addq.w  #1,(a0)
+        bsr.w   mouse_buttons
         lea     stick_x(pc),a0
         tst.w   ST_SHOWN(a0)
         beq.s   .done
@@ -495,6 +524,224 @@ mouse_flight_fire:
         clr.w   (a2)
 .done:
         movem.l (sp)+,d0/d2-d3/a2
+        rts
+
+; The buttons, every field (mouse_vbl): left CIA-A PRA bit 6, right and
+; middle POTINP bits 10 and 8, low when down (CD32: Psygore's pad read leaves
+; POTGO at $ffff, so both lines are pulled up). The right or middle button
+; counts only once its line has read up, so a line that reads low without a
+; mouse button on it does nothing. Keeps the last four fields' motion for
+; mouse_poll. In flight: a right press within DCLICK_GAP fields of
+; a click's release (a press shorter than CLICK_MAX) is the afterburner while
+; held; both buttons going down together, or a middle press, is a missile for
+; mouse_poll to queue. Keeps every register.
+mouse_buttons:
+        movem.l d0-d3/a0-a1,-(sp)
+        moveq   #0,d0
+        btst    #6,$bfe001
+        bne.s   .left
+        bset    #BT_LEFT,d0
+.left:
+        move.w  $dff016,d1
+        btst    #10,d1
+        bne.s   .right
+        bset    #BT_RIGHT,d0
+.right:
+        btst    #8,d1
+        bne.s   .middle
+        bset    #BT_MIDDLE,d0
+.middle:
+        lea     btn(pc),a0
+        moveq   #6,d1                   ; right and middle seen up: real lines
+        eor.w   d0,d1
+        and.w   #6,d1
+        or.w    d1,BT_SEEN(a0)
+        move.w  BT_SEEN(a0),d1
+        bset    #BT_LEFT,d1
+        and.w   d1,d0                   ; a line never seen up stays up
+        move.w  BT_NOW(a0),d1           ; the last field's
+        move.w  d0,BT_NOW(a0)
+        move.w  BT_IDX(a0),d2
+        addq.w  #2,d2
+        andi.w  #6,d2
+        move.w  d2,BT_IDX(a0)
+        lea     BT_DX(a0,d2.w),a1
+        move.w  mouse_sum_x(pc),d3      ; this field's motion
+        sub.w   BT_LAST(a0),d3
+        add.w   d3,BT_LAST(a0)
+        move.w  d3,(a1)
+        move.w  mouse_sum_y(pc),d3
+        sub.w   BT_LAST+2(a0),d3
+        add.w   d3,BT_LAST+2(a0)
+        move.w  d3,BT_DY-BT_DX(a1)
+        move.w  mouse_fields(pc),d3
+        sub.w   stick_field(pc),d3
+        cmpi.w  #HIDE_GAP,d3
+        bls.s   .flight
+        clr.w   BT_BURN(a0)             ; no flight
+        clr.w   BT_MISSILE(a0)
+        clr.w   BT_SHORT(a0)
+        bra.w   .done
+.flight:
+        btst    #BT_RIGHT,d0
+        beq.s   .up
+        btst    #BT_RIGHT,d1
+        bne.s   .held
+        clr.w   BT_HELD(a0)             ; pressed
+        tst.w   BT_SHORT(a0)
+        beq.s   .held
+        cmpi.w  #DCLICK_GAP,BT_GAP(a0)
+        bhi.s   .held
+        move.w  #1,BT_BURN(a0)          ; a double click
+.held:
+        cmpi.w  #CLICK_MAX,BT_HELD(a0)
+        bhs.s   .missile
+        addq.w  #1,BT_HELD(a0)
+        bra.s   .missile
+.up:
+        btst    #BT_RIGHT,d1
+        beq.s   .gap
+        clr.w   BT_SHORT(a0)            ; released
+        clr.w   BT_GAP(a0)
+        tst.w   BT_HELD(a0)
+        beq.s   .long                   ; no press seen (the first field)
+        cmpi.w  #CLICK_MAX,BT_HELD(a0)
+        bhs.s   .long
+        tst.w   BT_BURN(a0)
+        bne.s   .long                   ; a double click's second press
+        move.w  #1,BT_SHORT(a0)
+.long:
+        clr.w   BT_BURN(a0)
+.gap:
+        cmpi.w  #DCLICK_GAP,BT_GAP(a0)
+        bhi.s   .missile
+        addq.w  #1,BT_GAP(a0)
+.missile:
+        moveq   #3,d2                   ; left and right
+        and.w   d0,d2
+        subq.w  #3,d2
+        bne.s   .mid
+        moveq   #3,d2
+        and.w   d1,d2
+        subq.w  #3,d2
+        beq.s   .mid
+        move.w  #1,BT_MISSILE(a0)       ; both down now, not before
+.mid:
+        btst    #BT_MIDDLE,d0
+        beq.s   .done
+        btst    #BT_MIDDLE,d1
+        bne.s   .done
+        move.w  #1,BT_MISSILE(a0)
+.done:
+        movem.l (sp)+,d0-d3/a0-a1
+        rts
+
+; From the variant's hook after the native flight poll has stored its flags
+; (left, right, up, down, modifier, fire; a4 = game A4). In flight, with the
+; right button held: the modifier, the mouse's last four fields of motion as
+; directions, and no gun fire (the left button is then the missile). Queues
+; a pending missile's Enter, and the afterburner's Tab at once and every
+; BURN_REPEAT fields while it is held, as a held Tab's key repeat does: the
+; native command loop takes them as keys. The poll also runs in the rooms:
+; there, and with no flight, it does nothing. Keeps every register.
+mouse_poll:
+        movem.l d0-d1/a0-a1,-(sp)
+        lea     btn(pc),a1
+        move.w  mouse_fields(pc),d0
+        sub.w   stick_field(pc),d0
+        cmpi.w  #HIDE_GAP,d0
+        bls.s   .flight
+        clr.w   BT_MISSILE(a1)
+        bra.w   .done
+.flight:
+        movea.l mouse_params(pc),a0
+        move.w  MP_FLAGS(a0),d0
+        lea     (a4,d0.w),a0
+        btst    #BT_RIGHT,BT_NOW+1(a1)
+        beq.s   .keys
+        move.b  #1,4(a0)                ; the modifier: throttle and roll
+        clr.b   5(a0)
+        move.w  BT_DX(a1),d0
+        add.w   BT_DX+2(a1),d0
+        add.w   BT_DX+4(a1),d0
+        add.w   BT_DX+6(a1),d0
+        moveq   #0,d1
+        bsr.s   .axis
+        move.w  BT_DY(a1),d0
+        add.w   BT_DY+2(a1),d0
+        add.w   BT_DY+4(a1),d0
+        add.w   BT_DY+6(a1),d0
+        moveq   #2,d1                   ; forward (up) is faster
+        bsr.s   .axis
+.keys:
+        tst.w   BT_MISSILE(a1)
+        beq.s   .burn
+        clr.w   BT_MISSILE(a1)
+        moveq   #13,d0                  ; Enter: the selected missile
+        bsr.s   mouse_key
+.burn:
+        tst.w   BT_BURN(a1)
+        bne.s   .burning
+        clr.w   BT_SENT(a1)
+        bra.s   .done
+.burning:
+        move.w  mouse_fields(pc),d0
+        tst.w   BT_SENT(a1)
+        beq.s   .tab
+        move.w  d0,d1
+        sub.w   BT_TAB(a1),d1
+        cmpi.w  #BURN_REPEAT,d1
+        blo.s   .done
+.tab:
+        move.w  #1,BT_SENT(a1)
+        move.w  d0,BT_TAB(a1)
+        moveq   #9,d0                   ; Tab: the afterburner
+        bsr.s   mouse_key
+.done:
+        movem.l (sp)+,d0-d1/a0-a1
+        rts
+; Flag d1(a0) (negative) or d1+1(a0) (positive) for the motion d0.
+.axis:
+        cmpi.w  #-RIGHT_STEP,d0
+        bgt.s   .plus
+        move.b  #1,(a0,d1.w)
+.plus:
+        cmpi.w  #RIGHT_STEP,d0
+        blt.s   .none
+        move.b  #1,1(a0,d1.w)
+.none:
+        rts
+
+; Queue key d0.b in the game's key FIFO as its input handler does (OCS
+; O:344fa, CD32 E:342a6): the byte at the write index, which then advances
+; unless the FIFO is full. The handler runs in input.device's task, so
+; Forbid keeps it out. a4 = game A4. Keeps every register.
+mouse_key:
+        movem.l d0-d2/a0-a1/a6,-(sp)
+        movea.l mouse_params(pc),a0
+        move.w  MP_KEYS(a0),d1
+        lea     (a4,d1.w),a1            ; read index, write index
+        move.l  mouse_keybuf(pc),d2
+        bne.s   .buffer
+        move.w  MP_KEYBUF_A4(a0),d2
+        lea     (a4,d2.w),a0
+        bra.s   .queue
+.buffer:
+        movea.l d2,a0
+.queue:
+        movea.l 4.w,a6
+        jsr     -132(a6)                ; Forbid
+        move.w  2(a1),d1
+        move.w  d1,d2
+        addq.w  #1,d2
+        andi.w  #63,d2
+        cmp.w   (a1),d2
+        beq.s   .full
+        move.b  d0,(a0,d1.w)
+        move.w  d2,2(a1)
+.full:
+        jsr     -138(a6)                ; Permit
+        movem.l (sp)+,d0-d2/a0-a1/a6
         rts
 
 ; Hide the flight pointer by clearing its image's control words, with no
@@ -789,6 +1036,23 @@ ST_SHOWN = 12
 ST_MOVED = 14
 ST_PTR = 16                     ; pointer offset from the gunsight, half pixels: x.w, y.w
 
+BT_LEFT = 0                     ; button bits
+BT_RIGHT = 1
+BT_MIDDLE = 2
+BT_NOW = 0                      ; button record: the buttons this field
+BT_HELD = 2                     ; fields the right button has been held (to CLICK_MAX)
+BT_GAP = 4                      ; fields since its release (to DCLICK_GAP+1)
+BT_SHORT = 6                    ; its last press was a click
+BT_BURN = 8                     ; the afterburner: a double click's second press, held
+BT_MISSILE = 10                 ; a missile press for mouse_poll
+BT_SENT = 12                    ; mouse_poll: a Tab queued for this press
+BT_TAB = 14                     ; mouse_poll: mouse_fields at the last Tab
+BT_IDX = 16                     ; this field's motion slot, 0-6
+BT_LAST = 18                    ; mouse_sum_x/y at the last field
+BT_DX = 22                      ; the last four fields' x motion
+BT_DY = 30                      ; and y motion
+BT_SEEN = 38                    ; button bits whose line has read up
+
         cnop    0,4
 mouse_a4:       dc.l 0
 mouse_params:   dc.l 0
@@ -814,7 +1078,10 @@ stick_owned:    dc.w 0                  ; sprite 7: 0 not yet, 1 ours, -1 taken
 mask_top:       dc.w 0                  ; screen row of the mask's first row
 mask_rows:      dc.w 0                  ; mask rows (0: no aperture)
 fire_held:      dc.w 0                  ; left button fire: fields held (0: native)
+btn:            dc.w 7                  ; button record (BT_): all down, so no first press
+                dcb.w 19,0
         cnop    0,4
+mouse_keybuf:   dc.l 0                  ; the key FIFO, 0: at MP_KEYBUF_A4
 stick_image:    dc.l 0                  ; Chip pointer image, 0 without one
 stick_ss:       dc.l 0                  ; SimpleSprite, then the mask
 stick_gfx:      dc.l 0                  ; GfxBase

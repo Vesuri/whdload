@@ -60,6 +60,11 @@
  you move it back. The pointer appears when you move the mouse and hides after
  10 seconds without mouse movement. Using the joystick or keys to steer
  re-centres it.
+ The other mouse buttons in flight work as on the PC: hold the right button
+ and move the mouse forward or back to change speed, or left or right to
+ roll; the pointer stays where it is meanwhile. Double-click the right button
+ and hold it to fire the afterburner. Press both buttons together, or the
+ middle button, to fire the selected missile or drop a mine.
  On CD32, saving a pilot in the barracks also saves the Training Simulator high
  scores, as Bed_N.hi beside the Bed_N save, and loading that pilot restores
  them. Saves without this file still load, with the game's usual scores.
@@ -131,6 +136,9 @@
    screen is no longer ignored (thanks hexaae!).
  - Mouse flight: the mouse steers as in the PC version, and the left button
    fires while held (thanks hexaae!).
+ - Mouse flight: the right button changes speed and rolls, a right
+   double-click fires the afterburner, and both buttons or the middle button
+   fire missiles, as on the PC (thanks hexaae!).
  - Enhanced framerate: rotating ships and the title logo keep their centre
    instead of shaking as they turn, and a ship at the edge of the view no
    longer shifts by a pixel.

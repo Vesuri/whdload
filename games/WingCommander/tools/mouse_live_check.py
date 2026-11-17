@@ -32,13 +32,17 @@ from PIL import Image
 # accepted); name entry (input loop, poll result) and its A4 selected cell and
 # columns; flight: ramp store site (H0), ramps, view, aperture block and copper
 # list pair (A4; OCS none). German CD32 addresses map the English ones by
-# matching code.
+# matching code. buttons: the player's set speed, roll ramp and ship action
+# (A4), and the native afterburner and missile commands (H0: Tab's and
+# Enter's, E:19500's cases 16 and 18, OCS inline in the command loop).
 GAMES = {
     'ocs': dict(pointer=(0x19c, -2150), field=-0x800, intro=((0x180c4, 0x1edde), (0x180c4, 0x1f396)),
-                menu=(0x1f43c, 0x1f44e), flight=(0x1869e, 3720, -18318, -4188, 0)),
+                menu=(0x1f43c, 0x1f44e), flight=(0x1869e, 3720, -18318, -4188, 0),
+                buttons=(4430, 3724, 3316, 0x18d88, 0x18d9a)),
     'cd32': dict(pointer=(0xa88, -1156), field=-252, intro=((0x1898a, 0x1fbba), (0x1898a, 0x20164)),
                  menu=(0x20214, 0x20226), name=(0x16fc6, 0x16fd0, 17716, 17706),
-                 flight=(0x19064, 5882, -18280, -4318, -532), fire=(0x9546, 18120)),
+                 flight=(0x19064, 5882, -18280, -4318, -532), fire=(0x9546, 18120),
+                 buttons=(6592, 5886, 5478, 0x197e6, 0x197f8)),
     'cd32-de': dict(pointer=(2740, -1112), field=-208, intro=((0x18a44, 0x1fcbe), (0x18a44, 0x2026c)),
                     menu=(0x2031c, 0x2032e), name=(0x17064, 0x1706e, 17766, 17756),
                     flight=(0x1911e, 5926, -18236, -4274, -488)),
@@ -53,6 +57,8 @@ def main():
     p.add_argument('--name-entry', action='store_true', help='CD32: also the TrainSim name entry grid')
     p.add_argument('--flight', action='store_true', help='mouse steering and the pointer in the simulator flight')
     p.add_argument('--fire', action='store_true', help='CD32 English --flight: instead of steering, the left button held after a pause fires')
+    p.add_argument('--buttons', choices=('keys', 'stick'),
+                   help='English --flight: instead of steering, the buttons: keys (missile, afterburner) or stick (right button: throttle, roll)')
     p.add_argument('--german', action='store_true', help='CD32: the German executable (CUSTOM1=1)')
     p.add_argument('--direct-flight', action='store_true',
                    help='CD32 English --flight only, on a tools/flight_fixture.py --release build: the mission flight, no menu')
@@ -65,6 +71,8 @@ def main():
         p.error('--direct-flight: CD32 English enhanced --flight only')
     if a.fire and (a.variant != 'cd32' or a.german or not a.flight):
         p.error('--fire: CD32 English --flight only')
+    if a.buttons and (a.german or not a.flight or a.fire):
+        p.error('--buttons: English --flight only, without --fire')
     game = GAMES['cd32-de' if a.german else a.variant]
     out = new_output(a.output); out.mkdir(parents=True)
     v = get(a.variant); ocs = a.variant == 'ocs'
@@ -186,6 +194,8 @@ def main():
             return drawn, all(image.getpixel((74+2*px, 92+2*py)) == colour for px, py in drawn)
         if a.fire:              # the ship is destroyed about 5 s in: the steering steps do not fit too
             return [dict(fire=fire(var))]
+        if a.buttons:
+            return [dict(buttons=buttons(var, sym))]
         rows = [dict(motion=(0, 0), **state())]
         shot('flight-before')
         top = rows[0]['aperture'][5]
@@ -256,6 +266,64 @@ def main():
         assert min(hold[0]['energy']) < first and min(hold[2]['energy']) < hold[1]['energy'][-1], (first, hold)
         assert hold[0]['modifier'] == hold[2]['modifier'] == 0, hold
         return dict(energy=first, holds=hold)
+
+    def buttons(var, sym):
+        # keys: left then right, and the middle button: the native missile
+        # command runs; a right double click held: the afterburner (ship
+        # action 1), out again after the release. stick: the right button
+        # held with the mouse forward, back, left, right: the set speed rises
+        # and falls, the roll ramp goes negative and positive, and the pointer
+        # holds. Separate runs: the simulator destroys the ship a few seconds
+        # in, sooner in CD32 Original speed (a world step every other field).
+        speed, roll, action, burn, missile = game['buttons']
+        get = lambda: dict(speed=number(f'*(int*){a4+speed:#x}'), roll=number(f'*(short*){a4+roll:#x}'),
+                           action=number(f'*(short*){a4+action:#x}'),
+                           pointer=(var('stick_ptr'), number(f'*(short*){layout["slave"]+sym["stick_ptr"]+2:#x}')),
+                           gap=var('mouse_fields')-var('stick_field'))
+        def motion(dx, dy, n):
+            rows = []
+            for _ in range(n):
+                cmd(f'monitor mouse {dx} {dy}'); cmd('monitor fields 1'); rows.append(get())
+            return rows
+        out = dict(start=get())
+        if a.buttons == 'keys':
+            cmd('monitor input JOY1_FIRE_BUTTON 1'); cmd('monitor fields 2')
+            cmd('monitor input JOY1_2ND_BUTTON 1')
+            until(h0+missile, 30); out['both'] = 'missile'
+            cmd('monitor input JOY1_2ND_BUTTON 0'); cmd('monitor input JOY1_FIRE_BUTTON 0')
+            cmd('monitor fields 2')
+            cmd('monitor input JOY1_3RD_BUTTON 1')
+            until(h0+missile, 30); out['middle'] = 'missile'
+            cmd('monitor input JOY1_3RD_BUTTON 0'); cmd('monitor fields 17')   # past the double click window
+            for down, n in ((1, 3), (0, 3), (1, 0)):
+                cmd(f'monitor input JOY1_2ND_BUTTON {down}')
+                if n:
+                    cmd(f'monitor fields {n}')
+            out['burning'] = motion(0, 0, 15)
+            cmd('monitor input JOY1_2ND_BUTTON 0')
+            out['burnt'] = []
+            for _ in range(10):                 # its timer: 8 world steps from the last Tab
+                cmd('monitor fields 5'); out['burnt'].append(get())
+                if out['burnt'][-1]['action'] != 1:
+                    break
+            gaps = [r['gap'] for r in out['burning']+out['burnt']]
+            assert max(gaps) <= 12, ('the flight controller stopped', gaps)
+            assert any(r['action'] == 1 for r in out['burning']) and out['burnt'][-1]['action'] != 1, out
+            return out
+        cmd('monitor input JOY1_2ND_BUTTON 1')
+        out['faster'] = motion(0, -4, 10)
+        out['slower'] = motion(0, 4, 10)
+        out['roll_left'] = motion(-4, 0, 10)
+        out['roll_right'] = motion(4, 0, 12)
+        cmd('monitor input JOY1_2ND_BUTTON 0')
+        held = out['faster']+out['slower']+out['roll_left']+out['roll_right']
+        gaps = [r['gap'] for r in held]
+        assert max(gaps) <= 12, ('the flight controller stopped', gaps)
+        assert max(r['speed'] for r in out['faster']) > out['faster'][0]['speed'], out
+        assert min(r['speed'] for r in out['slower']) < max(r['speed'] for r in out['faster']), out
+        assert min(r['roll'] for r in out['roll_left']) < 0 < max(r['roll'] for r in out['roll_right']), out
+        assert all(r['pointer'] == held[0]['pointer'] for r in held), 'pointer moved with the right button'
+        return out
 
     rows = {}
     try:

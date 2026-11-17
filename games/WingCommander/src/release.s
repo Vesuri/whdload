@@ -116,6 +116,9 @@ release_limit:
 ; - Mouse flight (mouse.s). A virtual stick: mouse motion moves a stick position
 ;   that sets the pitch and yaw ramps in proportion, shown by the PC pointer
 ;   behind the cockpit, in colour 207 through a sprite colour bank.
+; - Mouse buttons in flight (mouse.s), as the PC's: the right button held
+;   makes motion throttle and roll, a right double click held is the
+;   afterburner, and both buttons or the middle one fire the missile.
 ; - TrainSim high scores. The game keeps its six-entry table only in memory,
 ;   seeded at boot and for a new game; its player entry (id 8) names the
 ;   current pilot. Saving a pilot also writes the table to Bed_N.hi beside
@@ -217,6 +220,15 @@ mouse_pad:
 pad_fire:
         dc.b    16,18,20,0
 
+; Flight poll's epilogue (E:18d82, G:18e3c): replaces movem.l (sp)+,d2-d7/a2
+; and rts. mouse_poll adds the right and middle buttons to the flags the
+; poll has just stored, then the poll returns.
+mouse_poll_cd32:
+        bsr.w   mouse_poll
+        addq.l  #4,sp
+        movem.l (sp)+,d2-d7/a2
+        rts
+
 ; Pad record reset (a0 = record): the click counter -1 ignores the next
 ; release. Keep it only for a red button or left mouse button held now.
 mouse_guard:
@@ -305,7 +317,8 @@ mouse_name:
 ; mouse.s parameters: position, rectangle, RAWMOUSE slot, hide counter (A4),
 ; native sprite move (H0); flight: pitch ramp, view, direction flags,
 ; aperture, flight copper lists (A4), aperture scan (H0); then name entry:
-; selected cell, columns (A4), native grid step (H0).
+; selected cell, columns (A4), native grid step (H0), pad read (H0); key
+; FIFO read index and buffer (A4).
 mouse_params_en:
         dc.w    2696,2728,162,-1160
         dc.l    $3171e
@@ -314,6 +327,8 @@ mouse_params_en:
         dc.w    17716,17706
         dc.l    $16c66
         dc.l    $33dfc
+        dc.w    94,-38
+        dc.l    0
 mouse_params_de:
         dc.w    2740,2772,206,-1116
         dc.l    $318e0
@@ -322,6 +337,8 @@ mouse_params_de:
         dc.w    17766,17756
         dc.l    $16d04
         dc.l    $33fbe
+        dc.w    138,6
+        dc.l    0
 name_step:      dc.l 0
 name_used:      dc.w 0,0,0
 
@@ -360,6 +377,9 @@ fix_patch_en:
         dc.w    3                ; PL_PS flight controller pitch/yaw ramp stores
         dc.l    $19064
         dc.w    mouse_steer-fix_patch_en
+        dc.w    3                ; PL_PS flight poll epilogue: right and middle buttons
+        dc.l    $18d82
+        dc.w    mouse_poll_cd32-fix_patch_en
         dc.w    3                ; PL_PS cockpit aperture scan calls: the pointer mask
         dc.l    $1784c
         dc.w    mouse_scan-fix_patch_en
@@ -404,6 +424,9 @@ fix_patch_de:
         dc.w    3
         dc.l    $1911e
         dc.w    mouse_steer-fix_patch_de
+        dc.w    3
+        dc.l    $18e3c
+        dc.w    mouse_poll_cd32-fix_patch_de
         dc.w    3
         dc.l    $178e4
         dc.w    mouse_scan-fix_patch_de

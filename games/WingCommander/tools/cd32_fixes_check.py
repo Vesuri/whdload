@@ -23,7 +23,7 @@ import argparse, ctypes as C, hashlib, json, re, struct
 from pathlib import Path
 from c2p_check import u, ck, P, I, Q, Z
 from runtime_buffers import load as load_slave
-from mouse_model import APERTURE, POINTER, KEY, Pointer, cockpit, FIRE_SEQUENCE, fire_poll, fire_expected, fire_native_holds
+from mouse_model import BUTTON_SEQUENCE, BUTTON_KEYS, buttons_expected, APERTURE, POINTER, KEY, Pointer, cockpit, FIRE_SEQUENCE, fire_poll, fire_expected, fire_native_holds
 
 u.uc_emu_stop.argtypes = [P]; u.uc_emu_stop.restype = I
 
@@ -40,7 +40,7 @@ GAMES = {
                                leave=0x2735a, left=0x27368, pos=2696, rect=2728, flags=18116,
                                slot=162, hide=-1160, image=-1164, gfx=-778, params='mouse_params_en',
                                name=0x16ed0, step=0x16c66, sel=17716, cols=17706,
-                               steer=0x19064, controller=0x18daa, ramp=5882, view=-18280,
+                               steer=0x19064, poll=0x18d82, poll_entry=0x18c5e, keys=94, keybuf=-38, controller=0x18daa, ramp=5882, view=-18280,
                                aperture=-4318, copper=-532, scan=0x2cc36, scans=(0x1784c, 0x1bd2e))),
     'german': dict(path='tmp/game/WingCommanderCD32/data/wing.german',
                    sha='2047da69f2c83803675921afd86204747609a5c59dd3e7f67d954d785677dabe',
@@ -53,7 +53,7 @@ GAMES = {
                               leave=0x2751c, left=0x2752a, pos=2740, rect=2772, flags=18166,
                               slot=206, hide=-1116, image=-1120, gfx=-734, params='mouse_params_de',
                               name=0x16f6e, step=0x16d04, sel=17766, cols=17756,
-                              steer=0x1911e, controller=0x18e64, ramp=5926, view=-18236,
+                              steer=0x1911e, poll=0x18e3c, poll_entry=0x18d18, keys=138, keybuf=6, controller=0x18e64, ramp=5926, view=-18236,
                               aperture=-4274, copper=-488, scan=0x2cdf8, scans=(0x178e4, 0x1bdd8))),
 }
 SLAVE = 0x200000          # slave payload
@@ -131,6 +131,11 @@ class Machine:
         self.write(self.a4+cfg['prefix'], struct.pack('>I', STRINGS+16))
         self.write(0x14246, b'\x4e\x75')    # slot-screen helper, not on the save path
         self.reg(17, 0x2700)
+        # CIA-A and the custom chips, every mouse button up (PRA bit 6,
+        # POTINP bits 10 and 8).
+        for hw in (0xbfe000, 0xdff000):
+            ck(u.uc_mem_map(self.h, hw, 0x1000, 3))
+        self.write(0xbfe001, b'\xff'); self.write(0xdff016, b'\xff\xff')
 
         def hook(h, address, size, data):
             off = address-RES
@@ -315,8 +320,6 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
     the VBL pad read with the left button."""
     mc = cfg['mouse']
     m = Machine(fixed, blob, cfg, {}, os=True)
-    for hw in (0xbfe000, 0xdff000):
-        ck(u.uc_mem_map(m.h, hw, 0x1000, 3))
     a4 = m.a4
     w = lambda off, fmt, *v: m.write(a4+off, struct.pack(fmt, *v))
     rd = lambda off: struct.unpack('>hh', m.read(a4+off, 4))
@@ -393,8 +396,6 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
     for name, code in (('psygore', psy), ('fixed', fixed)):
         for lmb in (0, 1):
             m = Machine(code, blob, cfg, {})
-            for hw in (0xbfe000, 0xdff000):
-                ck(u.uc_mem_map(m.h, hw, 0x1000, 3))
             m.write(0xbfe001, bytes([0xbf if lmb else 0xff]))
             m.reg(8, STACK)
             ck(u.uc_emu_start(m.h, mc['pad'], mc['pad']+6, 0, 10000))
@@ -409,7 +410,6 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
     for name, code in (('psygore', psy), ('fixed', fixed)):
         for pra, held in ((0xff, False), (0xbf, True), (0x7f, True)):
             m = Machine(code, blob, cfg, {})
-            ck(u.uc_mem_map(m.h, 0xbfe000, 0x1000, 3))
             m.write(0xbfe001, bytes([pra])); m.write(RECT, b'\x5a'*20)
             m.call(mc['reset'], b'', [(1, RECT)])
             record = m.read(RECT, 20); m.close()
@@ -419,6 +419,84 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
     out['click_guard'] = 'pass'
     out['name_entry'] = name_cases(cfg, fixed, blob, sy)
     out['flight'] = steer_cases(cfg, psy, fixed, blob, sy)
+    out['buttons'] = button_cases(cfg, fixed, blob, sy)
+    return out
+
+
+def button_cases(cfg, fixed, blob, sy):
+    """Mouse buttons in flight: the VBL's button read (mouse_vbl) and the
+    game's whole flight poll with the slave's epilogue hook, field by field
+    through BUTTON_SEQUENCE; the flags it leaves and the keys it queues in the
+    game's key FIFO. Without a flight, and with lines that never read up, the
+    poll is native. Then the pointer holds while the right button is down."""
+    mc = cfg['mouse']
+    assert fixed[mc['poll']:mc['poll']+6] == struct.pack('>HI', 0x4eb9, SLAVE+sy['mouse_poll_cd32'])
+    record = SURFACE
+
+    def machine():
+        m = Machine(fixed, blob, cfg, {}, os=True)
+        for off in (-132, -138):                    # Forbid, Permit
+            m.write(EXEC+off, b'\x4e\x75')
+        m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
+        return m
+
+    def event(m, dx, dy):
+        m.write(EVENT, struct.pack('>IBBHHhh', 0, 2, 0, 0xff, 0x8000, dx, dy))
+        m.call(SLAVE+sy['mouse_event'], b'', [(4, EVENT)])
+
+    def fields(m):
+        return struct.unpack('>H', m.read(SLAVE+sy['mouse_fields'], 2))[0]
+
+    def run(m, sequence, flight=True, lines=True, controller=False):
+        a4 = m.a4
+        rows = []
+        for left, right, middle, dx, dy in sequence:
+            if dx or dy:
+                event(m, dx, dy)
+            stamp = struct.pack('>H', fields(m) if flight else (fields(m)-100) & 0xffff)
+            m.write(SLAVE+sy['stick_field'], stamp)
+            m.write(0xbfe001, bytes([0xbf if left else 0xff]))
+            pot = (0xffff & ~(right << 10 | middle << 8)) if lines else 0
+            m.write(0xdff016, struct.pack('>H', pot))
+            m.call(SLAVE+sy['mouse_vbl'], b'')
+            m.write(SLAVE+sy['stick_field'], struct.pack('>H', fields(m) if flight else (fields(m)-100) & 0xffff))
+            m.write(record, bytes(16)); m.write(record+8, bytes([left]))     # fire: held after a double click
+            m.call(mc['poll_entry'], struct.pack('>I', record))
+            flags = tuple(bool(x) for x in m.read(a4+mc['flags'], 6))
+            rd, wr = struct.unpack('>HH', m.read(a4+mc['keys'], 4))
+            keys = bytes(m.read(a4+mc['keybuf']+(i % 64), 1)[0] for i in range(rd, rd+(wr-rd) % 64))
+            m.write(a4+mc['keys'], struct.pack('>H', wr))
+            rows.append((flags, keys))
+        return rows
+    out = {}
+    m = machine()
+    got, want = run(m, BUTTON_SEQUENCE), buttons_expected()
+    bad = [i for i, (g, w) in enumerate(zip(got, want)) if g != w]
+    assert not bad, ('buttons', bad[:8], [(got[i], want[i]) for i in bad[:8]])
+    assert b''.join(k for _, k in got) == BUTTON_KEYS, b''.join(k for _, k in got)
+    out['fields'], out['keys'] = len(got), b''.join(k for _, k in got).decode('latin-1').encode('unicode_escape').decode()
+    out['modifier'] = sum(f[4] for f, _ in got)
+    for name, flight, lines in (('no_flight', False, True), ('lines_low', True, False)):
+        m = machine()
+        got = run(m, BUTTON_SEQUENCE, flight, lines)
+        assert got == buttons_expected(flight=flight, lines=lines), name
+        assert all(f == (False,)*5+(bool(s[0]),) and k == b'' for (f, k), s in zip(got, BUTTON_SEQUENCE)), name
+        out[name] = 'native'
+    # The pointer: it moves with the mouse, and holds while the right button
+    # is down (the flight controller with the poll's modifier).
+    m = machine()
+    m.write(m.a4+mc['aperture'], struct.pack('>6h', *APERTURE))
+
+    def steer(right, dx):
+        m.write(0xdff016, struct.pack('>H', 0xffff & ~(right << 10)))
+        m.call(SLAVE+sy['mouse_vbl'], b'')
+        event(m, dx, 0)
+        m.write(m.a4+mc['flags'], bytes([0, 0, 0, 0, right])); m.write(m.a4+mc['view'], struct.pack('>h', 0))
+        m.call(mc['controller'], b'')
+        return struct.unpack('>hh', m.read(SLAVE+sy['stick_ptr'], 4))
+    steer(0, 0)
+    assert steer(0, 20) == (20, 0) and steer(1, 40) == (20, 0) and steer(1, -40) == (20, 0) and steer(0, 6) == (26, 0)
+    out['pointer_hold'] = 'pass'
     return out
 
 
@@ -431,8 +509,6 @@ def fire_cases(cfg, psy, fixed, blob, sy):
     rows = {}
     for name, code, flight in (('psygore', psy, True), ('fixed', fixed, False), ('fixed', fixed, True)):
         m = Machine(code, blob, cfg, {})
-        for hw in (0xbfe000, 0xdff000):
-            ck(u.uc_mem_map(m.h, hw, 0x1000, 3))
         m.write(record, bytes(20)+struct.pack('>hh', 15, 10))
         polled = []
         for down in FIRE_SEQUENCE:
@@ -758,7 +834,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path)
     p.add_argument('--output', required=True, type=Path)
-    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored'),
+    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored'),
                    help='negative control: the check must fail')
     a = p.parse_args()
     out = a.output.resolve()
@@ -785,6 +861,10 @@ def main():
         elif a.sabotage == 'steer-ignored':  # the yaw ramp never takes the stick position
             at = blob.index(bytes.fromhex('3600'), sy['mouse_steer'])   # move.w d0,d3
             blob[at:at+2] = bytes.fromhex('4e71')
+        elif a.sabotage == 'buttons-ignored':  # the flight poll's epilogue skips mouse_poll
+            at = sy['mouse_poll_cd32']
+            assert blob[at:at+2] == bytes.fromhex('6100')
+            blob[at:at+4] = bytes.fromhex('4e714e71')
         elif a.sabotage == 'mask-ignored':  # the pointer drawn over the cockpit too
             at = blob.index(bytes.fromhex('c052'), sy['stick_show'])
             blob[at:at+2] = bytes.fromhex('3012')
@@ -812,7 +892,7 @@ def main():
         sc = cfg['scores']
         assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']), (3, cfg['peek']['site']),
                           (3, mc['room']), (3, mc['exit']), (3, mc['pad']), (3, mc['guard']), (3, mc['name']),
-                          (3, mc['steer']), (3, mc['scans'][0]), (3, mc['scans'][1]), (3, sc['site'])], fixlog
+                          (3, mc['steer']), (3, mc['poll']), (3, mc['scans'][0]), (3, mc['scans'][1]), (3, sc['site'])], fixlog
         assert original[sc['site']:sc['site']+6] == bytes.fromhex('397c00018034')
         assert original[sc['restore']:sc['restore']+4] == bytes.fromhex('48e70030')
         assert all(original[x:x+2] == b'\x4e\xb9' for x in (sc['site']-12, sc['site']-6))
@@ -832,7 +912,7 @@ def main():
         assert original[t:t+4] == bytes.fromhex('3f04486c') and original[t+6:t+8] == bytes.fromhex('4eba')
         assert fixed[t:t+2] == bytes.fromhex('3f12') and fixed[t+2:t+8] == original[t+2:t+8]
         changed = [i for i in range(len(psy)) if psy[i] != fixed[i]]
-        assert all(any(x <= i < x+6 for x in list(s.values())+[cfg['peek']['site'], mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], sc['site']]+list(mc['scans'])) or t <= i < t+2
+        assert all(any(x <= i < x+6 for x in list(s.values())+[cfg['peek']['site'], mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], mc['poll'], sc['site']]+list(mc['scans'])) or t <= i < t+2
                    for i in changed)
         cases = {}
         # Negative control: Psygore's list writes the file but clears the name.

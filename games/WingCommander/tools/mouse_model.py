@@ -125,3 +125,81 @@ def fire_native_holds(sequence, polled):
         if run > 15 and modifier and not fire:
             stuck += 1
     return stuck
+
+
+# Mouse buttons in flight (mouse_buttons, mouse_poll). One entry per field:
+# (left, right, middle, dx, dy), the motion arriving before that field's VBL.
+def _fields(n, left=0, right=0, middle=0, dx=0, dy=0):
+    return [(left, right, middle, dx, dy)]*n
+
+
+BUTTON_SEQUENCE = (
+    _fields(10)
+    + _fields(20, right=1, dy=-3) + _fields(10, right=1, dx=3)        # faster, roll right
+    + _fields(10, right=1, dx=-3, dy=3) + _fields(5, right=1) + _fields(20)  # slower, roll left, still
+    + _fields(5, right=1) + _fields(5) + _fields(30, right=1) + _fields(20)  # double click held: afterburner
+    + _fields(5, right=1) + _fields(20) + _fields(10, right=1) + _fields(20)  # clicks too far apart
+    + _fields(20, right=1) + _fields(5) + _fields(10, right=1) + _fields(20)  # a long first press
+    + _fields(10, left=1) + _fields(10, left=1, right=1) + _fields(20)  # left, then both: a missile
+    + _fields(10, right=1) + _fields(5, left=1, right=1) + _fields(20)  # right, then both: a missile
+    + _fields(3, middle=1) + _fields(10)                               # middle: a missile
+    + _fields(10, dx=-3, dy=3))                                        # motion alone: nothing
+BUTTON_KEYS = b'\t'*6 + b'\r'*3      # what the sequence queues: six Tabs, three Enters
+
+
+def buttons_expected(sequence=BUTTON_SEQUENCE, flight=True, lines=True, step=4, click=15, gap=15, repeat=5):
+    """Per field, the flight poll's flags (left, right, up, down, modifier,
+    fire) and the keys queued, with native flags zero but fire = the left
+    button. The right button held: the modifier, no fire, and the last four
+    fields' motion beyond step as directions (forward is up). A right press
+    within gap fields of a click's release (a press under click fields) is
+    the afterburner: Tab at once and every repeat fields while held. Both
+    buttons going down together, or a middle press: Enter. Without a flight
+    nothing changes; lines that never read up (lines False) are never down."""
+    prev, seen = (1, 1, 1), [False, False]
+    held = gapc = short = burn = sent = tab = missile = 0
+    ring = [(0, 0)]*4
+    rows = []
+    for i, (left, right, middle, dx, dy) in enumerate(sequence):
+        if lines:
+            seen = [seen[0] or not right, seen[1] or not middle]
+        now = (left, right and seen[0], middle and seen[1])
+        ring = ring[1:]+[(dx, dy)]
+        if not flight:
+            burn = missile = short = 0
+        else:
+            if now[1]:
+                if not prev[1]:
+                    held = 0
+                    if short and gapc <= gap:
+                        burn = 1
+                held = min(held+1, click)
+            else:
+                if prev[1]:
+                    short = int(0 < held < click and not burn)
+                    gapc = 0
+                    burn = 0
+                gapc = min(gapc+1, gap+1)
+            if (now[0] and now[1] and not (prev[0] and prev[1])) or (now[2] and not prev[2]):
+                missile = 1
+        prev = now
+        flags = [0, 0, 0, 0, 0, left]
+        keys = b''
+        if flight:
+            if now[1]:
+                flags[4], flags[5] = 1, 0
+                sx, sy = sum(x for x, _ in ring), sum(y for _, y in ring)
+                flags[0], flags[1] = int(sx <= -step), int(sx >= step)
+                flags[2], flags[3] = int(sy <= -step), int(sy >= step)
+            if missile:
+                keys += b'\r'
+                missile = 0
+            if not burn:
+                sent = 0
+            elif not sent or i-tab >= repeat:
+                sent, tab = 1, i
+                keys += b'\t'
+        else:
+            missile = 0
+        rows.append((tuple(bool(f) for f in flags), keys))
+    return rows

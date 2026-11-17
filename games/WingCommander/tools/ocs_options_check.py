@@ -13,7 +13,7 @@ import struct
 from ocs_display_check import Native, CODE, DATA, STARTUP, STACK, STOP, ck, u, word, long
 from ocs_reconstruct import ROOT, new_output, require
 from ocs_icon import enhanced_icon, tooltypes
-from mouse_model import APERTURE, KEY, Pointer, cockpit, FIRE_SEQUENCE, fire_poll, fire_expected, fire_native_holds
+from mouse_model import BUTTON_SEQUENCE, BUTTON_KEYS, buttons_expected, APERTURE, KEY, Pointer, cockpit, FIRE_SEQUENCE, fire_poll, fire_expected, fire_native_holds
 
 
 GFX,RECT,IMAGE,EVENT,CHIP,ANY,SURFACE=0x1a0000,0x1a1000,0x1a1100,0x1a2000,0x1a3000,0x1a4000,0x1b0000
@@ -91,7 +91,63 @@ def mouse_scenario(c,slave,sy):
     require(all(g[:10]==bytes(10) and g[10:12]==word(-1) and g[12:22]==bytes(10) for g in guard.values()),'record reset')
     require([g[22:] for g in guard.values()]==[word(0),word(-1),word(-1)],'click release guard')
     steer_scenario(c,slave,sy,moves)
+    buttons_scenario(c,slave,sy)
     for r,v in saved.items():c.reg(r,v)
+
+
+def buttons_scenario(c,slave,sy):
+    """Mouse buttons in flight: mouse_vbl's button read and the native flight
+    poll O:182ce with the slave's epilogue hook, field by field through
+    BUTTON_SEQUENCE; its flags and the keys queued in the game's key FIFO
+    (read/write A4-2038/-2036, buffer O:34568). Without a flight and with lines
+    that never read up, the poll is native; the pointer holds while the right
+    button is down."""
+    a4=DATA+0x7ffe;record=DATA+0x77c8
+    require(c.read(CODE+0x183dc,6)==bytes.fromhex('4eb9')+long(slave+sy['mouse_poll_ocs']),'flight poll epilogue not hooked')
+    execbase=c.get(4,4)
+    for off in (-132,-138):c.write(execbase+off,word(0x4e75))       # Forbid, Permit
+    fields=lambda:c.get(slave+sy['mouse_fields'],2)
+    def event(dx,dy):
+        c.write(EVENT,struct.pack('>IBBHHhh',0,2,0,0xff,0x8000,dx,dy))
+        c.run(slave-CODE+sy['mouse_event'],registers={4:EVENT})
+    def reset():
+        c.write(slave+sy['btn'],word(7)+bytes(38))
+        c.write(a4-2036,word(c.get(a4-2038,2)))
+    def run(sequence,flight=True,lines=True):
+        rows=[]
+        stamp=lambda:word(fields() if flight else (fields()-100)&0xffff)
+        for left,right,middle,dx,dy in sequence:
+            if dx or dy:event(dx,dy)
+            c.write(slave+sy['stick_field'],stamp())
+            c.write(0xbfe001,bytes([0xbf if left else 0xff]))
+            c.write(0xdff016,word((0xffff&~(right<<10|middle<<8)) if lines else 0))
+            c.run(slave-CODE+sy['mouse_vbl'])
+            c.write(slave+sy['stick_field'],stamp())
+            c.write(record,bytes(12));c.write(record+8,bytes([left]))
+            c.run(0x182ce)
+            flags=tuple(bool(x) for x in c.read(a4+16084,6))
+            rd,wr=c.get(a4-2038,2),c.get(a4-2036,2)
+            keys=bytes(c.read(CODE+0x34568+(i%64),1)[0] for i in range(rd,rd+(wr-rd)%64))
+            c.write(a4-2038,word(wr));rows.append((flags,keys))
+        return rows
+    reset();got=run(BUTTON_SEQUENCE);want=buttons_expected()
+    bad=[i for i,(g,w) in enumerate(zip(got,want)) if g!=w]
+    require(not bad,f'mouse buttons at fields {bad[:8]}: {[(got[i],want[i]) for i in bad[:4]]}')
+    require(b''.join(k for _,k in got)==BUTTON_KEYS,'mouse button keys')
+    for flight,lines in ((False,True),(True,False)):
+        reset();got=run(BUTTON_SEQUENCE,flight,lines)
+        require(got==buttons_expected(flight=flight,lines=lines) and
+                all(f==(False,)*5+(bool(s[0]),) and k==b'' for (f,k),s in zip(got,BUTTON_SEQUENCE)),'mouse buttons control')
+    reset()
+    def steer(right,dx):
+        c.write(0xdff016,word(0xffff&~(right<<10)));c.run(slave-CODE+sy['mouse_vbl']);event(dx,0)
+        c.write(a4+16084,bytes([0,0,0,0,right]));c.write(a4-18318,word(0));c.run(0x183e4)
+        return struct.unpack('>hh',c.read(slave+sy['stick_ptr'],4))
+    c.write(0xdff016,word(0xffff));c.run(slave-CODE+sy['mouse_vbl'])
+    base=steer(0,0)
+    require(steer(0,20)==(base[0]+20,base[1]) and steer(1,40)==(base[0]+20,base[1]) and
+            steer(0,6)==(base[0]+26,base[1]),'pointer moved with the right button held')
+    c.write(0xdff016,word(0))
 
 
 def steer_scenario(c,slave,sy,moves):

@@ -1046,7 +1046,7 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   - The mask copy's cost at view changes is not measured.
   - Enhanced mode reads the live position, not the per-field input history.
   - The response curve has no measured PC reference.
-  - The right button is unused.
+  - The right button holds the pointer while it throttles and rolls (UR7).
   - Not yet played by the user.
 
 #### User reports after 2.0b (UR1–UR15)
@@ -1099,9 +1099,13 @@ Firing and mouse:
   apart; the reference centre is the gunsight by choice, not the PC's window
   middle.
 - **UR7 (H): right button for PC-style actions:** roll left/right, throttle
-  forward/back, double-click (and hold) for afterburner. Not implemented.
-- **UR8 (H): missiles on left+right together or the middle button.** Not
-  implemented.
+  forward/back, double-click (and hold) for afterburner. Implemented as the PC
+  reference card's mouse controls (internals, "Mouse buttons in flight").
+  Checked natively on both variants and live on both, in enhanced and
+  Original speed. Not yet played by the user.
+- **UR8 (H): missiles on left+right together or the middle button.**
+  Implemented with UR7; the same checks. The middle button is only checked
+  in the emulator.
 - **UR9 (H): mouse speed setting** (`MOUSE=nn` tooltype). Not implemented; the
   pointer moves two counts a pixel, as the PC's.
 

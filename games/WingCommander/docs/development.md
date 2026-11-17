@@ -47,15 +47,15 @@ audit, frame statistics, OCS candidates) call the generators directly with a new
 build against `release/slaves.sha256`, rebuilds both reconstructions (each asserts
 byte identity with the pinned original) and runs `release_check.py`,
 `cd32_fixes_check.py` (the CD32 bunk save, TrainSim key and click fixes, high scores, mouse and mouse
-flight on both languages; `--sabotage store-failure|list-stub|mouse-ignored|name-ignored|scores-ignored|steer-ignored|mask-ignored`
+flight, and the mouse buttons in flight on both languages; `--sabotage store-failure|list-stub|mouse-ignored|name-ignored|scores-ignored|steer-ignored|mask-ignored|buttons-ignored`
 are its negative controls),
 `waypoint_check.py` on CD32 English and German,
 `ocs_options_check.py` (which also runs the OCS mouse and mouse flight scenarios after
 both install paths) and the installer staging check. The live mouse check is separate and bounded:
 
 ```
-python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode] [--flight [--fire]] [--name-entry] [--german]
-python3 tools/mouse_live_check.py ocs tmp/build/release/WingCommander --output tmp/mouse-live-ocs [--original-mode] [--flight] [--setup a500]
+python3 tools/mouse_live_check.py cd32 tmp/build/release/WingCommanderCD32 --output tmp/mouse-live-cd32 [--original-mode] [--flight [--fire | --buttons keys|stick]] [--name-entry] [--german]
+python3 tools/mouse_live_check.py ocs tmp/build/release/WingCommander --output tmp/mouse-live-ocs [--original-mode] [--flight [--buttons keys|stick]] [--setup a500]
 ```
 
 `--flight` continues into the simulator flight that starts the Vega campaign

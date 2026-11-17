@@ -9194,8 +9194,9 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   per-field preview, and the hook acts in both. The position comes from the
   live sums, not from the per-field input history, so catch-up ticks in one
   frame share the latest position. In original modes it runs at the game's
-  frame rate. The left button is port-1 fire and fires while held (below);
-  the right button is unused. The mask copy runs at each aperture scan (flight start and view
+  frame rate. The left button is port-1 fire and fires while held (above);
+  while the right button is down the pointer holds and the motion throttles
+  and rolls ([below](#mouse-buttons-in-flight-both-release-builds-every-mode)). The mask copy runs at each aperture scan (flight start and view
   changes): the aperture's rows of 320 pixels. Its cost is not measured.
 
 How it is checked:
@@ -9242,6 +9243,105 @@ corners and along its top row the cockpit hides the whole pointer, as on the
 PC; 4 pixels below the aperture's top it shows whole at full pitch (the PC's
 edge rule), 61 pixels right of the gunsight at 4 steps of yaw. The colour on
 screen is (243,255,235) on CD32 (BPLCON4 $1c) and (255,255,255) on OCS.
+
+### Mouse buttons in flight (both release builds, every mode)
+
+User reports UR7 and UR8 ask for the PC version's mouse buttons, which its
+reference card lists: the right button and mouse forward or back for speed,
+left or right to roll, a right double click for the afterburner ("release
+button to stop"), both buttons for the selected missile or mine. UR8 adds
+the middle button for missiles. The native controls already have each
+action: the stick with fire held past the hold threshold is the modifier
+(directions throttle and roll), Tab is the afterburner and Enter the
+missile.
+
+| Item | OCS | CD32 English | CD32 German |
+|---|---|---|---|
+| Flight poll; its epilogue (hooked, 6 bytes) | `O:182ce`; `O:183dc` | `E:18c5e`; `E:18d82` | `G:18d18`; `G:18e3c` |
+| Key FIFO: read, write index (A4); 64-byte buffer | `-2038`, `-2036`; `O:34568` | `94`, `96`; A4 `-38` | `138`, `140`; A4 `6` |
+| Tab: afterburner (cad8, 8 or 2 steps) | `O:18d88` (`jsr caaa`) | `E:197e6` (case 16, `jsr cd34`) | |
+| Enter: missile or mine | `O:18d9a` | `E:197f8` (case 18) | |
+| Set speed, roll ramp, ship action (A4) | `4430`, `3724`, `3316` | `6592`, `5886`, `5478` | |
+
+- **Buttons.** `mouse_vbl` reads them every field: left CIA-A PRA bit 6,
+  right POTINP bit 10, middle POTINP bit 8, low when down. On CD32 Psygore's
+  pad read leaves POTGO at `$ffff`, which drives both port-0 pot lines high;
+  on OCS the game never writes POTGO. A right or middle line counts only once
+  it has read up, so a line that reads low without a button does nothing.
+  The VBL also keeps the last four fields' motion from `mouse_sum_x/y`.
+- **Right button: throttle and roll.** `mouse_poll` runs from the flight
+  poll's epilogue (the poll stores the direction, modifier and fire flags;
+  the controller reads them next). In flight with the right button down it
+  sets the modifier, clears fire, and sets left, right, up or down where the
+  last four fields' motion is at least 4 counts that way (forward is up,
+  faster). The native controller then calls the throttle step `ccda(±1)` and
+  steps the roll ramp by one per call, as for the stick with fire held.
+  `mouse_steer` drops the motion meanwhile, so the pointer, and the turn it
+  sets, holds.
+- **Double click: afterburner.** A right press within 15 fields of a click's
+  release (a press shorter than 15 fields) is the afterburner while it is
+  held. Holding Tab keeps the afterburner lit through key repeat; the poll
+  queues a Tab at the press and every 5 fields after it while held. The
+  native timer then runs out after the release, as after Tab.
+- **Missile.** Both buttons going down together (either first), or a middle
+  press, queue one Enter. Gun fire is off while the right button is down.
+- **Keys.** `mouse_key` writes the byte at the FIFO's write index and
+  advances it, as the input handler does, under Forbid (the handler runs in
+  input.device's task). The native command loop takes it as a key; in
+  enhanced mode the VBL input history samples the write index, so the key
+  reaches the next world tick as a typed key does.
+- **Elsewhere.** The poll also runs in the rooms (through `E:18d88`), and
+  in enhanced mode for every input field sample as well (CD32 `timing.s`,
+  OCS `ocs_prediction_field`). `mouse_poll` acts only while the controller
+  has run in the last 25 fields. Its flags come from live state, so every
+  poll in a field agrees; the Tabs are paced in fields and an Enter is
+  queued once.
+
+How it is checked:
+- **Native.** `tools/cd32_fixes_check.py` (both languages) and
+  `ocs_options_check.py` (after both installs) run `mouse_vbl` and the game's
+  whole flight poll with the hook, field by field through
+  `tools/mouse_model.py`'s `BUTTON_SEQUENCE`:
+  - the throttle and roll motion;
+  - a double click held;
+  - clicks too far apart, and a long first press;
+  - left then both, right then both;
+  - the middle button;
+  - motion alone.
+
+  The flags and the queued keys must match `buttons_expected`: six Tabs and
+  three Enters. With no flight, and with lines that read low from the start,
+  the poll must stay native. The flight controller with the modifier must
+  hold the pointer while the right button is down. `--sabotage
+  buttons-ignored` must fail.
+- **Live.** `tools/mouse_live_check.py --flight --buttons keys|stick` enters
+  the simulator flight. `keys`:
+  - presses left then right, and the middle button: each must reach the
+    native missile command (a breakpoint);
+  - double-clicks the right button and holds it: the ship action must become
+    1 (afterburner) and go back after the release.
+
+  `stick`: holds the right button with the mouse forward, back, left and
+  right; the set speed must rise and fall and the roll ramp go negative and
+  positive. The pointer reading stays at the gunsight there because the
+  mouse has not steered first, so only the native check tests the hold. The two are separate runs because the
+  simulator destroys the ship a few seconds in, sooner in CD32 Original
+  speed, where the world steps every other field.
+
+Live results (17.11.2026, simulator flight, `a1200-030`, deterministic warp):
+
+| Run | Both buttons, middle | Afterburner on (fields after the second press); off (sampled every 5 fields after the release) | Set speed: start, after forward, after back | Roll ramp: left, right |
+|---|---|---|---|---|
+| CD32 English, enhanced | missile command, missile command | 2; by 25 | 6400, 6912, 6400 | −2, 2 |
+| CD32 English, Original speed | the same | 1; by 5 | 6400, 7424, 6656 | −4, 5 |
+| OCS, enhanced | the same | 2; by 25 | 6400, 6912, 6400 | −2, 2 |
+| OCS, Original speed | the same | 4; by 25 | 6400, 6912, 6400 | −2, 2 |
+
+A step is 256 (one throttle call), so the rate is the world's: 10 Hz when
+enhanced, 25 Hz in CD32 Original speed. The CD32 keys run once failed to
+start the emulator (`common/run.sh`); the rerun passed. Not yet checked:
+real hardware (the OCS POTGO state under the OS is unmeasured), CD32 German
+live, and play by the user.
 
 ### CD32 bunk save: Psygore's StoreNV return value
 
