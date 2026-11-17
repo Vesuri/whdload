@@ -40,15 +40,35 @@ N+1, for measuring the later holes (`internals.md`, "Slave patches").
      copy (about 7 % of the A500's time now). The A500 draws about 4.7 frames a step.
    Acceptance: the putt's world steps as now (6 fields apart), and each presented frame
    between the two steps around it.
-2. **The A500's frame**, about 1.3 fields. With the view still, per frame: $48d4's threaded
-   code (the object draw list) 0.33 fields, the shape drawer it calls 0.22 (it plots each
-   pixel with four `bclr` and up to four `bset`), the renderer 0.25. Candidates:
-   - the shape drawer in the slave, writing a byte of each plane at a time with a mask;
-   - $48d4 as native code in the slave: it must build the same draw list ($46a2-$4782) and
-     call the drawer as the game does;
-   - steps (10 a second, about 1.2 fields each) are threaded code throughout.
+2. **The A500's frame.** The native draw list (`NewList`) took hole 1 from 37 to 44.25
+   frames a second with the pointer moving. Each hole on `a500`, 17.11.2026, this slave
+   (`CUSTOM1`, the view still for the trace, 60 fields; frames from `frames 240` and
+   `frames 240 5 3`). The columns are per cent of all the A500's time:
+
+   | Hole | Still | Moving | Shapes ($16ec) | Cells (`NewDraw`) | Draw list | $4fd0 | Waits |
+   |---:|---:|---:|---:|---:|---:|---:|---:|
+   | 1 | 47.25 | 44.25 | 17.5 | 24.4 | 10.7 | 3.9 | 16.1 |
+   | 2 | 12.5 | 12.75 | 56.3 | 7.8 | 4.5 | 1.5 | 5.0 |
+   | 3 | 30 | 30 | 18.2 | 18.8 | 11.3 | 3.2 | 22.2 |
+   | 4 | 40 | 38.5 | 14.1 | 13.5 | 9.5 | 5.7 | 26.1 |
+   | 5 | 30 | 30 | 18.2 | 15.6 | 11.9 | 5.3 | 23.5 |
+   | 6 | 40 | 40 | 18.5 | 13.5 | 9.1 | 4.1 | 27.9 |
+   | 7 | 38.5 | 39.5 | 32.4 | 16.3 | 12.1 | 5.1 | 7.3 |
+   | 8 | 30.25 | 31.75 | 17.7 | 17.0 | 11.8 | 6.1 | 20.6 |
+   | 9 | 22 | 21 | 32.7 | 11.4 | 11.0 | 6.6 | 9.9 |
+   | 10 | 20 | 20 | 35.2 | 9.1 | 6.4 | 14.4 | 5.0 |
+
+   "Draw list" is `NewList` and the threaded sort and draw calls after it; "Waits" is
+   `FrameCap`'s and `Hidden`'s busy waits. Candidates:
+   - the shape drawer ($16f2), the largest on holes 2, 7, 9 and 10: it plots each pixel with
+     four `bclr` and up to four `bset`. In the slave it could write a byte of each plane at a
+     time with a mask;
    - a third buffer: with two, a frame that ends while the playfield shows waits for its
-     end (`Hidden`); with three the next frame could start at once (32 KB more chip RAM).
+     end (`Hidden`), a fifth to a quarter of the time on holes 3-6 and 8, which run at
+     exactly 2 fields a frame. With three, the next frame could start at once (32 KB more
+     chip RAM);
+   - $4fd0's own threaded code on hole 10 (14.4 %, after each step);
+   - the steps (10 a second) are threaded code throughout.
    A 68000 must still draw correctly whatever the 68020+ path does.
 3. **Fast memory.** In fast memory now: the slave's code (the renderer, `Split`), the
    renderer's caches and the tile copy (ExpMem). What cannot move: `FILE1` is the 65xx

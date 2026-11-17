@@ -126,6 +126,18 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		pea	ShapeHook
 		move.l	(sp)+,$173e(a3)
 .norender
+		move.l	#$01384ef9,$48d4(a3)	;the draw list: jmp NewList
+		pea	NewList
+		move.l	(sp)+,$48d8(a3)
+	ifd VERIFY
+		lea	(_v,pc),a0
+		tst.l	V_EXP(a0)
+		beq.b	.nolcheck
+		move.l	#$01384ef9,$4d44(a3)	;the original's phases end: jmp ListCheck
+		pea	ListCheck
+		move.l	(sp)+,$4d48(a3)
+.nolcheck
+	endc
 		move.l	(_hole,pc),d0
 		beq.b	.hole1
 		cmp.l	#9,d0			;holes 1-10 (0-9)
@@ -794,6 +806,404 @@ ShapeHook	addq.w	#8,a3			;displaced
 		dbf	d1,.mr
 .out		movem.l	(sp)+,d0-d7/a0-a3/a5
 		rts
+
+;=============================================================================
+; The draw list. $48d4 (threaded code, once a frame) builds the list of what the frame
+; draws (eight tables of 16 entries at $46a2-$4791, an entry per 2 bytes: shape or piece
+; and frame $46a2/$46c2, depth $46e2, x $4702, y $4722, width $4742, height $4762, kind
+; $4782: 0 shape, 1 course piece), then sorts it ($1ff4) and draws it ($4d44-$4eb8):
+; - phase A ($48d4-$4b4a): each of the 32 objects ($0fda,X active) gets its frame from
+;   $1656 (Frame here) and is culled against the hole ($0ed4) and the view ($0e9c/$0e9e,
+;   304 wide, $11e6 high); a visible one is an entry, and a full list ends both phases;
+; - phase B ($4b4a-$4d44): each course piece flagged in $111a bit 1 is an entry from its
+;   record in the hole block ($4ec8,X + $0eb0); a visible one has the flag cleared.
+; NewList does both natively, with every write the threaded code makes (the scratch at
+; $4eba-$4ec7, $000a-$000d and $0022-$0029 included), and continues the threaded code at
+; $4d44 with X and Y as it has them there. Replaces $48d4-$48db (LDX #0; TXY; STX $4ec0's
+; opcode), entered by $0138 from the routine's JSR, so the caller's return is on the stack.
+; a4 is FILE1's base; the threaded code's registers are d0-d4 (A, X, Y, carry, NZ) and
+; $0106 sets them up again from the low bytes of d0-d2.
+
+LEW		macro			;\1: the little-endian word at the even address \1
+		move.w	\1,\2
+		ror.w	#8,\2
+		endm
+SEW		macro			;store \1 little-endian at the even address \2
+		ror.w	#8,\1
+		move.w	\1,\2
+		ror.w	#8,\1
+		endm
+
+NewList		movem.l	d3-d7/a1-a3,-(sp)
+	ifd VERIFY
+		bsr	ListSave
+	endc
+		moveq	#0,d0
+		moveq	#0,d1			;X: the object
+		moveq	#0,d2			;Y: the entry
+.obj		move.b	d1,$4ec0(a4)
+		move.b	d2,$4ec2(a4)
+		lea	(a4,d1.w),a0
+		tst.b	$0fda(a0)
+		beq	.next
+		move.b	$0eda(a0),$22(a4)	;the shape and frame
+		move.b	$0f1a(a0),$23(a4)
+		move.w	$105a(a0),$24(a4)	;the shape set
+		move.w	$109a(a0),$26(a4)
+		bsr	Frame
+		lea	(a4,d1.w),a0
+		LEW	$0f5a(a0),d3		;x less the frame's x origin
+		moveq	#0,d0
+		move.b	$26(a4),d0
+		sub.w	d0,d3
+		SEW	d3,$4ec4(a4)
+		LEW	$0f9a(a0),d4		;y less the y origin
+		move.b	$27(a4),d0
+		sub.w	d0,d4
+		SEW	d4,$4ec6(a4)
+		move.b	$22(a4),d0		;x: in the hole
+		move.w	d3,d5
+		add.w	d0,d5
+		SEW	d5,$4eba(a4)
+		bmi	.next
+		move.b	$24(a4),d0		;the width
+		bsr	InHole
+		bne	.next
+		LEW	$0e9c(a4),d6		;in the view
+		sub.w	d6,d5
+		SEW	d5,$4eba(a4)
+		bmi.b	.xneg
+		cmp.w	#$130,d5
+		bcc	.next
+		bra.b	.y
+.xneg		add.w	d0,d5
+		SEW	d5,$4eba(a4)
+		bmi	.next
+.y		move.b	$23(a4),d0		;y: in the hole
+		move.w	d4,d5
+		add.w	d0,d5
+		SEW	d5,$4eba(a4)
+		bmi	.next
+		move.b	$25(a4),d0		;the height
+		bsr	InHole
+		bne	.next
+		LEW	$0e9e(a4),d6		;in the view
+		sub.w	d6,d5
+		SEW	d5,$4eba(a4)
+		bmi.b	.yneg
+		moveq	#0,d6
+		move.b	$11e6(a4),d6
+		sub.w	d6,d5
+		SEW	d5,$4eba(a4)
+		bcc	.next
+		bra.b	.vis
+.yneg		add.w	d0,d5
+		SEW	d5,$4eba(a4)
+		bmi	.next
+.vis		lea	(a4,d2.w),a1		;the entry
+		move.b	$0eda(a0),$46a2(a1)
+		move.b	$0f1a(a0),$46c2(a1)
+		move.w	$105a(a0),$4742(a1)
+		move.w	$109a(a0),$4762(a1)
+		move.w	$101a(a0),$46e2(a1)
+		move.w	$0f5a(a0),$4702(a1)
+		move.w	$0f9a(a0),$4722(a1)
+		clr.b	$4782(a1)
+		moveq	#0,d0			;A: the LDA #0 for the kind
+		addq.b	#2,d2
+		cmp.b	#$20,d2
+	ifd VERIFY
+		bne.b	.notfull
+		addq.l	#1,$1cc.w		;lists that filled up
+		bra	.end
+.notfull
+	else
+		beq	.end			;the list is full
+	endc
+.next		addq.b	#2,d1
+		cmp.b	#$40,d1
+		bne	.obj
+
+		move.b	$0ed8(a4),d0		;phase B: the course pieces
+		beq	.end
+		moveq	#0,d1			;X: the piece
+.piece		lea	(a4,d1.w),a0
+		btst	#1,$111a(a0)
+		beq	.pnext
+		lea	(a4,d2.w),a1		;the entry
+		move.b	$119a(a0),$46e2(a1)
+		move.b	$119b(a0),$46e3(a1)
+		move.b	d2,$4eba(a4)
+		move.b	d1,$4ebb(a4)
+		moveq	#0,d3			;the piece's record: $4ec8,X + $0eb0
+		LEW	$4ec8(a0),d3
+		move.l	$0eb0(a4),d4
+		ror.w	#8,d4
+		swap	d4
+		ror.w	#8,d4
+		add.l	d3,d4
+		move.l	d4,d3
+		ror.w	#8,d3
+		swap	d3
+		ror.w	#8,d3
+		move.l	d3,$0a(a4)
+		and.l	#$ffffff,d4		;[$0a],Y: 24 bits
+		lea	(a4,d4.l),a2
+		move.b	4(a2),$4702(a1)
+		move.b	5(a2),$4703(a1)
+		move.b	6(a2),$4722(a1)
+		move.b	7(a2),$4723(a1)
+		move.b	8(a2),$4742(a1)
+		move.b	9(a2),$4743(a1)
+		move.b	10(a2),$4762(a1)
+		move.b	11(a2),$4763(a1)
+		moveq	#0,d3			;Y = $115a,X * 4 + 12, 8 bits
+		move.b	$115a(a0),d3
+		add.b	d3,d3
+		add.b	d3,d3
+		add.b	#12,d3
+		move.b	(a2,d3.w),$46a2(a1)
+		addq.b	#1,d3
+		move.b	(a2,d3.w),$46a3(a1)
+		addq.b	#1,d3
+		move.b	(a2,d3.w),$46c2(a1)
+		addq.b	#1,d3
+		move.b	(a2,d3.w),$46c3(a1)
+		move.b	#1,$4782(a1)
+		LEW	$4702(a1),d5		;x in the view
+		LEW	$0e9c(a4),d6
+		sub.w	d6,d5
+		SEW	d5,$4eba(a4)
+		bmi.b	.pxneg
+		cmp.w	#$130,d5
+		bcc	.pnext
+		bra.b	.py
+.pxneg		LEW	$4742(a1),d6
+		add.w	d6,d5
+		SEW	d5,$4eba(a4)
+		bmi	.pnext
+.py		LEW	$4722(a1),d5		;y in the view
+		LEW	$0e9e(a4),d6
+		sub.w	d6,d5
+		SEW	d5,$4eba(a4)
+		bmi.b	.pyneg
+		moveq	#0,d6
+		move.b	$11e6(a4),d6
+		sub.w	d6,d5
+		SEW	d5,$4eba(a4)
+		bcc	.pnext
+		bra.b	.pvis
+.pyneg		LEW	$4762(a1),d6
+		add.w	d6,d5
+		SEW	d5,$4eba(a4)
+		bmi	.pnext
+.pvis
+	ifd VERIFY
+		addq.l	#1,$1dc.w		;course-piece entries
+	endc
+		move.b	$111a(a0),d0		;drawn: clear the flag
+		and.b	#$fd,d0
+		move.b	d0,$111a(a0)
+		addq.b	#2,d2
+		beq.b	.end
+.pnext		addq.b	#2,d1
+		move.b	d1,d0
+		lsr.b	#1,d0
+		cmp.b	$0ed8(a4),d0
+		bne	.piece
+
+.end
+	ifd VERIFY
+		bsr	ListDone
+	endc
+		movem.l	(sp)+,d3-d7/a1-a3
+	ifd VERIFY
+		lea	(_v,pc),a0
+		tst.l	V_EXP(a0)
+		beq.b	.go
+		move.l	#$0864<<16,$48d4(a4)	;run the original on the same input:
+		move.l	#$074e077a,$48d8(a4)	;LDX #0; TXY; STX ...
+		bsr	ListFlush
+		lea	$48d4(a4),a5
+		jmp	$0106(a4)
+.go
+	endc
+		lea	$4d44(a4),a5		;STY $4ebe; STY $47a2; ...
+		jmp	$0106(a4)
+
+; e = d5 + d0 against the hole's size ($0ed4), as the threaded code tests it: Z clear
+; (out) unless e - size borrows or its high byte is 0. Writes e - size at $4ebc.
+InHole		move.w	d5,d6
+		add.w	d0,d6
+		SEW	d6,$4ebc(a4)
+		LEW	$0ed4(a4),d7
+		sub.w	d7,d6
+		SEW	d6,$4ebc(a4)
+		bcs.b	.in
+		and.w	#$ff00,d6
+		rts
+.in		cmp.w	d6,d6			;Z
+		rts
+
+; $1656: the frame. $0024-$0027 is the shape set (a little-endian offset from a4), $0022
+; the shape, $0023 the frame. Out: $0028 (and $0029 = 0), $0026, $0027 the frame's width
+; and origin, $0022-$0025 the first bytes of its four words. d0, a0, a2, a3.
+Frame		move.l	$24(a4),d0
+		ror.w	#8,d0
+		swap	d0
+		ror.w	#8,d0
+		movea.l	d0,a0
+		adda.l	a4,a0
+		movea.l	a0,a3
+		movea.l	a0,a2
+		moveq	#0,d0
+		move.b	$22(a4),d0
+		asl.w	#3,d0
+		adda.w	d0,a0
+		move.b	2(a0),$28(a4)
+		clr.b	$29(a4)
+		move.b	4(a0),$26(a4)
+		move.b	6(a0),$27(a4)
+		move.w	(a0),d0
+		ror.w	#8,d0
+		movea.l	a2,a0
+		adda.w	d0,a0
+		moveq	#0,d0
+		move.b	$23(a4),d0
+		add.w	d0,d0
+		adda.w	d0,a0
+		move.w	(a0),d0
+		ror.w	#8,d0
+		adda.w	d0,a3
+		move.b	(a3),$22(a4)
+		move.b	2(a3),$23(a4)
+		move.b	4(a3),$24(a4)
+		move.b	6(a3),$25(a4)
+		rts
+
+	ifd VERIFY
+; Debug builds, with ExpMem: NewList saves what the two phases read or write (ListSave),
+; builds the list, keeps what it wrote and puts the saved state back (ListDone), then runs
+; the original phases on it from $48d4 (put back for the run); at their end ($4d44,
+; ListCheck) everything they wrote is compared with NewList's, and the hook goes back.
+; Low memory is filled with $cc: $1d0 counts the lists that differed and $1d4 the lists
+; checked (from $cccccccc), $1d8 the first difference (the low word of $1d4 then, and the
+; byte's offset in the regions: $000a 0, $0022 4, $111a 12, $46a2 268, $4eba 748, X 762,
+; Y 763). $1dc counts NewList's course-piece entries and $1cc its lists that filled up.
+EX_VLIST	= EX_TILES+TILESIZE	;ExpMem: the saved state, then NewList's
+VL_SIZE		= 4+8+$100+$1e0+14+2	;$000a, $0022, $111a, $46a2, $4eba, X and Y
+
+VLREGS		macro			;\1: copy the regions between (a4) and a1
+		lea	$000a(a4),a0
+		moveq	#4-1,d7
+		bsr.b	\1
+		lea	$0022(a4),a0
+		moveq	#8-1,d7
+		bsr.b	\1
+		lea	$111a(a4),a0
+		move.w	#$100-1,d7
+		bsr.b	\1
+		lea	$46a2(a4),a0
+		move.w	#$1e0-1,d7
+		bsr.b	\1
+		lea	$4eba(a4),a0
+		moveq	#14-1,d7
+		bsr.b	\1
+		endm
+
+ListSave	movem.l	d7/a0-a1,-(sp)
+		lea	(_v,pc),a0
+		move.l	V_EXP(a0),d7
+		beq.b	.no
+		movea.l	d7,a1
+		lea	EX_VLIST(a1),a1
+		VLREGS	VLOut
+.no		movem.l	(sp)+,d7/a0-a1
+		rts
+VLOut		move.b	(a0)+,(a1)+
+		dbf	d7,VLOut
+		rts
+VLIn		move.b	(a1)+,(a0)+
+		dbf	d7,VLIn
+		rts
+
+ListDone	movem.l	d6-d7/a0-a1,-(sp)
+		lea	(_v,pc),a0
+		move.l	V_EXP(a0),d6		;d7 counts in VLREGS
+		beq.b	.no
+		movea.l	d6,a1
+		lea	EX_VLIST+VL_SIZE(a1),a1	;keep NewList's
+		VLREGS	VLOut
+		move.b	d1,(a1)+
+		move.b	d2,(a1)+
+		movea.l	d6,a1
+		lea	EX_VLIST(a1),a1		;and put the input back
+		VLREGS	VLIn
+.no		movem.l	(sp)+,d6-d7/a0-a1
+		rts
+
+ListFlush	movem.l	d0-d1/a0-a2,-(sp)
+		move.l	(_resload,pc),a2
+		jsr	(resload_FlushCache,a2)
+		movem.l	(sp)+,d0-d1/a0-a2
+		rts
+
+ListCheck	movem.l	d0-d7/a0-a6,-(sp)
+		lea	(_v,pc),a0
+		movea.l	V_EXP(a0),a1
+		lea	EX_VLIST+VL_SIZE(a1),a1
+		lea	$000a(a4),a0
+		moveq	#0,d5			;bytes that differ
+		moveq	#0,d6			;offset
+		moveq	#4,d7
+		bsr.b	.cmp
+		lea	$0022(a4),a0
+		moveq	#8,d7
+		bsr.b	.cmp
+		lea	$111a(a4),a0
+		move.w	#$100,d7
+		bsr.b	.cmp
+		lea	$46a2(a4),a0
+		move.w	#$1e0,d7
+		bsr.b	.cmp
+		lea	$4eba(a4),a0
+		moveq	#14,d7
+		bsr.b	.cmp
+		move.b	d1,-(sp)		;X and Y
+		movea.l	sp,a0
+		moveq	#1,d7
+		bsr.b	.cmp
+		move.b	d2,(sp)
+		movea.l	sp,a0
+		moveq	#1,d7
+		bsr.b	.cmp
+		addq.w	#2,sp
+		tst.w	d5
+		beq.b	.same
+		addq.l	#1,$1d0.w
+.same		addq.l	#1,$1d4.w
+		move.l	#$01384ef9,$48d4(a4)	;the hook back
+		pea	NewList
+		move.l	(sp)+,$48d8(a4)
+		bsr	ListFlush
+		movem.l	(sp)+,d0-d7/a0-a6
+		move.b	d2,$4ebe(a4)		;displaced: STY $4ebe; STY $47a2
+		move.b	d2,$47a2(a4)
+		move.w	d2,d4
+		lea	$4d4c(a4),a5
+		jmp	$0122(a4)
+.cmp		subq.w	#1,d7			;d7 bytes at a0 against a1; d5 counts
+.c		cmpm.b	(a0)+,(a1)+		;differing bytes, d6 the offset
+		beq.b	.ok
+		addq.w	#1,d5
+		cmp.l	#$cccccccc,$1d8.w	;the fill: none recorded yet
+		bne.b	.ok
+		move.w	$1d6.w,$1d8.w
+		move.w	d6,$1da.w
+.ok		addq.w	#1,d6
+		dbf	d7,.c
+		rts
+	endc
 
 	ifd VERIFY
 ; Debug builds: after each redraw, compare every cell of the back buffer with its tile in

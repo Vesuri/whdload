@@ -38,6 +38,7 @@ The loader, first hunk:
 | $1de2 | the input's `move.b $bfe001,d1` | `jsr ReadButton` | ours: a click between two steps is not lost ("Game time") |
 | $14c4 | the renderer's tile redraw ($14c4-$15dd) | `jmp NewDraw` | ours, with ExpMem: only the cells that changed ("Display") |
 | $173c | the shape drawer's `addq.w #8,a3; movea.l $32(a4),a0` | `jsr ShapeHook` | ours, with ExpMem: marks the cells a shape covers ("Display") |
+| $48d4 | the draw list's `LDX #0; TXY` and `STX $4ec0`'s opcode (threaded) | primitive $0138, `jmp NewList` | ours: the draw list's first two phases in native code ("Display") |
 | $7a9c | a game's start: the immediate of `LDY #0` (threaded), the position in the hole order | `CUSTOM1` | ours, debug, only with `CUSTOM1`=1-9: start on that hole (below) |
 
 Then `Patch` flushes the caches and turns on the instruction cache for BaseMem
@@ -138,6 +139,19 @@ fewer tiles instead. With ExpMem, `NewDraw` replaces the redraw (step 2):
   the cells it covers in the back buffer's cache. A shape drawn at fixed screen lines from
   $40000 (`$32` = $30000, the status line) that reaches line 33, where buffer 0's tiles
   start, drops both caches.
+- The draw list ($48d4, threaded code, once a frame) fills eight tables of 16 entries at
+  $46a2-$4791 (shape or piece and frame $46a2/$46c2, depth $46e2, x $4702, y $4722, width
+  $4742, height $4762, kind $4782: 0 a shape, 1 a course piece) in two phases, then sorts
+  them by depth ($1ff4) and draws them ($4d44-$4eb8: $16ec for shapes, $1a94 for pieces).
+  Phase A ($48d4-$4b4a) takes each of the 32 objects that is active ($0fda,X), gets its frame
+  from $1656, and culls it against the hole ($0ed4) and the view ($0e9c/$0e9e, 304 pixels
+  wide, $11e6 high). A full list ends both phases. Phase B ($4b4a-$4d44) takes each course
+  piece flagged in $111a bit 1 from its record in the hole block ($4ec8,X + $0eb0) and
+  clears the flag when the piece is visible. Phase A was 18.9 % of the A500's time on hole 1,
+  about 29,000 cycles a frame for 3 active objects. `NewList` does both phases in native
+  code, makes every write the threaded code makes (the scratch at $4eba-$4ec7, $000a-$000d
+  and $0022-$0029 too), and continues the threaded code at $4d44 with X and Y as it has
+  them there. The verify build compares the two on the same input.
 - The course pieces that change ($19ea, from $4fd0) change map words, which the compare
   catches. `Split` drops both caches whenever the drawing flag is clear or the interrupts
   are off (a hole may load).
