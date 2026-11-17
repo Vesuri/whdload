@@ -45,6 +45,13 @@ found no cell, list or shape differing on the 68000. Frames a second from the fl
 45.38. The cursor keys are not predicted (the pointer moves with them at the step), and
 a cut (a new state or hole, a late step) shows the last step at once.
 
+The waits that were CPU loops (17.11.2026, `internals.md`, "Slave patches"): Esc or the
+mouse button ends the credits; the hole's sign loads without the loader's delay, so the
+title no longer stays frozen after 1-4 (3.5 s on the `a500`); the game's delay $290c (the
+timer bonus screen, the stroke award, game over) waits the A500's time by the beam on every
+CPU. The loads after the sign keep the loader's delay, which on a fast CPU is what shows
+the sign, and the fades keep their loops.
+
 ## Next
 
 1. **The A500's frame.** The native draw list (`NewList`) took hole 1 from 37 to 44.25

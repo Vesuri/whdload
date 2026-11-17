@@ -26,6 +26,7 @@ The loader, first hunk:
 | $48 | `jsr` (absolute, relocated) to the protection check | `bra.s *+4` ($6002) | skips the check; see below |
 | $5a | `beq.w $ae` (check passed) | `bra.w $ae` (byte $60) | always takes the passed path |
 | $62e | the drive routine (writes $ff, $87, $87, $ff to CIA-B PRB $bfd100) | `rts` | no disk access |
+| $5c2 | the file load's `move.l #1000000,d0` before its `subi.l #1,d0; bne.s` loop (a CPU delay before each Open) | `jsr LoadDelay` | ours: a hole's sign (`SIGNn.UNV`) loads with one pass (below) |
 | $658 | `jsr (a3)`, a3 = `FILE1`'s address | `jmp Patch` | patch `FILE1` before it runs |
 
 `Patch` takes WHDLoad's CRC16 over the 64 KB at a3 (`FILE1`) and aborts with
@@ -38,6 +39,7 @@ The loader, first hunk:
 | $14bc | the renderer's `move.l $1462(a4),d0; move.w $2326(a4),d0` (the back buffer) | `jsr Hidden; nop` | ours: no drawing into a buffer still on screen ("Display") |
 | $5238 | the main loop's `LDA $0ea0; BEQ $524c` (threaded) | primitive $0138, `jmp Split` | ours: a world step each 6 fields, draw-only passes between ("Game time") |
 | $1de2 | the input's `move.b $bfe001,d1` | `jsr ReadButton` | ours: a click between two steps is not lost ("Game time") |
+| $2912 | the delay $290c's loop, `tst.b d0` to `bra.s` ($2912-$2921): A times 16001 `dbf` passes | `jsr Delay; bra.s $2922` | ours: the A500's time by the beam (below) |
 | $14c4 | the renderer's tile redraw ($14c4-$15dd) | `jmp NewDraw` | ours, with ExpMem: only the cells that changed ("Display") |
 | $173c | the shape drawer's `addq.w #8,a3; movea.l $32(a4),a0` | `jsr ShapeHook` | ours, with ExpMem: marks the cells a shape covers ("Display") |
 | $16f2 | the shape drawer's `clr.w $16da(a4); movea.l $2a(a4),a0` | `jmp NewShape` | ours, with ExpMem: the shape drawer with 16 pixels a write ("Display"); `ShapeHook` stays for the game's drawer, which the verify build runs |
@@ -64,6 +66,39 @@ the order of the table at $bb02 (3, 8, 0, 9, 4, 5, 1, 7, 6, 2: hole 1 is `HOLE3`
 position in it at $bb23 and the hole file's number at $5c5a. A game's start ($7a86) sets the
 position with `LDY #0` and loads the hole from the table; the advance after each hole is at
 $99a4. The skipped holes score 0, and the game ends after hole 10 as before.
+
+The game waits with CPU loops in three places, so on a faster CPU their screens go by
+faster:
+
+- The loader's file load (offset $5aa) counts 1000000 passes before each Open: 3.6 s on an
+  A500 (with the field counter stopped: the load leaves only VERTB on) and about a field on
+  the `a1200-030`. Pressing 1-4 on the title loads the hole's sign first, and the title
+  stayed frozen on screen for that time; the loads after it show the sign while they wait,
+  and the wait is all that keeps it up on a fast CPU. `LoadDelay` gives the sign's load
+  (the name after `Zany:FILES/` at offset $25c) one pass and the others the game's: on the
+  `a500` the sign came 100 fields after the key instead of 310, on the `a1200-030` 11
+  instead of 12. The rest is the game's own: unpacking the sign (the coder at $375e), a fade.
+- $290c (native, A the count) loops A times 16001 `dbf` passes. It holds the timer bonus
+  screen (254, $7ba0), "4 STROKE AWARD!" (240, $996c), "GAME OVER, Player N" (120, $9798) and
+  a wait after the last hole (100, $9f06). On the `a500` 254 took 391 fields with the
+  interrupts on (25.68 ms a count, the music's interrupt included). `Delay` waits as long by
+  the beam, counting field ends as 16.68 ms (or 20 ms from line 290 on, PAL), whatever the
+  interrupts: 392 fields on the `a500` and the `a1200-030` alike. The timer bonus hole is
+  drawn at a game's start ($7b0a: a random number's low 4 bits into the table at $7b28, the
+  hole file at $7b26): Walls 2 in 16, Fans 4, Carpets 4, Castle 3, Ant Hill 3.
+- The fades $2454 and $248a count 32 steps of 3000 `dbf` passes (about 8 fields on the A500).
+  Not changed.
+
+`BeamLine` reads VPOSR and VHPOSR until two reads give the same line: one long read is two
+word reads, and from line 255 to 256 between them it gives line 0 (V8 of 255, the low byte
+of 256). With one read `Delay` counted about 1.6 field ends a field (243 fields for 254).
+
+The credits (state 3, the phase at $752a 1-3: "Electronic Arts presents", "A Sandcastle
+production", "written by", 200 clock units each from the stamp at $752c by the table at
+$7610) end at Esc or the left mouse button: `SkipIntro` (from `Split`, each pass) sets the
+phase to 4, the blank before the title, with its 50 units passed, and the game's next update
+sets up "Press 1-4 to start" as after the credits. `FixKey` marks Esc ($45) for it. 1-4
+already started a game during the credits.
 
 `FixKey` decodes the raw key the game pushed at $1f20 (from 4(sp)). On F10 ($59) it writes 9
 to $15ca2 (`FILE1` $5ca2), the strokes left. Then it

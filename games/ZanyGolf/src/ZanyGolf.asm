@@ -82,6 +82,9 @@ Start		lea	_resload(pc),a1
 		move.b	#$60,$5a(a1)
 
 		move.w	#$4e75,$62e(a1)		;disk access
+		move.w	#$4eb9,$5c2(a1)		;the load's delay: jsr LoadDelay
+		pea	LoadDelay
+		move.l	(sp)+,$5c4(a1)
 
 		move.w	#$4ef9,$658(a1)
 		pea	Patch
@@ -143,6 +146,11 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		move.w	#$4eb9,$1de2(a3)	;the input's mouse button: jsr ReadButton
 		pea	ReadButton
 		move.l	(sp)+,$1de4(a3)
+
+		move.w	#$4eb9,$2912(a3)	;the delay $290c: jsr Delay, bra.s $2922
+		pea	Delay
+		move.l	(sp)+,$2914(a3)
+		move.w	#$6008,$2918(a3)
 
 		lea	(_v,pc),a0
 		tst.l	V_EXP(a0)
@@ -239,9 +247,15 @@ FrameCap	movem.l	d1/a0,-(sp)
 		move.w	#$8000,d0		;displaced
 		rts
 
-BeamLine	move.l	$dff004,d1		;d1: the beam's line (VPOSR, VHPOSR)
+BeamLine	move.l	d0,-(sp)		;d1: the beam's line (VPOSR, VHPOSR)
+.read		move.l	$dff004,d0		;two word reads: from line 255 to 256
+		move.l	$dff004,d1		;between them they give V8 of 255 and
+		eor.l	d1,d0			;the low byte of 256, line 0. So until
+		and.l	#$1ff00,d0		;two reads give the same line
+		bne.b	.read
 		lsr.l	#8,d1
 		and.w	#$1ff,d1
+		move.l	(sp)+,d0
 		rts
 
 ; After the flip ($14bc, both renderers). A flip on lines FLIP_LOAD to SHOW_END shows
@@ -291,7 +305,8 @@ _lastflip	dc.b	0
 ; never catches up in a burst. With the interrupts off the counter stops, so every pass
 ; steps. a4 is FILE1's base, d7 and a0 are scratch in the threaded code.
 STEP_FIELDS	= 6
-Split		bsr	PollButton
+Split		bsr	SkipIntro
+		bsr	PollButton
 		LEW	$5e1c(a4),d7		;between two steps: where the last put
 		swap	d7			;the pointer (it may have moved it itself)
 		LEW	$5e1e(a4),d7
@@ -2740,7 +2755,13 @@ _v		dcb.b	V_SIZE,0
 FixKey		move.w	4(sp),d0
 		ror.b	#1,d0
 		not.b	d0
-		cmpi.b	#$59,d0		; cmpi as the shipped slave has it: vasm encodes cmp #,Dn as CMP
+		cmp.b	#$45,d0		;Esc down: for SkipIntro
+		bne.b	.noesc
+		move.l	a0,-(sp)
+		lea	(_esc,pc),a0
+		st	(a0)
+		move.l	(sp)+,a0
+.noesc		cmpi.b	#$59,d0		; cmpi as the shipped slave has it: vasm encodes cmp #,Dn as CMP
 		bne	BeamDelay
 		move.b	#9,$15ca2	;set 9 strokes
 BeamDelay	moveq	#8,d0
@@ -2750,6 +2771,81 @@ BM_2		cmp.b	$dff006,d0
 		beq	BM_2
 		move.w	(sp)+,d0
 		dbf	d0,BM_1
+		rts
+
+; The credits (the title state 3, phases $752a 1-3: "Electronic Arts presents", "A
+; Sandcastle production", "written by", 200 clock units each from the stamp $752c, table
+; $7610) end at Esc (FixKey) or the left mouse button: the phase becomes 4, the blank
+; before the title, with its 50 units already passed, so the game's next update sets up
+; "Press 1-4 to start" as after the credits. From Split, each pass. Only d7 and a0.
+SkipIntro	lea	(_esc,pc),a0
+		move.b	(a0),d7
+		clr.b	(a0)
+		btst	#6,$bfe001
+		bne.b	.button
+		st	d7
+.button		tst.b	d7
+		beq.b	.no
+		cmp.b	#3,$0ea8(a4)
+		bne.b	.no
+		move.b	$752a(a4),d7
+		subq.b	#1,d7
+		cmp.b	#3,d7
+		bcc.b	.no
+		move.b	#4,$752a(a4)
+		LEW	$5de6(a4),d7		;the clock less 100: the blank's 50 passed
+		sub.w	#100,d7
+		SEW	d7,$752c(a4)
+.no		rts
+
+_esc		dc.b	0,0			;Esc pressed since SkipIntro looked
+
+; The game's delay $290c (native, from the threaded code with A the count): A times
+; 16001 dbf passes, a CPU loop. The calls: 254 for the timer bonus screen ($7ba0), 240
+; for "4 STROKE AWARD!" ($996c), 120 for "GAME OVER, Player N" ($9798) and 100 after the
+; last hole ($9f06). On an NTSC A500 254 took 391 fields, interrupts and all (25.68 ms
+; a count); a 68030 ran it in a fraction of that. This waits for the A500's time by the
+; beam (field ends, as fields of 16.68 ms or, from line 290 on, 20 ms), interrupts or
+; not. Replaces tst.b d0 to bra.s at $2912-$2921 (d0 and d1 are saved around it).
+DELAY_UNIT	= 2568				;the A500's time for a count, in 10 us
+Delay		movem.l	d0/d2-d3,-(sp)
+		and.l	#$ff,d0
+		mulu	#DELAY_UNIT,d0
+		moveq	#0,d2			;the time passed, in 10 us
+		bsr	BeamLine
+.field		move.w	d1,d3
+		bsr	BeamLine
+		cmp.w	d3,d1
+		bcc.b	.field			;the same field
+		add.l	#1668,d2
+		cmp.w	#290,d3
+		bcs.b	.ntsc
+		add.l	#2000-1668,d2
+.ntsc		cmp.l	d0,d2
+		bcs.b	.field
+		movem.l	(sp)+,d0/d2-d3
+		rts
+
+; The loader's file load (loader offset $5aa) waits 1000000 passes of subi.l/bne before
+; it opens the file, a CPU loop (3.6 s on an A500, about 15 fields on a 68030). Pressing
+; 1-4 on the title loads the hole's sign first, with the title frozen on screen for
+; that time; the loads after it show the sign while they wait. So the sign's load (the
+; name Zany:FILES/SIGNn.UNV at loader offset $25c) gets a single pass, the others the
+; game's. Replaces move.l #1000000,d0 at $5c2; d0 only.
+LoadDelay	move.l	a0,-(sp)
+		move.l	4(sp),a0		;the return: loader offset $5c8
+		lea	$25c+11-$5c8(a0),a0	;the name after Zany:FILES/
+		move.l	#1000000,d0
+		cmp.b	#'S',(a0)+
+		bne.b	.wait
+		cmp.b	#'I',(a0)+
+		bne.b	.wait
+		cmp.b	#'G',(a0)+
+		bne.b	.wait
+		cmp.b	#'N',(a0)
+		bne.b	.wait
+		moveq	#1,d0
+.wait		move.l	(sp)+,a0
 		rts
 
 Unsupported	pea	TDREASON_WRONGVER
