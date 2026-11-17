@@ -1097,10 +1097,13 @@ Firing and mouse:
   variants and live on CD32. Enhanced fire is still committed on world ticks
   only (up to 100 ms at 1.0x).
 - **UR6 (H): flight pointer briefly over the HUD or past the edges** when moved
-  fast, especially vertically; positioning less accurate than H's. Open. A
-  likely cause is the masked image and the sprite position updating a field
-  apart; the reference centre is the gunsight by choice, not the PC's window
-  middle.
+  fast, especially vertically; positioning less accurate than H's. The masked
+  image and the sprite position were written at different points of a field.
+  Implemented (2026-11-17): both are staged and written together in the VBL
+  (internals, "Image and position in the same field"). The emulator reproduces
+  the report with the old code and shows no pixel over the cockpit with the
+  fix, on both variants (`--fast-motion`); not yet played by the user. The
+  reference centre is the gunsight by choice, not the PC's window middle.
 - **UR7 (H): right button for PC-style actions. Closed (user decision,
   2026-11-17):** roll left/right, throttle forward/back, double-click (and hold) for afterburner. Implemented as the PC
   reference card's mouse controls (internals, "Mouse buttons in flight").

@@ -71,7 +71,8 @@ GFX = 0x341000            # graphics base; MoveSprite at -426
 EVENT = 0x342000          # InputEvent
 EXEC = 0x343000           # exec base; OpenLibrary at -552, AllocMem at -198
 CHIP = 0x344000           # AllocMem's Chip block
-ANY = 0x346000            # AllocMem's other block (the SimpleSprite, then the mask)
+ANY = 0x346000            # AllocMem's other block (the SimpleSprite, the mask, the staging)
+STAGE = ANY+12+200*44     # the pointer's next control words and lines (mouse.s STAGE)
 COPPER = 0x34c000         # two cprlists, then their copper lists
 SURFACE = 0x350000        # cockpit surface record; its row table and rows follow
 CALLS = {12: 'SaveFile', 36: 'GetFileSize', 88: 'DeleteFile', 8: 'LoadFile'}
@@ -163,11 +164,12 @@ class Machine:
         # runs): OpenLibrary returns GFX, AllocMem CHIP for Chip and ANY
         # otherwise; GetSprite gives the asked sprite unless sprite_free is
         # cleared; ChangeSprite binds a1's posctldata to a2; MoveSprite writes
-        # control words into the flight pointer's image.
+        # its x, y as the control words where the flight pointer's posctldata
+        # points (its image or the staging).
         if os:
             self.write(4, struct.pack('>I', EXEC))
         self.allocs, self.changes, self.sprites, self.sprite_free = [], [], [], True
-        for off in (-552, -198):
+        for off in (-552, -198, -120, -126):     # and Disable, Enable
             self.write(EXEC+off, b'\x4e\x75')
         for off in (-408, -420):
             self.write(GFX+off, b'\x4e\x75')
@@ -194,8 +196,9 @@ class Machine:
 
         def move(h, address, size, data):
             self.moves.append((C.c_int16(self.reg(9)).value, C.c_int16(self.reg(10)).value, self.reg(1), self.reg(2)))
-            if self.read(self.reg(2), 4) == struct.pack('>I', CHIP):
-                self.write(CHIP, b'\x6a\x7e\x71\x01')
+            at = struct.unpack('>I', self.read(self.reg(2), 4))[0]
+            if at in (CHIP, STAGE):
+                self.write(at, struct.pack('>HH', self.reg(9) & 0xffff, self.reg(10) & 0xffff))
         self.mcb = C.CFUNCTYPE(None, P, Q, C.c_uint32, P)(move)
         handle = Z(); ck(u.uc_hook_add(self.h, C.byref(handle), 4, self.mcb, None, GFX-426, GFX-425))
 
@@ -662,7 +665,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         a4 = m.a4
         m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
         mask_size = 200*44
-        assert m.allocs == [(12+mask_size, 0x10000), (44, 0x10002)], m.allocs
+        assert m.allocs == [(12+mask_size+40, 0x10000), (44, 0x10002)], m.allocs   # SimpleSprite, mask, staging
         m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
         assert len(m.allocs) == 2, 'pointer allocated twice'
         m.write(a4+mc['aperture'], struct.pack('>6h', *APERTURE))
@@ -725,10 +728,23 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         def img():
             return [(x, x) for x in ptr.lines()]
 
+        # The VBL (stick_commit, mouse_vbl's first call) copies the staging
+        # to the Chip image: the control words and lines change together.
+        def commit():
+            m.call(SLAVE+sy['stick_commit'], b'')
+
+        def chip():
+            return m.read(CHIP, 40)
+
         def image():
+            commit()
             return [struct.unpack('>HH', m.read(CHIP+4+4*r, 4)) for r in range(9)]
 
+        def control():
+            return struct.unpack('>hh', m.read(CHIP, 4))
+
         def shown():
+            commit()
             return m.read(CHIP, 4) != bytes(4)
 
         tick(100)
@@ -744,16 +760,18 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         assert struct.unpack('>I', m.read(a4+mc['slot'], 4))[0] == SLAVE+sy['mouse_event']
         # 80 pixels right, past the PC's last step (62) but not at the edge: 5 steps.
         assert ptr.at() == (239, 62) and steer((0, 0)) == want() == ((0, 5), [(234, 58)]), 'mouse right: yaw right'
+        assert chip() == bytes(40), 'pointer image written before the VBL'
         # The first showing takes sprite 7 and binds the image; the odd
         # sprites' colour bank is 192 in both lists, the rest of BPLCON4 kept.
         assert m.sprites == [(ANY, 7)] and m.changes == [(ANY, CHIP)]
         assert struct.unpack('>h', m.read(ANY+4, 2))[0] == 9
         assert (bplcon4(0, 5), bplcon4(1, 300)) == (0x001c, 0x00ac)
-        assert image() == img(), image()
+        assert image() == img() and control() == ptr.sprite(), image()
         # Down 26 pixels, two counts a pixel on both axes: past steps 5 and 18.
-        ev(0, 52); tick()
+        ev(0, 52); tick(); before = chip()
         assert ptr.at() == (239, 88) and steer() == want() and want()[0] == (-2, 5), 'mouse down: pitch up (stick back)'
-        assert image() == img()
+        assert chip() == before, 'pointer moved or masked before the VBL'
+        assert image() == img() and control() == ptr.sprite() and chip() != before
         assert len(m.sprites) == 1 and len(m.changes) == 1
         # Held still off centre: the ramps hold, the ship keeps turning.
         tick(); assert steer() == (want()[0], [])
@@ -952,7 +970,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path)
     p.add_argument('--output', required=True, type=Path)
-    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored', 'roll-native', 'return-ignored', 'esc-ignored', 'speed-ignored'),
+    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored', 'roll-native', 'return-ignored', 'esc-ignored', 'speed-ignored', 'stage-ignored'),
                    help='negative control: the check must fail')
     a = p.parse_args()
     out = a.output.resolve()
@@ -995,6 +1013,9 @@ def main():
         elif a.sabotage == 'speed-ignored':  # every option gives the normal speed
             at = blob.index(bytes.fromhex('0400020306080c10'), sy['mouse_option'])
             blob[at:at+8] = bytes([4]*8)
+        elif a.sabotage == 'stage-ignored':  # the lines straight to the Chip image, as before UR6
+            at = blob.index(bytes.fromhex('43ed2270'), sy['stick_show'])   # lea STAGE+4(a5),a1
+            blob[at:at+4] = bytes.fromhex('43eb0004')                   # lea 4(a3),a1
         elif a.sabotage == 'mask-ignored':  # the pointer drawn over the cockpit too
             at = blob.index(bytes.fromhex('c052'), sy['stick_show'])
             blob[at:at+2] = bytes.fromhex('3012')

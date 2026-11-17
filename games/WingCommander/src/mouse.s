@@ -32,6 +32,9 @@
 ; Sprite 7's colour 3 is colour 31, white on OCS; on CD32 the slave moves the
 ; odd sprites' colour bank in the flight copper lists to 192, which makes it
 ; colour 207, the PC pointer's own (243,255,235).
+; Each move stages the masked lines and the control words, and the VBL
+; (stick_commit) writes them to the image together, so the pointer's place
+; and the mask under it change in the same field.
 ; The stick or keys steering, the external view and a new flight re-centre it.
 ; The pointer appears only once the mouse moves and hides after 10 seconds
 ; without motion; the variant's VBL hook calls mouse_vbl, which also hides it
@@ -71,6 +74,8 @@ POINTER_SPRITE = 7              ; odd: its colour bank leaves sprites 0-6 alone
 SPRITE_BANK = 12                ; odd sprites' colours from 192: sprite 7 colour 3 is 207
 MASK_STRIDE = 44                ; bytes per mask row: a pad byte, 40, three pad bytes
 MASK_SIZE = 200*MASK_STRIDE     ; the aperture's rows at most
+STAGE = SS_SIZE+MASK_SIZE       ; stick_ss offset: the next image's control words and lines
+STAGE_SIZE = 4+9*4              ; (POINTER_H lines), copied to the Chip image in the VBL
 SS_SIZE = 12                    ; SimpleSprite: posctldata.l, height, x, y, num
 RIGHT_STEP = 4                  ; counts in the last four fields: a direction
 CLICK_MAX = 15                  ; fields: a shorter right press is a click
@@ -118,7 +123,7 @@ mouse_init:
         lea     stick_gfx(pc),a1
         move.l  d0,(a1)
         beq.s   .ready
-        move.l  #SS_SIZE+MASK_SIZE,d0
+        move.l  #SS_SIZE+MASK_SIZE+STAGE_SIZE,d0
         move.l  #$10000,d1              ; MEMF_CLEAR
         jsr     -198(a6)                ; AllocMem
         lea     stick_ss(pc),a1
@@ -554,6 +559,7 @@ steps_y:        dc.w 5,18,27,35,38,$7fff
 ; the mouse has been idle for IDLE_GAP fields; the next motion shows it.
 ; Keeps every register.
 mouse_vbl:
+        bsr.w   stick_commit
         movem.l d0/a0,-(sp)
         lea     mouse_fields(pc),a0
         addq.w  #1,(a0)
@@ -891,6 +897,8 @@ stick_hide:
         movem.l d0/a0,-(sp)
         lea     stick_shown(pc),a0
         clr.w   (a0)
+        lea     stick_pending(pc),a0
+        clr.w   (a0)
         move.l  stick_image(pc),d0
         beq.s   .done
         movea.l d0,a0
@@ -904,6 +912,8 @@ stick_hide:
 ; without the sprite there is no pointer. Keeps every register.
 stick_show:
         movem.l d0-d7/a0-a3/a5-a6,-(sp)
+        lea     stick_pending(pc),a0    ; the VBL leaves the staging alone
+        clr.w   (a0)
         move.l  stick_image(pc),d0
         beq.w   .done
         movea.l d0,a3
@@ -957,7 +967,7 @@ stick_show:
 .yhigh:
         ; Each line keeps the pixels over the aperture: mask bits from the
         ; image's left pixel (x-4, bit x+4 of the row with its pad byte).
-        lea     4(a3),a1
+        lea     STAGE+4(a5),a1          ; the staging lines
         lea     pointer_lines(pc),a2
         lea     SS_SIZE(a5),a0          ; mask
         move.w  d5,d6
@@ -996,11 +1006,52 @@ stick_show:
         subq.w  #5,d0                   ; sprite pixel 0 is at MoveSprite x+1
         move.w  d5,d1
         subq.w  #4,d1
+        ; MoveSprite writes the control words to the Chip image (posctldata;
+        ; it also points the sprite's DMA there): take them to the staging and
+        ; put the shown ones back, with the VBL held off.
+        movea.l 4.w,a6
+        jsr     -120(a6)                ; Disable
+        movea.l stick_gfx(pc),a6
+        move.l  (a3),-(sp)              ; the shown control words
         suba.l  a0,a0
         movea.l a5,a1
         jsr     -426(a6)                ; MoveSprite
+        move.l  (a3),STAGE(a5)
+        move.l  (sp)+,(a3)
+        lea     stick_pending(pc),a0
+        move.w  #1,(a0)
+        movea.l 4.w,a6
+        jsr     -126(a6)                ; Enable
 .done:
         movem.l (sp)+,d0-d7/a0-a3/a5-a6
+        rts
+
+; From mouse_vbl, first: the pointer's staged control words and lines, which
+; stick_show wrote together, to the Chip image, so the position and the mask
+; under it change in the same field. Keeps every register.
+        if POINTER_SPRITE<>7
+        fail    "stick_commit writes sprite 7's registers"
+        endif
+stick_commit:
+        movem.l d0/a0-a1,-(sp)
+        lea     stick_pending(pc),a0
+        tst.w   (a0)
+        beq.s   .done
+        clr.w   (a0)
+        movea.l stick_ss(pc),a0
+        lea     STAGE+STAGE_SIZE(a0),a0
+        movea.l stick_image(pc),a1
+        lea     STAGE_SIZE(a1),a1
+        moveq   #STAGE_SIZE/4-1,d0
+.copy:                                  ; backwards: the control words last
+        move.l  -(a0),-(a1)
+        dbf     d0,.copy
+        ; The VBL can end after sprite DMA has fetched this field's control
+        ; words (line 25): the same words to the registers, before the
+        ; sprite's first line (VSTART 40 at the highest).
+        move.l  (a1),$dff178            ; SPR7POS, SPR7CTL
+.done:
+        movem.l (sp)+,d0/a0-a1
         rts
 
 ; CD32: the odd sprites' colour bank in each of the game's two flight copper
@@ -1222,6 +1273,7 @@ stick_ptr:      dc.w 0,0                ; pointer offset from the gunsight, half
 stick_owned:    dc.w 0                  ; sprite 7: 0 not yet, 1 ours, -1 taken
 mask_top:       dc.w 0                  ; screen row of the mask's first row
 mask_rows:      dc.w 0                  ; mask rows (0: no aperture)
+stick_pending:  dc.w 0                  ; the staging holds an image for the next VBL
 roll_mouse:     dc.w 0                  ; the right button has rolled: scaled until the ramp settles
 fire_held:      dc.w 0                  ; left button fire: fields held (0: native)
 btn:            dc.w 7                  ; button record (BT_): all down, so no first press

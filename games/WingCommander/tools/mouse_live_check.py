@@ -62,6 +62,9 @@ def main():
     p.add_argument('--fire', action='store_true', help='CD32 English --flight: instead of steering, the left button held after a pause fires')
     p.add_argument('--buttons', choices=('keys', 'stick'),
                    help='English --flight: instead of steering, the buttons: keys (missile, afterburner) or stick (right button: throttle, roll)')
+    p.add_argument('--fast-motion', action='store_true',
+                   help='English --flight: instead of steering, fast motion over the aperture edges, a screenshot '
+                        'a field: no pointer pixel may show over the cockpit (UR6)')
     p.add_argument('--german', action='store_true', help='CD32: the German executable (CUSTOM1=1)')
     p.add_argument('--esc', action='store_true',
                    help='only the intro: the right button as Esc in its two waits, then the start menu')
@@ -81,6 +84,8 @@ def main():
         p.error('--fire: CD32 English --flight only')
     if a.buttons and (a.german or not a.flight or a.fire):
         p.error('--buttons: English --flight only, without --fire')
+    if a.fast_motion and (a.german or not a.flight or a.fire or a.buttons):
+        p.error('--fast-motion: English --flight only, without --fire or --buttons')
     if a.mouse_option and (a.flight or a.name_entry or a.esc or a.direct_flight):
         p.error('--mouse-option: the start menu only')
     game = GAMES['cd32-de' if a.german else a.variant]
@@ -213,6 +218,8 @@ def main():
             return [dict(fire=fire(var))]
         if a.buttons:
             return [dict(buttons=buttons(var, sym))]
+        if a.fast_motion:
+            return [dict(fast_motion=fast_motion(var, sym))]
         rows = [dict(motion=(0, 0), **state())]
         shot('flight-before')
         top = rows[0]['aperture'][5]
@@ -255,6 +262,51 @@ def main():
         assert r[5]['sprite'] == (220-5, 0-4) and r[5]['drawn'] == 0, r[5]
         assert r[6]['sprite'] == (220-5, top) and r[6]['drawn'] > 0 and r[6]['pitch'] == 9, r[6]
         return rows
+
+    def fast_motion(var, sym):
+        # UR6: the pointer image keeps only the pixels over the aperture, by
+        # the mask under its position; the image and the position must change
+        # in the same field. 15 pixels a field down and up over the
+        # aperture's bottom edge and 20 left and right over its sides, a
+        # screenshot a field: no pixel in the pointer colour may show over
+        # the cockpit (a mask bit clear) near the pointer's last places.
+        # Pixels in that colour before the pointer shows are the cockpit's own.
+        colour = (255, 255, 255) if ocs else (243, 255, 235)
+        ss = var('stick_ss', 'int')
+        def grab(name):
+            path = out/(name+'.bin')
+            cmd(f'monitor profile 1 "" "{path}"', 60)
+            (out/(name+'.png')).write_bytes(barto.load(str(path)).fields[-1].shot)
+            path.unlink()
+            return Image.open(out/(name+'.png')).convert('RGB')
+        def at(image):
+            return {(px, py) for py in range(200) for px in range(320)
+                    if image.getpixel((74+2*px, 92+2*py)) == colour}
+        base = at(grab('fast-before'))
+        top, rows = var('mask_top'), var('mask_rows')
+        path = out/'mask.bin'
+        cmd(f'dump binary memory {path} {ss+12:#x} {ss+12+44*rows:#x}')
+        mask = path.read_bytes(); path.unlink()
+        def view(px, py):     # the view shows through here
+            r = py-top
+            return 0 <= r < rows and 0 <= px < 320 and mask[44*r+1+px//8] >> (7-px % 8) & 1
+        seq = ([(0, 30)]*4+[(0, -30)]*8+[(0, 30)]*4+[(-40, 0)]*6+[(40, 0)]*12+[(-40, 0)]*6)*2+[(0, 0)]*3
+        places, fields = [], []
+        for i, (dx, dy) in enumerate(seq):
+            cmd(f'monitor mouse {dx} {dy}')
+            image = grab(f'fast-{i:02d}')
+            places = (places+[(number(f'*(short*){ss+6:#x}'), number(f'*(short*){ss+8:#x}'))])[-3:]
+            near = {(x+1+c, y+r) for x, y in places for r in range(-2, 11) for c in range(-2, 11)}
+            lit = (at(image) & near)-base
+            fields.append(dict(motion=(dx, dy), sprite=places[-1], shown=sum(1 for q in lit if view(*q)),
+                               over=sorted(q for q in lit if not view(*q))))
+        result = dict(fields=len(fields), shown=sum(f['shown'] for f in fields),
+                      over=sum(len(f['over']) for f in fields),
+                      over_fields=[(i, f['sprite'], f['over'][:4]) for i, f in enumerate(fields) if f['over']])
+        (out/'fast-motion.json').write_text(json.dumps(fields))
+        assert result['shown'] > 0, result
+        assert result['over'] == 0, result
+        return result
 
     def fire(var):
         # The left button held, released, then held again: the guns fire in

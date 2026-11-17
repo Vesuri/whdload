@@ -9170,12 +9170,31 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   does, and copies the key pixels of those rows into a bit mask (44 bytes a
   row, with pad bytes, so the pointer can leave the screen edges; 105 rows in
   the Hornet, 81 in the simulator, at most 200). Lines outside the rows are
-  hidden. Each pointer move writes the image lines ANDed with the mask under
+  hidden. Each pointer move makes the image lines ANDed with the mask under
   them. Each view change scans again, so the mask is the current cockpit's;
   the pointer shows in the front view only.
+- **Image and position in the same field (UR6).** The controller runs at any
+  point of a field. When it wrote the lines and MoveSprite wrote the control
+  words straight into the Chip image, the field could show the new mask's
+  lines at the old place or tear between them, so for a field the pointer
+  showed over the cockpit or lost pixels over the view, at most where it
+  crossed the aperture's edges fast (user report UR6). Now `stick_show` writes the lines to a 40-byte
+  staging block after the mask. MoveSprite still writes the control words to
+  the Chip image: on these Kickstarts it also points the sprite's DMA at
+  `posctldata`, so it cannot be given the staging (the pointer vanished when
+  it was). With interrupts disabled, the slave copies MoveSprite's words to
+  the staging and puts the shown ones back. `stick_commit`, the first call of
+  `mouse_vbl`, copies the whole staging to the Chip image, the control words
+  last, and writes them to SPR7POS/SPR7CTL as well. That covers a VBL that
+  ends after sprite DMA has fetched the control words (line 25); the sprite's
+  first line is VSTART 40 at the highest. A probe measured the commit at
+  lines 10–11 on CD32 and 17–18 on OCS (`a1200-030`, simulator flight). A
+  flag the VBL tests keeps it from copying a staging being written. The
+  pointer shows one field after the controller call that placed it.
 - **Sprite and colour.** The pointer is sprite 7, allocated with GetSprite at
-  its first showing, with a 44-byte Chip image and a SimpleSprite plus the
-  8800-byte mask in any memory (`mouse_init` allocates both once, cleared).
+  its first showing, with a 44-byte Chip image and a SimpleSprite, the
+  8800-byte mask and the 40-byte staging in any memory (`mouse_init`
+  allocates both once, cleared).
   Without them or without sprite 7 the mouse still steers, with no pointer. The
   game's room pointer takes sprite 2, falling back to 4, 6 and 1
   (`E:31536`, `O:31b1a`). Sprite 7's colour 3 is colour 31 on OCS, where the
@@ -9220,8 +9239,12 @@ How it is checked:
   bank 12 with their other bits kept, a changed list must be found again, and
   sprite 7 must be taken and bound once; a taken sprite 7 leaves steering
   without a pointer. `tools/mouse_model.py` holds the expected pointer,
-  stick, ramps and image. Psygore's list alone is the control (the mouse does not steer);
-  `--sabotage steer-ignored` and `mask-ignored` must fail.
+  stick, ramps and image. The Chip image must not change until the VBL's
+  commit, which then changes the lines and the position together (the
+  MoveSprite stand-in writes its x, y as the control words).
+  Psygore's list alone is the control (the mouse does not steer);
+  `--sabotage steer-ignored`, `mask-ignored` and `stage-ignored` (the lines
+  straight to the Chip image, as before UR6) must fail.
 - **OCS, native.** `tools/ocs_options_check.py` runs the same controller and
   mask scenario on the 68000 model after both installs.
 - **Live.** `tools/mouse_live_check.py --flight` enters the simulator flight
@@ -9231,7 +9254,17 @@ How it is checked:
   aperture's top. At each step it reads the pointer offset, the stick,
   the aperture block, sprite 7's position and image and (CD32) both lists'
   BPLCON4, compares them with the model, and checks every image pixel in the
-  screenshot in the pointer colour. The ramps it reads at the store can lag the pointer
+  screenshot in the pointer colour. `--fast-motion` instead moves the
+  pointer 15 pixels a field down and up over the aperture's bottom edge and
+  20 a field left and right over its sides, twice (83 fields, a screenshot
+  each). It reads the slave's mask from memory: no pixel in the pointer colour
+  may show over the cockpit near the pointer's last three places. Pixels in
+  that colour before the pointer shows are the cockpit's own and do not
+  count. Results (17.11.2026, enhanced mode): CD32 and OCS 0 pixels over the
+  cockpit, 2178 over the view. The slaves built from the code before this
+  change are the control: 264 pixels over the cockpit on CD32 (8 fields, at
+  every edge crossing) and 66 on OCS (2 fields, at the right side).
+  The ramps it reads at the store can lag the pointer
   by one call in enhanced mode, because the preview restores the world tick's
   ramps.
 

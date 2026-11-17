@@ -29,7 +29,7 @@ def mouse_scenario(c,slave,sy):
     c.write(CODE+0x33518,long(GFX));c.write(GFX-426,word(0x4e75))
     def move():
         moves.append((struct.unpack('>h',word(c.reg(9)))[0],struct.unpack('>h',word(c.reg(10)))[0]))
-        if c.get(c.reg(2),4)==CHIP:c.write(CHIP,long(0x6a7e7101))    # control words, as MoveSprite
+        if c.get(c.reg(2),4)==CHIP:c.write(CHIP,word(c.reg(9)&0xffff)+word(c.reg(10)&0xffff))    # control words: x, y
     c.intercept(GFX-426,move)
     c.write(RECT+24,struct.pack('>4h',40,30,280,180));c.write(IMAGE+4,struct.pack('>hh',-3,-2))
     c.write(a4+444,long(RECT));c.write(a4-2158,long(IMAGE));c.write(a4-2154,word(0))
@@ -197,6 +197,7 @@ def steer_scenario(c,slave,sy,moves):
     require(c.get(slave+sy['mouse_scan_native'],4)==CODE+0x2bc9a,'native aperture scan')
     require(c.read(CHIP,44)==bytes(44),'pointer image not blank')
     for off in (-408,-420):c.write(GFX+off,word(0x4e75))
+    for off in (-120,-126):c.write(c.get(4,4)+off,word(0x4e75))       # Disable, Enable
     def change():changes.append((c.reg(2),c.reg(3)));c.write(c.reg(2),long(c.reg(3)))
     def sprite():sprites.append((c.reg(1),c.reg(9)&0xffff));c.write(c.reg(1)+10,word(c.reg(9)&0xffff))
     c.intercept(GFX-420,change);c.intercept(GFX-408,sprite)
@@ -221,14 +222,23 @@ def steer_scenario(c,slave,sy,moves):
     def ev(dx,dy):event(dx,dy);ptr.move(dx,dy)
     want=lambda:(ptr.ramps(),[ptr.sprite()])
     img=lambda:[(x,x) for x in ptr.lines()]
-    image=lambda:[struct.unpack('>HH',c.read(CHIP+4+4*r,4)) for r in range(9)]
-    shown=lambda:c.read(CHIP,4)!=bytes(4)
+    # The VBL (stick_commit, mouse_vbl's first call) copies the staging to the
+    # Chip image: the control words and lines change together.
+    commit=lambda:c.run(slave-CODE+sy['stick_commit'])
+    chip=lambda:c.read(CHIP,40)
+    def image():commit();return [struct.unpack('>HH',c.read(CHIP+4+4*r,4)) for r in range(9)]
+    control=lambda:struct.unpack('>hh',c.read(CHIP,4))
+    def shown():commit();return c.read(CHIP,4)!=bytes(4)
     tick(100)
     require(steer((5,-3))==((3,-1),[]),'native ramp decay')
     ev(160,0);tick();require(steer((0,0))==want()==((0,5),[(234,58)]),'mouse right: yaw right')
     require(sprites==[(ANY,7)] and changes==[(ANY,CHIP)] and c.get(ANY+4,2)==9,'pointer sprite not bound')
-    require(image()==img(),'pointer image')
-    ev(0,52);tick();require(ptr.at()==(239,88) and steer()==want() and want()[0]==(-2,5),'mouse down: pitch up')
+    require(chip()==bytes(40),'pointer image written before the VBL')
+    require(image()==img() and control()==ptr.sprite(),'pointer image')
+    ev(0,52);tick();before=chip()
+    require(ptr.at()==(239,88) and steer()==want() and want()[0]==(-2,5),'mouse down: pitch up')
+    require(chip()==before,'pointer moved or masked before the VBL')
+    require(image()==img() and control()==ptr.sprite() and chip()!=before,'pointer image and position not together')
     tick();require(steer()==(want()[0],[]),'held pointer position')
     ev(-150,-44);tick();require(ptr.at()==(164,66) and steer()==want() and want()[0]==(0,0),'PC dead zone')
     ev(1000,1000);tick();require(steer()==want()==((-9,9),[(319-5,199-4)]) and image()==[(0,0)]*9,'full deflection, hidden')
