@@ -9238,8 +9238,11 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   of the same build (ESPRM 13, OSPRM 12) showed yellow, cyan and magenta on
   the A1200: bank 13, the ESPRM nibble. Its copinit points sprite 7 at the
   image ($61c8, 8-byte aligned) and sprite 6 at the blank sprite, so the image
-  is sprite 7's; FMODE $0003 leaves the sprite fetch at 16 bits. With both
-  nibbles set the pointer is colour 207 either way.
+  is sprite 7's; FMODE $0003 leaves the sprite fetch at 16 bits. The same
+  test with the image placed on an 8-byte boundary by the slave (allocated 8
+  bytes larger and rounded up) was yellow, cyan and magenta too, so alignment
+  is not the cause. With both nibbles set the pointer is colour 207 either
+  way.
 - **Hiding.** `mouse_vbl`, called from each variant's VBL hook (CD32 the port-1
   pad read, OCS the port-1 fire sample), counts fields. Once the controller has
   not run for 25 fields (a pause, the map, the end of the flight), or the mouse
