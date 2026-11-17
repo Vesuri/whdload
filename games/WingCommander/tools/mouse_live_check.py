@@ -261,7 +261,7 @@ def main():
             assert all(v >> 16 == v & 0xffff and v >> 16 & ~POINTER[i] == 0 for i, v in enumerate(x['lines'])), x
             assert x['on_screen'], x
             if copper:
-                assert all(v & 0x0f == 12 for v in x['bplcon4']), x
+                assert all(v & 0xff == 0xcc for v in x['bplcon4']), x
         # 80 pixels right, then 26 down: the same counts a pixel on both axes.
         w, h, cx, cy, left, top = r[1]['aperture']
         assert r[1]['sprite'] == (cx+80-5, cy-4) and r[2]['sprite'] == (cx+80-5, cy+26-4), r

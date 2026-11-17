@@ -30,7 +30,7 @@
 ; two calls of the native aperture scan also copy the cockpit's transparent
 ; pixels into a mask, and the pointer image keeps only the pixels over them.
 ; Sprite 7's colour 3 is colour 31, white on OCS; on CD32 the slave moves the
-; odd sprites' colour bank in the flight copper lists to 192, which makes it
+; sprites' colour banks in the flight copper lists to 192, which makes it
 ; colour 207, the PC pointer's own (243,255,235).
 ; Each move stages the masked lines and the control words, and the VBL
 ; (stick_commit) writes them to the image together, so the pointer's place
@@ -71,7 +71,7 @@ FLIGHT_GAP = 50                 ; fields without a controller call: a new flight
 HIDE_GAP = 25                   ; fields without one before the pointer hides
 IDLE_GAP = 500                  ; fields without motion before it hides (10 s PAL)
 POINTER_SPRITE = 7              ; odd: its colour bank leaves sprites 0-6 alone
-SPRITE_BANK = 12                ; odd sprites' colours from 192: sprite 7 colour 3 is 207
+SPRITE_BANK = 12                ; sprite colours from 192: sprite 7 colour 3 is 207
 MASK_STRIDE = 44                ; bytes per mask row: a pad byte, 40, three pad bytes
 MASK_SIZE = 200*MASK_STRIDE     ; the aperture's rows at most
 STAGE = SS_SIZE+MASK_SIZE       ; stick_ss offset: the next image's control words and lines
@@ -1142,8 +1142,11 @@ stick_commit:
     endc
         rts
 
-; CD32: the odd sprites' colour bank in each of the game's two flight copper
-; lists (their BPLCON4 move, found once per list). OCS has no bank (0).
+; CD32: the sprites' colour banks in each of the game's two flight copper
+; lists (their BPLCON4 move, found once per list). OCS has no bank (0). Both
+; ESPRM and OSPRM: a real A1200 takes sprite 7's bank from ESPRM (bits 7-4),
+; the AGA documentation and FS-UAE from OSPRM (bits 3-0). No even sprite
+; shows in flight.
 ; a4 = game A4; uses d0-d3/a0-a2.
 BANK_SEARCH = 1024              ; copper moves searched for BPLCON4
     ifd BANK_DIAG
@@ -1242,10 +1245,7 @@ stick_bank:
         move.l  a0,(a2)
         move.w  d2,4(a2)
 .set:
-        move.b  3(a0,d2.w),d0
-        andi.b  #$f0,d0
-        ori.b   #SPRITE_BANK,d0
-        move.b  d0,3(a0,d2.w)
+        move.b  #SPRITE_BANK<<4!SPRITE_BANK,3(a0,d2.w)
 .next:
         addq.l  #8,a2
         dbf     d1,.list

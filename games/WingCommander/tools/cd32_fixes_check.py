@@ -672,7 +672,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         m.write(SURFACE+0xa00, struct.pack('>I', SURFACE+0xe00)*200)
         # Two flight copper lists, BPLCON4 at different places and values.
         lists = (COPPER+0x100, COPPER+0x900)
-        for i, (at, value) in enumerate(((5, 0x0011), (300, 0x00a3))):
+        for i, (at, value) in enumerate(((5, 0x0011), (300, 0x55a3))):
             body = [(0x0180+2*(k % 32), 0x010c) for k in range(at)]+[(0x010c, value), (0x0106, 0x0c00), (0xffff, 0xfffe)]
             m.write(lists[i], b''.join(struct.pack('>HH', *x) for x in body))
             m.write(COPPER+16*i+4, struct.pack('>I', lists[i]))
@@ -761,11 +761,11 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         # 80 pixels right, past the PC's last step (62) but not at the edge: 5 steps.
         assert ptr.at() == (239, 62) and steer((0, 0)) == want() == ((0, 5), [(234, 58)]), 'mouse right: yaw right'
         assert chip() == bytes(40), 'pointer image written before the VBL'
-        # The first showing takes sprite 7 and binds the image; the odd
-        # sprites' colour bank is 192 in both lists, the rest of BPLCON4 kept.
+        # The first showing takes sprite 7 and binds the image; both sprite
+        # colour banks (ESPRM, OSPRM) are 192 in both lists, BPLAM kept.
         assert m.sprites == [(ANY, 7)] and m.changes == [(ANY, CHIP)]
         assert struct.unpack('>h', m.read(ANY+4, 2))[0] == 9
-        assert (bplcon4(0, 5), bplcon4(1, 300)) == (0x001c, 0x00ac)
+        assert (bplcon4(0, 5), bplcon4(1, 300)) == (0x00cc, 0x55cc)
         assert image() == img() and control() == ptr.sprite(), image()
         # Down 26 pixels, two counts a pixel on both axes: past steps 5 and 18.
         ev(0, 52); tick(); before = chip()
@@ -800,7 +800,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         m.write(COPPER+4, struct.pack('>I', new))
         m.write(lists[1], struct.pack('>HH', 0xffff, 0xfffe))
         ev(1, 0); tick(); steer()
-        assert struct.unpack('>H', m.read(new+6, 2))[0] == 0x001c
+        assert struct.unpack('>H', m.read(new+6, 2))[0] == 0x00cc
         out['colour_bank'] = 'pass'
         # The stick or keys steer: re-centred, pointer hidden, native ramps.
         tick(); assert steer((0, -9), (0, 1, 0, 0, 0)) == ((0, 1), []) and not shown()

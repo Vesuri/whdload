@@ -9211,19 +9211,22 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   black in the Nav-1 palette (in the simulator only 20–23 are set: black,
   green, blue), so the old blue pointer (sprite 2, colour 23) was invisible in
   missions. Colour 207 is (243, 255, 235), the PC pointer's own colour, in both
-  palettes, and it is sprite 7's colour 3 with the odd sprites' bank at 192. So
-  the slave sets BPLCON4's OSPRM to 12 in both flight copper lists, keeping its
-  other bits; it finds each list's BPLCON4 move once (about 530 moves in, after
-  the colour loads) and searches again when a list changes. The even sprites,
-  the room and Intuition pointers' among them, keep bank 16.
+  palettes, and it is sprite 7's colour 3 with its sprite bank at 192. So the
+  slave sets BPLCON4's ESPRM and OSPRM both to 12 in both flight copper lists,
+  keeping BPLAM; it finds each list's BPLCON4 move once (about 530 moves in,
+  after the colour loads) and searches again when a list changes. Both,
+  because a real A1200 takes sprite 7's bank from ESPRM (bits 7–4), where the
+  AGA documentation and FS-UAE (`drawing.cpp`, `sbasecol[1]` for the higher
+  sprite of a pair) take it from OSPRM (bits 3–0). No even sprite shows in
+  flight; the room and Intuition pointers keep bank 16 in the rooms.
   The pointer's colour on screen was (243,255,235) in the first mission of
   systems 1, 2, 4, 6, 9 and 12 too (2026-11-17, `--direct-flight --system`;
   all six had the 320×105 aperture). On the user's real Amiga (with an Indivision) the pointer
-  shows black in flight (CD32, a 68040 card with Zorro III RAM, CACHE),
-  which is what colour 31 would show if the bank change did not reach the
-  display. The emulator's 68040 model with CACHE (and NoMMU: the gdb-driven
+  showed black in flight (CD32, a 68040 card with Zorro III RAM, CACHE),
+  which is what colour 31 shows if the bank change does not apply to sprite
+  7. The emulator's 68040 model with CACHE (and NoMMU: the gdb-driven
   build has no MMU) shows it in the right colour too, in the simulator and
-  the Nav-1 mission; not explained yet. Composite video shows the same, and
+  the Nav-1 mission. Composite video shows the same, and
   NOCACHE does not help. In the emulator's Nav-1 flight the diagnostic build
   (`--bank-diag`, docs/development.md) saw COP2LC on one of the two patched
   lists in every field, each list's only BPLCON4 move at offset 2116 with
@@ -9231,8 +9234,12 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   user's A1200 snapshot (2026-11-18) showed the same: COP2LC on a patched
   list in all 250 fields, BPLCON4 $001c, colour 207 (243,255,235), and
   flight lists identical to the emulator's but for three mission colours
-  (20, 22, 23). So the registers reach the display; the striped test
-  pointer of the same build tells which bank real Lisa uses for sprite 7.
+  (20, 22, 23). So the registers reach the display. The striped test pointer
+  of the same build (ESPRM 13, OSPRM 12) showed yellow, cyan and magenta on
+  the A1200: bank 13, the ESPRM nibble. Its copinit points sprite 7 at the
+  image ($61c8, 8-byte aligned) and sprite 6 at the blank sprite, so the image
+  is sprite 7's; FMODE $0003 leaves the sprite fetch at 16 bits. With both
+  nibbles set the pointer is colour 207 either way.
 - **Hiding.** `mouse_vbl`, called from each variant's VBL hook (CD32 the port-1
   pad read, OCS the port-1 fire sample), counts fields. Once the controller has
   not run for 25 fields (a pause, the map, the end of the flight), or the mouse
