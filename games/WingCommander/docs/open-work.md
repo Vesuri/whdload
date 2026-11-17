@@ -1018,12 +1018,15 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
     renderer holds Forbid+Disable across field boundaries, so the motion
     arrives in bursts there, as the stick pointer does.
   - CD32 name entry: the mouse also moves the selection box over the
-    character grid, a cell per 18 counts (live-checked in English and German).
-    The OCS name entry is keyboard only.
+    character grid, a cell per 18 counts, and the right button is Return
+    (user request, 2026-11-17), so the mouse alone enters a name
+    (live-checked in English and German). The OCS name entry is keyboard
+    only, so the right button does nothing there.
   - CD32 German passes the same live check (intro, menu, name entry).
   - The user reports the mouse working in play (2026-11-13). Not separately
     recorded: the bar, barracks and TrainSim rooms.
-  - Unchanged: key-only waits such as the nav map, and the right button.
+  - Unchanged: key-only waits such as the nav map, and the right button
+    outside flight and the CD32 name entry.
 
   See [mouse](internals.md#mouse-in-rooms-and-menus-both-release-builds-every-mode).
 - **Mouse flight: done in both release builds, every mode (2026-11-13).** The
@@ -1102,7 +1105,9 @@ Firing and mouse:
   forward/back, double-click (and hold) for afterburner. Implemented as the PC
   reference card's mouse controls (internals, "Mouse buttons in flight").
   Checked natively on both variants and live on both, in enhanced and
-  Original speed. Not yet played by the user.
+  Original speed. The user found the roll too slow (2026-11-17): the right
+  button now rolls four times as fast as the keys, the rest unchanged.
+  Not yet played by the user since.
 - **UR8 (H): missiles on left+right together or the middle button.**
   Implemented with UR7; the same checks. The middle button is only checked
   in the emulator.

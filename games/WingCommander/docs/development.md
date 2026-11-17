@@ -47,7 +47,7 @@ audit, frame statistics, OCS candidates) call the generators directly with a new
 build against `release/slaves.sha256`, rebuilds both reconstructions (each asserts
 byte identity with the pinned original) and runs `release_check.py`,
 `cd32_fixes_check.py` (the CD32 bunk save, TrainSim key and click fixes, high scores, mouse and mouse
-flight, and the mouse buttons in flight on both languages; `--sabotage store-failure|list-stub|mouse-ignored|name-ignored|scores-ignored|steer-ignored|mask-ignored|buttons-ignored`
+flight, and the mouse buttons in flight on both languages; `--sabotage store-failure|list-stub|mouse-ignored|name-ignored|scores-ignored|steer-ignored|mask-ignored|buttons-ignored|roll-native|return-ignored`
 are its negative controls),
 `waypoint_check.py` on CD32 English and German,
 `ocs_options_check.py` (which also runs the OCS mouse and mouse flight scenarios after

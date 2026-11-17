@@ -8968,7 +8968,10 @@ and its fire and guard hooks. Addresses:
   there; the stick still wraps. The VBL pad read counts fields, and motion is
   dropped at the first poll after a gap of more than 8 fields, so motion on
   other screens does not move the box. The left button picks a character as
-  fire does.
+  fire does. A right button press queues Return (13) in the key FIFO
+  (`mouse_key`); the loop reads keys (`E:34318`) when the pad gives nothing,
+  and Return ends the name or the callsign (`E:170b8`), so the mouse alone
+  enters a name. A press held from before the first poll does nothing.
 
 How it is checked:
 - **CD32, native.** `tools/cd32_fixes_check.py` runs the room routine from after
@@ -8979,8 +8982,10 @@ How it is checked:
   first; the previous build fails this. It runs the room exit, the
   VBL pad read with and without the left button, and the record reset with each
   button held. It runs the name entry hook with the native grid step through
-  sub-cell, edge, row and stale motion and stick steps. Psygore's list alone is
-  the control; `--sabotage mouse-ignored` and `name-ignored` must fail.
+  sub-cell, edge, row and stale motion and stick steps, and through right
+  button presses: each new press queues one Return, a held one and one held
+  from before the screen none. Psygore's list alone is the control;
+  `--sabotage mouse-ignored`, `name-ignored` and `return-ignored` must fail.
 - **OCS, native.** `tools/ocs_options_check.py` runs the same scenario on the
   68000 model after both the enhanced and the original-mode install.
 - **Live.** `tools/mouse_live_check.py` skips the intro with the left button
@@ -9004,8 +9009,10 @@ Live results (deterministic warp, PAL, 2026-11-13):
   The native stick pointer has the same cadence.
 - **All five runs:** the first click selects.
 - **CD32 name entry (enhanced, `a1200-030`):** the box moves exactly two
-  columns and two rows (8-column grid, from column 1, row 4 to 3, 6), and the
-  click enters "S".
+  columns and two rows (8-column grid, from column 1, row 4 to 3, 6), the
+  click enters "S", and the right button reaches the Return case (`E:170b8`,
+  German `G:17156`), which ends the name; the callsign prompt follows
+  (2026-11-17, English and German).
 - **CD32 German (`--german`, `CUSTOM1=1`, `a1200-030`):** the same intro,
   menu and name entry results ("NACHNAME: S"). Its checkpoints map the English
   ones by matching code (`G:18a44`, `1fcbe`, `2026c`, `2031c`, `2032e`, name
@@ -9275,9 +9282,22 @@ missile.
   sets the modifier, clears fire, and sets left, right, up or down where the
   last four fields' motion is at least 4 counts that way (forward is up,
   faster). The native controller then calls the throttle step `ccda(±1)` and
-  steps the roll ramp by one per call, as for the stick with fire held.
+  steps the roll ramp, as for the stick with fire held.
   `mouse_steer` drops the motion meanwhile, so the pointer, and the turn it
   sets, holds.
+- **Roll, four times native.** The native roll ramp steps by one a
+  controller call to ±9 and decays by two; the roll rate is the ship's
+  (ship table +38) times the ramp over 8 (`E:7a4`). That took a lot of
+  mouse motion (user decision, 2026-11-17: four times the roll).
+  `mouse_steer`, which the controller calls just before it stores the roll
+  ramp, replaces that ramp while the right button is down, and after its
+  release until the ramp is back at 0: the same rule from the
+  controller's own roll flags (`d5` left, `d6` right) with `ROLL_SCALE` (4)
+  times the steps, the cap and the decay. The same motion therefore rolls
+  four times as far, and the fastest roll is four times the keys'. The
+  threshold of 4 counts is unchanged, and so are pitch, yaw and the
+  throttle. The enhanced preview runs the same controller and restores the
+  ramp, so it sees the same roll.
 - **Double click: afterburner.** A right press within 15 fields of a click's
   release (a press shorter than 15 fields) is the afterburner while it is
   held. Holding Tab keeps the afterburner lit through key repeat; the poll
@@ -9312,8 +9332,11 @@ How it is checked:
   The flags and the queued keys must match `buttons_expected`: six Tabs and
   three Enters. With no flight, and with lines that read low from the start,
   the poll must stay native. The flight controller with the modifier must
-  hold the pointer while the right button is down. `--sabotage
-  buttons-ignored` must fail.
+  hold the pointer while the right button is down. Its roll ramp must step
+  natively without the right button (1 to 9, decay by two) and, with it,
+  by 4 to ±36, reset on a reversal, decay by 8 after the release and then
+  go native again. `--sabotage buttons-ignored` and `roll-native` must fail
+  (CD32; OCS runs the same roll cases).
 - **Live.** `tools/mouse_live_check.py --flight --buttons keys|stick` enters
   the simulator flight. `keys`:
   - presses left then right, and the middle button: each must reach the
@@ -9323,7 +9346,8 @@ How it is checked:
 
   `stick`: holds the right button with the mouse forward, back, left and
   right; the set speed must rise and fall and the roll ramp go negative and
-  positive. The pointer reading stays at the gunsight there because the
+  positive in steps of 4. It reads the ship table's roll rates, which
+  times 36 must fit the word `E:7a4` computes. The pointer reading stays at the gunsight there because the
   mouse has not steered first, so only the native check tests the hold. The two are separate runs because the
   simulator destroys the ship a few seconds in, sooner in CD32 Original
   speed, where the world steps every other field.
@@ -9338,10 +9362,14 @@ Live results (17.11.2026, simulator flight, `a1200-030`, deterministic warp):
 | OCS, Original speed | the same | 4; by 25 | 6400, 6912, 6400 | −2, 2 |
 
 A step is 256 (one throttle call), so the rate is the world's: 10 Hz when
-enhanced, 25 Hz in CD32 Original speed. The CD32 keys run once failed to
+enhanced, 25 Hz in CD32 Original speed. The roll column was measured before
+the fourfold roll. With it (`stick` runs only), the ramp reaches −8 and 8 in
+CD32 and OCS enhanced and −16 and 20 in CD32 Original speed, in steps of 4.
+The ship table's roll rates are 1–22 (the Hornet's 8), so 36 times the
+largest is 792, well inside the word `E:7a4` computes. The CD32 keys run once failed to
 start the emulator (`common/run.sh`); the rerun passed. Not yet checked:
 real hardware (the OCS POTGO state under the OS is unmeasured), CD32 German
-live, and play by the user.
+flight live, and play by the user.
 
 ### CD32 bunk save: Psygore's StoreNV return value
 

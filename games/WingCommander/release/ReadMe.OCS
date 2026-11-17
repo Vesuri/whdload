@@ -52,8 +52,9 @@
  A mouse in port 0 moves the pointer in the rooms and menus, in every mode.
  Its left button works as fire: it clicks, skips and continues sequences, and
  fires the guns in flight for as long as you hold it, as on the PC. On CD32 it
- also moves the selection box when you enter your name. The joystick, CD32 pad
- and keys work as before.
+ also moves the selection box when you enter your name, and the right button
+ works as Return there, so a name can be entered with the mouse alone. The
+ joystick, CD32 pad and keys work as before.
  In flight the mouse steers as in the PC version: move the pointer right of
  the gunsight to turn right and below it to pull the nose up. The further it
  is from the gunsight, the faster the turn, and the ship keeps turning until
@@ -62,9 +63,10 @@
  re-centres it.
  The other mouse buttons in flight work as on the PC: hold the right button
  and move the mouse forward or back to change speed, or left or right to
- roll; the pointer stays where it is meanwhile. Double-click the right button
- and hold it to fire the afterburner. Press both buttons together, or the
- middle button, to fire the selected missile or drop a mine.
+ roll, four times as fast as with the keys; the pointer stays where it is
+ meanwhile. Double-click the right button and hold it to fire the
+ afterburner. Press both buttons together, or the middle button, to fire the
+ selected missile or drop a mine.
  On CD32, saving a pilot in the barracks also saves the Training Simulator high
  scores, as Bed_N.hi beside the Bed_N save, and loading that pilot restores
  them. Saves without this file still load, with the game's usual scores.
@@ -132,7 +134,7 @@
  - CD32 edition: Training Simulator high scores are kept with each saved pilot
    (thanks hexaae!).
  - Mouse control of the room and menu pointer, and on CD32 of the name entry
-   box; the left mouse button works as fire. The first click after entering a
+   box, where the right button is Return; the left mouse button works as fire. The first click after entering a
    screen is no longer ignored (thanks hexaae!).
  - Mouse flight: the mouse steers as in the PC version, and the left button
    fires while held (thanks hexaae!).

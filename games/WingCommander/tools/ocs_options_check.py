@@ -147,6 +147,19 @@ def buttons_scenario(c,slave,sy):
     base=steer(0,0)
     require(steer(0,20)==(base[0]+20,base[1]) and steer(1,40)==(base[0]+20,base[1]) and
             steer(0,6)==(base[0]+26,base[1]),'pointer moved with the right button held')
+    # The right button's roll: the native ramp (A4 3724) with four times its
+    # steps, cap and decay, until it settles after the release.
+    def roll(right,flag):
+        c.write(0xdff016,word(0xffff&~(right<<10)));c.run(slave-CODE+sy['mouse_vbl'])
+        c.write(a4+16084,bytes([flag<0,flag>0,0,0,1]));c.write(a4-18318,word(0));c.run(0x183e4)
+        return struct.unpack('>h',c.read(a4+3724,2))[0]
+    roll(0,0);roll(0,0);roll(0,0);roll(0,0);roll(0,0)
+    got=[roll(0,1) for _ in range(11)]+[roll(0,0) for _ in range(5)]
+    require(got==[1,2,3,4,5,6,7,8,9,9,9,7,5,3,1,0],f'native roll {got}')
+    got=[roll(1,-1) for _ in range(10)]+[roll(1,1) for _ in range(2)]+[roll(1,0) for _ in range(2)]
+    require(got==[-4,-8,-12,-16,-20,-24,-28,-32,-36,-36,4,8,0,0],f'mouse roll {got}')
+    got=[roll(1,1) for _ in range(9)]+[roll(0,0) for _ in range(6)]+[roll(0,1) for _ in range(2)]
+    require(got==[4,8,12,16,20,24,28,32,36,28,20,12,4,0,0,1,2],f'released roll {got}')
     c.write(0xdff016,word(0))
 
 

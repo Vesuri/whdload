@@ -497,6 +497,35 @@ def button_cases(cfg, fixed, blob, sy):
     steer(0, 0)
     assert steer(0, 20) == (20, 0) and steer(1, 40) == (20, 0) and steer(1, -40) == (20, 0) and steer(0, 6) == (26, 0)
     out['pointer_hold'] = 'pass'
+    out['roll'] = roll_cases(machine, mc, sy)
+    return out
+
+
+def roll_cases(machine, mc, sy):
+    """The right button's roll: the flight controller with the modifier and
+    the roll flags; its roll ramp is the native ramp scaled by ROLL_SCALE in
+    its steps, cap and decay, until it settles after the release."""
+    def ctl(m, right, roll):
+        m.write(0xdff016, struct.pack('>H', 0xffff & ~(right << 10)))
+        m.call(SLAVE+sy['mouse_vbl'], b'')
+        m.write(m.a4+mc['flags'], bytes([roll < 0, roll > 0, 0, 0, 1])); m.write(m.a4+mc['view'], struct.pack('>h', 0))
+        m.call(mc['controller'], b'')
+        return struct.unpack('>h', m.read(m.a4+mc['ramp']+4, 2))[0]
+    out = {}
+    m = machine()
+    m.write(m.a4+mc['aperture'], struct.pack('>6h', *APERTURE))
+    ctl(m, 0, 0)
+    # Native (the stick with fire held): one step a call to 9, decay by two.
+    got = [ctl(m, 0, 1) for _ in range(11)]+[ctl(m, 0, 0) for _ in range(5)]
+    assert got == [1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 7, 5, 3, 1, 0], ('native roll', got)
+    out['native'] = got
+    # The right button: four times each step, the cap and the decay.
+    got = [ctl(m, 1, -1) for _ in range(10)]+[ctl(m, 1, 1) for _ in range(2)]+[ctl(m, 1, 0) for _ in range(2)]
+    assert got == [-4, -8, -12, -16, -20, -24, -28, -32, -36, -36, 4, 8, 0, 0], ('mouse roll', got)
+    got = [ctl(m, 1, 1) for _ in range(9)]+[ctl(m, 0, 0) for _ in range(6)]+[ctl(m, 0, 1) for _ in range(2)]
+    assert got == [4, 8, 12, 16, 20, 24, 28, 32, 36, 28, 20, 12, 4, 0, 0, 1, 2], ('released roll', got)
+    out['mouse'] = got
+    m.close()
     return out
 
 
@@ -826,6 +855,20 @@ def name_cases(cfg, fixed, blob, sy):
     event(0, -1000); assert poll() == (0, 0)
     event(30, 0); poll()
     event(30, 0); assert poll(gap=20) == (1, 0), 'stale motion kept after a gap'
+    # The right button: a press queues one Return; one held from before the
+    # screen (the first poll after a gap) does nothing.
+    for off in (-132, -138):                    # Forbid, Permit
+        m.write(EXEC+off, b'\x4e\x75')
+
+    def keys(right, gap=1):
+        m.write(SLAVE+sy['btn'], struct.pack('>H', right << 1))
+        poll(gap=gap)
+        rd, wr = struct.unpack('>HH', m.read(a4+mc['keys'], 4))
+        got = bytes(m.read(a4+mc['keybuf']+(i % 64), 1)[0] for i in range(rd, rd+(wr-rd) % 64))
+        m.write(a4+mc['keys'], struct.pack('>H', wr))
+        return got
+    got = [keys(1, 50), keys(1), keys(0), keys(1), keys(1), keys(0), keys(0), keys(1), keys(1, 50), keys(0), keys(1)]
+    assert got == [b'', b'', b'', b'\r', b'', b'', b'', b'\r', b'', b'', b'\r'], ('name return', got)
     m.close()
     return 'pass'
 
@@ -834,7 +877,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path)
     p.add_argument('--output', required=True, type=Path)
-    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored'),
+    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored', 'roll-native', 'return-ignored'),
                    help='negative control: the check must fail')
     a = p.parse_args()
     out = a.output.resolve()
@@ -865,6 +908,12 @@ def main():
             at = sy['mouse_poll_cd32']
             assert blob[at:at+2] == bytes.fromhex('6100')
             blob[at:at+4] = bytes.fromhex('4e714e71')
+        elif a.sabotage == 'roll-native':  # the right button's roll never scaled
+            at = blob.index(bytes.fromhex('3f40000a'), sy['mouse_steer'])   # move.w d0,10(sp)
+            blob[at:at+4] = bytes.fromhex('4e714e71')
+        elif a.sabotage == 'return-ignored':  # the name entry's right button queues nothing
+            at = blob.index(bytes.fromhex('700d6100'), sy['mouse_name'])
+            blob[at+2:at+6] = bytes.fromhex('4e714e71')
         elif a.sabotage == 'mask-ignored':  # the pointer drawn over the cockpit too
             at = blob.index(bytes.fromhex('c052'), sy['stick_show'])
             blob[at:at+2] = bytes.fromhex('3012')

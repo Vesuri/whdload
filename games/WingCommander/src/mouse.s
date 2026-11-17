@@ -72,6 +72,7 @@ RIGHT_STEP = 4                  ; counts in the last four fields: a direction
 CLICK_MAX = 15                  ; fields: a shorter right press is a click
 DCLICK_GAP = 15                 ; fields from a click's release to a double click
 BURN_REPEAT = 5                 ; fields between the afterburner's Tabs (key repeat)
+ROLL_SCALE = 4                  ; the right button's roll: native ramp steps, decay and cap times this
 
 ; a0 = parameter table, d0 = game H0 base.
 mouse_init:
@@ -273,7 +274,11 @@ mouse_event:
 ; 6-byte call), with d2 = pitch and d3 = yaw ramp as the native code left them.
 ; Native ramps step by one per call to +-9 and decay by two; the mouse sets
 ; them at once. Mouse right is the stick right (yaw +); mouse down is the stick
-; back (pitch -). Every register except d2/d3 is kept.
+; back (pitch -). While the right button rolls, and until the roll ramp
+; settles after it, the roll ramp (d4, which the controller stores next) is
+; the native ramp with ROLL_SCALE times its steps, decay and cap, from the
+; controller's roll flags in d5 (left) and d6 (right): ROLL_SCALE times the
+; roll for the same motion. Every register except d2-d4 is kept.
 mouse_steer:
         movem.l d0-d1/d4-d7/a0-a3/a5-a6,-(sp)
         lea     mouse_a4(pc),a0
@@ -376,6 +381,59 @@ mouse_steer:
         move.w  MP_RAMP(a1),d1
         move.w  d2,(a4,d1.w)
         move.w  d3,2(a4,d1.w)
+        lea     roll_mouse(pc),a0
+        move.w  btn+BT_NOW(pc),d0
+        btst    #BT_RIGHT,d0
+        beq.s   .free_roll
+        move.w  #1,(a0)                 ; the right button rolls: scaled
+        bra.s   .roll
+.free_roll:
+        tst.w   (a0)
+        beq.s   .native_roll
+        tst.w   4(a4,d1.w)
+        bne.s   .roll
+        clr.w   (a0)                    ; released and settled: native again
+        bra.s   .native_roll
+.roll:
+        move.w  4(a4,d1.w),d0           ; the roll ramp before this call
+        tst.b   15(sp)                  ; the controller's roll flags: d5 left,
+        beq.s   .not_left
+        tst.w   d0                      ; d6 right (both: neither)
+        ble.s   .roll_left
+        moveq   #0,d0
+.roll_left:
+        subq.w  #ROLL_SCALE,d0
+        cmpi.w  #-9*ROLL_SCALE,d0
+        bge.s   .roll_store
+        moveq   #-9*ROLL_SCALE,d0
+        bra.s   .roll_store
+.not_left:
+        tst.b   19(sp)
+        beq.s   .decay
+        tst.w   d0
+        bge.s   .roll_right
+        moveq   #0,d0
+.roll_right:
+        addq.w  #ROLL_SCALE,d0
+        cmpi.w  #9*ROLL_SCALE,d0
+        ble.s   .roll_store
+        moveq   #9*ROLL_SCALE,d0
+        bra.s   .roll_store
+.decay:
+        cmpi.w  #-2*ROLL_SCALE,d0
+        bge.s   .decay_low
+        addq.w  #2*ROLL_SCALE,d0
+        bra.s   .roll_store
+.decay_low:
+        cmpi.w  #2*ROLL_SCALE,d0
+        ble.s   .settled
+        subq.w  #2*ROLL_SCALE,d0
+        bra.s   .roll_store
+.settled:
+        moveq   #0,d0
+.roll_store:
+        move.w  d0,10(sp)               ; d4: the controller stores it next
+.native_roll:
         movem.l (sp)+,d0-d1/d4-d7/a0-a3/a5-a6
         addq.l  #2,(sp)                 ; past the displaced store's last word
         rts
@@ -1077,6 +1135,7 @@ stick_ptr:      dc.w 0,0                ; pointer offset from the gunsight, half
 stick_owned:    dc.w 0                  ; sprite 7: 0 not yet, 1 ours, -1 taken
 mask_top:       dc.w 0                  ; screen row of the mask's first row
 mask_rows:      dc.w 0                  ; mask rows (0: no aperture)
+roll_mouse:     dc.w 0                  ; the right button has rolled: scaled until the ramp settles
 fire_held:      dc.w 0                  ; left button fire: fields held (0: native)
 btn:            dc.w 7                  ; button record (BT_): all down, so no first press
                 dcb.w 19,0

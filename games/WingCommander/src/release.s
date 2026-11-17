@@ -245,6 +245,10 @@ mouse_guard:
 ; jsr step(pc), with d0 = the stick's column step and the row step already
 ; pushed. Adds whole cells of mouse motion since the last poll. Columns stop
 ; at the grid edge (the stick wraps) and motion from other screens is dropped.
+; A right button press queues Return in the key FIFO, which the name loop
+; reads when the pad gives nothing: it ends the name or the callsign, so a
+; name can be entered with the mouse alone. A press held from before the
+; screen does nothing.
 ; Enters the native step with both arguments pushed, as the native call does.
 NAME_SEL = 26                   ; parameter table: A4 offset, selected cell code
 NAME_COLS = 28                  ; A4 offset, grid columns
@@ -264,17 +268,28 @@ mouse_name:
         move.w  NAME_COLS(a1),d4
         move.w  (a4,d4.w),d4
         lea     mouse_sum_x(pc),a0
-        lea     name_used(pc),a1        ; used x, used y, last poll field
+        lea     name_used(pc),a1        ; used x, used y, last poll field, right
         move.w  mouse_fields(pc),d1
         move.w  d1,d2
         sub.w   4(a1),d2
         move.w  d1,4(a1)
+        moveq   #1<<BT_RIGHT,d1
+        and.w   btn+BT_NOW(pc),d1       ; the right button now
         cmpi.w  #8,d2
         bls.s   .fresh
+        move.w  d1,6(a1)                ; held from before: no press
         move.w  (a0),(a1)               ; first poll on this screen
         move.w  2(a0),2(a1)
         bra.s   .done
 .fresh:
+        move.w  6(a1),d2
+        move.w  d1,6(a1)
+        not.w   d2
+        and.w   d2,d1
+        beq.s   .motion
+        moveq   #13,d0                  ; pressed: Return
+        bsr.w   mouse_key
+.motion:
         move.w  (a0),d1
         sub.w   (a1),d1
         ext.l   d1
@@ -340,7 +355,7 @@ mouse_params_de:
         dc.w    138,6
         dc.l    0
 name_step:      dc.l 0
-name_used:      dc.w 0,0,0
+name_used:      dc.w 0,0,0,0            ; used x, used y, last poll field, right button
 
 ; Raw patch lists (no includes in this build): command, long offset, argument.
 fix_patch_en:

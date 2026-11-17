@@ -9,8 +9,8 @@ position must follow the mouse, and a click must select the menu item, as
 Return does. OCS original mode (the unchanged renderer) is only required to
 cover the distance; see the assertion. CD32 --name-entry continues into the
 simulator, lets the ship be destroyed and, at the top-score name entry, moves
-the selection box over the character grid with the mouse and clicks a
-character. Screenshots and reports stay in the capture directory under tmp/.
+the selection box over the character grid with the mouse, clicks a
+character and ends the name with the right button. Screenshots and reports stay in the capture directory under tmp/.
 """
 import argparse
 import functools
@@ -30,21 +30,23 @@ from PIL import Image
 # Per game: A4 offsets of the room pointer position, the pointer SimpleSprite
 # (x at +6) and the field clock; H0 intro waits (wait, done), menu (ready,
 # accepted); name entry (input loop, poll result) and its A4 selected cell and
-# columns; flight: ramp store site (H0), ramps, view, aperture block and copper
+# columns, then its Return case (H0); flight: ramp store site (H0), ramps, view, aperture block and copper
 # list pair (A4; OCS none). German CD32 addresses map the English ones by
 # matching code. buttons: the player's set speed, roll ramp and ship action
 # (A4), and the native afterburner and missile commands (H0: Tab's and
 # Enter's, E:19500's cases 16 and 18, OCS inline in the command loop).
+# ship: the player's ship type (A4, its C type) and the ship table (A4, 104
+# bytes a type; the roll rate at +38, which E:7a4 multiplies by the roll ramp).
 GAMES = {
     'ocs': dict(pointer=(0x19c, -2150), field=-0x800, intro=((0x180c4, 0x1edde), (0x180c4, 0x1f396)),
                 menu=(0x1f43c, 0x1f44e), flight=(0x1869e, 3720, -18318, -4188, 0),
-                buttons=(4430, 3724, 3316, 0x18d88, 0x18d9a)),
+                buttons=(4430, 3724, 3316, 0x18d88, 0x18d9a), ship=('short', 2170, -11224)),
     'cd32': dict(pointer=(0xa88, -1156), field=-252, intro=((0x1898a, 0x1fbba), (0x1898a, 0x20164)),
-                 menu=(0x20214, 0x20226), name=(0x16fc6, 0x16fd0, 17716, 17706),
+                 menu=(0x20214, 0x20226), name=(0x16fc6, 0x16fd0, 17716, 17706, 0x170b8),
                  flight=(0x19064, 5882, -18280, -4318, -532), fire=(0x9546, 18120),
-                 buttons=(6592, 5886, 5478, 0x197e6, 0x197f8)),
+                 buttons=(6592, 5886, 5478, 0x197e6, 0x197f8), ship=('unsigned char', 4367, -11354)),
     'cd32-de': dict(pointer=(2740, -1112), field=-208, intro=((0x18a44, 0x1fcbe), (0x18a44, 0x2026c)),
-                    menu=(0x2031c, 0x2032e), name=(0x17064, 0x1706e, 17766, 17756),
+                    menu=(0x2031c, 0x2032e), name=(0x17064, 0x1706e, 17766, 17756, 0x17156),
                     flight=(0x1911e, 5926, -18236, -4274, -488)),
 }
 def main():
@@ -132,7 +134,7 @@ def main():
     def name_entry():
         # E:16fc6 first name-input iteration; E:16fd0 poll result in d0.
         # Selected cell code at A4+17716, grid columns at A4+17706.
-        loop, result, sel, cols = game['name']
+        loop, result, sel, cols, enter = game['name']
         until(h0+loop, 600)
         cmd('monitor fields 4'); until(h0+loop)
         width = number(f'*(short*){a4+cols:#x}')
@@ -153,7 +155,12 @@ def main():
         cmd('monitor input JOY1_FIRE_BUTTON 0')
         assert code not in (13, 127), code
         cmd('monitor fields 4'); shot('name-picked')
-        return dict(columns=width, start=start, moved=moved, picked=code)
+        # The right button is Return: it ends the name.
+        cmd('monitor input JOY1_2ND_BUTTON 1')
+        until(h0+enter, 30)
+        cmd('monitor input JOY1_2ND_BUTTON 0')
+        cmd('monitor fields 4'); shot('name-entered')
+        return dict(columns=width, start=start, moved=moved, picked=code, entered='return')
 
     def flight():
         # The flight: the controller's ramp stores (the slave's mouse_steer).
@@ -322,6 +329,15 @@ def main():
         assert max(r['speed'] for r in out['faster']) > out['faster'][0]['speed'], out
         assert min(r['speed'] for r in out['slower']) < max(r['speed'] for r in out['faster']), out
         assert min(r['roll'] for r in out['roll_left']) < 0 < max(r['roll'] for r in out['roll_right']), out
+        # The right button's roll ramp steps by four (native: one); the roll
+        # rates in the ship table times its cap still fit the word E:7a4
+        # computes.
+        kind, ship, table = game['ship']
+        out['ship'] = number(f'*({kind}*){a4+ship:#x}')
+        out['roll_rates'] = [number(f'*(short*){a4+table+104*i+38:#x}') for i in range(16)]
+        rolls = [r['roll'] for r in out['roll_left']+out['roll_right']]
+        assert max(map(abs, rolls)) >= 8 and all(r % 4 == 0 for r in rolls), rolls
+        assert max(map(abs, out['roll_rates']))*36 < 32768, out['roll_rates']
         assert all(r['pointer'] == held[0]['pointer'] for r in held), 'pointer moved with the right button'
         return out
 
