@@ -1053,7 +1053,7 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   - Enhanced mode reads the live position, not the per-field input history.
   - The response curve has no measured PC reference.
   - The right button holds the pointer while it throttles and rolls (UR7).
-  - Not yet played by the user.
+  - Played by the user only for the right-button roll (UR7).
 
 #### User reports after 2.0b (UR1–UR15)
 
@@ -1066,13 +1066,10 @@ Status is against the published 2.0b (15.11.2026). Refer to items by ID.
 Speed and pacing:
 - **UR1 (H, U): flight too slow at 10 Hz. Closed (user decision, 2026-11-16):**
   World speed 1.2x–2.0x addresses it; the icon default stays 1.0x.
-- **UR2 (H, U): cutscenes and animations too slow.** U: cutscenes in general;
-  H: the opening orchestra (about 16 fps, plus a pause before it) and the
-  applause (15–16 fps). Mostly open: the orchestra now steps every three PAL /
-  four NTSC fields (16.7/15 per second; user decision, 2026-11-16), with no
-  pause added before it; the applause is probably the briefing crowd,
-  already one picture per three fields (16.7/s PAL), unconfirmed. World speed
-  excludes cutscenes by design, so this needs a separate decision.
+- **UR2 (H, U): cutscenes and animations too slow. Closed (user decision,
+  2026-11-17):** the user finds the cutscenes fine now. The opening orchestra
+  steps every three PAL / four NTSC fields (16.7/15 per second), with no pause
+  added before it; World speed excludes cutscenes by design.
 - **UR3 (U): launch camera less smooth than Psygore's** where the camera follows
   the ship as the cockpit closes. Exterior launch fixed (2026-11-16):
   intermediate pictures showed the next native actor state, so crew, tractor
@@ -1104,13 +1101,13 @@ Firing and mouse:
   likely cause is the masked image and the sprite position updating a field
   apart; the reference centre is the gunsight by choice, not the PC's window
   middle.
-- **UR7 (H): right button for PC-style actions:** roll left/right, throttle
-  forward/back, double-click (and hold) for afterburner. Implemented as the PC
+- **UR7 (H): right button for PC-style actions. Closed (user decision,
+  2026-11-17):** roll left/right, throttle forward/back, double-click (and hold) for afterburner. Implemented as the PC
   reference card's mouse controls (internals, "Mouse buttons in flight").
   Checked natively on both variants and live on both, in enhanced and
-  Original speed. The user found the roll too slow (2026-11-17): the right
-  button now rolls four times as fast as the keys, the rest unchanged.
-  Not yet played by the user since.
+  Original speed. The user found the roll too slow, so the right button now
+  rolls four times as fast as the keys, the rest unchanged. The user
+  tested the four-times roll and finds it fine.
 - **UR8 (H): missiles on left+right together or the middle button.**
   Implemented with UR7; the same checks. The middle button is only checked
   in the emulator.
