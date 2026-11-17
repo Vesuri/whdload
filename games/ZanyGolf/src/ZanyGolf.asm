@@ -87,6 +87,28 @@ Start		lea	_resload(pc),a1
 		move.l	(sp)+,$65a(a1)
 		jmp	(a1)
 
+LEW		macro			;\1: the little-endian word at the even address \1
+		move.w	\1,\2
+		ror.w	#8,\2
+		endm
+SEW		macro			;store \1 little-endian at the even address \2
+		ror.w	#8,\1
+		move.w	\1,\2
+		ror.w	#8,\1
+		endm
+LEL		macro			;\1: the little-endian long at the even address \1
+		move.l	\1,\2
+		ror.w	#8,\2
+		swap	\2
+		ror.w	#8,\2
+		endm
+TBIT		macro			;bit \2 of \1 set: set bit \4 of \3
+		btst	#\2,\1
+		beq.b	.\@
+		bset	#\4,\3
+.\@
+		endm
+
 Patch		movem.l	d0-d7/a0-a6,-(sp)
 		move.l	a3,a0
 		move.l	#65536,d0
@@ -111,6 +133,11 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		move.l	#$01384ef9,$5238(a3)	;the main loop: step the world each
 		pea	Split			;STEP_FIELDS fields, draw in between
 		move.l	(sp)+,$523c(a3)
+
+		move.w	#$4eb9,$1d78(a3)	;the input's mouse counts: jsr PtrTake,
+		pea	PtrTake			;bra.w $1dc4
+		move.l	(sp)+,$1d7a(a3)
+		move.l	#$60000044,$1d7e(a3)
 
 		move.w	#$4eb9,$1de2(a3)	;the input's mouse button: jsr ReadButton
 		pea	ReadButton
@@ -155,6 +182,7 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		bhi.b	.hole1
 		move.w	d0,$7a9c(a3)		;a game's start: LDY #0 -> LDY #hole (CUSTOM1)
 .hole1		bsr	PtrInit			;the pointer as sprites
+		bsr	IpInit			;frames between the steps
 		jsr	(resload_FlushCache,a2)	;the code changed
 		move.l	#CACRF_EnableI,d0	;the instruction cache for BaseMem: the
 		move.l	d0,d1			;game never changes its code. Not the
@@ -250,10 +278,11 @@ _lastflip	dc.b	0
 ; - flag clear: input and step ($524c), and loop; the game clock then counts real fields.
 ; - flag set and STEP_FIELDS fields since the last step: the same, input and step only, so
 ;   the step is not held up behind a frame; the next pass draws it.
-; - flag set and fewer: draw only (DrawOnly), and loop. $4fd0 draws the course pieces
-;   that have come into view (it clears their bit 0 in $111a); what it reads (the view,
-;   the pieces and their bits) changes only in a step, so after its first run following a
-;   step it would find nothing, and DrawOnly starts after it until the next step.
+; - flag set and fewer: draw only (DrawOnly), between the last two steps (Present), and
+;   loop. $4fd0 draws the course pieces that have come into view (it clears their bit 0
+;   in $111a); what it reads (the view, the pieces and their bits) changes only in a step
+;   or with the view drawn, so while neither changed since its last run it would find
+;   nothing, and DrawOnly starts after it.
 ; A step can change the flag (the pause screen clears it), and the next pass tests it again,
 ; as the game's own next pass did.
 ; Steps are due every STEP_FIELDS fields by the field counter; a step more than one step
@@ -262,6 +291,11 @@ _lastflip	dc.b	0
 ; steps. a4 is FILE1's base, d7 and a0 are scratch in the threaded code.
 STEP_FIELDS	= 6
 Split		bsr	PollButton
+		LEW	$5e1c(a4),d7		;between two steps: where the last put
+		swap	d7			;the pointer (it may have moved it itself)
+		LEW	$5e1e(a4),d7
+		lea	(_ptrbase,pc),a0
+		move.l	d7,(a0)
 		move.b	$0ea0(a4),d0		;displaced: LDA $0ea0
 		move.b	d0,d4
 		lea	(_laststep,pc),a0
@@ -277,17 +311,24 @@ Split		bsr	PollButton
 		cmp.b	#2*STEP_FIELDS,d7
 		bcc.b	.late
 		addq.b	#STEP_FIELDS,(a0)
+		bsr	IpSnap			;the state before the step
 		bra.b	.step
 .late		move.b	$145c(a4),(a0)
+		bsr	IpCut			;late: no frames between
 .step		lea	(_stepped,pc),a0
 		st	(a0)
 		lea	$524c(a4),a5		;JSR $1d5a; JSR $62b2; JMP $5232
 		jmp	$0122(a4)		;dispatch
-.draw		lea	(_stepped,pc),a0
+.draw		bsr	Present			;d7: the fields since the step was due
+		lea	(_stepped,pc),a0
 		lea	(DrawOnly,pc),a5
+		move.l	$0e9c(a4),d7		;the view $4fd0 would read
 		tst.b	(a0)
+		bne.b	.full
+		cmp.l	_lastview-_stepped(a0),d7
 		beq.b	.lite
-		clr.b	(a0)
+.full		clr.b	(a0)
+		move.l	d7,_lastview-_stepped(a0)
 		jmp	$0122(a4)
 .lite		addq.w	#4,a5			;no step since $4fd0 last ran: skip it
 		jmp	$0122(a4)
@@ -297,6 +338,7 @@ Split		bsr	PollButton
 .off		lea	(_v+V_RESET,pc),a0	;no frames now (a hole may load): NewDraw
 		st	(a0)			;starts again from nothing
 		bsr	PtrOff
+		bsr	IpCut
 		bra.b	.step
 
 ; Debug: CUSTOM1=N (0-9, the splash window's "Start on hole") starts every game on hole
@@ -312,10 +354,395 @@ _hole		dc.l	0
 DrawOnly	dc.w	$05e8,$4fd0		;JSR $4fd0
 		dc.w	$05e8,$1478		;JSR $1478: the renderer
 		dc.w	$05e8,$48d4		;JSR $48d4
-		dc.w	$0438,$5232		;JMP $5232
+		dc.w	$0138			;native: the world's state back
+		bra.w	Restore
+DrawEnd		dc.w	$0438,$5232		;JMP $5232
 
+_lastview	dc.w	0,0			;the view $4fd0 last ran with
 _laststep	dc.b	0
 _stepped	dc.b	0			;a step ran since $4fd0 last did
+		even
+
+;=============================================================================
+; Frames between the steps. A step changes the world every 6 fields; the draw-only
+; passes between show it (Split). IpSnap keeps, before each step, what the frames draw
+; moving things from: the view ($0e9c/$0e9e) and the 32 objects' x and y ($0f5a/$0f9a)
+; and frames ($0f1a), with what tells an object's moves from a cut (active $0fda, shape
+; $0eda, shape set $105a, the state $0ea8 and the hole $5c5a). Present, before a
+; draw-only pass, puts in their place, for the pass only, (Restore puts the world's back
+; after it):
+; - the view and each object that moved less than IP_JUMP on each axis, between the
+;   step before and the last, (fields since the step was due + 1)/6 of the way, to the
+;   nearest pixel, and for the first half the step before's frame of the object, so an
+;   animation keeps with its moves: the frame, shown from the next field, is a step
+;   behind the world at most;
+; - the course pieces each step draws over the objects, on every pass (.mask);
+; - while the player points or draws a stroke back ($5e1a 0, $9676 0 or 1, in play):
+;   the pointer ($5e1c), where the next step will put it by the counts gathered so far
+;   (PtrPredict), and what the step makes of it: the view, scrolled as $8afe scrolls it,
+;   the pointer's object ($8dd6) or, drawing back, the ball's mark, the three dots
+;   and the pointer's object ($8e0c). The sprite and these then move together.
+; Without the buffer (IpInit) the frames between show the last step.
+IP_JUMP		= 96			;a move longer than this is a cut
+IP_PREV		= 0			;x 64, y 64, active 64, shape 64, set 64, view 4,
+IP_PSTATE	= 324			;state, hole
+IP_SAVE		= 326			;$0f1a-$1019, view 4, pointer 4
+IP_MASK		= IP_SAVE+256+8		;the last step's pieces: bit 1 of $111a 64, $119a 64,
+IP_MASKP	= IP_MASK+128		;the step before's the same
+IP_MSAVE	= IP_MASKP+128		;$111a 64, $119a 64, for Restore
+IP_PFRAME	= IP_MSAVE+128		;the step before's frames ($0f1a) 64
+IP_SIZE		= IP_PFRAME+64
+
+IpInit		movem.l	d0-d1/a0-a1/a6,-(sp)
+		move.l	#IP_SIZE,d0
+		move.l	#$10001,d1		;MEMF_PUBLIC|MEMF_CLEAR
+		movea.l	4.w,a6
+		jsr	-198(a6)		;AllocMem
+		lea	(_ipbuf,pc),a0
+		move.l	d0,(a0)
+		movem.l	(sp)+,d0-d1/a0-a1/a6
+		rts
+
+; Before a step (Split; d7 and a0 scratch).
+IpSnap		movem.l	d0/a1-a2,-(sp)
+		move.l	(_ipbuf,pc),d0
+		beq.b	.out
+		movea.l	d0,a1
+		lea	$0f5a(a4),a2		;x, y, active
+		moveq	#192/4-1,d0
+.xya		move.l	(a2)+,(a1)+
+		dbf	d0,.xya
+		lea	$0eda(a4),a2
+		moveq	#64/4-1,d0
+.shape		move.l	(a2)+,(a1)+
+		dbf	d0,.shape
+		lea	$105a(a4),a2
+		moveq	#64/4-1,d0
+.set		move.l	(a2)+,(a1)+
+		dbf	d0,.set
+		move.l	$0e9c(a4),(a1)+
+		move.b	$0ea8(a4),(a1)+
+		move.b	$5c5a(a4),(a1)+
+		lea	IP_PFRAME-IP_SAVE(a1),a1
+		lea	$0f1a(a4),a2
+		moveq	#64/4-1,d0
+.frame		move.l	(a2)+,(a1)+
+		dbf	d0,.frame
+		lea	(_ipvalid,pc),a2
+		st	(a2)
+.out		movem.l	(sp)+,d0/a1-a2
+		rts
+
+IpCut		lea	(_ipvalid,pc),a0	;no step before to draw from
+		clr.b	(a0)
+		rts
+
+; Before a draw-only pass (Split): d7 the fields since the step was due (0-5). Keeps
+; all registers but d7 and a0.
+Present		movem.l	d0-d6/a1-a3,-(sp)
+		move.l	(_ipbuf,pc),d0
+		beq	.out
+		movea.l	d0,a1
+		lea	IP_SAVE(a1),a2		;the world's, for Restore
+		lea	$0f1a(a4),a0
+		moveq	#256/4-1,d0
+.save		move.l	(a0)+,(a2)+
+		dbf	d0,.save
+		move.l	$0e9c(a4),(a2)+
+		move.l	$5e1c(a4),(a2)+
+		lea	(_ipin,pc),a0
+		st	(a0)
+		moveq	#0,d6
+		move.b	d7,d6
+		addq.w	#1,d6			;the way from the step before: d6/6
+		moveq	#0,d5			;d5: the step before is drawn from
+		tst.b	_ipvalid-_ipin(a0)
+		beq.b	.nosame
+		move.b	$0ea8(a4),d0		;the same screen and hole
+		cmp.b	IP_PSTATE(a1),d0
+		bne.b	.nosame
+		move.b	$5c5a(a4),d0
+		cmp.b	IP_PSTATE+1(a1),d0
+		bne.b	.nosame
+		moveq	#1,d5
+.nosame		bsr	.mask
+		tst.b	d5
+		beq	.ptr
+		moveq	#0,d1			;X: the object
+.obj		lea	(a4,d1.w),a0
+		lea	(a1,d1.w),a2
+		tst.b	$0fda(a0)
+		beq.b	.onext
+		tst.b	128(a2)
+		beq.b	.onext
+		move.b	$0eda(a0),d0
+		cmp.b	192(a2),d0
+		bne.b	.onext
+		move.w	$105a(a0),d0
+		cmp.w	256(a2),d0
+		bne.b	.onext
+		LEW	(a2),d2
+		LEW	$0f5a(a0),d3
+		bsr	.lerp
+		bcs.b	.onext
+		move.w	d3,d5
+		LEW	64(a2),d2
+		LEW	$0f9a(a0),d3
+		bsr	.lerp
+		bcs.b	.onext
+		SEW	d5,$0f5a(a0)
+		SEW	d3,$0f9a(a0)
+		cmp.w	#3,d6			;the frame with the position: the step
+		bcc.b	.onext			;before's for the first half
+		move.b	IP_PFRAME(a2),$0f1a(a0)
+.onext		addq.w	#2,d1
+		cmp.w	#$40,d1
+		bne.b	.obj
+		LEW	320(a1),d2		;the view
+		LEW	$0e9c(a4),d3
+		bsr	.lerp
+		bcs.b	.ptr
+		move.w	d3,d5
+		LEW	322(a1),d2
+		LEW	$0e9e(a4),d3
+		bsr	.lerp
+		bcs.b	.ptr
+		SEW	d5,$0e9c(a4)
+		SEW	d3,$0e9e(a4)
+
+.ptr		cmp.b	#4,$0ea8(a4)		;in play, the ball at rest
+		bne	.out
+		tst.b	$0fda(a4)
+		beq	.out
+		tst.b	$5e1a(a4)
+		bne	.out
+		lea	$4000(a4),a0
+		move.b	$9676-$4000(a0),d6
+		cmp.b	#2,d6
+		bcc	.out
+		lea	IP_SAVE+8(a1),a0	;objects 4-8 are the next step's: its
+		lea	$0f22(a4),a2		;frames
+		moveq	#10-1,d0
+.pframe		move.b	(a0)+,(a2)+
+		dbf	d0,.pframe
+		bsr	PtrPredict		;d0, d1: the pointer the step will see
+		SEW	d0,$5e1c(a4)
+		SEW	d1,$5e1e(a4)
+		LEW	IP_SAVE+256(a1),d2	;the view the step scrolls ($8afe)
+		move.w	d0,d3
+		subq.w	#8,d3
+		cmp.w	d2,d3
+		bge.b	.vx1
+		move.w	d3,d2
+.vx1		move.w	d0,d3
+		add.w	#8-$130,d3
+		cmp.w	d2,d3
+		blt.b	.vx2
+		move.w	d3,d2
+.vx2		SEW	d2,$0e9c(a4)
+		LEW	IP_SAVE+258(a1),d2
+		move.w	d1,d3
+		subq.w	#8,d3
+		cmp.w	d2,d3
+		bge.b	.vy1
+		move.w	d3,d2
+.vy1		moveq	#0,d4
+		move.b	$11e6(a4),d4
+		move.w	d1,d3
+		addq.w	#8,d3
+		sub.w	d4,d3
+		cmp.w	d2,d3
+		blt.b	.vy2
+		move.w	d3,d2
+.vy2		SEW	d2,$0e9e(a4)
+		subq.w	#8,d0			;the pointer's object at it less 8
+		subq.w	#8,d1
+		tst.b	d6
+		bne.b	.back
+		SEW	d0,$0f62(a4)		;object 4 ($8dd6)
+		SEW	d1,$0fa2(a4)
+		bra	.out
+.back		SEW	d0,$0f6a(a4)		;$8e0c: object 8 the pointer,
+		SEW	d1,$0faa(a4)
+		LEW	$5df0(a4),d2		;4 the ball's mark
+		subq.w	#8,d2
+		SEW	d2,$0f62(a4)
+		LEW	$5df2(a4),d3
+		subq.w	#8,d3
+		SEW	d3,$0fa2(a4)
+		sub.w	d2,d0			;dx, dy from the ball
+		sub.w	d3,d1
+		moveq	#1,d4
+		move.b	d4,$0fe2(a4)		;4-7 on, the mark's frame 1
+		move.b	d4,$0fe4(a4)
+		move.b	d4,$0fe6(a4)
+		move.b	d4,$0fe8(a4)
+		move.b	d4,$0f22(a4)
+		move.w	d0,d4			;|dx| + |dy| under 256: the dots
+		bpl.b	.ax
+		neg.w	d4
+.ax		move.w	d1,d5
+		bpl.b	.ay
+		neg.w	d5
+.ay		cmp.w	#4,d4			;on the ball ($9148): the mark's frame 0
+		bcc.b	.off
+		cmp.w	#4,d5
+		bcc.b	.off
+		clr.b	$0f22(a4)
+.off		add.w	d5,d4
+		cmp.w	#$100,d4		;nearer than 8 from the ball are off
+		bcc.b	.dots
+		lsr.b	#1,d4
+		cmp.b	#8,d4
+		bcc.b	.d6
+		clr.b	$0fe6(a4)
+.d6		move.b	d4,d5
+		lsr.b	#1,d5
+		add.b	d4,d5
+		cmp.b	#8,d5
+		bcc.b	.d7
+		clr.b	$0fe8(a4)
+.d7		lsr.b	#1,d4
+		cmp.b	#8,d4
+		bcc.b	.dots
+		clr.b	$0fe4(a4)
+.dots		asr.w	#1,d0			;6 halfway, 5 and 7 a quarter each side
+		asr.w	#1,d1
+		move.w	d2,d4
+		add.w	d0,d4
+		SEW	d4,$0f66(a4)
+		move.w	d3,d5
+		add.w	d1,d5
+		SEW	d5,$0fa6(a4)
+		asr.w	#1,d0
+		asr.w	#1,d1
+		add.w	d0,d2
+		SEW	d2,$0f64(a4)
+		add.w	d1,d3
+		SEW	d3,$0fa4(a4)
+		add.w	d0,d4
+		SEW	d4,$0f68(a4)
+		add.w	d1,d5
+		SEW	d5,$0fa8(a4)
+.out		movem.l	(sp)+,d0-d6/a1-a3
+		rts
+; The course pieces drawn over the objects. Each step flags the piece under each moving
+; object ($9faa: bit 1 of $111a,X, with the depth $119a,X from the object's y) and the
+; draw list draws the flagged ones that are visible over the shapes, clearing the flag
+; ($4d20): only the first frame after a step would have them. The first pass after a
+; step keeps the flags and depths; each pass flags the last step's pieces and, drawn
+; from the step before (d5), that step's too, with the nearer depth. Restore puts the
+; world's back, less the flags the list cleared of them. a1 the buffer; keeps d5-d6.
+.mask		lea	$111a(a4),a0
+		lea	IP_MSAVE(a1),a2
+		moveq	#64/4-1,d0
+.msave		move.l	(a0)+,(a2)+
+		dbf	d0,.msave
+		lea	$119a(a4),a0
+		moveq	#64/4-1,d0
+.msave2		move.l	(a0)+,(a2)+
+		dbf	d0,.msave2
+		lea	(_stepped,pc),a0	;the first pass after a step
+		tst.b	(a0)
+		beq.b	.mput
+		lea	IP_MASK(a1),a2
+		moveq	#128/4-1,d0
+.mshift		move.l	(a2),d1			;the last step's become the step before's
+		tst.b	d5
+		bne.b	.mkeep
+		moveq	#0,d1
+.mkeep		move.l	d1,IP_MASKP-IP_MASK(a2)
+		addq.w	#4,a2
+		dbf	d0,.mshift
+		lea	IP_MASK(a1),a2
+		lea	$111a(a4),a0
+		moveq	#64-1,d0
+.mflag		move.b	(a0)+,d1
+		and.b	#2,d1
+		move.b	d1,(a2)+
+		dbf	d0,.mflag
+		lea	$119a(a4),a0
+		moveq	#64/4-1,d0
+.mdepth		move.l	(a0)+,(a2)+
+		dbf	d0,.mdepth
+.mput		lea	IP_MASK(a1),a2
+		lea	IP_MASKP(a1),a3
+		lea	$115a(a4),a0		;between $111a and $119a
+		moveq	#0,d1			;X: the piece
+.mpiece		move.b	(a2,d1.w),d0
+		LEW	64(a2,d1.w),d2
+		tst.b	d5
+		beq.b	.mone
+		or.b	(a3,d1.w),d0
+		LEW	64(a3,d1.w),d3
+		cmp.w	d2,d3
+		bcc.b	.mone
+		move.w	d3,d2
+.mone		tst.b	d0
+		beq.b	.mnext
+		bset	#1,$111a-$115a(a0,d1.w)
+		SEW	d2,$119a-$115a(a0,d1.w)
+.mnext		addq.w	#2,d1
+		cmp.w	#64,d1
+		bne.b	.mpiece
+		rts
+
+; d2 the step before's, d3 the last's: d3 d6/6 of the way, to the nearest pixel (a
+; half away from 0, so a pixel's move comes at d6 3, with the frame). Carry set: a cut.
+.lerp		sub.w	d2,d3
+		beq.b	.same
+		move.w	d3,d4
+		bpl.b	.lpos
+		neg.w	d4
+.lpos		cmp.w	#IP_JUMP,d4
+		bhi.b	.cut
+		muls	d6,d3
+		add.w	d3,d3
+		bmi.b	.lneg
+		addq.w	#6,d3
+		bra.b	.ldiv
+.lneg		subq.w	#6,d3
+.ldiv		divs	#12,d3
+.same		add.w	d2,d3
+		moveq	#0,d4			;carry clear
+		rts
+.cut		ori	#1,ccr
+		rts
+
+; After a draw-only pass (DrawOnly, native from primitive $0138): the world's state
+; back, then on to the thread's JMP $5232.
+Restore		movem.l	d0-d1/a1-a2,-(sp)
+		lea	(_ipin,pc),a0
+		tst.b	(a0)
+		beq.b	.go
+		clr.b	(a0)
+		movea.l	(_ipbuf,pc),a1
+		lea	IP_SAVE(a1),a1
+		lea	$0f1a(a4),a2
+		moveq	#256/4-1,d0
+.back		move.l	(a1)+,(a2)+
+		dbf	d0,.back
+		move.l	(a1)+,$0e9c(a4)
+		move.l	(a1)+,$5e1c(a4)
+		lea	IP_MSAVE-IP_SAVE-264(a1),a1	;the pieces' flags: the world's, less
+		lea	$111a(a4),a2		;those the list cleared
+		moveq	#64/4-1,d0
+.flags		move.l	(a2),d1
+		or.l	#$fdfdfdfd,d1
+		and.l	(a1)+,d1
+		move.l	d1,(a2)+
+		dbf	d0,.flags
+		lea	$119a(a4),a2
+		moveq	#64/4-1,d0
+.depths		move.l	(a1)+,(a2)+
+		dbf	d0,.depths
+.go		movem.l	(sp)+,d0-d1/a1-a2
+		lea	(DrawEnd,pc),a5
+		jmp	$0122(a4)
+
+_ipbuf		dc.l	0			;IP_SIZE, public; 0 none
+_ipvalid	dc.b	0			;IpSnap kept the step before
+_ipin		dc.b	0			;Present put its state in
 		even
 
 ; The input routine (FILE1 $1d5c, part of the step) reads the left mouse button from CIA-A
@@ -352,27 +779,6 @@ ReadButton	movem.l	d7/a0,-(sp)
 
 _button		dc.b	0,0			;the state the step reported last, changed since
 
-LEW		macro			;\1: the little-endian word at the even address \1
-		move.w	\1,\2
-		ror.w	#8,\2
-		endm
-SEW		macro			;store \1 little-endian at the even address \2
-		ror.w	#8,\1
-		move.w	\1,\2
-		ror.w	#8,\1
-		endm
-LEL		macro			;\1: the little-endian long at the even address \1
-		move.l	\1,\2
-		ror.w	#8,\2
-		swap	\2
-		ror.w	#8,\2
-		endm
-TBIT		macro			;bit \2 of \1 set: set bit \4 of \3
-		btst	#\2,\1
-		beq.b	.\@
-		bset	#\4,\3
-.\@
-		endm
 
 ;=============================================================================
 ; The pointer. The game draws it as an object, a shape in the frame, at the pointer's
@@ -383,14 +789,15 @@ TBIT		macro			;bit \2 of \1 set: set bit \4 of \3
 ; and keeps it 8 pixels inside the hole ($5e20/$5e22) and the view, which it scrolls. With
 ; a chip block (PtrInit), sprites 0 and 1, attached (15 colours, COLOR17-31 copied from the
 ; playfield's), show it instead, moved by the interrupt every field:
-; - the clamp is PTR_MAX instead: shown every field, the clamped axis stopped while the
-;   other went on, and a fast straight stroke wobbled;
-; - PtrStep, at the input routine's end, keeps where the step puts the pointer: its
-;   position plus the counts the routine took;
-; - PtrVbi, at each vertical blank, adds the quarter of the counts gathered since,
-;   clamped as the next step will clamp them, keeps the pointer inside the hole and the
-;   view as the step does, and places the sprites on the frame on screen (whose view
-;   FrameCap keeps at the flip);
+; - PtrTake takes the counts in the input routine's place, with the clamp PTR_MAX
+;   (always, sprites or not: shown every field, the clamped axis stopped while the other
+;   went on, and a fast straight stroke wobbled), and keeps where the step puts the
+;   pointer (_ptrbase);
+; - PtrVbi, at each vertical blank, places the sprites at PtrPredict (_ptrbase plus the
+;   quarter of the counts gathered since, clamped as the next step will clamp them) in
+;   the view of the frame on screen (which FrameCap keeps at the flip); the frames
+;   between the steps scroll the view and draw the aiming line for that point too
+;   (Present);
 ; - PtrList, after the draw list, takes the pointer's entry out of the list and draws its
 ;   frame into the sprites when the frame changed; the sprites show from the flip that
 ;   shows the frame (FrameCap). A frame wider than 16 pixels or taller
@@ -437,17 +844,6 @@ PtrInit		movem.l	d0-d2/a0-a2/a6,-(sp)	;a3 = FILE1
 .rest		move.l	a2,d0
 		bsr.b	.ptr
 		dbf	d2,.rest
-		moveq	#2-1,d1			;the input routine's clamps, x and y
-		lea	$1d88(a3),a0
-.max		move.w	#PTR_MAX,(a0)		;cmp.w #31,d0
-		move.w	#PTR_MAX,6(a0)		;move.w #31,d0
-		move.w	#-PTR_MAX,10(a0)	;cmp.w #-31,d0
-		move.w	#-PTR_MAX,16(a0)	;move.w #-31,d0
-		lea	$1dae-$1d88(a0),a0
-		dbf	d1,.max
-		move.w	#$4ef9,$1dfe(a3)	;the input routine's end: jmp PtrStep
-		pea	PtrStep
-		move.l	(sp)+,$1e00(a3)
 		move.w	#$4eb9,$2246(a3)	;the interrupt: jsr PtrVbi; nop over
 		pea	PtrVbi			;bsr.w $1f0c; tst.b $126e(a4)
 		move.l	(sp)+,$2248(a3)
@@ -464,21 +860,115 @@ PtrInit		movem.l	d0-d2/a0-a2/a6,-(sp)	;a3 = FILE1
 		addq.w	#2,d1
 		rts
 
-; Replaces movem.l (sp)+,d0-d2; lea $1e0a(a4),a5 at $1dfe; d0-d2 and a0 are free here.
-PtrStep		LEW	$5e1c(a4),d0		;x and y the step will reach
-		move.b	$0e80(a4),d1
-		ext.w	d1
-		add.w	d1,d0
-		swap	d0
+; The input routine's counts ($1d78-$1dc3; a4 = FILE1, d0-d2 and a0 free): for each
+; axis a quarter of the counts the interrupt gathered ($1d54/$1d56), the remainder of 4
+; left, clamped to +-PTR_MAX into $0e80/$0e88, with the interrupts off, so PtrVbi never
+; sees the counts taken and the pointer not yet moved. Keeps where the step will put the
+; pointer (_ptrbase: the position plus the counts, clamped as $92de and $8afe clamp it).
+PtrTake		movem.l	d3-d4,-(sp)
+		move.w	$dff01c,d4		;INTENAR
+		move.w	#$4000,$dff09a		;the interrupts off
+		lea	$1d54(a4),a0
+		bsr.b	.take
+		move.b	d0,$0e80(a4)
+		move.w	d0,d3
+		lea	$1d56(a4),a0
+		bsr.b	.take
+		move.b	d0,$0e88(a4)
+		move.w	d0,d1
 		LEW	$5e1e(a4),d0
-		move.b	$0e88(a4),d1
-		ext.w	d1
-		add.w	d1,d0
-		lea	(_ptrstep,pc),a0
+		add.w	d0,d1
+		LEW	$5e1c(a4),d0
+		add.w	d3,d0
+		bsr	PtrClamp
+		swap	d0
+		move.w	d1,d0
+		lea	(_ptrbase,pc),a0
 		move.l	d0,(a0)
-		movem.l	(sp)+,d0-d2		;displaced
-		lea	$1e0a(a4),a5
-		jmp	$0106(a4)
+		btst	#14,d4
+		beq.b	.off
+		move.w	#$c000,$dff09a		;back on
+.off		movem.l	(sp)+,d3-d4
+		rts
+.take		move.w	(a0),d0
+		asr.w	#2,d0
+		move.w	d0,d1
+		asl.w	#2,d1
+		sub.w	d1,(a0)
+		bra.b	PtrQ
+
+; d0: a quarter of the counts, clamped as the input routine clamps it.
+PtrQ		cmp.w	#PTR_MAX,d0
+		ble.b	.lo
+		moveq	#PTR_MAX,d0
+.lo		cmp.w	#-PTR_MAX,d0
+		bge.b	.ok
+		moveq	#-PTR_MAX,d0
+.ok		rts
+
+; Where the next step puts the pointer: _ptrbase plus the counts gathered since,
+; clamped. Out: d0 x, d1 y. Keeps the other registers.
+PtrPredict	move.l	d2,-(sp)
+		move.w	$1d54(a4),d0
+		asr.w	#2,d0
+		bsr.b	PtrQ
+		add.w	(_ptrbase,pc),d0
+		move.w	d0,d2
+		move.w	$1d56(a4),d0
+		asr.w	#2,d0
+		bsr.b	PtrQ
+		add.w	(_ptrbase+2,pc),d0
+		move.w	d0,d1
+		move.w	d2,d0
+		move.l	(sp)+,d2		;and on into PtrClamp
+
+; Clamp the pointer d0 (x), d1 (y) as the step does: while a stroke is drawn back ($9676
+; 1) into the box around the ball ($92de: $34 left of $5df0 to $33 right, $24 above
+; $5df2 to $23 below), then 8 pixels inside the hole ($8afe). Keeps the other registers.
+PtrClamp	movem.l	d2-d3/a0,-(sp)
+		lea	$4000(a4),a0
+		cmp.b	#1,$9676-$4000(a0)
+		bne.b	.hole
+		LEW	$5df0(a4),d2
+		sub.w	#$34,d2
+		move.w	d0,d3
+		sub.w	d2,d3
+		bpl.b	.bx
+		move.w	d2,d0
+		bra.b	.by
+.bx		cmp.w	#$68,d3
+		bcs.b	.by
+		add.w	#$67,d2
+		move.w	d2,d0
+.by		LEW	$5df2(a4),d2
+		sub.w	#$24,d2
+		move.w	d1,d3
+		sub.w	d2,d3
+		bpl.b	.by1
+		move.w	d2,d1
+		bra.b	.hole
+.by1		cmp.w	#$48,d3
+		bcs.b	.hole
+		add.w	#$47,d2
+		move.w	d2,d1
+.hole		cmp.w	#8,d0
+		bge.b	.h1
+		moveq	#8,d0
+.h1		LEW	$5e20(a4),d2
+		subq.w	#8,d2
+		cmp.w	d2,d0
+		blt.b	.h2
+		move.w	d2,d0
+.h2		cmp.w	#8,d1
+		bge.b	.h3
+		moveq	#8,d1
+.h3		LEW	$5e22(a4),d2
+		subq.w	#8,d2
+		cmp.w	d2,d1
+		blt.b	.h4
+		move.w	d2,d1
+.h4		movem.l	(sp)+,d2-d3/a0
+		rts
 
 ; From the interrupt ($2246), after it has added the mouse's counts; a4 = FILE1. Keeps
 ; every register.
@@ -510,23 +1000,19 @@ PtrPlace	move.l	(_ptrspr,pc),d0
 .col		move.w	(a3),(a6)+
 		addq.w	#4,a3
 		dbf	d1,.col
-		move.w	_ptrstep-_ptron(a2),d0	;x
-		move.w	$1d54(a4),d1
-		LEW	$5e20(a4),d2
-		move.w	_ptrview-_ptron(a2),d3
+		bsr	PtrPredict		;on the course
+		sub.w	_ptrview-_ptron(a2),d0	;in the view of the frame on screen
 		move.w	#$128,d4
-		bsr	.axis
+		bsr	.screen
 		move.w	d0,d5
 		add.w	_ptroff-_ptron(a2),d5
 		add.w	#PTR_HPOS,d5		;HSTART
-		move.w	_ptrstep+2-_ptron(a2),d0 ;y
-		move.w	$1d56(a4),d1
-		LEW	$5e22(a4),d2
-		move.w	_ptrview+2-_ptron(a2),d3
+		move.w	d1,d0
+		sub.w	_ptrview+2-_ptron(a2),d0
 		moveq	#0,d4
 		move.b	$11e6(a4),d4
 		subq.w	#8,d4
-		bsr	.axis
+		bsr	.screen
 		add.w	_ptroff+2-_ptron(a2),d0
 		add.w	#PTR_VPOS,d0		;VSTART
 		move.w	d0,d1
@@ -562,31 +1048,14 @@ PtrPlace	move.l	(_ptrspr,pc),d0
 		move.w	d2,2(a3)
 .out		rts
 
-; One axis: d0 where the step put the pointer, d1 the counts since, d2 the hole's size,
-; d3 the view, d4 the last place in the view. Out: d0 in the view.
-.axis		asr.w	#2,d1			;as $1d5c takes them
-		cmp.w	#PTR_MAX,d1
-		ble.b	.a1
-		moveq	#PTR_MAX,d1
-.a1		cmp.w	#-PTR_MAX,d1
-		bge.b	.a2
-		moveq	#-PTR_MAX,d1
-.a2		add.w	d1,d0
-		cmp.w	#8,d0			;in the hole, as $8afe
-		bge.b	.a3
+; d0 into 8 to d4, the pointer's places in the view.
+.screen		cmp.w	#8,d0
+		bge.b	.s1
 		moveq	#8,d0
-.a3		subq.w	#8,d2
-		cmp.w	d2,d0
-		ble.b	.a4
-		move.w	d2,d0
-.a4		sub.w	d3,d0			;in the view
-		cmp.w	#8,d0
-		bge.b	.a5
-		moveq	#8,d0
-.a5		cmp.w	d4,d0
-		ble.b	.a6
+.s1		cmp.w	d4,d0
+		ble.b	.s2
 		move.w	d4,d0
-.a6		rts
+.s2		rts
 
 ; No pointer until a frame is drawn again (Split, the drawing flag clear or the
 ; interrupts off: a hole may load, with new shapes). Only d7 and a0.
@@ -806,7 +1275,7 @@ PtrDraw		movem.l	d0-d7/a0-a3,-(sp)
 
 _ptrspr		dc.l	0			;the sprites, chip; 0 none
 _ptrrec		dc.l	0			;the frame drawn into them, 0 none
-_ptrstep	dc.w	0,0			;x, y where the step put the pointer
+_ptrbase	dc.w	0,0			;x, y where the last step put the pointer, or this one will
 _ptroff		dc.w	0,0			;the frame's left column, first line
 _ptrh		dc.w	0			;its lines
 _ptron		dc.b	0			;show the sprites

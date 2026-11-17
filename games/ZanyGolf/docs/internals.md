@@ -44,9 +44,8 @@ The loader, first hunk:
 | $48d4 | the draw list's `LDX #0; TXY` and `STX $4ec0`'s opcode (threaded) | primitive $0138, `jmp NewList` | ours: the draw list's first two phases in native code ("Display") |
 | $22b0 | the copper list's top: `SPR0DATA` and `SPR0DATB` = 0 | `BPLCON2` = $24, `DMACON` = $8020 | ours, with the sprites' chip RAM: sprite DMA on, sprites in front of the playfield ("The pointer") |
 | $2338 | the copper list's tail, after its wait for line $90: `DMACON` = $0020 (sprite DMA off), the data registers of sprites 0-7 = 0 | a wait for line $f8, the eight sprite pointers | ours, likewise |
-| $1dfe | the input's end, `movem.l (sp)+,d0-d2; lea $1e0a(a4),a5` | `jmp PtrStep` | ours, likewise: where the step puts the pointer |
 | $2246 | the interrupt's `bsr.w $1f0c; tst.b $126e(a4)` | `jsr PtrVbi; nop` | ours, likewise: the sprites placed every field |
-| $1d88, $1d8e, $1d92, $1d98; $1dae, $1db4, $1db8, $1dbe | the input's clamps of a step's move, ±31 | ±100 (`PTR_MAX`) | ours, likewise: a fast stroke stays straight ("The pointer") |
+| $1d78 | the input's take of the mouse's counts ($1d78-$1dc3: a quarter of each, clamped to ±31) | `jsr PtrTake; bra.w $1dc4` | ours: clamped to ±100 (`PTR_MAX`), a fast stroke stays straight, and where the step puts the pointer kept ("The pointer") |
 | $7a9c | a game's start: the immediate of `LDY #0` (threaded), the position in the hole order | `CUSTOM1` | ours, debug, only with `CUSTOM1`=1-9: start on that hole (below) |
 
 Then `Patch` flushes the caches and turns on the instruction cache for BaseMem
@@ -234,12 +233,15 @@ colours (the interrupt copies the copper list's COLOR01-15 into COLOR17-31 each 
   the other went on, so a fast straight stroke wobbled: with the mouse moving 10 pixels
   right and 5 up a field on `a1200` the sprite went 3 fields diagonally and 3 straight
   up. With ±100 it goes straight (1000 pixels a second before the clamp).
-- `PtrStep` (at the input routine's end) keeps where this step puts the pointer: the
-  position plus $0e80/$0e88.
+- `PtrTake` (in place of the input routine's take, $1d78) takes the counts with the
+  interrupts off, so the interrupt never sees them taken and the pointer not yet moved,
+  and keeps where this step puts the pointer: the position plus $0e80/$0e88, clamped as
+  $92de (the box around the ball while a stroke is drawn back) and $8afe (8 pixels inside
+  the hole) clamp it.
 - `PtrVbi` (in the interrupt, after it has added the counts, at the vertical blank's run)
-  adds a quarter of the counts gathered since, clamped as the next step will clamp
-  them, keeps the result inside the hole and the view as $8afe does, and writes the
-  sprites' control words for the frame on screen. `FrameCap` keeps that frame's view at
+  places the sprites at `PtrPredict`: that point plus a quarter of the counts gathered
+  since, clamped as the next step will clamp them, in the view of the frame on screen. It
+  writes the sprites' control words. `FrameCap` keeps that frame's view at
   the flip ($1474/$1476 of the frame drawn before). A flip before line $48 shows in the
   field already begun, after the sprite DMA has loaded the control words, so `FrameCap`
   places the sprites again then and writes their registers too (the sprites start at line
@@ -259,9 +261,11 @@ VSTART $52, so the sprite covers exactly the pixels the game's shape did. With t
 moved and then at rest, a screenshot of each hole on `a1200` was the same with the sprite
 as with the game's shape, but for animations the two runs caught at different moments
 (holes 2, 3, 6, 7 and 9). The pointer moves every field by the counts,
-the game's pointer only at each step. Between steps the sprite is ahead of what the frame
-shows of the game's pointer, the aiming line and the dots included, by the counts the next
-step will take. The cursor keys move the sprite only at the step.
+the game's pointer only at each step. The frames between the steps draw what the step
+will make of the predicted point ("Game time"): the view scrolled to it, and while a
+stroke is drawn back the aiming line, so the sprite, the view and the line move together.
+With the pointer at rest the dots and their flags were the same as the game's table at
+three positions on `a1200`. The cursor keys move the pointer only at the step.
 
 ## Game time
 
@@ -340,12 +344,43 @@ pass, as the game's own next pass saw it); the passes between draw only (`DrawOn
 thread in the slave: JSR $4fd0, $1478, $48d4, JMP $5232). Those three are drawing only:
 $4fd0 draws the course pieces that have come into view once (it clears their bit in $111a),
 $48d4 builds the visible objects' draw list, $1478 is the renderer. What $4fd0 reads (the
-view, the pieces, their bits) changes only in a step, so draw-only passes skip it after its
-first run following a step. A step more than one
+view, the pieces, their bits) changes only in a step or with the view drawn, so draw-only
+passes skip it while neither changed since its last run (below). A step more than one
 step late restarts the schedule, so a slow machine steps at most twice in a row and never
 catches up in a burst; with the interrupts off (the counter stops) every pass steps.
-`FrameCap` at the flip now only keeps the flips to one a field. The draw-only frames show
-the last step's state again; interpolating between steps is open work.
+`FrameCap` at the flip now only keeps the flips to one a field.
+
+The draw-only frames are drawn between the last two steps (`IpSnap`, `Present`,
+`Restore`; with a 1 KB buffer; without it they show the last step). Before each step
+`IpSnap` keeps the view, the 32 objects' x, y and frames, and what tells a move from a cut
+(each object's active flag, shape and shape set, the state $0ea8 and the hole $5c5a).
+`Present`, before each draw-only pass, puts in their place, for the pass only:
+
+- the view and each object active in both steps, with the same shape and set, that moved
+  at most 96 pixels on each axis, the fraction (fields since the step was due + 1)/6 of
+  the way, to the nearest pixel. The frame shows from the next field, so the last step is
+  reached as the next is due: what is drawn is a step behind the world at most. For the
+  first half of the way an object keeps the step before's frame, so an animation keeps
+  with its moves (the hamburger on hole 2 bobs a pixel as its frame changes; with the new
+  frame at once the frame led the move by 2 fields of each 6).
+- while the player points or draws a stroke back, in play with the ball at rest: the
+  pointer at `PtrPredict`'s point, the view scrolled to it as $8afe scrolls, the pointer's
+  object ($8dd6) or, drawing back, the ball's mark, the three dots, their flags and the
+  pointer's object as $8e0c places them. These are ahead of the last step, not behind.
+- the course pieces drawn over the objects. Each step flags the piece under each moving
+  object ($9faa: bit 1 of $111a,X, with a depth from the object's y in $119a,X), and the
+  draw list draws the flagged pieces that are visible over the shapes and clears their
+  flags ($4d20), so only the first frame after a step had them and the ball showed on top
+  of the piece in the others. The first pass after a step keeps the flags and depths;
+  every pass flags the last step's pieces and the step before's, with the nearer depth.
+  On hole 4's putt the piece over the ball was in the list every 6th field before and in
+  every field after.
+
+`Restore` puts the world's values back after the pass, and of the pieces' flags only the
+ones the list cleared stay cleared, as the game's own frame after the step clears them.
+A state or hole change, a late step and a pass with the interrupts off or the drawing flag
+clear cut: the next frames show the last step. $4fd0 runs in a draw-only pass after a step
+or whenever the view drawn moved since it last ran (`_lastview`).
 
 The input routine reads the left mouse button from CIA-A once a step, its only read of it
 ($1de2), so a click shorter than 6 fields between two steps would be lost. Every pass polls
@@ -387,7 +422,7 @@ the threaded-code primitives 53 %, the slave's renderer 26 % (the cell compare a
 (it plots shapes pixel by pixel with `bclr`/`bset`). With the view still, a frame took 0.25
 fields in the renderer, 0.16 in $4fd0 (now skipped between steps), 0.33 in $48d4's threaded
 code (the object draw list) and 0.22 in the shape drawer it calls.
-These are before `NewList` and `NewShape`; `open-work.md` (item 2) has each hole's
+These are before `NewList` and `NewShape`; `open-work.md` (item 1) has each hole's
 frames and costs since.
 
 **The intended speed is 10 frames a second at NTSC**, 6 fields a frame: that is what the

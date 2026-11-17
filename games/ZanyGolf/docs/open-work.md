@@ -15,7 +15,7 @@ machine tried.
 Rendering (17.11.2026, `internals.md`, "Display" and "Game time"): with an optional ExpMem
 the slave redraws only the cells whose map word changed or that a shape covered, and copies
 the other buffer with the blitter when the view scrolled (`NewDraw`, `ShapeHook`); draw-only
-passes skip $4fd0 between steps; the draw list and the shape drawer are native code
+passes skip $4fd0 unless a step ran or the view drawn moved; the draw list and the shape drawer are native code
 (`NewList`, `NewShape`); the instruction cache is on for BaseMem. Frames a second
 with the pointer moving: `a500` 9.25 to 37, `a1200` 13.25 to 58.5, the 68030 setups 57 to 60
 (one a field). No buffer is drawn into while it is on screen (`Hidden`): a frame that ends
@@ -28,28 +28,24 @@ N+1, for measuring the later holes (`internals.md`, "Slave patches").
 The pointer is a pair of hardware sprites (17.11.2026, `internals.md`, "The pointer"),
 placed by the interrupt every field from the mouse's counts the next step will take, on
 the frame on screen; the game's shape for it is taken out of the draw list. A step's move
-is clamped to ±100 pixels instead of the game's ±31, so a fast stroke stays straight. The aiming
-line and the dots, drawn into the frame, still move once a step (item 1). At rest the
-sprite covers the same pixels as the game's shape on every hole.
+is clamped to ±100 pixels instead of the game's ±31, so a fast stroke stays straight. At
+rest the sprite covers the same pixels as the game's shape on every hole.
+
+The frames between the steps are interpolated (17.11.2026, `internals.md`, "Game time"):
+the view and the objects are drawn between the last two steps, a step behind the world at
+most, with each object's animation frame switched halfway; the course pieces drawn over
+the ball are drawn in every frame, not only the first after a step; while the player
+points or draws a stroke back, the frames draw what the next step will make of the
+pointer's predicted point (the scroll, the aiming line), so they move with the sprite. The
+world is unchanged: the `a500` putt rests at 156, 226 as before, and the verify build
+found no cell, list or shape differing on the 68000. Frames a second from the flips
+(`frametrack`): the same with the hole still; on the `a500` the putt's roll 43.7 against
+45.38. The cursor keys are not predicted (the pointer moves with them at the step), and
+a cut (a new state or hole, a late step) shows the last step at once.
 
 ## Next
 
-1. **Interpolate the frames between steps** (decided 17.11.2026): the moving things must be
-   drawn between the last two steps, at the fraction of the step the frame shows (the
-   fields since the step's due time, which `Split` keeps, over 6). What is needed, in order:
-   - the presented state: the view position ($0e9c/$0e9e, the fine scroll), the ball
-     (object table at $5c7a), the other objects the shape drawer ($16f2) draws, and the
-     animations the clock drives. Each needs its previous and current step kept, and the
-     renderer drawing from interpolated copies without the world seeing them.
-   - what may not be interpolated: cuts (a new hole, the ball sunk or reset), and
-     anything drawn into the tile map.
-   - $4fd0 reads the view, so with an interpolated view it must run whenever the view
-     moved, not only after a step (`Split`'s `_stepped`).
-   - cost: an interpolated view scrolls nearly every frame, so each frame pays the scroll
-     copy (about 7 % of the A500's time now). The A500 draws about 4.7 frames a step.
-   Acceptance: the putt's world steps as now (6 fields apart), and each presented frame
-   between the two steps around it.
-2. **The A500's frame.** The native draw list (`NewList`) took hole 1 from 37 to 44.25
+1. **The A500's frame.** The native draw list (`NewList`) took hole 1 from 37 to 44.25
    frames a second with the pointer moving, and the native shape drawer (`NewShape`) hole
    2 from 12.5 to 25. Each hole on `a500`, 17.11.2026, before `NewShape` (`CUSTOM1`, the
    view still for the trace, 60 fields; frames from `frames 240` and `frames 240 5 3`),
@@ -88,14 +84,14 @@ sprite covers the same pixels as the game's shape on every hole.
    - $4fd0's own threaded code on hole 10 (14.4 %, after each step);
    - the steps (10 a second) are threaded code throughout.
    A 68000 must still draw correctly whatever the 68020+ path does.
-3. **Fast memory.** In fast memory now: the slave's code (the renderer, `Split`), the
+2. **Fast memory.** In fast memory now: the slave's code (the renderer, `Split`), the
    renderer's caches and the tile copy (ExpMem). What cannot move: `FILE1` is the 65xx
    machine's bank 0, and every other address the game uses is a4-relative too (the hole
    block at a4+$11d0a, the screen buffers at a4+$30000, the copper list inside `FILE1` at
    $2272), so moving `FILE1` would move an address space with chip-only data in it. Native
    code also reads its variables PC-relative and resets a4 with `lea (pc)`, and the
    dispatch takes the primitives' bank from a4. Hot threaded or native routines can move
-   only as slave copies (item 2). The game's user stack ($9570) could move: small gain, not
+   only as slave copies (item 1). The game's user stack ($9570) could move: small gain, not
    tried.
 
 ## Also seen

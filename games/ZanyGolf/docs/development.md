@@ -124,6 +124,11 @@ Traps:
   second with the committed slave, and 25 and 20 with the next, each run alone
   (17.11.2026); hole 1 moved between 30.25 and 47.5 when two runs shared the host. Compare
   builds over several runs, or not by frame rates at all.
+- **`frames` undercounts frames of about a field.** It samples the plane pointer once a
+  field, so two flips between two samples count as one, and a build whose frames take
+  close to a field each reads low: an interpolating build read 30.5 frames a second on
+  hole 1 against 49.5, with the same flips at the flip's breakpoint (`frametrack`) as the
+  build before. Count flips with `frametrack` when the frame time is near a field.
 - **Per-frame timers carry the frames drawn before a putt.** Friction applies every fifth
   frame from the hole's start, so the same putt on two machines takes different paths
   unless the timer at $5cd2 has the same value at the release; change the hold before
