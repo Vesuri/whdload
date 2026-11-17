@@ -233,7 +233,7 @@ def main():
         if a.fast_motion:
             return [dict(fast_motion=fast_motion(var, sym))]
         if a.bank_diag:
-            return [dict(bank_diag=bank_diag(var))]
+            return [dict(bank_diag=bank_diag(var, state))]
         rows = [dict(motion=(0, 0), **state())]
         shot('flight-before')
         top = rows[0]['aperture'][5]
@@ -277,7 +277,7 @@ def main():
         assert r[6]['sprite'] == (220-5, top) and r[6]['drawn'] > 0 and r[6]['pitch'] == 9, r[6]
         return rows
 
-    def bank_diag(var):
+    def bank_diag(var, state):
         # The pointer shown (a mouse step every 50 fields, well within the
         # 500-field idle hide) past the 250- and 1500-field snapshots, which
         # the slave saves with resload_SaveFile into the data directory.
@@ -286,6 +286,12 @@ def main():
         for i in range(36):
             step = 4 if i % 2 == 0 else -4
             cmd(f'monitor mouse {step} 0'); cmd('monitor fields 50', 120)
+        # The test pointer: a 9x9 block, three lines each of colours 1, 2, 3.
+        row = state(); shot('bank-diag')
+        image = Image.open(out/'bank-diag.png').convert('RGB')
+        x, y = row['sprite']
+        stripes = [sorted({image.getpixel((74+2*(x+1+c), 92+2*(y+r))) for r in range(3*k, 3*k+3)
+                           for c in range(9) if row['lines'][r]}) for k in range(3)]
         files = sorted((wc_run.capture_drawer(out)/'data').glob('WCBank[0-9]'))
         buf = var('diag_buf', 'int')
         memory = dict(shown=var('diag_shown'), saved=var('diag_saved'), due=var('diag_due'),
@@ -299,6 +305,9 @@ def main():
             c = d['counters']
             assert c['shown'] > 0 and c['lof_other'] == 0 and c['unpatched'] == 0 and c['attach'] == 0, d
             assert c['lof_list0'] > 0 and c['lof_list1'] > 0, d
+        rows.append(dict(stripes=stripes, sprite=row['sprite'], lines=row['lines']))
+        print('stripes', stripes, flush=True)
+        assert stripes == [[(255, 0, 0)], [(0, 255, 0)], [(0, 0, 255)]], stripes
         return rows
 
     def fast_motion(var, sym):

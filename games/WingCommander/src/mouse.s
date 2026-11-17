@@ -1055,10 +1055,33 @@ stick_show:
         move.b  2(a0,d1.l),d0
         lsl.l   d7,d0
         lsr.l   #8,d0
+    ifd BANK_DIAG
+        andi.w  #$ff80,d0               ; the test: a 9x9 block
+    else
         and.w   (a2),d0
+    endc
 .put:
+    ifd BANK_DIAG
+        ; Three lines each of colour 1 (SPR7DATA), 2 (SPR7DATB) and 3.
+        cmpi.w  #6,d2
+        bhs.s   .c1
+        cmpi.w  #3,d2
+        bhs.s   .c2
+        move.w  d0,(a1)+
+        move.w  d0,(a1)+
+        bra.s   .lined
+.c1:
+        move.w  d0,(a1)+
+        clr.w   (a1)+
+        bra.s   .lined
+.c2:
+        clr.w   (a1)+
+        move.w  d0,(a1)+
+.lined:
+    else
         move.w  d0,(a1)+                ; colour 3: both planes
         move.w  d0,(a1)+
+    endc
         addq.l  #2,a2
         addq.w  #1,d6
         dbf     d2,.line
@@ -1173,10 +1196,11 @@ stick_bank:
         move.l  a0,(a2)
         move.w  d2,4(a2)
 .set:
-        move.b  3(a0,d2.w),d0
-        andi.b  #$f0,d0
-        ori.b   #SPRITE_BANK,d0
-        move.b  d0,3(a0,d2.w)
+        ; The test: the odd sprites' bank 12 as released, the even sprites'
+        ; bank 13, and distinct colours where sprite 7's colours 1-3 land
+        ; with either, or with the default bank 1 (diag_colours).
+        move.b  #13<<4!SPRITE_BANK,3(a0,d2.w)
+        bsr.w   diag_palette
 .next:
         addq.l  #8,a2
         dbf     d1,.list
@@ -1419,6 +1443,57 @@ diag_due:       dc.w 0                  ; a snapshot to save at the next show
 diag_saved:     dc.w 0
 diag_name:      dc.b 'WCBank0',0
         even
+
+; a0 = a flight copper list, d2.w = its BPLCON4 move's offset: the colour
+; moves before it for diag_colours get those values (both LOCT halves).
+diag_palette:
+        movem.l d0-d4/a1,-(sp)
+        moveq   #0,d1                   ; offset
+        moveq   #0,d3                   ; BPLCON3 bank * 32
+.walk:
+        cmp.w   d2,d1
+        bhs.s   .end
+        move.w  (a0,d1.w),d0
+        btst    #0,d0
+        bne.s   .step                   ; WAIT or SKIP
+        cmpi.w  #$0106,d0
+        bne.s   .colour
+        move.w  2(a0,d1.w),d3
+        lsr.w   #8,d3
+        lsr.w   #5,d3
+        lsl.w   #5,d3
+        bra.s   .step
+.colour:
+        subi.w  #$0180,d0
+        bcs.s   .step
+        cmpi.w  #$0040,d0
+        bhs.s   .step
+        lsr.w   #1,d0
+        add.w   d3,d0                   ; colour number
+        lea     diag_colours(pc),a1
+.find:
+        move.w  (a1)+,d4
+        bmi.s   .step
+        cmp.w   d4,d0
+        beq.s   .hit
+        addq.l  #2,a1
+        bra.s   .find
+.hit:
+        move.w  (a1),2(a0,d1.w)
+.step:
+        addq.w  #4,d1
+        bra.s   .walk
+.end:
+        movem.l (sp)+,d0-d4/a1
+        rts
+; Sprite 7's colours 1, 2, 3: in the odd sprites' bank 12 (as released) red,
+; green, blue; in bank 13 (the even sprites' nibble) yellow, cyan, magenta;
+; in the default bank 1 white, orange, grey.
+diag_colours:
+        dc.w    205,$f00,206,$0f0,207,$00f
+        dc.w    221,$ff0,222,$0ff,223,$f0f
+        dc.w    29,$fff,30,$f80,31,$888
+        dc.w    -1
 
 ; From the VBL, after the commit: where COP2LC points (the game sets GfxBase
 ; LOFlist with it) and whether that list's BPLCON4 move has our bank.

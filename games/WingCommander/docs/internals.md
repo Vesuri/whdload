@@ -9227,7 +9227,12 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   NOCACHE does not help. In the emulator's Nav-1 flight the diagnostic build
   (`--bank-diag`, docs/development.md) saw COP2LC on one of the two patched
   lists in every field, each list's only BPLCON4 move at offset 2116 with
-  $001c, no patch undone, and no ATTACH; copinit has no BPLCON4 move.
+  $001c, no patch undone, and no ATTACH; copinit has no BPLCON4 move. The
+  user's A1200 snapshot (2026-11-18) showed the same: COP2LC on a patched
+  list in all 250 fields, BPLCON4 $001c, colour 207 (243,255,235), and
+  flight lists identical to the emulator's but for three mission colours
+  (20, 22, 23). So the registers reach the display; the striped test
+  pointer of the same build tells which bank real Lisa uses for sprite 7.
 - **Hiding.** `mouse_vbl`, called from each variant's VBL hook (CD32 the port-1
   pad read, OCS the port-1 fire sample), counts fields. Once the controller has
   not run for 25 fields (a pause, the map, the end of the flight), or the mouse

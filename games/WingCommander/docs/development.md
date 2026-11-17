@@ -94,8 +94,14 @@ moves: VBL counts of which list GfxBase LOFlist (the game's COP2LC) was and
 whether its BPLCON4 move had bank 12, how often the patch was undone or not
 found, SPR7CTL's ATTACH, and copies of both flight copper lists and copinit.
 WHDLoad writes them at quit (its write cache). `tools/bank_diag.py` reads them.
-The live check flies the fixture with `NoWriteCache` and asserts both
-snapshots show the bank on the displayed list:
+The build also tells the explanations apart on screen: the pointer is a 9×9
+block of three lines each of colours 1, 2 and 3, BPLCON4's low byte is $dc
+(odd sprites bank 12, even sprites bank 13), and the flight lists' palette
+loads give sprite 7's colours 1–3 red, green, blue in bank 12 (as documented),
+yellow, cyan, magenta in bank 13 (the even sprites' nibble), and white,
+orange, grey in the default bank 1. The live check flies the fixture with
+`NoWriteCache`, asserts both snapshots show the bank on the displayed list
+and that the stripes are red, green and blue:
 
 ```
 python3 tools/reconstruct.py --variant cd32 --release --bank-diag --output tmp/bankdiag-cd32
