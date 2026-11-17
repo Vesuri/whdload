@@ -86,6 +86,24 @@ python3 tools/flight_fixture.py --release --nav 1 --output tmp/mouse-nav1-fixtur
 python3 tools/mouse_live_check.py cd32 tmp/mouse-nav1-fixture --output tmp/mouse-live-nav1 --flight --direct-flight
 ```
 
+The flight pointer's colour bank has a diagnostic build for real machines
+(`--bank-diag`, never released; it assembles only under `BANK_DIAG`, so the
+release slaves are unchanged). With the pointer shown for 250, 1500 and 3000
+fields it saves `WCBank1`-`3` into the data directory when the pointer next
+moves: VBL counts of which list GfxBase LOFlist (the game's COP2LC) was and
+whether its BPLCON4 move had bank 12, how often the patch was undone or not
+found, SPR7CTL's ATTACH, and copies of both flight copper lists and copinit.
+WHDLoad writes them at quit (its write cache). `tools/bank_diag.py` reads them.
+The live check flies the fixture with `NoWriteCache` and asserts both
+snapshots show the bank on the displayed list:
+
+```
+python3 tools/reconstruct.py --variant cd32 --release --bank-diag --output tmp/bankdiag-cd32
+python3 tools/flight_fixture.py --release --nav 1 --bank-diag --output tmp/bankdiag-fixture
+python3 tools/mouse_live_check.py cd32 tmp/bankdiag-fixture --output tmp/bankdiag-live --flight --direct-flight --bank-diag
+python3 tools/bank_diag.py tmp/run/bankdiag-live/.run/dh1/data/WCBank[0-9]
+```
+
 The CD32 `--name-entry` run also asserts the slave state after the flight: the
 language's mode, and that the enhanced flight clock ran (none in
 `--original-mode`). The German release build depends on `tools/german_map.py`,

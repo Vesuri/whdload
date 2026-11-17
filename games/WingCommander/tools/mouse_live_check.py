@@ -68,6 +68,8 @@ def main():
                    help='English --flight: instead of steering, fast motion over the aperture edges, a screenshot '
                         'a field: no pointer pixel may show over the cockpit (UR6)')
     p.add_argument('--german', action='store_true', help='CD32: the German executable (CUSTOM1=1)')
+    p.add_argument('--bank-diag', action='store_true',
+                   help='CD32 --flight with a --bank-diag build: keep the pointer shown 1600 fields and read the WCBank1-2 snapshots')
     p.add_argument('--esc', action='store_true',
                    help='only the intro: the right button as Esc in its two waits, then the start menu')
     p.add_argument('--mouse-option', type=int, choices=range(1, 8),
@@ -110,6 +112,8 @@ def main():
             locate = functools.partial(locate, german=True)
         if a.direct_flight:     # the fixture's direct-flight argument (docs/development.md)
             whd = f'CUSTOM2=2 CUSTOM3={a.system} CUSTOM4={a.mission} '+whd
+    if a.bank_diag:         # WHDLoad writes cached files only at exit; the check kills the emulator
+        whd += ' NoWriteCache'
     if a.mouse_option:
         whd = whd.replace('CUSTOM5=8', f'CUSTOM5={8+16*a.mouse_option}').replace('CUSTOM5=1 ', f'CUSTOM5={1+16*a.mouse_option} ')
     length = 0x400000 if ocs else 0x800000
@@ -228,6 +232,8 @@ def main():
             return [dict(buttons=buttons(var, sym))]
         if a.fast_motion:
             return [dict(fast_motion=fast_motion(var, sym))]
+        if a.bank_diag:
+            return [dict(bank_diag=bank_diag(var))]
         rows = [dict(motion=(0, 0), **state())]
         shot('flight-before')
         top = rows[0]['aperture'][5]
@@ -269,6 +275,30 @@ def main():
         assert r[4]['sprite'] == (0-5, 0-4) and r[4]['drawn'] == 0, r[4]
         assert r[5]['sprite'] == (220-5, 0-4) and r[5]['drawn'] == 0, r[5]
         assert r[6]['sprite'] == (220-5, top) and r[6]['drawn'] > 0 and r[6]['pitch'] == 9, r[6]
+        return rows
+
+    def bank_diag(var):
+        # The pointer shown (a mouse step every 50 fields, well within the
+        # 500-field idle hide) past the 250- and 1500-field snapshots, which
+        # the slave saves with resload_SaveFile into the data directory.
+        import bank_diag as bd
+        # The slave saves a due snapshot when the pointer next moves.
+        for i in range(36):
+            step = 4 if i % 2 == 0 else -4
+            cmd(f'monitor mouse {step} 0'); cmd('monitor fields 50', 120)
+        files = sorted((wc_run.capture_drawer(out)/'data').glob('WCBank[0-9]'))
+        buf = var('diag_buf', 'int')
+        memory = dict(shown=var('diag_shown'), saved=var('diag_saved'), due=var('diag_due'),
+                      counters=[number(f'*(int*){buf+8+4*i:#x}') for i in range(11)] if buf else None)
+        assert [f.name for f in files] == ['WCBank1', 'WCBank2'], (files, memory)
+        rows = []
+        for f in files:
+            d = bd.decode(f.read_bytes())
+            d['verdict'] = bd.verdict(d)
+            rows.append(d)
+            c = d['counters']
+            assert c['shown'] > 0 and c['lof_other'] == 0 and c['unpatched'] == 0 and c['attach'] == 0, d
+            assert c['lof_list0'] > 0 and c['lof_list1'] > 0, d
         return rows
 
     def fast_motion(var, sym):

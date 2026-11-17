@@ -46,9 +46,11 @@ def cd32_main(argv):
     p.add_argument('--render-family', choices=('auto','030','040'), default='auto', help='diagnostic converter-family override')
     p.add_argument('--render-verify', action='store_true', help='native original/replacement twin on every conversion; requires --render')
     p.add_argument('--input', default=VARIANT.SLAVE)
+    p.add_argument('--bank-diag', action='store_true', help='diagnostic: the flight pointer colour bank counters and WCBank1-3 snapshots; requires --release, never released')
     p.add_argument('--c2p-experiment',choices=('control','block040','full-original','full030','full040'),help='D5 diagnostic equal-layout converter comparison; release only')
     a = p.parse_args(argv)
     if a.c2p_experiment and not a.release:p.error('--c2p-experiment requires --release')
+    if a.bank_diag and not a.release:p.error('--bank-diag requires --release')
     if a.release:
         if a.timing_verify or a.flight_verify or a.flight_control or a.render_verify or a.render_family!='auto':
             p.error('public-option build supports frame-stats, comparison-control and c2p-experiment diagnostics')
@@ -140,6 +142,7 @@ def cd32_main(argv):
         lines.append('RENDER_FAMILY equ '+str({'auto':0,'030':30,'040':40}[a.render_family]))
         lines.append(render_source(ROOT, variant="cd32"))
     if a.release:
+        if a.bank_diag:lines.append('BANK_DIAG equ 1')
         lines.append((ROOT/'src/release.s').read_text())
         lines.append((ROOT/'src/mouse.s').read_text())
     if a.timing:

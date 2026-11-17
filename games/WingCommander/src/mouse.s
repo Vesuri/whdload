@@ -77,6 +77,52 @@ MASK_SIZE = 200*MASK_STRIDE     ; the aperture's rows at most
 STAGE = SS_SIZE+MASK_SIZE       ; stick_ss offset: the next image's control words and lines
 STAGE_SIZE = 4+9*4              ; (POINTER_H lines), copied to the Chip image in the VBL
 SS_SIZE = 12                    ; SimpleSprite: posctldata.l, height, x, y, num
+
+; BANK_DIAG (a diagnostic build, never released): counts how the CD32 flight
+; pointer's colour bank fares, and with the pointer shown for 250, 1500 and
+; 3000 fields saves a snapshot as WCBank1-3 (tools/bank_diag.py reads them).
+    ifd BANK_DIAG
+D_MAGIC = 0                     ; 'WCBD'
+D_VERSION = 4                   ; 1
+D_CALLS = 8                     ; stick_bank calls
+D_FOUND = 12                    ; BPLCON4 moves found by a search
+D_NOTFOUND = 16                 ; searches without one
+D_UNDONE = 20                   ; a known move no longer had our bank
+D_SHOWN = 24                    ; VBLs with the pointer shown
+D_LOF0 = 28                     ; ... GfxBase LOFlist was list 0's start
+D_LOF1 = 32                     ; ... list 1's
+D_LOFOTHER = 36                 ; ... neither
+D_PATCHED = 40                  ; ... that list's BPLCON4 move had our bank
+D_UNPATCHED = 44                ; ... it had not
+D_ATTACH = 48                   ; ... SPR7CTL had ATTACH
+D_INDEX = 52                    ; snapshot number
+D_FIELD = 56                    ; mouse_fields
+D_GFX = 60                      ; GfxBase LOFlist, SHFlist, copinit
+D_TABLE = 72                    ; the game's two cprlist pointers
+D_STARTS = 80                   ; their starts
+D_BANK = 88                     ; bank_lists (16 bytes)
+D_IMAGE = 104                   ; the sprite image's control words, then line 0
+D_LASTCON4 = 116                ; last BPLCON4 value seen in the VBL (word)
+D_BADCON4 = 118                 ; last value without our bank (word)
+D_MAXCOUNT = 120                ; the cprlists' MaxCount words
+D_HEADER = 128
+D_LIST_SIZE = 4096
+D_COPINIT_SIZE = 1024
+DIAG_SIZE = D_HEADER+2*D_LIST_SIZE+D_COPINIT_SIZE
+    endc
+
+DIAGINC macro
+    ifd BANK_DIAG
+        move.l  a3,-(sp)
+        move.l  diag_buf(pc),-(sp)
+        beq.s   .di\@
+        movea.l (sp),a3
+        addq.l  #1,\1(a3)
+.di\@:
+        addq.l  #4,sp
+        movea.l (sp)+,a3
+    endc
+    endm
 RIGHT_STEP = 4                  ; counts in the last four fields: a direction
 CLICK_MAX = 15                  ; fields: a shorter right press is a click
 DCLICK_GAP = 15                 ; fields from a click's release to a double click
@@ -123,6 +169,19 @@ mouse_init:
         lea     stick_gfx(pc),a1
         move.l  d0,(a1)
         beq.s   .ready
+    ifd BANK_DIAG
+        move.l  #DIAG_SIZE,d0
+        moveq   #0,d1                   ; any memory, uncleared: header set at saving
+        jsr     -198(a6)                ; AllocMem
+        lea     diag_buf(pc),a1
+        move.l  d0,(a1)
+        beq.s   .ready
+        movea.l d0,a1
+        moveq   #D_HEADER/4-1,d1
+.clear:
+        clr.l   (a1)+
+        dbf     d1,.clear
+    endc
         move.l  #SS_SIZE+MASK_SIZE+STAGE_SIZE,d0
         move.l  #$10000,d1              ; MEMF_CLEAR
         jsr     -198(a6)                ; AllocMem
@@ -938,6 +997,9 @@ stick_show:
         jsr     -420(a6)                ; ChangeSprite
 .owned:
         bsr.w   stick_bank
+    ifd BANK_DIAG
+        bsr.w   diag_save
+    endc
         ; The gunsight plus the pointer offset.
         movea.l mouse_params(pc),a1
         move.w  MP_APERTURE(a1),d0
@@ -1052,12 +1114,75 @@ stick_commit:
         move.l  (a1),$dff178            ; SPR7POS, SPR7CTL
 .done:
         movem.l (sp)+,d0/a0-a1
+    ifd BANK_DIAG
+        bra.w   diag_vbl
+    endc
         rts
 
 ; CD32: the odd sprites' colour bank in each of the game's two flight copper
 ; lists (their BPLCON4 move, found once per list). OCS has no bank (0).
 ; a4 = game A4; uses d0-d3/a0-a2.
 BANK_SEARCH = 1024              ; copper moves searched for BPLCON4
+    ifd BANK_DIAG
+stick_bank:
+        DIAGINC D_CALLS
+        movea.l mouse_params(pc),a1
+        move.w  MP_COPPER(a1),d0
+        beq.w   .done
+        lea     (a4,d0.w),a1            ; two cprlist pointers
+        lea     bank_lists(pc),a2       ; per list: start.l, offset.w, pad
+        moveq   #2-1,d1
+.list:
+        move.l  (a1)+,d0
+        beq.w   .next
+        movea.l d0,a0
+        move.l  4(a0),d0                ; cprlist start
+        beq.w   .next
+        movea.l d0,a0
+        cmp.l   (a2),d0
+        bne.w   .find
+        move.w  4(a2),d2
+        cmpi.w  #$010c,(a0,d2.w)
+    ifd BANK_DIAG
+        bne.w   .find
+        moveq   #$f,d0                  ; still our bank since the last call?
+        and.b   3(a0,d2.w),d0
+        cmpi.b  #SPRITE_BANK,d0
+        beq.w   .set
+        DIAGINC D_UNDONE
+        bra.w   .set
+    else
+        beq.w   .set
+    endc
+.find:
+        clr.l   (a2)
+        moveq   #0,d2
+        move.w  #BANK_SEARCH-1,d3
+.search:
+        cmpi.w  #$010c,(a0,d2.w)
+        beq.s   .found
+        cmpi.l  #$fffffffe,(a0,d2.w)
+        beq.w   .none                   ; no BPLCON4: search again next time
+        addq.w  #4,d2
+        dbf     d3,.search
+.none:
+        DIAGINC D_NOTFOUND
+        bra.w   .next
+.found:
+        DIAGINC D_FOUND
+        move.l  a0,(a2)
+        move.w  d2,4(a2)
+.set:
+        move.b  3(a0,d2.w),d0
+        andi.b  #$f0,d0
+        ori.b   #SPRITE_BANK,d0
+        move.b  d0,3(a0,d2.w)
+.next:
+        addq.l  #8,a2
+        dbf     d1,.list
+.done:
+        rts
+    else
 stick_bank:
         movea.l mouse_params(pc),a1
         move.w  MP_COPPER(a1),d0
@@ -1102,6 +1227,7 @@ stick_bank:
         dbf     d1,.list
 .done:
         rts
+    endc
 
 ; Replaces both calls of the native cockpit aperture scan (a 6-byte jsr; on
 ; the stack the surface, the span output and the transparent key byte; a4 =
@@ -1286,4 +1412,154 @@ stick_ss:       dc.l 0                  ; SimpleSprite, then the mask
 stick_gfx:      dc.l 0                  ; GfxBase
 mouse_scan_native: dc.l 0               ; H0 aperture scan
 bank_lists:     dc.l 0,0,0,0            ; per copper list: start, BPLCON4 offset
+    ifd BANK_DIAG
+diag_buf:       dc.l 0
+diag_shown:     dc.w 0                  ; VBLs with the pointer shown
+diag_due:       dc.w 0                  ; a snapshot to save at the next show
+diag_saved:     dc.w 0
+diag_name:      dc.b 'WCBank0',0
+        even
+
+; From the VBL, after the commit: where COP2LC points (the game sets GfxBase
+; LOFlist with it) and whether that list's BPLCON4 move has our bank.
+diag_vbl:
+        movem.l d0-d2/a0-a2,-(sp)
+        move.l  diag_buf(pc),d0
+        beq.w   .done
+        movea.l d0,a2
+        lea     stick_x(pc),a0
+        tst.w   ST_SHOWN(a0)
+        beq.w   .done
+        addq.l  #1,D_SHOWN(a2)
+        movea.l stick_gfx(pc),a0
+        move.l  50(a0),d0               ; LOFlist
+        lea     bank_lists(pc),a1
+        cmp.l   (a1),d0
+        beq.s   .list0
+        cmp.l   8(a1),d0
+        beq.s   .list1
+        addq.l  #1,D_LOFOTHER(a2)
+        bra.s   .ctl
+.list0:
+        addq.l  #1,D_LOF0(a2)
+        bra.s   .check
+.list1:
+        addq.l  #1,D_LOF1(a2)
+        addq.l  #8,a1
+.check:
+        movea.l d0,a0
+        move.w  4(a1),d1
+        move.w  2(a0,d1.w),d2
+        move.w  d2,D_LASTCON4(a2)
+        moveq   #$f,d1
+        and.w   d2,d1
+        cmpi.w  #SPRITE_BANK,d1
+        bne.s   .unpatched
+        addq.l  #1,D_PATCHED(a2)
+        bra.s   .ctl
+.unpatched:
+        addq.l  #1,D_UNPATCHED(a2)
+        move.w  d2,D_BADCON4(a2)
+.ctl:
+        movea.l stick_image(pc),a0
+        btst    #7,3(a0)                ; SPR7CTL ATTACH
+        beq.s   .count
+        addq.l  #1,D_ATTACH(a2)
+.count:
+        lea     diag_shown(pc),a0
+        addq.w  #1,(a0)
+        move.w  (a0),d0
+        cmpi.w  #250,d0
+        beq.s   .due
+        cmpi.w  #1500,d0
+        beq.s   .due
+        cmpi.w  #3000,d0
+        bne.s   .done
+.due:
+        lea     diag_due(pc),a0
+        move.w  #1,(a0)
+.done:
+        movem.l (sp)+,d0-d2/a0-a2
+        rts
+
+; From stick_show (the game's main code; a4 = game A4): a due snapshot.
+diag_save:
+        movem.l d0-d7/a0-a6,-(sp)
+        lea     diag_due(pc),a0
+        tst.w   (a0)
+        beq.w   .done
+        clr.w   (a0)
+        move.l  diag_buf(pc),d0
+        beq.w   .done
+        movea.l d0,a2
+        move.l  #'WCBD',D_MAGIC(a2)
+        moveq   #1,d0
+        move.l  d0,D_VERSION(a2)
+        lea     diag_saved(pc),a0
+        addq.w  #1,(a0)
+        moveq   #0,d0
+        move.w  (a0),d0
+        move.l  d0,D_INDEX(a2)
+        lea     diag_name+6(pc),a0
+        addi.b  #'0',d0
+        move.b  d0,(a0)
+        moveq   #0,d0
+        move.w  mouse_fields(pc),d0
+        move.l  d0,D_FIELD(a2)
+        movea.l stick_gfx(pc),a0
+        move.l  50(a0),D_GFX(a2)
+        move.l  54(a0),D_GFX+4(a2)
+        move.l  38(a0),D_GFX+8(a2)
+        movea.l mouse_params(pc),a1
+        move.w  MP_COPPER(a1),d0
+        lea     (a4,d0.w),a1
+        lea     D_HEADER(a2),a3         ; list copies
+        moveq   #0,d1                   ; list 0, 1
+.list:
+        move.l  (a1)+,d0
+        move.l  d0,D_TABLE(a2,d1.w*4)
+        beq.s   .nolist
+        movea.l d0,a0
+        move.w  8(a0),D_MAXCOUNT(a2,d1.w*2)
+        move.l  4(a0),d0
+        move.l  d0,D_STARTS(a2,d1.w*4)
+        beq.s   .nolist
+        movea.l d0,a0
+        movea.l a3,a5
+        move.w  #D_LIST_SIZE/4-1,d2
+.copy:
+        move.l  (a0)+,(a5)+
+        dbf     d2,.copy
+.nolist:
+        lea     D_LIST_SIZE(a3),a3
+        addq.w  #1,d1
+        cmpi.w  #2,d1
+        bcs.s   .list
+        move.l  D_GFX+8(a2),d0          ; copinit
+        beq.s   .bank
+        movea.l d0,a0
+        move.w  #D_COPINIT_SIZE/4-1,d2
+.copinit:
+        move.l  (a0)+,(a3)+
+        dbf     d2,.copinit
+.bank:
+        lea     bank_lists(pc),a0
+        lea     D_BANK(a2),a1
+        moveq   #4-1,d2
+.copybank:
+        move.l  (a0)+,(a1)+
+        dbf     d2,.copybank
+        movea.l stick_image(pc),a0
+        move.l  (a0)+,D_IMAGE(a2)
+        move.l  (a0),D_IMAGE+4(a2)
+        move.l  stick_ss(pc),D_IMAGE+8(a2)
+        lea     diag_name(pc),a0
+        movea.l a2,a1
+        move.l  #DIAG_SIZE,d0
+        movea.l slave+$121e(pc),a2
+        jsr     12(a2)                  ; resload_SaveFile
+.done:
+        movem.l (sp)+,d0-d7/a0-a6
+        rts
+    endc
         even

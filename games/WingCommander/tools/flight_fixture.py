@@ -17,6 +17,7 @@ def main():
     p.add_argument('--comparison-control',action='store_true',help='D4 diagnostic old comparison loop')
     p.add_argument('--view-control',action='store_true',help='D3 diagnostic native clear/composition control; release only')
     p.add_argument('--frame-stats',action='store_true',help='diagnostic frame-part recorder')
+    p.add_argument('--bank-diag',action='store_true',help='diagnostic flight pointer colour-bank snapshots; release only')
     p.add_argument('--schedule',choices=('normal','slow','one-field'),default='normal',help='VERIFY-only render schedule')
     p.add_argument('--nav',type=int,choices=(0,1),default=0)
     p.add_argument('--iterations', type=int, choices=(0,100000), default=0)
@@ -29,9 +30,10 @@ def main():
     if a.frame_stats and not (a.timing or a.release):p.error('--frame-stats requires --timing or --release')
     if a.comparison_control and not (a.timing or a.release):p.error('comparison control requires --timing or --release')
     if a.view_control and not a.release:p.error('--view-control requires --release')
+    if a.bank_diag and not a.release:p.error('--bank-diag requires --release')
     if a.timing or a.release:
         if a.iterations: p.error('timing fixture cannot also use the old delay tail')
-        subprocess.run([sys.executable,str(ROOT/'tools/reconstruct.py'),'--variant','cd32','--release' if a.release else '--timing','--output',a.output]+(['--timing-verify'] if a.timing_verify else [])+(['--flight-verify'] if a.flight_verify else [])+(['--flight-control'] if a.flight_control else [])+(['--frame-stats'] if a.frame_stats else [])+(['--comparison-control'] if a.comparison_control else [])+(['--c2p-experiment',a.c2p_experiment] if a.c2p_experiment else []),check=True)
+        subprocess.run([sys.executable,str(ROOT/'tools/reconstruct.py'),'--variant','cd32','--release' if a.release else '--timing','--output',a.output]+(['--timing-verify'] if a.timing_verify else [])+(['--flight-verify'] if a.flight_verify else [])+(['--flight-control'] if a.flight_control else [])+(['--frame-stats'] if a.frame_stats else [])+(['--bank-diag'] if a.bank_diag else [])+(['--comparison-control'] if a.comparison_control else [])+(['--c2p-experiment',a.c2p_experiment] if a.c2p_experiment else []),check=True)
     else:
         subprocess.run([sys.executable,str(ROOT/'tools/intro_timing_fixture.py'),
                         '--output',a.output,'--iterations',str(a.iterations)],check=True)

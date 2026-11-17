@@ -9223,7 +9223,11 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   which is what colour 31 would show if the bank change did not reach the
   display. The emulator's 68040 model with CACHE (and NoMMU: the gdb-driven
   build has no MMU) shows it in the right colour too, in the simulator and
-  the Nav-1 mission; not explained yet.
+  the Nav-1 mission; not explained yet. Composite video shows the same, and
+  NOCACHE does not help. In the emulator's Nav-1 flight the diagnostic build
+  (`--bank-diag`, docs/development.md) saw COP2LC on one of the two patched
+  lists in every field, each list's only BPLCON4 move at offset 2116 with
+  $001c, no patch undone, and no ATTACH; copinit has no BPLCON4 move.
 - **Hiding.** `mouse_vbl`, called from each variant's VBL hook (CD32 the port-1
   pad read, OCS the port-1 fire sample), counts fields. Once the controller has
   not run for 25 fields (a pause, the map, the end of the flight), or the mouse
