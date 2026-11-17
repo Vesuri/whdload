@@ -13,9 +13,11 @@ A step is one of
     click N        hold the left mouse button N fields, release it
     title          run until the title takes input (state 3, drawing), then press 1 until
                    the game leaves it (state 4), at most 10 tries 60 fields apart
-    play           click until the pause screen (state 5; the hole's intro, then about 400
-                   fields of loading with interrupts off), then click until play (state 4,
-                   drawing); at most 5 and 10 clicks
+    play           until hole 1 is in play (state 4, drawing, the ball active): click in
+                   the intro while it runs (the intro picture and the hole load with
+                   interrupts off, the field counter stopped, and a click then is lost) and
+                   at the pause screen (state 5: the intro's click, or a key, can carry over
+                   into play as a click, depending on where it fell between two steps)
     mouse DX DY N  N times: add DX, DY to the mouse counters, run one field
     shot NAME      screenshot to tmp/shots/NAME.png (traces one field)
     prof N BIN     cycle-exact trace of N fields (needs a CPU without MMU)
@@ -36,7 +38,8 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOL = [sys.executable, str(ROOT / 'tools/zanygolf.py')]
 
 # 'hole1': the credits and title, 1 for one player, the hole's intro, a click, the hole's
-# loading, the pause screen, a click: hole 1 in play, the pointer at rest. The credits take
+# loading, the pause screen and a click when the intro's click carried over: hole 1 in
+# play, the pointer at rest. The credits take
 # about 1350 NTSC fields on a1200-030 and 2200 on a500, so the route waits for the game's
 # state instead of counting fields.
 # 'putt' (from 'hole1'): press the button, drag the pointer 48 right and 36 down in 12
@@ -55,6 +58,8 @@ ROUTES = {
 # frames (the title draws too, the pause screen does not).
 STATE = 0x10ea8
 DRAWING = 0x10ea0
+COUNTER = 0x1145c    # the field counter, low byte first
+BALL_ON = 0x10fda    # object 0's (the ball's) active flag: 0 in the intro, 1 in play
 
 
 def until(test, tries, fields=50):
@@ -63,6 +68,12 @@ def until(test, tries, fields=50):
             return True
         req('gdb', f'monitor fields {fields}')
     return test()
+
+
+def counter():
+    out = req('gdb', f'x/2xb {COUNTER:#x}')
+    b = [int(v, 16) for v in out.split(':')[1].split()]
+    return b[0] | b[1] << 8
 
 
 def req(*words):
@@ -113,18 +124,19 @@ def run(steps):
         elif w[0] == 'frametrack':
             print(req('frametrack', w[1], str(ROOT / f'tmp/shots/{w[2]}.txt')), end='')
         elif w[0] == 'play':
-            for _ in range(5):
-                run(['click 5'])
-                if until(lambda: peek(STATE, 'b') == 5, 16):
+            for _ in range(120):
+                state = peek(STATE, 'b')
+                if state == 4 and peek(DRAWING, 'b') == 1 and peek(BALL_ON, 'b'):
                     break
+                if state == 5:
+                    run(['click 5', 'f 60'])
+                    continue
+                c0 = counter()
+                req('gdb', 'monitor fields 50')
+                if state == 4 and (counter() - c0) & 0xffff >= 45:
+                    run(['click 5'])
             else:
-                sys.exit('play: no pause screen after 5 clicks')
-            for _ in range(10):
-                run(['click 5', 'f 60'])
-                if peek(STATE, 'b') == 4 and peek(DRAWING, 'b') == 1:
-                    break
-            else:
-                sys.exit('play: still paused after 10 clicks')
+                sys.exit('play: not in play after 120 polls')
         elif w[0] == 'mouse':
             for _ in range(int(w[3])):
                 req('gdb', f'monitor mouse {w[1]} {w[2]}')

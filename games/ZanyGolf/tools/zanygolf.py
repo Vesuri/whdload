@@ -5,7 +5,7 @@
     python3 tools/zanygolf.py frames N [DX DY K]
                                              run N fields one at a time and count the frames
                                              shown: flips of the copper list's plane pointer
-                                             (program offset $14a8 flips it); no breakpoint,
+                                             (program offset $14ac flips it); no breakpoint,
                                              so it works on every CPU, MMU cores included.
                                              With DX DY: move the mouse by DX, DY every field,
                                              reversing direction every K fields (default 30)
@@ -15,7 +15,7 @@
                                              x, y and its two velocity components
     python3 tools/zanygolf.py frametrack N FILE
                                              run to the renderer's flip N times (a breakpoint at
-                                             program offset $14a8; not on MMU cores) and write a
+                                             program offset $14ac; not on MMU cores) and write a
                                              line a frame: the field counter, the clock and the
                                              object block $5c7a-$5d29 in hex
 
@@ -29,7 +29,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
 from game_server import game_server  # noqa: E402
 
 PLANE4 = 0x12326     # the low word of BPL4PT in the copper list; bit 15 picks the buffer
-SWAP = 0x114a8       # the renderer flips PLANE4 and the other plane pointers here
+SWAP = 0x114ac       # the renderer flips PLANE4 and the other plane pointers here (the
+                     # first instruction after the slave's jsr FrameCap at $114a4)
 COUNTER = 0x1145c    # the game's field counter, low byte first
 CLOCK = 0x15de6      # the game clock in fields: the elapsed-fields sum $5de4 less the epoch $6424
 BALL = 0x15c7a       # the ball (object 0 of four): x, then y at +8 (pixels on the course

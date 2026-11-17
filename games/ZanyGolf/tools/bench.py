@@ -22,9 +22,11 @@ import route  # noqa: E402
 from profile import TwoStack  # noqa: E402
 
 # Program addresses (FILE1 at $10000; offset = address - $10000).
-SWAP = 0x114a8       # the renderer flips the copper list's plane pointers: a frame is shown
+SWAP = 0x114ac       # the renderer flips the copper list's plane pointers: a frame is shown
+                     # (the first instruction after the slave's jsr FrameCap at $114a4)
 RENDER = 0x1147a     # the renderer's entry (from the threaded code)
-TILE = 0x1153a       # one 8x8 tile of the full rows: 32 byte copies
+TILE = 0x1153a       # one 8x8 tile of the full rows: 32 byte copies (the game's renderer;
+                     # never runs under the slave's NewDraw, so the counts read 0)
 ROW = 0x1151e        # one row of 40 tiles
 OBJECTS = 0x116f2    # draws shapes into the back buffer (after the tiles)
 VBL = 0x121e6        # the game's interrupt handler (every level; VERTB and COPER)
