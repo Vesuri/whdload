@@ -49,7 +49,7 @@ The loader, first hunk:
 | $2338 | the copper list's tail, after its wait for line $90: `DMACON` = $0020 (sprite DMA off), the data registers of sprites 0-7 = 0 | a wait for line $f8, the eight sprite pointers | ours, likewise |
 | $2246 | the interrupt's `bsr.w $1f0c; tst.b $126e(a4)` | `jsr PtrVbi; nop` | ours, likewise: the sprites placed every field |
 | $1d78 | the input's take of the mouse's counts ($1d78-$1dc3: a quarter of each, clamped to ±31) | `jsr PtrTake; bra.w $1dc4` | ours: clamped to ±100 (`PTR_MAX`), a fast stroke stays straight, and where the step puts the pointer kept ("The pointer") |
-| $7a9c | a game's start: the immediate of `LDY #0` (threaded), the position in the hole order | `CUSTOM1` | ours, debug, only with `CUSTOM1`=1-9: start on that hole (below) |
+| $7a9c | a game's start: the immediate of `LDY #0` (threaded), the position in the hole order | `CUSTOM1` | ours, only with `CUSTOM1`=1-9: start on that hole (below) |
 
 Then `Patch` flushes the caches and turns on the instruction cache for BaseMem
 (`resload_SetCACR`). The game never changes its native code: FILE1 dumped at the title and
@@ -59,10 +59,10 @@ chip RAM, where the whole game is, non-cacheable for data in hardware, and on a 
 68060 a cacheable access to it is cancelled and restarted, several times slower (WHDLoad's
 `cache.html`).
 
-The slave header is version 17, for `ws_config`: the splash window's "Start on hole
-(debug)" list, the holes by the names of the score card ("1. Windmill" to "10. Mystery"),
+The slave header is version 17, for `ws_config`: the splash window's "Start on
+hole" list, the holes by the names of the score card ("1. Windmill" to "10. Mystery"),
 sets `CUSTOM1` to 0-9, and `CUSTOM1=N` starts every game on hole N+1 instead
-of hole 1, the windmill (for profiling the later holes). The game plays the hole files in
+of hole 1, the windmill (also for profiling the later holes). The game plays the hole files in
 the order of the table at $bb02 (3, 8, 0, 9, 4, 5, 1, 7, 6, 2: hole 1 is `HOLE3`), with the
 position in it at $bb23 and the hole file's number at $5c5a. A game's start ($7a86) sets the
 position with `LDY #0` and loads the hole from the table; the advance after each hole is at

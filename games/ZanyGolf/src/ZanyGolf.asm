@@ -21,7 +21,7 @@ _expmem		dc.l	-EXPSIZE		;optional: the renderer's caches (NewDraw)
 		dc.w	0			;ws_kickcrc
 		dc.w	_config-_base		;ws_config
 _data		dc.b	"data",0
-_config		dc.b	"C1:L:Start on hole (debug):1. Windmill,2. Hamburger,3. Walls,4. Pinball,5. Fans,"
+_config		dc.b	"C1:L:Start on hole:1. Windmill,2. Hamburger,3. Walls,4. Pinball,5. Fans,"
 		dc.b	"6. Carpets,7. Castle,8. Ant Hill,9. Energy,10. Mystery",0
 _name		dc.b	"Zany Golf",0
 _copy		dc.b	"1988 Electronic Arts",0
@@ -367,7 +367,7 @@ Split		bsr	SkipIntro
 		bsr	IpCut
 		bra.b	.step
 
-; Debug: CUSTOM1=N (0-9, the splash window's "Start on hole") starts every game on hole
+; CUSTOM1=N (0-9, the splash window's "Start on hole") starts every game on hole
 ; N+1 instead of hole 1, the windmill. The game plays the holes in the order of the table
 ; at $bb02 (3,8,0,9,4,5,1,7,6,2: the hole files HOLEn, 3 the windmill), with the position
 ; at $bb23 and the hole at $5c5a. A game's start ($7a86, threaded code) sets the position

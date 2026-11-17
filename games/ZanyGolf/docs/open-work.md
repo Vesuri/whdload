@@ -22,7 +22,7 @@ with the pointer moving: `a500` 9.25 to 37, `a1200` 13.25 to 58.5, the 68030 set
 while the playfield shows waits for its end, which costs the `a500` a fifth of its frames.
 The verify build found no cell differing from its tile on every CPU from 68000 to 68060,
 with `DCACHE` too, and no draw list or shape differing from the game's on the 68030 and the
-68000. The debug option `CUSTOM1=N` starts every game on hole
+68000. The option `CUSTOM1=N` ("Start on hole") starts every game on hole
 N+1, for measuring the later holes (`internals.md`, "Slave patches").
 
 The pointer is a pair of hardware sprites (17.11.2026, `internals.md`, "The pointer"),
