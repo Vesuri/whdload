@@ -30,10 +30,8 @@ the TrainSim screens on both (2026-11-16). The published 2.0b (16.11.2026)
 crashed an A1200/040 after a close kill: its clipped-table margin grew with
 the scale, so a rotated object near the camera wrote outside the bitmap. The
 margin is now 4, and the check draws up to scale 8192 against guard memory;
-2.0b (17.11.2026) replaces that release. Not yet done: a user look at a close
-kill in flight. Still
-open: a user look in flight,
-the cost per draw (not measured beyond
+2.0b (17.11.2026) replaces that release; the user played it, close kills
+included, without a crash (2026-11-17). Still open: the cost per draw (not measured beyond
 a profile share), and the scale-only path. See
 [rotated bitmaps](internals.md#rotated-bitmaps-centred-tables-both-release-builds).
 
