@@ -250,6 +250,73 @@ _planealloc
         and.w   #-8,d0
 .x      rts
 
+; FMODE 3 only once START's display is on. START writes it (hunk 0 +$710) while the OS's
+; copper list still runs, then copies its own list to chip, waits for line 256 (+$13ce) and
+; only then takes the copper (+$7de-+$7f6: DMA off, COP1LC, COPJMP1, DMA on). The OS's
+; copinit writes FMODE 0 at the top of every frame and START's list never writes FMODE, so
+; a frame starting in between (where +$710 falls depends on the CPU: on an A1200/040 with
+; its caches on) leaves FMODE 0 for good: every line fetched 40 bytes instead of START's
+; 48 (DDF $38-$d0, modulo $20), the classic skew. The write at +$710 is skipped (bra.s)
+; and made after COPJMP1 (+$7f0, clr.w COPJMP1 becoming jsr _fmode), while START's list
+; runs and its bitplane DMA is still off. On every CPU, also without Enhanced framerate.
+; Test defines: FMODE_RACE holds +$710 until line 305, so that a frame starts before
+; COPJMP1 (the copy of the list alone takes 5 lines); FMODE_NOFIX leaves START as it is.
+; a1 START's segment list (its first hunk's link).
+
+_fmodepatch
+        movem.l d0-d1/a0-a2,-(a7)
+        lea     4(a1),a0                ; hunk 0
+        cmp.l   #$33fc0003,$710(a0)     ; move.w #3,FMODE
+        bne     .x
+        cmp.l   #$00dff1fc,$714(a0)
+        bne     .x
+        cmp.l   #$427900df,$7f0(a0)     ; clr.w COPJMP1
+        bne     .x
+        cmp.w   #$f088,$7f4(a0)
+        bne     .x
+        IFD FMODE_RACE
+        lea     $2a2(a0),a1
+        cmp.w   #$4eb9,(a1)+            ; jsr +$710
+        bne     .x
+        lea     $710(a0),a2
+        cmp.l   (a1),a2
+        bne     .x
+        move.l  a2,d0
+        lea     _fmgo(pc),a2
+        move.l  d0,(a2)
+        lea     _fmrace(pc),a2
+        move.l  a2,(a1)
+        ENDC
+        IFND FMODE_NOFIX
+        move.w  #$6006,$710(a0)         ; bra.s past it
+        lea     $7f0(a0),a1
+        move.w  #$4eb9,(a1)+            ; jsr _fmode
+        pea     _fmode(pc)
+        move.l  (a7)+,(a1)
+        ENDC
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.x      movem.l (a7)+,d0-d1/a0-a2
+        rts
+
+; START's copper list on (COPJMP1), then FMODE 3
+_fmode  clr.w   $dff088
+        move.w  #3,$dff1fc
+        rts
+
+        IFD FMODE_RACE
+_fmrace move.l  d0,-(a7)
+.w      move.l  $dff004,d0
+        lsr.l   #8,d0
+        and.w   #$1ff,d0
+        cmp.w   #305,d0
+        bne.s   .w
+        move.l  (a7)+,d0
+        move.l  _fmgo(pc),-(a7)
+        rts
+_fmgo   dc.l    0
+        ENDC
+
 
 ;============================================================================
 ; like a program from "startup-sequence" executed, full dos process,
@@ -341,6 +408,7 @@ _cont
             add.l   a1,a1
             add.l   a1,a1
             bsr _planepatch
+            bsr _fmodepatch
 
 
 ;******************** PRESTIGE_CRACKDEB
@@ -407,7 +475,6 @@ _cont
                 moveq   #_args_end-_args,d0
                 lea     (_args,pc),a0
                 movem.l (_saveregs,pc),d1-d6/a2-a6
-                move.w #$f,$dff1fc
                 jsr     (4,a1)
 
         IFD QUIT_AFTER_PROGRAM_EXIT

@@ -69,7 +69,6 @@ After `LoadSeg`:
   becomes `jsr _prepcrack`. When the byte at `-5(a3)` is 7 it compares the seven bytes from
   `-4(a3)` with two script signatures and, on a match, changes the byte their offset word
   points to from `$14` to `$0a`; then it does the three replaced instructions.
-- FMODE (`$dff1fc`) is set to `$f` (64-bit bitplane and sprite fetch) just before the call.
 
 The low-memory jumps at `$100` and `$106` sit in the CPU vector table (user vectors 64 and
 65).
@@ -77,11 +76,11 @@ The low-memory jumps at `$100` and `$106` sit in the CPU vector table (user vect
 ## AGA improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan. All but the two options
-(items 19 and 20) and the planes' alignment (item 21) are the splash window's "Enhanced framerate", `CUSTOM2` (`_enhget`), on in
+(items 19 and 20), the planes' alignment (item 21) and FMODE (item 22) are the splash window's "Enhanced framerate", `CUSTOM2` (`_enhget`), on in
 the installed icon. Without it `_bootdos` installs none of them and puts v1.2's caches back
 (`_cpu12`: `resload_SetCPU` with v1.2's `CACHE` value over the KickEmu's `CACHECHIPDATA`), so
 the game runs as v1.2 did, with START's fast pool given up as before (item 1). The two options
-work either way, and item 21 is always made. `_hunks` finds START's hunks 1 and 2 for all of them.
+work either way, and items 21 and 22 are always made. `_hunks` finds START's hunks 1 and 2 for all of them.
 
 1. **START's fast pool kept** (`_fastpool`): with the 1 MB ExpMem (not with `MemConfig=1`),
    hunk 0 `+$196` [`$1c2`], `move.l #0,<hunk 1 +$f4>` (`23fc 0000 0000`, checked first),
@@ -546,13 +545,31 @@ work either way, and item 21 is always made. `_hunks` finds START's hunks 1 and 
     bytes apart, all multiples of 8. The first two planes are CFou!'s block at `$190000`;
     the other six (hunk 0 `+$5ba`, 96,000 bytes, `<hunk 1 +$13e>`-`<+$152>`) and the plane
     at `+$4ba` (8,000 bytes, `<hunk 1 +$b6>`) are `AllocMem(CHIP|CLEAR)`, which promises
-    only 4-byte alignment. On a real A1200/040 with Zorro III fast memory every menu screen
-    was skewed. Each call's 16 bytes, `+$5c0`-`+$5cf` and `+$4c0`-`+$4cf`
+    only 4-byte alignment. Each call's 16 bytes, `+$5c0`-`+$5cf` and `+$4c0`-`+$4cf`
     (`48e7 0002 2c78 0004 4eae ff3a 4cdf 4000`, checked with the sizes before them), become
     `jsr _planealloc` and `bra.s` to the store, and `_planealloc` asks for 8 bytes more and
     rounds the address up to 8. START never frees either block. FS-UAE gave 8-byte aligned
     blocks with and without it (`$181e8`) on the `a1200-fast`, `a1200-040` and the
     `a1200-040` with 32 MB of Zorro III only.
+22. **FMODE set once START's display is on** (`_fmodepatch`, `_fmode`; on every CPU and
+    without Enhanced framerate, a fix of v1.2's display): START writes FMODE 3 at hunk 0
+    `+$710` (`33fc 0003 00df f1fc`, called once, from `+$2a2`) while the OS's copper list
+    still runs, copies its own list to chip (`+$732`-`+$752`), waits for line 256
+    (`+$7c8` `jsr +$13e0`, `+$13ce`) and only then takes the copper (`+$7de`-`+$7f6`: DMA
+    off, COP1LC, COPJMP1, DMA on). Graphics' copinit writes FMODE 0 at the top of every
+    frame (`MOVE $1fc,0` at its `+$1c`), and START's list sets every display register but
+    FMODE, so a frame that starts between `+$710` and COPJMP1 leaves FMODE 0 for the rest
+    of the game: 40 bytes fetched a line instead of 48 against the 80-byte rows, every
+    screen skewed. Where `+$710` falls in the frame depends on the CPU: line 136 in FS-UAE's
+    `a1200-040`, so the copy (5 lines) and the wait end in the same frame; on a real
+    A1200/040 with 32 MB of Zorro III and its caches on, every screen was skewed, and
+    `NOCACHE` or BaseMem non-cacheable (slower) hid it. `+$710` becomes `bra.s +$718`
+    (`6006`), and `+$7f0`, `clr.w COPJMP1` (`4279 00df f088`, both checked first), becomes
+    `jsr _fmode`, which strobes COPJMP1 and then writes FMODE 3: START's list runs and its
+    bitplane DMA is still off. v1.2's FMODE `$f` just before the call to START is gone, as
+    copinit overwrote it at the next frame. The test define `FMODE_RACE` holds `+$710`
+    until line 305 (`_fmrace`, through `+$2a2`): the copy then ends on line 13 of the next
+    frame, and FS-UAE shows the skew with `FMODE_NOFIX` and the right screens without it.
 
 ## ECS improvements
 

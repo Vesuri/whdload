@@ -63,8 +63,9 @@
  - Option "Smooth landscape" (AGA; splash window, or the tooltype Custom3=1,
    which the installer sets): hills keep their shape as you turn instead of
    changing at every step
- - AGA: the screens' bitplanes always on 8-byte boundaries, as the AGA's
-   64-bit fetch needs: on some machines every menu screen was skewed
+ - AGA: the intro and the menu screens are no longer skewed on some machines
+   (an A1200/040, for one): the display's fetch mode is set only once the
+   game's own display is on
  - Uses 1 MB of Fast memory (WHDLoad 20 or newer); with the tooltype
    MemConfig=1 it runs in 256 KB of Fast memory as version 1.2 did
  - Enhanced framerate, AGA: faster drawing of the 3D view, with the CPU
