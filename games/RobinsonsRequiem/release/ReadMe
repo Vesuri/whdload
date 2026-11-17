@@ -52,7 +52,7 @@
  or     aminet:dev/misc/whdload#?
  and    aminet:game/patch/
 
- version 2.0b (17.11.2026) done by Vesuri:
+ version 2.0b (18.11.2026) done by Vesuri:
  - Option "Enhanced framerate" (splash window, or the tooltype Custom2=1, which
    the installer sets): the improvements below. Without it the game
    runs as it did in version 1.2

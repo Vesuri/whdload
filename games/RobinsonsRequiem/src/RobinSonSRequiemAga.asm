@@ -98,12 +98,12 @@ slv_CurrentDir  dc.b    "data-aga",0
 slv_name        dc.b    "Robinson Requiem AGA",0
 slv_copy        dc.b    "Silmarils",0
 slv_info        dc.b    "Coded By CFou!, improved by Vesuri",10
-                dc.b    "Version 2.0b (17.11.2026) "
+                dc.b    "Version 2.0b (18.11.2026) "
         IFD BARFLY
                 INCBIN  "T:date"
         ENDC
                 dc.b    0
-                dc.b    "$VER: RobinsonSRequiemAga.Slave 2.0b (17.11.2026)",0
+                dc.b    "$VER: RobinsonSRequiemAga.Slave 2.0b (18.11.2026)",0
 slv_config	dc.b	"C2:B:Enhanced framerate;"
 		dc.b	"C1:L:Movement speed:Original,1X (ECS),2X (AGA);"
 		dc.b	"C3:B:Smooth landscape;",0

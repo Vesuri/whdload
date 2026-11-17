@@ -100,12 +100,12 @@ slv_CurrentDir  dc.b    "data-ecs",0
 slv_name        dc.b    "Robinson Requiem ECS",0
 slv_copy        dc.b    "Silmarils",0
 slv_info        dc.b    "Coded By CFou!, improved by Vesuri",10
-                dc.b    "Version 2.0b (17.11.2026) "
+                dc.b    "Version 2.0b (18.11.2026) "
         IFD BARFLY
                 INCBIN  "T:date"
         ENDC
                 dc.b    0
-                dc.b    "$VER: RobinsonSRequiemECS.Slave 2.0b (17.11.2026)",0
+                dc.b    "$VER: RobinsonSRequiemECS.Slave 2.0b (18.11.2026)",0
         EVEN
 
 slv_config	dc.b	"C2:B:Enhanced framerate;"
