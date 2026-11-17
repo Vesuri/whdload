@@ -81,19 +81,23 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		move.l	(sp)+,$14a6(a3)
 		move.w	#$4e71,$14aa(a3)
 
+		move.l	#$01384ef9,$5238(a3)	;the main loop: step the world each
+		pea	Split			;STEP_FIELDS fields, draw in between
+		move.l	(sp)+,$523c(a3)
+
 		movem.l	(sp)+,d0-d7/a0-a6
 		jmp	(a3)
 
-; The game advances its world one step a drawn frame and counts the step as 6 fields
-; (10 frames a second at NTSC), with nothing to limit the frame rate, so a fast machine
-; played it fast. Replaces the flip's first two instructions (FILE1 $14a4: the fine scroll
-; into the copper list, and d0 = $8000) and first waits until FRAME_FIELDS fields have
-; passed since the previous flip, by the game's field counter (FILE1 $145c, low byte). The
-; counter advances at the copper interrupt (line $90), after the copper has loaded the
-; field's plane pointers, so a flip there shows from the top of the next field. A frame
-; that took longer does not wait. No wait while the interrupts are off (the counter would
-; not move). a4 is FILE1's base here.
-FRAME_FIELDS	= 6
+; The game advanced its world one step a drawn frame and counts the step as 6 fields
+; (10 steps a second at NTSC). Split (below) now steps the world on its own clock, so
+; this only keeps the flips to at most one a field. Replaces the flip's first two
+; instructions (FILE1 $14a4: the fine scroll into the copper list, and d0 = $8000) and
+; first waits until FRAME_FIELDS fields have passed since the previous flip, by the game's
+; field counter (FILE1 $145c, low byte). The counter advances at the copper interrupt
+; (line $90), after the copper has loaded the field's plane pointers, so a flip there
+; shows from the top of the next field. No wait while the interrupts are off (the counter
+; would not move). a4 is FILE1's base here.
+FRAME_FIELDS	= 1
 FrameCap	move.w	d0,$2312(a4)		;displaced: the fine scroll
 		movem.l	d1/a0,-(sp)
 		lea	(_lastflip,pc),a0
@@ -111,6 +115,56 @@ FrameCap	move.w	d0,$2312(a4)		;displaced: the fine scroll
 		rts
 
 _lastflip	dc.b	0
+		even
+
+; The main loop (FILE1 $5232, threaded code) draws a frame when the drawing flag ($0ea0)
+; is set (JSR $4fd0, $1478, $48d4), then reads the input (JSR $1d5a) and steps the world
+; (JSR $62b2, which also adds 6 fields to the game clock). Replaces the flag test at $5238
+; (LDA $0ea0; BEQ $524c) with native code (primitive $0138) that jumps here and picks the
+; rest of the pass by setting the thread pointer a5:
+; - flag clear: input and step ($524c), and loop; the game clock then counts real fields.
+; - flag set and STEP_FIELDS fields since the last step: the same, input and step only, so
+;   the step is not held up behind a frame; the next pass draws it.
+; - flag set and fewer: draw only (DrawOnly), and loop.
+; A step can change the flag (the pause screen clears it), and the next pass tests it again,
+; as the game's own next pass did.
+; Steps are due every STEP_FIELDS fields by the field counter; a step more than one step
+; late restarts the schedule from now, so a slow machine steps every pass as before and
+; never catches up in a burst. With the interrupts off the counter stops, so every pass
+; steps. a4 is FILE1's base, d7 and a0 are scratch in the threaded code.
+STEP_FIELDS	= 6
+Split		move.b	$0ea0(a4),d0		;displaced: LDA $0ea0
+		move.b	d0,d4
+		lea	(_laststep,pc),a0
+		beq.b	.update
+		move.w	$dff01c,d7		;INTENAR: master, COPER and VERTB on?
+		and.w	#$4030,d7
+		cmp.w	#$4030,d7
+		bne.b	.step
+		move.b	$145c(a4),d7
+		sub.b	(a0),d7
+		cmp.b	#STEP_FIELDS,d7
+		bcs.b	.draw
+		cmp.b	#2*STEP_FIELDS,d7
+		bcc.b	.late
+		addq.b	#STEP_FIELDS,(a0)
+		bra.b	.step
+.late		move.b	$145c(a4),(a0)
+.step		lea	$524c(a4),a5		;JSR $1d5a; JSR $62b2; JMP $5232
+		jmp	$0122(a4)		;dispatch
+.draw		lea	(DrawOnly,pc),a5
+		jmp	$0122(a4)
+.update		move.b	$145c(a4),d7		;the first pass with the flag set steps
+		subq.b	#STEP_FIELDS,d7
+		move.b	d7,(a0)
+		bra.b	.step
+
+DrawOnly	dc.w	$05e8,$4fd0		;JSR $4fd0
+		dc.w	$05e8,$1478		;JSR $1478: the renderer
+		dc.w	$05e8,$48d4		;JSR $48d4
+		dc.w	$0438,$5232		;JMP $5232
+
+_laststep	dc.b	0
 		even
 
 FixKey		move.w	4(sp),d0

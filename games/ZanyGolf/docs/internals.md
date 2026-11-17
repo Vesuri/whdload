@@ -30,7 +30,8 @@ The loader, first hunk:
 | Offset | Original | Patch | Why |
 |---|---|---|---|
 | $1f38 | `move.w #300,d0; dbf d0,*` (the keyboard handshake delay, a CPU loop) | `nop; jsr FixKey` | a delay on the beam, and the trainer |
-| $14a4 | the flip's `move.w d0,$2312(a4); move.w #$8000,d0` | `jsr FrameCap; nop` | ours: at most one frame each 6 fields ("Game time") |
+| $14a4 | the flip's `move.w d0,$2312(a4); move.w #$8000,d0` | `jsr FrameCap; nop` | ours: at most one frame a field ("Game time") |
+| $5238 | the main loop's `LDA $0ea0; BEQ $524c` (threaded) | primitive $0138, `jmp Split` | ours: a world step each 6 fields, draw-only passes between ("Game time") |
 
 `FixKey` decodes the raw key the game pushed at $1f20 (from 4(sp)). On F10 ($59) it writes 9
 to $15ca2 (`FILE1` $5ca2), the strokes left. Then it
@@ -170,24 +171,37 @@ button 37 or 40 fields instead of 30 put the A500's timer in phase. Then the A50
 table matched the 68030's at every frame except $5d12, which differed by a constant $80
 gathered at rest before the putt, and the ball came to rest at 154, 229.
 
-**With the frame cap** (ours, `FrameCap` at the flip): before flipping, the renderer waits
-until 6 fields have passed since the previous flip, by the game's counter. The counter
-advances at the copper interrupt at line $90, after the copper has loaded the field's plane
-pointers, so the new frame shows from the top of the next field while the renderer starts
-on the old buffer above the beam. A frame that took longer flips at once; with the
-interrupts off it never waits. The same putt, 17.11.2026 (rest positions move by a pixel
-or two with the friction timer's phase, which the cap shifts):
+**With the world on its own clock** (ours): `Split` replaces the main loop's flag test at
+$5238 with native code that chooses the rest of the pass. With the drawing flag clear, the
+pass reads the input and steps ($524c), as before. With the flag set, a step is due each 6
+fields by the game's counter: a due pass reads the input and steps only, and loops (the
+step is not held up behind a frame, and a step that clears the flag is seen by the next
+pass, as the game's own next pass saw it); the passes between draw only (`DrawOnly`, a
+thread in the slave: JSR $4fd0, $1478, $48d4, JMP $5232). Those three are drawing only:
+$4fd0 draws the course pieces that have come into view once (it clears their bit in $111a),
+$48d4 builds the visible objects' draw list, $1478 is the renderer. A step more than one
+step late restarts the schedule, so a slow machine steps at most twice in a row and never
+catches up in a burst; with the interrupts off (the counter stops) every pass steps.
+`FrameCap` at the flip now only keeps the flips to one a field. The draw-only frames show
+the last step's state again; interpolating between steps is open work.
 
-| Machine | WHDLoad option | Fields between flips | Game speed |
-|---|---|---|---:|
-| `a500` | | 6.25 (6 x100, 7 x41, 8 x1) | 0.96x, as before |
-| `a1200` | | 6.02 (6 x147, one 5, one 7) | 1.00x |
-| `a1200-030`, no MMU model | | 6 x149 | 1.00x |
-| `a1200-030`, no MMU model | `CACHE` | 6 x149 | 1.00x |
+The putt (900 fields from the press, `track`) and hole 1 with the pointer moving and the
+view scrolling (`frames 240 5 3`), NTSC, 17.11.2026. Game speed is the clock's advance
+over the real fields:
 
-With the pointer moving (`frames 240 5 3`), the `a1200-030` preset shows 10.00 frames a
-second, every flip 6 fields apart, and the `a500` 9.50 with this slave and with the
-original alike.
+| Machine | WHDLoad option | Putt: frames a second | Putt: game speed | Pointer moving: frames a second |
+|---|---|---:|---:|---:|
+| `a500` | | 9.40 | 1.00x (0.95x capped) | 9.25 (9.50 capped and original) |
+| `a1200` | | 13.1 | 1.00x | 13.25 |
+| `a1200-030` | | | | 14.75 |
+| `a1200-030`, no MMU model | | 14.7 | 1.00x | |
+| `a1200-030`, no MMU model | `CACHE` | 24.7 | 1.00x | 24.75 |
+
+The A500 now holds 10 steps a second: when a frame took more than 6 fields it steps twice
+before the next frame, which costs it a frame in about 40. Steps run 4 to 8 fields apart
+on the 68030 (a step waits for the frame in progress) and 6 on average. The ball comes to
+rest within a pixel or two of the capped runs, because the fields at which the steps sample
+the mouse move with the schedule. Screenshots of the draw-only frames show no trails.
 
 **The intended speed is 10 frames a second at NTSC**, 6 fields a frame: that is what the
 game takes a frame to be. The stock NTSC A500 comes close and stays below it: hole 1 draws

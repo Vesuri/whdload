@@ -1,8 +1,9 @@
 # Zany Golf
 
 Electronic Arts' Zany Golf (1988, by Will Harvey) under WHDLoad. The slave is Bored Seal's
-v1.1 (23-Jul-2006; v1.0 05-Aug-2000), an OSEmu slave, with a frame cap added (10 frames a
-second at most, the game's intended speed). The original slave
+v1.1 (23-Jul-2006; v1.0 05-Aug-2000), an OSEmu slave, with the world stepped on its own
+clock at the game's intended 10 steps a second and frames drawn between the steps, at most
+one a field. The original slave
 is by Bored Seal (game.conf `AUTHOR`, `UPSTREAM`): neither JOTD's nor StingRay's repository
 holds it, so `src/ZanyGolf.asm` is the source from the whdload.de install package
 (`ZanyGolfHD/src/ZanyGolf.asm`). The ReadMe also thanks Jan Vieten for the disk image and
