@@ -9212,7 +9212,7 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   the room and Intuition pointers' among them, keep bank 16.
   The pointer's colour on screen was (243,255,235) in the first mission of
   systems 1, 2, 4, 6, 9 and 12 too (2026-11-17, `--direct-flight --system`;
-  all six had the 320×105 aperture). On the user's A1200 with an Indivision the pointer
+  all six had the 320×105 aperture). On the user's real Amiga (with an Indivision) the pointer
   shows black in flight, which is what colour 31 would show if the bank change
   did not reach the display; not explained yet.
 - **Hiding.** `mouse_vbl`, called from each variant's VBL hook (CD32 the port-1
