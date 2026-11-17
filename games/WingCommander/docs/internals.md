@@ -9241,7 +9241,8 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   is sprite 7's; FMODE $0003 leaves the sprite fetch at 16 bits. The same
   test with the image placed on an 8-byte boundary by the slave (allocated 8
   bytes larger and rounded up) was yellow, cyan and magenta too, so alignment
-  is not the cause. With both nibbles set the pointer is colour 207 either
+  is not the cause; its snapshots show the image at $61c8 and BPLCON4 $00dc in
+  both lists, on the displayed list in all 1629 fields. With both nibbles set the pointer is colour 207 either
   way.
 - **Hiding.** `mouse_vbl`, called from each variant's VBL hook (CD32 the port-1
   pad read, OCS the port-1 fire sample), counts fields. Once the controller has
