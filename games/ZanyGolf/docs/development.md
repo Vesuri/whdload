@@ -56,7 +56,8 @@ CMD='gdb monitor key 01 1'` and so on). For anything repeatable use the harness 
 | Tool | Does |
 |---|---|
 | `tools/boot.sh` | boots a server (`tools/zanygolf.py serve`): warp, deterministic, nothing in port 0, no window; run options pass through |
-| `tools/route.py STEPS` | drives it: `stop`, `f N`, `key RAW N`, `click N`, `press`, `release`, `title`, `play`, `mouse DX DY N`, `shot`, `prof`, `track`, `frametrack`, `gdb`. The route `hole1` reaches hole 1 in play (it waits for the title's state, presses 1, then clicks through the hole's intro and the pause screen); `putt` then plays one putt (`internals.md`, "Game time") |
+| `tools/route.py STEPS` | drives it: `stop`, `f N`, `key RAW N`, `click N`, `press`, `release`, `title`, `play`, `mouse DX DY N`, `shot`, `prof`, `track`, `frametrack`, `gdb`. The route `hole1` reaches hole 1 in play (it waits for the title's state, presses 1, then clicks through the hole's intro, and the pause screen when one comes, until the ball is active); `putt` then plays one putt (`internals.md`, "Game time") |
+| `make build BUILD=verify` | the slave with `VERIFY`: after every frame `NewDraw` checks each cell of the back buffer against its tile in the hole block. Low memory (fill $cc..) counts: $1f0 cells that differed, $1f4 frames checked, $1f8 the first difference (frame, row, column), $1e0/$1e4/$1e8 frames drawn at the same origin, scrolled, from nothing. Run it with `BUILD=verify tools/boot.sh`; frames are several times slower |
 | `tools/zanygolf.py frames N [DX DY K]` | counts the frames shown in N fields from the flips of the copper list's plane pointer, optionally moving the mouse every field; no breakpoint, so it works on every CPU, MMU cores included |
 | `tools/zanygolf.py track N FILE` | a line a field for N fields: the field counter, whether a frame was shown, the game clock, the ball's position and velocity; every CPU |
 | `tools/zanygolf.py frametrack N FILE` | a line a frame for N frames, at a breakpoint on the flip: the field counter, the clock and the object table $5c7a-$5d29; not on MMU cores |
@@ -102,6 +103,15 @@ Traps:
   route waits for the state at `FILE1` $0ea8 and the drawing flag at $0ea0 instead
   (`internals.md`, "Game time"). After the click on the hole's intro the game loads the
   hole for about 400 fields with interrupts off, and the field counter stops.
+- **A screenshot during a load breaks it.** `shot` traces a field; taken while the game
+  loads with interrupts off (after the title's 1, after the intro's click: the field
+  counter stops) the load never finishes, with the shipped slave too. Take screenshots
+  once the counter moves.
+- **A click during a load is lost**, and the intro and play are both state 4 with drawing:
+  `play` tells them apart by the ball's active flag at $0fda.
+- **The flip patch moved the flip.** `FrameCap`'s `jsr` covers $14a4-$14a9, so the harness
+  marks a frame at $14ac (`SWAP` in `zanygolf.py` and `bench.py`); `bench.py`'s tile counts
+  are the game's renderer's and read 0 under `NewDraw`.
 - **Per-frame timers carry the frames drawn before a putt.** Friction applies every fifth
   frame from the hole's start, so the same putt on two machines takes different paths
   unless the timer at $5cd2 has the same value at the release; change the hold before

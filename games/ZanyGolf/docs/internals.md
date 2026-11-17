@@ -7,8 +7,10 @@ $10000 on every machine tried, so its runtime address is $10000 + offset).
 
 ## Loading and memory
 
-A WHDLoad v10 slave (flags `NoError`, `EmulTrap`, `NoKbd`), 512 KB base memory, no ExpMem,
-`ws_keyexit` $59 (F10). It loads `OSEmu.400` from `data/` to $400 and initialises it, then
+A WHDLoad v10 slave (flags `NoError`, `EmulTrap`, `NoKbd`), 512 KB base memory, an optional
+72 KB ExpMem (ours, for the renderer's caches, "Display"), `ws_keyexit` $59 (F10). The slave
+takes the ExpMem's address before it initialises OSEmu and clears `ws_ExpMem`, so OSEmu does
+not give the memory to the game. It loads `OSEmu.400` from `data/` to $400 and initialises it, then
 calls `dos.library` `LoadSeg` on `data/Zany` through OSEmu. The loader opens
 `Zany:FILES/FILE1` and the other files through OSEmu's DOS emulation, all from `data/`
 (`PRELOAD` holds them). The slave patches the loader's first hunk, then jumps to its start.
@@ -32,6 +34,17 @@ The loader, first hunk:
 | $1f38 | `move.w #300,d0; dbf d0,*` (the keyboard handshake delay, a CPU loop) | `nop; jsr FixKey` | a delay on the beam, and the trainer |
 | $14a4 | the flip's `move.w d0,$2312(a4); move.w #$8000,d0` | `jsr FrameCap; nop` | ours: at most one frame a field ("Game time") |
 | $5238 | the main loop's `LDA $0ea0; BEQ $524c` (threaded) | primitive $0138, `jmp Split` | ours: a world step each 6 fields, draw-only passes between ("Game time") |
+| $1de2 | the input's `move.b $bfe001,d1` | `jsr ReadButton` | ours: a click between two steps is not lost ("Game time") |
+| $14bc | the renderer's tile redraw ($14bc-$15dd) | `jmp NewDraw` | ours, with ExpMem: only the cells that changed ("Display") |
+| $173c | the shape drawer's `addq.w #8,a3; movea.l $32(a4),a0` | `jsr ShapeHook` | ours, with ExpMem: marks the cells a shape covers ("Display") |
+
+Then `Patch` flushes the caches and turns on the instruction cache for BaseMem
+(`resload_SetCACR`). The game never changes its native code: FILE1 dumped at the title and
+twice in play differs from the file only in data (the variables between routines, the
+slave's own patches). The data cache stays off: every Amiga with a 68030 or later marks
+chip RAM, where the whole game is, non-cacheable for data in hardware, and on a 68040 or
+68060 a cacheable access to it is cancelled and restarted, several times slower (WHDLoad's
+`cache.html`).
 
 `FixKey` decodes the raw key the game pushed at $1f20 (from 4(sp)). On F10 ($59) it writes 9
 to $15ca2 (`FILE1` $5ca2), the strokes left. Then it
@@ -88,7 +101,36 @@ The renderer ($147a, entered from the threaded code once a frame):
 3. The shape drawer ($16f2) then draws shapes into the same buffer (twice a frame in the
    measured window).
 
-It redraws all 800 tiles every frame, whether or not the view moved.
+The game's renderer redraws all 800 tiles every frame, whether or not the view moved: on
+the A500 that was 61 % of the CPU (`bench.py`, hole 1, the shipped renderer). Copying a
+byte with `move.b (a2)+,d16(An)` is already the 68000's cheapest way, so the slave draws
+fewer tiles instead. With ExpMem, `NewDraw` replaces the redraw (step 2):
+
+- A cache per buffer (21 rows of 40 words in ExpMem) holds the map word each cell was last
+  drawn from, and the view origin it was drawn at (x in 16-pixel steps, y in pixels). A cell
+  is drawn only when its map word differs, two cells compared at a time. Map words are
+  32-byte tile offsets, all even, so `$0001` marks a cell to redraw.
+- When the origin moved since the back buffer was drawn, the blitter copies the other
+  buffer (last frame's) into it, shifted by the difference: x moves in 16-pixel steps, so
+  the copy is whole words, one blit a plane. The other buffer's cache comes along shifted,
+  and the cells uncovered are marked. The game never uses the blitter (no write to its
+  registers in FILE1). After the blits the slave flushes the caches (`resload_FlushCache`):
+  with the data cache on, the shape drawer's `bclr`/`bset` would read stale bytes.
+- `ShapeHook` runs at the shape drawer's start, walks the shape's rows with the drawer's own
+  arithmetic (x steps, pixel-pair counts, the clip to lines 0-159 and pixels 0-319) and marks
+  the cells it covers in the back buffer's cache. A shape drawn at fixed screen lines from
+  $40000 (`$32` = $30000, the status line) that reaches line 33, where buffer 0's tiles
+  start, drops both caches.
+- The course pieces that change ($19ea, from $4fd0) change map words, which the compare
+  catches. `Split` drops both caches whenever the drawing flag is clear or the interrupts
+  are off (a hole may load).
+- When the ExpMem is fast memory (not chip, not $c00000 slow RAM), the tiles are read from
+  a copy of the hole block there (64 KB + 32, the reach of a 16-bit offset), made again when
+  the block's address changes or the caches were dropped.
+
+Without ExpMem the game's renderer stays. The verify build (`make build BUILD=verify`)
+checks every cell of the back buffer against its tile in the hole block after every frame;
+`development.md`, "Harness".
 
 ## Interrupts
 
@@ -179,29 +221,53 @@ step is not held up behind a frame, and a step that clears the flag is seen by t
 pass, as the game's own next pass saw it); the passes between draw only (`DrawOnly`, a
 thread in the slave: JSR $4fd0, $1478, $48d4, JMP $5232). Those three are drawing only:
 $4fd0 draws the course pieces that have come into view once (it clears their bit in $111a),
-$48d4 builds the visible objects' draw list, $1478 is the renderer. A step more than one
+$48d4 builds the visible objects' draw list, $1478 is the renderer. What $4fd0 reads (the
+view, the pieces, their bits) changes only in a step, so draw-only passes skip it after its
+first run following a step. A step more than one
 step late restarts the schedule, so a slow machine steps at most twice in a row and never
 catches up in a burst; with the interrupts off (the counter stops) every pass steps.
 `FrameCap` at the flip now only keeps the flips to one a field. The draw-only frames show
 the last step's state again; interpolating between steps is open work.
 
+The input routine reads the left mouse button from CIA-A once a step, its only read of it
+($1de2), so a click shorter than 6 fields between two steps would be lost. Every pass polls
+the button (`PollButton`, from `Split`), and `ReadButton`, in place of the read, reports the
+other state from the one it reported last whenever a poll since saw it change: a click
+reaches the game as a press at one step and a release at the next. Each step turns a press
+edge, or any key, into a click event ($6462 sets $649a), so a click on the hole's intro can
+carry over into play as a click and open the pause screen, or not, depending on where it
+fell between two steps.
+
 The putt (900 fields from the press, `track`) and hole 1 with the pointer moving and the
-view scrolling (`frames 240 5 3`), NTSC, 17.11.2026. Game speed is the clock's advance
-over the real fields:
+view scrolling (`frames 240 5 3`, and `frames 240 10 8 20` for more scrolling), NTSC,
+17.11.2026, this slave. Game speed is the clock's advance over the real fields; the "before"
+column is the slave with the steps split but the game's renderer:
 
-| Machine | WHDLoad option | Putt: frames a second | Putt: game speed | Pointer moving: frames a second |
-|---|---|---:|---:|---:|
-| `a500` | | 9.40 | 1.00x (0.95x capped) | 9.25 (9.50 capped and original) |
-| `a1200` | | 13.1 | 1.00x | 13.25 |
-| `a1200-030` | | | | 14.75 |
-| `a1200-030`, no MMU model | | 14.7 | 1.00x | |
-| `a1200-030`, no MMU model | `CACHE` | 24.7 | 1.00x | 24.75 |
+| Machine | WHDLoad option | Putt: frames a second | Game speed | Pointer moving | More scrolling | Before |
+|---|---|---:|---:|---:|---:|---:|
+| `a500` | | 47.7 | 1.00x | 46.5 | 48.25 | 9.25 |
+| `a1200` | | | | 57.5 | 58.5 | 13.25 |
+| `a1200-030` | | | | 60 | 60 | 14.75 |
+| `a1200-030`, no MMU model | | | | 60 | 60 | |
+| `a1200-030`, no MMU model | `CACHE` | 60 | 1.00x | 60 | 60 | 24.75 |
 
-The A500 now holds 10 steps a second: when a frame took more than 6 fields it steps twice
-before the next frame, which costs it a frame in about 40. Steps run 4 to 8 fields apart
-on the 68030 (a step waits for the frame in progress) and 6 on average. The ball comes to
-rest within a pixel or two of the capped runs, because the fields at which the steps sample
-the mouse move with the schedule. Screenshots of the draw-only frames show no trails.
+Steps run exactly 6 fields apart on both (a pass is now shorter than a field). Before the
+renderer change the A500 held 10 steps a second by stepping twice before a frame when a
+frame took more than 6 fields. The ball comes to rest at 156, 226 on the A500 and 155, 227
+on the 68030: within a pixel or two of earlier runs, as the fields at which the steps sample
+the mouse move with the schedule. The verify build found no cell differing from its tile on
+`a500`, `a1200`, the `a1200-030` preset with `DCACHE`, `a1200-030` without the MMU model
+with `CACHE` and with `DCACHE` (FS-UAE then caches chip data, so the flush after the blits is
+exercised), and `a1200-040` and `a1200-060` with `DCACHE`: 120 to 1500 frames each, scrolled
+frames among them.
+
+Where the A500's time goes now (`bench.py`, scrolling, 38 frames a second before $4fd0 was
+skipped between steps; and a trace of 60 fields with the view still, by threaded routine):
+the threaded-code primitives 53 %, the slave's renderer 26 % (the cell compare and the tiles
+19 %, the scroll copy with its blitter waits and the cache shift 7 %), the shape drawer 11 %
+(it plots shapes pixel by pixel with `bclr`/`bset`). With the view still, a frame took 0.25
+fields in the renderer, 0.16 in $4fd0 (now skipped between steps), 0.33 in $48d4's threaded
+code (the object draw list) and 0.22 in the shape drawer it calls.
 
 **The intended speed is 10 frames a second at NTSC**, 6 fields a frame: that is what the
 game takes a frame to be. The stock NTSC A500 comes close and stays below it: hole 1 draws
@@ -214,8 +280,9 @@ frames either way, but the music would run at 50 fields a second.
 
 ## Measurements
 
-Hole 1 in play with the pointer moving and the view scrolling, NTSC (60 fields a second,
-16.7 ms a field), the shipped slave, 17.11.2026. Frames are counted by `tools/zanygolf.py
+The shipped slave's figures, the baseline (this slave's are in "Game time"). Hole 1 in play
+with the pointer moving and the view scrolling, NTSC (60 fields a second, 16.7 ms a field),
+the shipped slave, 17.11.2026. Frames are counted by `tools/zanygolf.py
 frames 240 5 3` (flips of the plane pointer, no breakpoints; 240 fields, the mouse moving
 5, 3 counts a field), the costs from `tools/bench.py` traces (120 fields), which need a CPU
 without an MMU model: `a1200-030` with `EXTRA_ARGS=--uae_mmu_model=0`, the same 50 MHz
