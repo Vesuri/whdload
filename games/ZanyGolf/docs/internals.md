@@ -37,6 +37,7 @@ The loader, first hunk:
 | $1de2 | the input's `move.b $bfe001,d1` | `jsr ReadButton` | ours: a click between two steps is not lost ("Game time") |
 | $14bc | the renderer's tile redraw ($14bc-$15dd) | `jmp NewDraw` | ours, with ExpMem: only the cells that changed ("Display") |
 | $173c | the shape drawer's `addq.w #8,a3; movea.l $32(a4),a0` | `jsr ShapeHook` | ours, with ExpMem: marks the cells a shape covers ("Display") |
+| $7a9c | a game's start: the immediate of `LDY #0` (threaded), the position in the hole order | `CUSTOM1` | ours, debug, only with `CUSTOM1`=1-9: start on that hole (below) |
 
 Then `Patch` flushes the caches and turns on the instruction cache for BaseMem
 (`resload_SetCACR`). The game never changes its native code: FILE1 dumped at the title and
@@ -45,6 +46,14 @@ slave's own patches). The data cache stays off: every Amiga with a 68030 or late
 chip RAM, where the whole game is, non-cacheable for data in hardware, and on a 68040 or
 68060 a cacheable access to it is cancelled and restarted, several times slower (WHDLoad's
 `cache.html`).
+
+The slave header is version 17, for `ws_config`: the splash window's "Start on hole
+(debug)" list sets `CUSTOM1` to 0-9, and `CUSTOM1=N` starts every game on hole N+1 instead
+of hole 1, the windmill (for profiling the later holes). The game plays the hole files in
+the order of the table at $bb02 (3, 8, 0, 9, 4, 5, 1, 7, 6, 2: hole 1 is `HOLE3`), with the
+position in it at $bb23 and the hole file's number at $5c5a. A game's start ($7a86) sets the
+position with `LDY #0` and loads the hole from the table; the advance after each hole is at
+$99a4. The skipped holes score 0, and the game ends after hole 10 as before.
 
 `FixKey` decodes the raw key the game pushed at $1f20 (from 4(sp)). On F10 ($59) it writes 9
 to $15ca2 (`FILE1` $5ca2), the strokes left. Then it

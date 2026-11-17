@@ -3,7 +3,7 @@
 		opt	o4-		; the shipped slave keeps move.l #65536,d0, not moveq+swap
 
 _base		SLAVE_HEADER			;ws_Security + ws_ID
-		dc.w	10			;ws_Version
+		dc.w	17			;ws_Version: 17 for ws_config
 		dc.w	WHDLF_NoError|WHDLF_EmulTrap|WHDLF_NoKbd
 		dc.l	$80000			;ws_BaseMemSize
 		dc.l	0			;ws_ExecInstall
@@ -16,7 +16,12 @@ _expmem		dc.l	-EXPSIZE		;optional: the renderer's caches (NewDraw)
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
+		dc.w	0			;ws_kickname: no Kickstart
+		dc.l	0			;ws_kicksize
+		dc.w	0			;ws_kickcrc
+		dc.w	_config-_base		;ws_config
 _data		dc.b	"data",0
+_config		dc.b	"C1:L:Start on hole (debug):1,2,3,4,5,6,7,8,9,10",0
 _name		dc.b	"Zany Golf",0
 _copy		dc.b	"1988 Electronic Arts",0
 _info		dc.b	"installed & fixed by Bored Seal",10
@@ -26,6 +31,9 @@ _info		dc.b	"installed & fixed by Bored Seal",10
 Start		lea	_resload(pc),a1
 		move.l	a0,(a1)
 		move.l	a0,a2
+
+		lea	(_tags,pc),a0		;CUSTOM1: the hole a new game starts on
+		jsr	(resload_Control,a2)
 
 		lea	(_expmem,pc),a0		;take the ExpMem for the renderer, and hide
 		move.l	(a0),d0			;it from OSEmu, which would otherwise give
@@ -114,6 +122,12 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		pea	ShapeHook
 		move.l	(sp)+,$173e(a3)
 .norender
+		move.l	(_hole,pc),d0
+		beq.b	.hole1
+		cmp.l	#9,d0			;holes 1-10 (0-9)
+		bhi.b	.hole1
+		move.w	d0,$7a9c(a3)		;a game's start: LDY #0 -> LDY #hole (CUSTOM1)
+.hole1
 		jsr	(resload_FlushCache,a2)	;the code changed
 		move.l	#CACRF_EnableI,d0	;the instruction cache for BaseMem: the
 		move.l	d0,d1			;game never changes its code. Not the
@@ -206,6 +220,16 @@ Split		bsr	PollButton
 .off		lea	(_v+V_RESET,pc),a0	;no frames now (a hole may load): NewDraw
 		st	(a0)			;starts again from nothing
 		bra.b	.step
+
+; Debug: CUSTOM1=N (0-9, the splash window's "Start on hole") starts every game on hole
+; N+1 instead of hole 1, the windmill. The game plays the holes in the order of the table
+; at $bb02 (3,8,0,9,4,5,1,7,6,2: the hole files HOLEn, 3 the windmill), with the position
+; at $bb23 and the hole at $5c5a. A game's start ($7a86, threaded code) sets the position
+; with LDY #0 at $7a9a; the patch sets that immediate ($7a9c) to N. The holes before it
+; are not played, so their scores stay 0, and the game ends after hole 10 as before.
+_tags		dc.l	WHDLTAG_CUSTOM1_GET
+_hole		dc.l	0
+		dc.l	TAG_DONE
 
 DrawOnly	dc.w	$05e8,$4fd0		;JSR $4fd0
 		dc.w	$05e8,$1478		;JSR $1478: the renderer

@@ -18,7 +18,8 @@ the other buffer with the blitter when the view scrolled (`NewDraw`, `ShapeHook`
 passes skip $4fd0 between steps; the instruction cache is on for BaseMem. Frames a second
 with the pointer moving: `a500` 9.25 to 46.5, `a1200` 13.25 to 57.5, the 68030 setups 60
 (one a field). The verify build found no cell differing from its tile on every CPU from
-68000 to 68060, with `DCACHE` too.
+68000 to 68060, with `DCACHE` too. The debug option `CUSTOM1=N` starts every game on hole
+N+1, for measuring the later holes (`internals.md`, "Slave patches").
 
 ## Next
 
