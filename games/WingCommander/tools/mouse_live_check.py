@@ -71,6 +71,9 @@ def main():
     p.add_argument('--mouse-option', type=int, choices=range(1, 8),
                    help='only the start menu, with CUSTOM5 bits 4-6 set to this: 1 off (no pointer motion or '
                         'click, the hook sites native), 2-7 0.5x-4x (the room position moves that much more)')
+    p.add_argument('--system', type=int, choices=range(1, 14), default=1,
+                   help='--direct-flight: the system (CUSTOM3), 1 Enyo to 13 Hell\'s Kitchen')
+    p.add_argument('--mission', type=int, choices=range(3), default=0, help='--direct-flight: the mission (CUSTOM4)')
     p.add_argument('--direct-flight', action='store_true',
                    help='CD32 English --flight only, on a tools/flight_fixture.py --release build: the mission flight, no menu')
     a = p.parse_args()
@@ -103,7 +106,7 @@ def main():
             whd = 'CUSTOM1=1 '+whd
             locate = functools.partial(locate, german=True)
         if a.direct_flight:     # the fixture's direct-flight argument (docs/development.md)
-            whd = 'CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 '+whd
+            whd = f'CUSTOM2=2 CUSTOM3={a.system} CUSTOM4={a.mission} '+whd
     if a.mouse_option:
         whd = whd.replace('CUSTOM5=0', f'CUSTOM5={16*a.mouse_option}').replace('CUSTOM5=3', f'CUSTOM5={3+16*a.mouse_option}')
     length = 0x400000 if ocs else 0x800000
@@ -213,6 +216,8 @@ def main():
             colour = (255, 255, 255) if ocs else (243, 255, 235)
             x, y = row['sprite']
             drawn = [(x+1+c, y+r) for r in range(9) for c in range(9) if row['lines'][r] >> (31-c) & 1]
+            seen = sorted({image.getpixel((74+2*px, 92+2*py)) for px, py in drawn})
+            row['colours'] = seen
             return drawn, all(image.getpixel((74+2*px, 92+2*py)) == colour for px, py in drawn)
         if a.fire:              # the ship is destroyed about 5 s in: the steering steps do not fit too
             return [dict(fire=fire(var))]

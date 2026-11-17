@@ -75,8 +75,9 @@ both holds must spend energy, with no modifier and the controller running.
 
 A real mission cockpit (the Nav-1 Hornet) needs the direct-flight fixture,
 CD32 English only: the release slave with the game's direct-flight argument.
-`--direct-flight` boots it with `CUSTOM2=2 CUSTOM3=1 CUSTOM4=0` and runs the
-flight steps without the intro and menu:
+`--direct-flight` boots it with `CUSTOM2=2 CUSTOM3=1 CUSTOM4=0` (`--system N`
+and `--mission M` choose others) and runs the flight steps without the intro
+and menu:
 
 ```
 python3 tools/flight_fixture.py --release --nav 1 --output tmp/mouse-nav1-fixture
