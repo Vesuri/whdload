@@ -51,11 +51,14 @@ LAYOUTS = {
 }
 # START is in the machine's Zorro II fast memory, from $200000 (the A500's 2 MB to $400000,
 # the a3000-50's and the A1200 setups' 8 MB to $a00000), where WHDLoad puts the slave's
-# ExpMem, or on an A500 without it in slow memory from $c00000 (to $dc0000). gdb's find stops
+# ExpMem, in Zorro III fast memory from $40000000 (EXTRA_ARGS=--zorro_iii_memory=32768 to
+# $42000000, up to 128 MB), or on an A500 without either in slow memory from $c00000 (to
+# $dc0000). gdb's find stops
 # at the first unreadable byte and then reports no match at all, so the search ends where
 # the memory does (fast_end).
 FAST, FAST_MAX, FAST_STEP = 0x200000, 0xa00000, 0x40000
 SLOW, SLOW_MAX = 0xc00000, 0xdc0000
+Z3, Z3_MAX = 0x40000000, 0x48000000
 
 
 def layout(variant=None):
@@ -120,11 +123,12 @@ def find_hunk0(g, variant=None):
     """START's hunk 0 (the CPU is stopped on return); RuntimeError while it is not loaded."""
     lay = layout(variant)
     g.stop()
-    start, end = FAST, fast_end(g)
-    if end == FAST:
-        start, end = SLOW, fast_end(g, SLOW, SLOW_MAX)
-        if end == SLOW:
-            raise RuntimeError('no fast memory at $200000 nor slow memory at $c00000')
+    for start, limit in ((FAST, FAST_MAX), (Z3, Z3_MAX), (SLOW, SLOW_MAX)):
+        end = fast_end(g, start, limit)
+        if end != start:
+            break
+    else:
+        raise RuntimeError('no fast memory at $200000 or $40000000, nor slow memory at $c00000')
     out = g.cmd(f'find /h {start:#x}, {end - 16:#x}, {HUNK0_SIG}', timeout=120)
     hits = [int(w, 16) for w in out.split('\n') if re.fullmatch(r'0x[0-9a-f]+', w.strip())]
     # The PRELOAD copy of the file matches too; the loaded segment is the match whose
