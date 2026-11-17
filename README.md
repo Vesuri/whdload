@@ -30,7 +30,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Prince of Persia Enhanced | JOTD | released upstream as JOTD's 5.2 (24.10.2026) |
 | Red Baron Enhanced | JOTD | [3.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/RedBaronEnhanced-3.0b-20261013) |
 | Road Rash Enhanced | JOTD | [3.0b (11.11.2026)](https://github.com/Vesuri/whdload/releases/tag/RoadRashEnhanced-3.0b-20261111) |
-| Robinson's Requiem Enhanced | CFou! | [2.0b (17.11.2026)](https://github.com/Vesuri/whdload/releases/tag/RobinsonsRequiemEnhanced-2.0b-20261117) |
+| Robinson's Requiem Enhanced | CFou! | [2.0b (18.11.2026)](https://github.com/Vesuri/whdload/releases/tag/RobinsonsRequiemEnhanced-2.0b-20261118) |
 | Star Wars Enhanced | StingRay | [3.0b (16.11.2026)](https://github.com/Vesuri/whdload/releases/tag/StarWarsEnhanced-3.0b-20261116) |
 | Stellar 7 Enhanced | Psygore | [2.0b (07.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Stellar7Enhanced-2.0b-20261107) |
 | Test Drive Enhanced | JOTD | [2.0b (13.11.2026)](https://github.com/Vesuri/whdload/releases/tag/TestDriveEnhanced-2.0b-20261113) |
