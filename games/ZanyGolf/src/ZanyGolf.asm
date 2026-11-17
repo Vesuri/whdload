@@ -151,6 +151,14 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		pea	Delay
 		move.l	(sp)+,$2914(a3)
 		move.w	#$6008,$2918(a3)
+		move.w	#$4eb9,$246a(a3)	;the fades' step delays: jsr FadeIn/Out, nop
+		pea	FadeIn
+		move.l	(sp)+,$246c(a3)
+		move.w	#$4e71,$2470(a3)
+		move.w	#$4eb9,$24a2(a3)
+		pea	FadeOut
+		move.l	(sp)+,$24a4(a3)
+		move.w	#$4e71,$24a8(a3)
 
 		lea	(_v,pc),a0
 		tst.l	V_EXP(a0)
@@ -2825,6 +2833,44 @@ Delay		movem.l	d0/d2-d3,-(sp)
 		bcs.b	.field
 		movem.l	(sp)+,d0/d2-d3
 		rts
+
+; The palette fades $2454 (in, d2 0 to 248) and $248a (out, d2 248 to 0) set 32 steps,
+; each followed by 3001 dbf passes ($246a, $24a2), a CPU loop. On an NTSC A500 a step took
+; 104 lines fading in and 100 out (12.6 and 12.2 fields), the step's work and the
+; interrupts included. These wait until as many lines have passed since the step before
+; ended (the first step: since now), by the beam, so the A500 keeps its time and a faster
+; CPU takes it too. The frame's length is the highest line seen plus one (NTSC 263, PAL
+; 313). Replace move.w #3000,d3; dbf d3,* (d3 ends as $ffff, as there).
+FADEIN_LINES	= 103
+FADEOUT_LINES	= 99
+FadeIn		movem.l	d0-d1/d3/a0,-(sp)
+		moveq	#FADEIN_LINES,d0
+		tst.w	d2
+		bra.b	Fade
+FadeOut		movem.l	d0-d1/d3/a0,-(sp)
+		moveq	#FADEOUT_LINES,d0
+		cmp.w	#248,d2
+Fade		lea	(_fade,pc),a0
+		bne.b	.wait
+		bsr	BeamLine		;the first step
+		move.w	d1,(a0)
+.wait		bsr	BeamLine
+		cmp.w	2(a0),d1
+		bls.b	.since
+		move.w	d1,2(a0)		;the highest line seen
+.since		move.w	d1,d3
+		sub.w	(a0),d3
+		bcc.b	.lines
+		add.w	2(a0),d3		;across the frame's end
+		addq.w	#1,d3
+.lines		cmp.w	d0,d3
+		bcs.b	.wait
+		move.w	d1,(a0)			;this step's end
+		movem.l	(sp)+,d0-d1/d3/a0
+		move.w	#$ffff,d3
+		rts
+
+_fade		dc.w	0,262			;the last step's end, the highest line
 
 ; The loader's file load (loader offset $5aa) waits 1000000 passes of subi.l/bne before
 ; it opens the file, a CPU loop (3.6 s on an A500, about 15 fields on a 68030). Pressing

@@ -39,6 +39,7 @@ The loader, first hunk:
 | $14bc | the renderer's `move.l $1462(a4),d0; move.w $2326(a4),d0` (the back buffer) | `jsr Hidden; nop` | ours: no drawing into a buffer still on screen ("Display") |
 | $5238 | the main loop's `LDA $0ea0; BEQ $524c` (threaded) | primitive $0138, `jmp Split` | ours: a world step each 6 fields, draw-only passes between ("Game time") |
 | $1de2 | the input's `move.b $bfe001,d1` | `jsr ReadButton` | ours: a click between two steps is not lost ("Game time") |
+| $246a, $24a2 | the fades' `move.w #3000,d3; dbf d3,*` after each palette step | `jsr FadeIn`, `jsr FadeOut`; `nop` | ours: the A500's time by the beam (below) |
 | $2912 | the delay $290c's loop, `tst.b d0` to `bra.s` ($2912-$2921): A times 16001 `dbf` passes | `jsr Delay; bra.s $2922` | ours: the A500's time by the beam (below) |
 | $14c4 | the renderer's tile redraw ($14c4-$15dd) | `jmp NewDraw` | ours, with ExpMem: only the cells that changed ("Display") |
 | $173c | the shape drawer's `addq.w #8,a3; movea.l $32(a4),a0` | `jsr ShapeHook` | ours, with ExpMem: marks the cells a shape covers ("Display") |
@@ -67,7 +68,7 @@ position in it at $bb23 and the hole file's number at $5c5a. A game's start ($7a
 position with `LDY #0` and loads the hole from the table; the advance after each hole is at
 $99a4. The skipped holes score 0, and the game ends after hole 10 as before.
 
-The game waits with CPU loops in three places, so on a faster CPU their screens go by
+The game waits with CPU loops in three places, so on a faster CPU their screens went by
 faster:
 
 - The loader's file load (offset $5aa) counts 1000000 passes before each Open: 3.6 s on an
@@ -86,8 +87,15 @@ faster:
   interrupts: 392 fields on the `a500` and the `a1200-030` alike. The timer bonus hole is
   drawn at a game's start ($7b0a: a random number's low 4 bits into the table at $7b28, the
   hole file at $7b26): Walls 2 in 16, Fans 4, Carpets 4, Castle 3, Ant Hill 3.
-- The fades $2454 and $248a count 32 steps of 3000 `dbf` passes (about 8 fields on the A500).
-  Not changed.
+- The fades $2454 (in) and $248a (out) set 32 palette steps, each followed by 3001 `dbf`
+  passes ($246a, $24a2). On the `a500` a fade in took 3317 lines (12.6 fields, 104 a step)
+  and a fade out 3205 (12.2 fields), the steps' work and the interrupts included; on the
+  `a1200-030` under a field. `FadeIn` and `FadeOut` wait until 103 or 99 lines have passed
+  since the step before ended (the first step: since the call), by the beam, the frame's
+  length the highest line seen plus one: the `a500` 3325 and 3188, the `a1200-030` 3292
+  and 3163. (Lines from the field counter and the beam at breakpoints: the counter steps
+  at the field's top on the `a500` and near line $90 on the `a1200-030`, the reading
+  that keeps each step at least its wait.)
 
 `BeamLine` reads VPOSR and VHPOSR until two reads give the same line: one long read is two
 word reads, and from line 255 to 256 between them it gives line 0 (V8 of 255, the low byte
