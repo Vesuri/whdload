@@ -118,6 +118,12 @@ Traps:
   preloaded files and the title never comes; use `a500-1.5m`, the same 68000.
 - **Four boots at once can fail one** (`boot failed`, no detail in the server log);
   three at once have not failed.
+- **One run's frame rate is not a build's.** The boot runs in warp until `hole1`'s `stop`,
+  for as long as the host takes, so each run reaches the hole at another point of its
+  animations. On `a500`, hole 2 (`frames 240`, still and moving) gave 20 and 25 frames a
+  second with the committed slave, and 25 and 20 with the next, each run alone
+  (17.11.2026); hole 1 moved between 30.25 and 47.5 when two runs shared the host. Compare
+  builds over several runs, or not by frame rates at all.
 - **Per-frame timers carry the frames drawn before a putt.** Friction applies every fifth
   frame from the hole's start, so the same putt on two machines takes different paths
   unless the timer at $5cd2 has the same value at the release; change the hold before

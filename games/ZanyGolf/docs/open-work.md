@@ -25,6 +25,12 @@ with `DCACHE` too, and no draw list or shape differing from the game's on the 68
 68000. The debug option `CUSTOM1=N` starts every game on hole
 N+1, for measuring the later holes (`internals.md`, "Slave patches").
 
+The pointer is a pair of hardware sprites (17.11.2026, `internals.md`, "The pointer"),
+placed by the interrupt every field from the mouse's counts the next step will take, on
+the frame on screen; the game's shape for it is taken out of the draw list. The aiming
+line and the dots, drawn into the frame, still move once a step (item 1). At rest the
+sprite covers the same pixels as the game's shape on every hole.
+
 ## Next
 
 1. **Interpolate the frames between steps** (decided 17.11.2026): the moving things must be
@@ -42,17 +48,7 @@ N+1, for measuring the later holes (`internals.md`, "Slave patches").
      copy (about 7 % of the A500's time now). The A500 draws about 4.7 frames a step.
    Acceptance: the putt's world steps as now (6 fields apart), and each presented frame
    between the two steps around it.
-2. **The pointer as a hardware sprite** (asked 17.11.2026): the pointer is drawn into the
-   frame and moves once a step. It should be a hardware sprite moved
-   by the interrupt every field, smoothly, whatever the frame rate. The aiming line, drawn
-   into the frame, may lag behind it while dragging; interpolation (item 1) should close
-   that. Known so far: the interrupt adds JOY0DAT's changes to $1d54/$1d56 every run; the
-   input routine ($1d5c, once a step) takes a quarter of each (the rest kept), clamped to
-   ±31, into $0e80/$0e88 for player $0c54; threaded code at $86ce reads them with an
-   acceleration ($0e60/$0e68) and keys ($0e58) into $88a4/$88a6 and $889c/$889e. Still
-   to find: the pointer's object and position, its bounds, and what else draws it (the
-   intro, the pause screen, the title).
-3. **The A500's frame.** The native draw list (`NewList`) took hole 1 from 37 to 44.25
+2. **The A500's frame.** The native draw list (`NewList`) took hole 1 from 37 to 44.25
    frames a second with the pointer moving, and the native shape drawer (`NewShape`) hole
    2 from 12.5 to 25. Each hole on `a500`, 17.11.2026, before `NewShape` (`CUSTOM1`, the
    view still for the trace, 60 fields; frames from `frames 240` and `frames 240 5 3`),
@@ -72,6 +68,9 @@ N+1, for measuring the later holes (`internals.md`, "Slave patches").
    | 9 | 22 | 21 | 32.7 | 11.4 | 11.0 | 6.6 | 9.9 | 28.5 | 28.25 |
    | 10 | 20 | 20 | 35.2 | 9.1 | 6.4 | 14.4 | 5.0 | 30 | 29.75 |
 
+   The frames are one run each, and a run's frames depend on where it reaches the hole
+   (hole 2 gave 20 and 25 with one slave; `development.md`, traps). On holes 1, 2 and
+   10 the sprite pointer's frames stayed within that.
    "Draw list" is `NewList` and the threaded sort and draw calls after it; "Waits" is
    `FrameCap`'s and `Hidden`'s busy waits. Holes 3-8 draw a frame in about a field, and
    `Hidden` rounds a frame up to one or two fields, so their rates move in steps with
@@ -88,14 +87,14 @@ N+1, for measuring the later holes (`internals.md`, "Slave patches").
    - $4fd0's own threaded code on hole 10 (14.4 %, after each step);
    - the steps (10 a second) are threaded code throughout.
    A 68000 must still draw correctly whatever the 68020+ path does.
-4. **Fast memory.** In fast memory now: the slave's code (the renderer, `Split`), the
+3. **Fast memory.** In fast memory now: the slave's code (the renderer, `Split`), the
    renderer's caches and the tile copy (ExpMem). What cannot move: `FILE1` is the 65xx
    machine's bank 0, and every other address the game uses is a4-relative too (the hole
    block at a4+$11d0a, the screen buffers at a4+$30000, the copper list inside `FILE1` at
    $2272), so moving `FILE1` would move an address space with chip-only data in it. Native
    code also reads its variables PC-relative and resets a4 with `lea (pc)`, and the
    dispatch takes the primitives' bank from a4. Hot threaded or native routines can move
-   only as slave copies (item 3). The game's user stack ($9570) could move: small gain, not
+   only as slave copies (item 2). The game's user stack ($9570) could move: small gain, not
    tried.
 
 ## Also seen

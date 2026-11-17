@@ -154,7 +154,7 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		cmp.l	#9,d0			;holes 1-10 (0-9)
 		bhi.b	.hole1
 		move.w	d0,$7a9c(a3)		;a game's start: LDY #0 -> LDY #hole (CUSTOM1)
-.hole1
+.hole1		bsr	PtrInit			;the pointer as sprites
 		jsr	(resload_FlushCache,a2)	;the code changed
 		move.l	#CACRF_EnableI,d0	;the instruction cache for BaseMem: the
 		move.l	d0,d1			;game never changes its code. Not the
@@ -195,6 +195,16 @@ FrameCap	movem.l	d1/a0,-(sp)
 		cmp.w	#FLIP_LOAD+2,d1
 		bcs.b	.load
 .flip		move.w	d1,_flipline-_lastflip(a0)
+		move.l	_ptrnext-_lastflip(a0),_ptrview-_lastflip(a0) ;the frame drawn last
+		move.l	$1474(a4),_ptrnext-_lastflip(a0)	;shows, this one's view next
+		move.b	_ptrwant-_lastflip(a0),_ptron-_lastflip(a0)	;and its pointer
+		cmp.w	#PTR_VBL,d1		;from this field: the pointer on it
+		bcc.b	.later
+		movem.l	d0-d6/a1-a3/a6,-(sp)
+		moveq	#1,d6
+		bsr	PtrPlace
+		movem.l	(sp)+,d0-d6/a1-a3/a6
+.later
 		move.w	d0,$2312(a4)		;displaced: the fine scroll
 		movem.l	(sp)+,d1/a0
 		move.w	#$8000,d0		;displaced
@@ -227,6 +237,8 @@ Hidden		movem.l	d1-d2,-(sp)
 		rts
 
 _flipline	dc.w	0
+_ptrview	dc.w	0,0			;the view of the frame on screen (PtrVbi)
+_ptrnext	dc.w	0,0			;of the frame drawn last
 _lastflip	dc.b	0
 		even
 
@@ -284,6 +296,7 @@ Split		bsr	PollButton
 		move.b	d7,(a0)
 .off		lea	(_v+V_RESET,pc),a0	;no frames now (a hole may load): NewDraw
 		st	(a0)			;starts again from nothing
+		bsr	PtrOff
 		bra.b	.step
 
 ; Debug: CUSTOM1=N (0-9, the splash window's "Start on hole") starts every game on hole
@@ -338,6 +351,455 @@ ReadButton	movem.l	d7/a0,-(sp)
 		rts
 
 _button		dc.b	0,0			;the state the step reported last, changed since
+
+LEW		macro			;\1: the little-endian word at the even address \1
+		move.w	\1,\2
+		ror.w	#8,\2
+		endm
+SEW		macro			;store \1 little-endian at the even address \2
+		ror.w	#8,\1
+		move.w	\1,\2
+		ror.w	#8,\1
+		endm
+LEL		macro			;\1: the little-endian long at the even address \1
+		move.l	\1,\2
+		ror.w	#8,\2
+		swap	\2
+		ror.w	#8,\2
+		endm
+TBIT		macro			;bit \2 of \1 set: set bit \4 of \3
+		btst	#\2,\1
+		beq.b	.\@
+		bset	#\4,\3
+.\@
+		endm
+
+;=============================================================================
+; The pointer. The game draws it as an object, a shape in the frame, at the pointer's
+; position on the course map ($5e1c x, $5e1e y, little-endian) less 8: object 4 (X=8)
+; while the player points ($9676 0), object 8 (X=$10) while a stroke is drawn back ($9676
+; 1). Each step moves the position by the input routine's ($1d5c) quarter of the mouse's
+; counts, clamped to +-31 ($0e80/$0e88; the rest of the counts stays for the next step),
+; and keeps it 8 pixels inside the hole ($5e20/$5e22) and the view, which it scrolls. With
+; a chip block (PtrInit), sprites 0 and 1, attached (15 colours, COLOR17-31 copied from the
+; playfield's), show it instead, moved by the interrupt every field:
+; - PtrStep, at the input routine's end, keeps where the step puts the pointer: its
+;   position plus the counts the routine took;
+; - PtrVbi, at each vertical blank, adds the quarter of the counts gathered since,
+;   clamped as the next step will clamp them, keeps the pointer inside the hole and the
+;   view as the step does, and places the sprites on the frame on screen (whose view
+;   FrameCap keeps at the flip);
+; - PtrList, after the draw list, takes the pointer's entry out of the list and draws its
+;   frame into the sprites when the frame changed; the sprites show from the flip that
+;   shows the frame (FrameCap). A frame wider than 16 pixels or taller
+;   than PTR_H lines stays a shape.
+; The copper list ($2274) turned the sprite DMA off at line $90 and cleared the sprites'
+; data registers: its tail now loads the eight sprite pointers below the playfield (line
+; $f8; 2-7 an empty sprite), and its top turns the sprite DMA on and puts sprites 0 and 1
+; in front of the playfield (BPLCON2). Without the block the game draws the pointer.
+PTR_H		= 32			;lines a sprite holds
+PTR_SPR		= 4+4*PTR_H+4		;a sprite: position, control, PTR_H lines, the end
+PTR_SIZE	= 2*PTR_SPR+8		;sprites 0 and 1, the empty sprite
+PTR_HPOS	= $7f			;HSTART at the view's left edge
+PTR_VPOS	= $52			;VSTART at its top: the playfield's first line
+PTR_VBL		= $48			;the interrupt's runs before this line are the VERTB's
+
+PtrInit		movem.l	d0-d2/a0-a2/a6,-(sp)	;a3 = FILE1
+		move.l	#PTR_SIZE,d0
+		move.l	#$10002,d1		;MEMF_CHIP|MEMF_CLEAR
+		movea.l	4.w,a6
+		jsr	-198(a6)		;AllocMem
+		tst.l	d0
+		beq	.no
+		lea	(_ptrspr,pc),a0
+		move.l	d0,(a0)
+		movea.l	d0,a1
+		lea	2*PTR_SPR(a1),a2	;the empty sprite
+		lea	$dff120,a0		;until the copper list loads them
+		moveq	#8-1,d1
+.null		move.l	a2,(a0)+
+		dbf	d1,.null
+		move.l	#$01040024,$22b0(a3)	;the copper list's top: BPLCON2, sprites
+		move.l	#$00968020,$22b4(a3)	;in front; DMACON, sprites on
+		move.l	#$f801ff00,$2338(a3)	;its tail: wait for line $f8, then the
+		lea	$233c(a3),a0		;pointers
+		move.w	#$0120,d1
+		move.l	a1,d0			;sprite 0
+		bsr.b	.ptr
+		lea	PTR_SPR(a1),a6
+		move.l	a6,d0			;sprite 1
+		bsr.b	.ptr
+		moveq	#6-1,d2
+.rest		move.l	a2,d0
+		bsr.b	.ptr
+		dbf	d2,.rest
+		move.w	#$4ef9,$1dfe(a3)	;the input routine's end: jmp PtrStep
+		pea	PtrStep
+		move.l	(sp)+,$1e00(a3)
+		move.w	#$4eb9,$2246(a3)	;the interrupt: jsr PtrVbi; nop over
+		pea	PtrVbi			;bsr.w $1f0c; tst.b $126e(a4)
+		move.l	(sp)+,$2248(a3)
+		move.w	#$4e71,$224c(a3)
+.no		movem.l	(sp)+,d0-d2/a0-a2/a6
+		rts
+.ptr		swap	d0			;the moves for SPRxPTH and SPRxPTL
+		move.w	d1,(a0)+
+		move.w	d0,(a0)+
+		addq.w	#2,d1
+		swap	d0
+		move.w	d1,(a0)+
+		move.w	d0,(a0)+
+		addq.w	#2,d1
+		rts
+
+; Replaces movem.l (sp)+,d0-d2; lea $1e0a(a4),a5 at $1dfe; d0-d2 and a0 are free here.
+PtrStep		LEW	$5e1c(a4),d0		;x and y the step will reach
+		move.b	$0e80(a4),d1
+		ext.w	d1
+		add.w	d1,d0
+		swap	d0
+		LEW	$5e1e(a4),d0
+		move.b	$0e88(a4),d1
+		ext.w	d1
+		add.w	d1,d0
+		lea	(_ptrstep,pc),a0
+		move.l	d0,(a0)
+		movem.l	(sp)+,d0-d2		;displaced
+		lea	$1e0a(a4),a5
+		jmp	$0106(a4)
+
+; From the interrupt ($2246), after it has added the mouse's counts; a4 = FILE1. Keeps
+; every register.
+PtrVbi		movem.l	d0-d6/a1-a3/a6,-(sp)
+		bsr	BeamLine
+		cmp.w	#PTR_VBL,d1
+		bcc.b	.done
+		moveq	#0,d6			;the sprites' control words
+		bsr.b	PtrPlace
+.done		movem.l	(sp)+,d0-d6/a1-a3/a6
+		jsr	$1f0c(a4)		;displaced
+		tst.b	$126e(a4)
+		rts
+
+; Place the sprites (or hide them): their control words, which the sprite DMA loads
+; after the vertical blank, and with d6 set their registers too, for a frame that shows
+; from this field after that (FrameCap). d0-d5, a1-a3, a6.
+PtrPlace	move.l	(_ptrspr,pc),d0
+		beq	.out
+		movea.l	d0,a1
+		lea	(_ptron,pc),a2
+		moveq	#0,d0
+		moveq	#0,d2
+		tst.b	(a2)
+		beq	.put
+		lea	$22ba+4(a4),a3		;the copper list's COLOR01-15
+		moveq	#15-1,d1
+		lea	$dff1a2,a6		;COLOR17-31
+.col		move.w	(a3),(a6)+
+		addq.w	#4,a3
+		dbf	d1,.col
+		move.w	_ptrstep-_ptron(a2),d0	;x
+		move.w	$1d54(a4),d1
+		LEW	$5e20(a4),d2
+		move.w	_ptrview-_ptron(a2),d3
+		move.w	#$128,d4
+		bsr	.axis
+		move.w	d0,d5
+		add.w	_ptroff-_ptron(a2),d5
+		add.w	#PTR_HPOS,d5		;HSTART
+		move.w	_ptrstep+2-_ptron(a2),d0 ;y
+		move.w	$1d56(a4),d1
+		LEW	$5e22(a4),d2
+		move.w	_ptrview+2-_ptron(a2),d3
+		moveq	#0,d4
+		move.b	$11e6(a4),d4
+		subq.w	#8,d4
+		bsr	.axis
+		add.w	_ptroff+2-_ptron(a2),d0
+		add.w	#PTR_VPOS,d0		;VSTART
+		move.w	d0,d1
+		add.w	_ptrh-_ptron(a2),d1	;VSTOP
+		moveq	#0,d2			;the control word: VSTOP, the high bits
+		move.w	d1,d2
+		lsl.w	#8,d2
+		btst	#8,d0
+		beq.b	.v8
+		addq.w	#4,d2
+.v8		btst	#8,d1
+		beq.b	.e8
+		addq.w	#2,d2
+.e8		lsr.w	#1,d5
+		bcc.b	.h0
+		addq.w	#1,d2
+.h0		lsl.w	#8,d0			;the position word: VSTART, HSTART/2
+		move.b	d5,d0
+.put		move.w	d0,(a1)
+		move.w	d2,2(a1)
+		move.w	d0,PTR_SPR(a1)
+		tst.w	d2
+		beq.b	.att
+		or.w	#$80,d2			;attached
+.att		move.w	d2,PTR_SPR+2(a1)
+		tst.b	d6
+		beq.b	.out
+		lea	$dff140,a3		;SPR0POS
+		move.w	d0,8(a3)		;SPR1POS, CTL, then sprite 0's
+		move.w	d2,10(a3)
+		and.w	#$ff7f,d2
+		move.w	d0,(a3)
+		move.w	d2,2(a3)
+.out		rts
+
+; One axis: d0 where the step put the pointer, d1 the counts since, d2 the hole's size,
+; d3 the view, d4 the last place in the view. Out: d0 in the view.
+.axis		asr.w	#2,d1			;as $1d5c takes them
+		cmp.w	#31,d1
+		ble.b	.a1
+		moveq	#31,d1
+.a1		cmp.w	#-31,d1
+		bge.b	.a2
+		moveq	#-31,d1
+.a2		add.w	d1,d0
+		cmp.w	#8,d0			;in the hole, as $8afe
+		bge.b	.a3
+		moveq	#8,d0
+.a3		subq.w	#8,d2
+		cmp.w	d2,d0
+		ble.b	.a4
+		move.w	d2,d0
+.a4		sub.w	d3,d0			;in the view
+		cmp.w	#8,d0
+		bge.b	.a5
+		moveq	#8,d0
+.a5		cmp.w	d4,d0
+		ble.b	.a6
+		move.w	d4,d0
+.a6		rts
+
+; No pointer until a frame is drawn again (Split, the drawing flag clear or the
+; interrupts off: a hole may load, with new shapes). Only d7 and a0.
+PtrOff		lea	(_ptron,pc),a0
+		clr.b	(a0)
+		clr.b	_ptrwant-_ptron(a0)
+		clr.l	_ptrrec-_ptron(a0)
+		move.l	_ptrspr-_ptron(a0),d7
+		beq.b	.no
+		movea.l	d7,a0
+		clr.l	(a0)
+		clr.l	PTR_SPR(a0)
+.no		rts
+
+; After the draw list (NewList, or ListCheck in the verify build): d2 holds Y, the
+; entries times 2. If the pointer's object is in the list, take its entry out (the last
+; entry takes its place: the list is sorted after) and show the sprites. Keeps every
+; register but d2's low byte.
+PtrList		movem.l	d0-d1/d3-d7/a0-a3,-(sp)
+		moveq	#0,d6			;the sprites off
+		move.l	(_ptrspr,pc),d0
+		beq	.out
+		moveq	#8,d1			;the pointer's object
+		lea	$4000(a4),a0		;$9676: beyond a 16-bit displacement
+		move.b	$9676-$4000(a0),d0
+		beq.b	.obj
+		moveq	#$10,d1
+		subq.b	#1,d0
+		bne	.done
+.obj		lea	(a4,d1.w),a0
+		tst.b	$0fda(a0)
+		beq	.done
+		LEW	$5e1c(a4),d3		;at the pointer, less 8
+		subq.w	#8,d3
+		LEW	$0f5a(a0),d0
+		cmp.w	d0,d3
+		bne	.done
+		LEW	$5e1e(a4),d3
+		subq.w	#8,d3
+		LEW	$0f9a(a0),d0
+		cmp.w	d0,d3
+		bne	.done
+		moveq	#0,d7
+		move.b	d2,d7
+		moveq	#0,d5			;its entry
+.find		cmp.w	d7,d5
+		bcc	.done			;not in the view
+		lea	(a4,d5.w),a1
+		tst.b	$4782(a1)
+		bne.b	.fnext
+		move.w	$4702(a1),d0
+		cmp.w	$0f5a(a0),d0
+		bne.b	.fnext
+		move.w	$4722(a1),d0
+		cmp.w	$0f9a(a0),d0
+		bne.b	.fnext
+		move.b	$46a2(a1),d0
+		cmp.b	$0eda(a0),d0
+		bne.b	.fnext
+		move.b	$46c2(a1),d0
+		cmp.b	$0f1a(a0),d0
+		beq.b	.found
+.fnext		addq.w	#2,d5
+		bra.b	.find
+.found		move.w	$109a(a0),d0		;the frame's record, as NewShape finds
+		ror.w	#8,d0			;it: the bank ($2a, little-endian)
+		swap	d0
+		move.w	$105a(a0),d0
+		ror.w	#8,d0
+		movea.l	d0,a3
+		adda.l	a4,a3
+		movea.l	a3,a2
+		moveq	#0,d0
+		move.b	$0eda(a0),d0		;the shape's frames
+		asl.w	#3,d0
+		adda.w	d0,a2
+		LEW	(a2),d0
+		movea.l	a3,a2
+		adda.w	d0,a2
+		moveq	#0,d0
+		move.b	$0f1a(a0),d0		;the frame
+		add.w	d0,d0
+		adda.w	d0,a2
+		LEW	(a2),d0
+		adda.w	d0,a3
+		lea	(_ptron,pc),a2
+		cmpa.l	_ptrrec-_ptron(a2),a3
+		beq.b	.drawn
+		bsr	PtrDraw
+.drawn		tst.b	_ptrfit-_ptron(a2)
+		beq.b	.done			;too big: a shape
+		subq.w	#2,d7			;the last entry into its place
+		lea	(a4,d7.w),a2
+		move.w	$46a2(a2),$46a2(a1)
+		move.w	$46c2(a2),$46c2(a1)
+		move.w	$46e2(a2),$46e2(a1)
+		move.w	$4702(a2),$4702(a1)
+		move.w	$4722(a2),$4722(a1)
+		move.w	$4742(a2),$4742(a1)
+		move.w	$4762(a2),$4762(a1)
+		move.w	$4782(a2),$4782(a1)
+		move.b	d7,d2
+		moveq	#1,d6
+.done		lea	(_ptrwant,pc),a0	;from the flip that shows the frame
+		move.b	d6,(a0)
+.out		movem.l	(sp)+,d0-d1/d3-d7/a0-a3
+		rts
+
+; Draw the frame whose record is at a3 into the sprites: its rows as NewShape walks
+; them, a line each. A nibble is the pixel's colour (its bit 3 goes to the buffer's first
+; plane, which the copper list loads as BPL4PT): bits 0 and 1 into sprite 0's two words,
+; 2 and 3 into sprite 1's. Sets _ptrrec, _ptrfit, _ptroff (the
+; frame's left column and first line from the pointer) and _ptrh.
+PtrDraw		movem.l	d0-d7/a0-a3,-(sp)
+		lea	(_ptron,pc),a2
+		move.l	a3,_ptrrec-_ptron(a2)
+		clr.b	_ptrfit-_ptron(a2)
+		moveq	#0,d6
+		move.b	6(a3),d6		;rows
+		beq	.out
+		cmp.w	#PTR_H,d6
+		bhi	.out
+		lea	8(a3),a1
+		move.w	#$7fff,d4		;the leftmost pixel
+		move.w	#-$8000,d5		;the rightmost
+		moveq	#0,d0			;x
+		moveq	#0,d1			;the previous row's pairs
+		move.w	d6,d3
+		subq.w	#1,d3
+.span		bsr	.x
+		tst.w	d1
+		beq.b	.snext
+		bmi	.out
+		cmp.w	d0,d4
+		ble.b	.s1
+		move.w	d0,d4
+.s1		move.w	d1,d2
+		add.w	d2,d2
+		add.w	d0,d2
+		subq.w	#1,d2
+		cmp.w	d2,d5
+		bge.b	.s2
+		move.w	d2,d5
+.s2		adda.w	d1,a1
+.snext		dbf	d3,.span
+		move.w	d5,d2
+		sub.w	d4,d2
+		cmp.w	#15,d2			;16 pixels at most
+		bhi	.out
+		movea.l	(_ptrspr,pc),a0
+		addq.w	#4,a0
+		moveq	#PTR_H-1,d2
+.clr		clr.l	(a0)
+		clr.l	PTR_SPR(a0)
+		addq.w	#4,a0
+		dbf	d2,.clr
+		movea.l	(_ptrspr,pc),a0
+		addq.w	#4,a0			;line 0
+		lea	8(a3),a1
+		moveq	#0,d0
+		moveq	#0,d1
+		move.w	d6,d3
+		subq.w	#1,d3
+.row		bsr	.x
+		move.w	d1,d7
+		beq.b	.rnext
+		move.w	d0,d2			;the first pixel's bit
+		sub.w	d4,d2
+		move.w	#$8000,d6
+		lsr.w	d2,d6
+		subq.w	#1,d7
+.pair		move.b	(a1)+,d2
+		move.b	d2,d5
+		lsr.b	#4,d5
+		bsr	.pix
+		move.b	d2,d5
+		bsr	.pix
+		dbf	d7,.pair
+.rnext		addq.w	#4,a0
+		dbf	d3,.row
+		subq.w	#8,d4			;from the pointer: the object is 8 up
+		move.w	d4,_ptroff-_ptron(a2)	;and left
+		move.b	2(a3),d0
+		ext.w	d0
+		subq.w	#8,d0
+		move.w	d0,_ptroff+2-_ptron(a2)
+		moveq	#0,d0
+		move.b	6(a3),d0
+		move.w	d0,_ptrh-_ptron(a2)
+		st	_ptrfit-_ptron(a2)
+.out		movem.l	(sp)+,d0-d7/a0-a3
+		rts
+.x		move.b	(a1),d2			;the row's x, as the game steps it
+		ext.w	d2
+		add.w	d1,d2
+		add.w	d2,d2
+		add.w	d2,d0
+		moveq	#0,d1
+		move.b	2(a1),d1		;its pairs
+		ext.w	d1
+		addq.w	#4,a1
+		rts
+.pix		btst	#0,d5			;the nibble is the colour
+		beq.b	.p1
+		or.w	d6,(a0)
+.p1		btst	#1,d5
+		beq.b	.p2
+		or.w	d6,2(a0)
+.p2		btst	#2,d5
+		beq.b	.p3
+		or.w	d6,PTR_SPR(a0)
+.p3		btst	#3,d5
+		beq.b	.p4
+		or.w	d6,PTR_SPR+2(a0)
+.p4		lsr.w	#1,d6
+		rts
+
+_ptrspr		dc.l	0			;the sprites, chip; 0 none
+_ptrrec		dc.l	0			;the frame drawn into them, 0 none
+_ptrstep	dc.w	0,0			;x, y where the step put the pointer
+_ptroff		dc.w	0,0			;the frame's left column, first line
+_ptrh		dc.w	0			;its lines
+_ptron		dc.b	0			;show the sprites
+_ptrwant	dc.b	0			;the frame drawn last shows them
+_ptrfit		dc.b	0			;the frame drawn fits them
 
 ;=============================================================================
 ; The renderer's tiles. The game's renderer ($147a) flips the buffers, then redraws all
@@ -841,27 +1303,6 @@ ShapeMark	movem.l	d0-d7/a0-a3/a5,-(sp)	;NewShape's entry: a0 = $32 as read
 EX_STAB		= EX_TILES+TILESIZE	;ExpMem: 256 bytes by 8 positions, planes 0/1 and 2/3
 STABSIZE	= 256*64
 
-LEW		macro			;\1: the little-endian word at the even address \1
-		move.w	\1,\2
-		ror.w	#8,\2
-		endm
-SEW		macro			;store \1 little-endian at the even address \2
-		ror.w	#8,\1
-		move.w	\1,\2
-		ror.w	#8,\1
-		endm
-LEL		macro			;\1: the little-endian long at the even address \1
-		move.l	\1,\2
-		ror.w	#8,\2
-		swap	\2
-		ror.w	#8,\2
-		endm
-TBIT		macro			;bit \2 of \1 set: set bit \4 of \3
-		btst	#\2,\1
-		beq.b	.\@
-		bset	#\4,\3
-.\@
-		endm
 
 ; A pair byte b at position j of 16 pixels (0 the leftmost pair), at b*64+j*8: planes 0
 ; and 1 at bits 31-30 and 15-14 shifted right by 2*j (left pixel the higher bit), then
@@ -1436,6 +1877,7 @@ NewList		movem.l	d3-d7/a1-a3,-(sp)
 		jmp	$0106(a4)
 .go
 	endc
+		bsr	PtrList
 		lea	$4d44(a4),a5		;STY $4ebe; STY $47a2; ...
 		jmp	$0106(a4)
 
@@ -1594,6 +2036,7 @@ ListCheck	movem.l	d0-d7/a0-a6,-(sp)
 		move.l	(sp)+,$48d8(a4)
 		bsr	ListFlush
 		movem.l	(sp)+,d0-d7/a0-a6
+		bsr	PtrList
 		move.b	d2,$4ebe(a4)		;displaced: STY $4ebe; STY $47a2
 		move.b	d2,$47a2(a4)
 		move.w	d2,d4

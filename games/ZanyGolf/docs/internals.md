@@ -7,13 +7,15 @@ $10000 on every machine tried, so its runtime address is $10000 + offset).
 
 ## Loading and memory
 
-A WHDLoad v10 slave (flags `NoError`, `EmulTrap`, `NoKbd`), 512 KB base memory, an optional
-72 KB ExpMem (ours, for the renderer's caches, "Display"), `ws_keyexit` $59 (F10). The slave
+A WHDLoad v17 slave (flags `NoError`, `EmulTrap`, `NoKbd`), 512 KB base memory, an optional
+88 KB ExpMem (ours, for the renderer's caches and tables, "Display"), `ws_keyexit` $59 (F10). The slave
 takes the ExpMem's address before it initialises OSEmu and clears `ws_ExpMem`, so OSEmu does
 not give the memory to the game. It loads `OSEmu.400` from `data/` to $400 and initialises it, then
 calls `dos.library` `LoadSeg` on `data/Zany` through OSEmu. The loader opens
 `Zany:FILES/FILE1` and the other files through OSEmu's DOS emulation, all from `data/`
 (`PRELOAD` holds them). The slave patches the loader's first hunk, then jumps to its start.
+`Patch` allocates 280 bytes of chip RAM through OSEmu's `AllocMem` for the pointer's
+sprites ("The pointer"); without it the game draws the pointer.
 
 ## Slave patches
 
@@ -40,6 +42,10 @@ The loader, first hunk:
 | $173c | the shape drawer's `addq.w #8,a3; movea.l $32(a4),a0` | `jsr ShapeHook` | ours, with ExpMem: marks the cells a shape covers ("Display") |
 | $16f2 | the shape drawer's `clr.w $16da(a4); movea.l $2a(a4),a0` | `jmp NewShape` | ours, with ExpMem: the shape drawer with 16 pixels a write ("Display"); `ShapeHook` stays for the game's drawer, which the verify build runs |
 | $48d4 | the draw list's `LDX #0; TXY` and `STX $4ec0`'s opcode (threaded) | primitive $0138, `jmp NewList` | ours: the draw list's first two phases in native code ("Display") |
+| $22b0 | the copper list's top: `SPR0DATA` and `SPR0DATB` = 0 | `BPLCON2` = $24, `DMACON` = $8020 | ours, with the sprites' chip RAM: sprite DMA on, sprites in front of the playfield ("The pointer") |
+| $2338 | the copper list's tail, after its wait for line $90: `DMACON` = $0020 (sprite DMA off), the data registers of sprites 0-7 = 0 | a wait for line $f8, the eight sprite pointers | ours, likewise |
+| $1dfe | the input's end, `movem.l (sp)+,d0-d2; lea $1e0a(a4),a5` | `jmp PtrStep` | ours, likewise: where the step puts the pointer |
+| $2246 | the interrupt's `bsr.w $1f0c; tst.b $126e(a4)` | `jsr PtrVbi; nop` | ours, likewise: the sprites placed every field |
 | $7a9c | a game's start: the immediate of `LDY #0` (threaded), the position in the hole order | `CUSTOM1` | ours, debug, only with `CUSTOM1`=1-9: start on that hole (below) |
 
 Then `Patch` flushes the caches and turns on the instruction cache for BaseMem
@@ -145,10 +151,11 @@ fewer tiles instead. With ExpMem, `NewDraw` replaces the redraw (step 2):
   position (made screen-relative in place), `$32` the target. A frame's record holds its
   row count (byte 6) and first line's offset (byte 2), then the rows: an x step (signed,
   plus the previous row's count, in pixel pairs), a count of pixel pairs, two more bytes and
-  the pairs, a byte each with the left pixel in the high nibble (bit 3 plane 0 to bit 0
-  plane 3, 0 transparent). Rows are clipped to lines 0-159 and pixels to 0-319, and the
+  the pairs, a byte each with the left pixel in the high nibble (bit 3 the buffer's first
+  plane, which the copper list loads as BPL4PT, to bit 0 its last: the nibble is the
+  colour, 0 transparent). Rows are clipped to lines 0-159 and pixels to 0-319, and the
   game plots each pixel with four `bclr` and up to four `bset`. With ExpMem, `NewShape`
-  replaces it: a row inside 0-319 is built 16 pixels at a time, a word a plane from a 2 KB
+  replaces it: a row inside 0-319 is built 16 pixels at a time, a word a plane from a 16 KB
   table in ExpMem (each byte gives 2 bits of each plane), the pixels outside 0-319 masked
   off, and written with one masked long read-modify-write a plane (a long may reach a word
   past either end of the row, which it writes back unchanged).
@@ -191,6 +198,62 @@ $1d54/$1d56, so no motion is lost however late the game reads them, and polls th
 channels of note durations at $2d92, written to Paula) and, while $126e is set, the music
 sequencer at $40b8. Sound runs on real time; nothing in the handler moves the game world.
 The counter stops while the game loads a hole, which it does with interrupts off.
+
+## The pointer
+
+The game draws the pointer as one of its objects, a shape in the frame (a white cross
+9 pixels wide), at the pointer's position less 8. The position is a point on the course
+map at $5e1c (x) and $5e1e (y), little-endian. While the player points ($9676 = 0) the
+pointer is object 4 (X = 8). While a stroke is drawn back ($9676 = 1; a press within 4
+pixels of the ball starts it) the pointer is object 8 (X = $10), object 4 marks the ball
+and objects 5-7 are the dots between. While the ball rolls ($9676 = 2) there is no
+pointer, and a new turn puts it on the ball ($854e).
+
+Each step, the input routine ($1d5c) takes a quarter of the mouse's counts gathered by the
+interrupt ($1d54/$1d56; the rest stays for the next step), clamped to ±31, into
+$0e80/$0e88. $86ce turns those into the step's move (plus cursor keys, $0e58, and an
+acceleration from $0e60/$0e68, 0 with the mouse), $88a8 adds it to the position, and
+$8afe keeps the position 8 pixels inside the hole ($5e20/$5e22 its size) and the view,
+scrolling the view ($0e9c/$0e9e) when it comes within 8 pixels of an edge (304 pixels
+wide, $11e6 high). So the game's pointer moves once a step, 10 times a second.
+
+With the 280 bytes of chip RAM, sprites 0 and 1 show the pointer instead, attached for 15
+colours (the interrupt copies the copper list's COLOR01-15 into COLOR17-31 each field):
+
+- The copper list turned sprite DMA off at line $90 every field and cleared all eight
+  sprites' data registers, and nothing else in the game touches sprites. Its tail now
+  waits for line $f8, below the playfield and so below the pointer, and loads the eight
+  sprite pointers (sprites 2-7 an empty sprite). Its top turns sprite DMA on and sets
+  BPLCON2 to $24, sprites in front of the playfield. The playfield's fetch starts at
+  DDFSTRT $30, which takes sprite 7's slot; sprites 0 and 1 keep theirs.
+- `PtrStep` (at the input routine's end) keeps where this step puts the pointer: the
+  position plus $0e80/$0e88.
+- `PtrVbi` (in the interrupt, after it has added the counts, at the vertical blank's run)
+  adds a quarter of the counts gathered since, clamped to ±31 as the next step will clamp
+  them, keeps the result inside the hole and the view as $8afe does, and writes the
+  sprites' control words for the frame on screen. `FrameCap` keeps that frame's view at
+  the flip ($1474/$1476 of the frame drawn before). A flip before line $48 shows in the
+  field already begun, after the sprite DMA has loaded the control words, so `FrameCap`
+  places the sprites again then and writes their registers too (the sprites start at line
+  $52 at the earliest).
+- `PtrList` (after the draw list, in `NewList`, or in the verify build after
+  `ListCheck`'s compare) finds the pointer's entry: the object that the mode names,
+  active, at the position less 8, and in the list (in the view). It takes the entry out
+  (the last entry moves into its place; the list is sorted after) and shows the sprites,
+  otherwise turns them off, from the flip that shows this frame (`FrameCap`). A new frame of the shape is drawn into the sprites
+  (`PtrDraw`) from its record, the way the drawer walks it. A frame wider than 16 pixels or
+  taller than 32 lines would stay a shape; the pointer's frames are 9 by 9.
+- `Split` turns the sprites off whenever the drawing flag is clear or the interrupts are
+  off (the pause screen, a hole loading), and the next frame draws the frame again.
+
+The sprite's place on the screen is the pointer's place in the view plus HSTART $7f and
+VSTART $52, so the sprite covers exactly the pixels the game's shape did. With the pointer
+moved and then at rest, a screenshot of each hole on `a1200` was the same with the sprite
+as with the game's shape, but for animations the two runs caught at different moments
+(holes 2, 3, 6, 7 and 9). The pointer moves every field by the counts,
+the game's pointer only at each step. Between steps the sprite is ahead of what the frame
+shows of the game's pointer, the aiming line and the dots included, by the counts the next
+step will take. The cursor keys move the sprite only at the step.
 
 ## Game time
 
@@ -316,7 +379,7 @@ the threaded-code primitives 53 %, the slave's renderer 26 % (the cell compare a
 (it plots shapes pixel by pixel with `bclr`/`bset`). With the view still, a frame took 0.25
 fields in the renderer, 0.16 in $4fd0 (now skipped between steps), 0.33 in $48d4's threaded
 code (the object draw list) and 0.22 in the shape drawer it calls.
-These are before `NewList` and `NewShape`; `open-work.md` (item 3) has each hole's
+These are before `NewList` and `NewShape`; `open-work.md` (item 2) has each hole's
 frames and costs since.
 
 **The intended speed is 10 frames a second at NTSC**, 6 fields a frame: that is what the
