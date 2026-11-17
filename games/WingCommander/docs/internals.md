@@ -9410,6 +9410,65 @@ How it is checked:
   `E:1899c`, `G:18a56`) must run and the stage end, and the start menu must
   follow.
 
+### Mouse speed and off (UR9; both release builds, every mode)
+
+UR9 asks for a mouse speed setting (`MOUSE=nn`). WHDLoad passes a slave only
+Custom1-5, all in use, so the setting is CUSTOM5 bits 4-6, a splash-window
+cycle gadget `C5:M:Mouse:...:4-6` beside the world speed and framerate. Field
+0 must stay the normal speed, so that icons without the bits (every 2.0b
+icon, and no tooltype at all) keep the mouse as it was; off is therefore 1:
+
+| Bits 4-6 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| Mouse | normal | off | 0.5x | 0.75x | 1.5x | 2x | 3x | 4x |
+| CUSTOM5 add | 0 | 16 | 32 | 48 | 64 | 80 | 96 | 112 |
+| Quarter counts per count | 4 | (none) | 2 | 3 | 6 | 8 | 12 | 16 |
+
+- **Decoding.** CD32 `release_setcpu` and OCS `ocs_option_gate` take the
+  bits out of CUSTOM5 before the framerate and world speed are read, so those
+  keep their rules (CD32 still rejects a framerate/speed value above 9 and any
+  bit above 6; OCS still falls back to original mode). `mouse_option`
+  (`src/mouse.s`) turns the field into `mouse_speed`.
+- **Speed.** `mouse_event`, the RAWMOUSE slot, is where every count enters:
+  the rooms' pointer, the flight pointer and stick, the right button's
+  throttle and roll, the CD32 name entry's cells all read the counts it adds
+  (`mouse_sum_x/y`, `mouse_x/y`). It multiplies each event's counts by
+  `mouse_speed` and keeps a quarter remainder per axis (`mouse_rem`), so slow
+  speeds lose no motion and no direction is favoured. An event that adds up
+  to less than a count moves nothing. Normal skips the scaling, so the
+  normal mouse behaves as before. The thresholds stay in counts (the name
+  entry's 18 a cell, the right button's 4 for a direction), so they scale
+  with the speed too, as on a faster mouse.
+- **Off.** No mouse patch is installed, so the game is left to its stick,
+  pad and keys as in Psygore's slave, including the native first-click
+  release guard. CD32 keeps the mouse entries in their own lists,
+  `mouse_patch_en/_de`, which `release_patchseg` applies after `fix_patch`
+  only when the mouse is on, then calls `mouse_init`. OCS installs its hooks
+  from one table on each path; with the mouse off `word_fixes` writes back
+  the six bytes of each `MOUSE` site (the same bytes the guards checked) and
+  skips `mouse_init`. Nothing allocates the pointer sprite then.
+
+How it is checked:
+- **Native.** `release_check.py` decodes CUSTOM5 values with mouse bits on
+  both languages: the speed, and the old fields unchanged or rejected.
+  `cd32_fixes_check.py` applies `fix_patch` alone (no mouse site changes),
+  then `mouse_patch`, and feeds `mouse_event` mixed events at every speed:
+  the sums and pointer must move by the scaled counts with the remainder
+  carried, and a sub-count event must not move the sprite;
+  `--sabotage speed-ignored` must fail. `ocs_options_check.py` runs both
+  install paths with the mouse off: every mouse hook site must keep the
+  game's bytes, the other hooks must be installed.
+- **Live.** `mouse_live_check.py --mouse-option N` at the start menu: off
+  (the intro skipped with Esc), the room hook site keeps the game's bytes,
+  12 fields of motion leave the pointer still and a left click selects
+  nothing; a speed: 24 counts move the room position 3q pixels, q its
+  quarter counts.
+  Results (2026-11-17, enhanced mode): CD32 English and OCS off (room site
+  `3942`, pointer still, three room results -1), CD32 English 4x (+48),
+  CD32 German 2x (+24), OCS 0.5x (+6). The normal mouse's menu runs on
+  both variants are unchanged (two pixels a field, out and back). Not run
+  in flight or in the name entry at another speed; not played.
+
 ### CD32 bunk save: Psygore's StoreNV return value
 
 Barracks saving (`E:26c60` actions, common tail `E:26dc0` rebuilding the bunks

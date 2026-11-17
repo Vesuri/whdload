@@ -392,6 +392,31 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
     w(mc['pos'], '>hh', 100, 60)
     assert room() == (100, 60) and (var('mouse_x'), var('mouse_y')) == (200, 120)
     out['exit'] = 'pass'
+    # The mouse option: 0 normal, 1 off, 2-7 0.5x-4x, in quarter counts with
+    # the remainder carried. Only the scaled counts reach the sums and pointer.
+    def option(v):
+        m.call(SLAVE+sy['mouse_option'], b'', [(9, v)])
+        return C.c_int16(m.reg(9)).value
+    assert [option(v) for v in (0, 1, 2, 3, 4, 5, 6, 7, 8, 0x17)] == [4, 0, 2, 3, 6, 8, 12, 16, 4, 16]
+    speeds = {}
+    for v, q in ((2, 2), (3, 3), (4, 6), (5, 8), (6, 12), (7, 16), (0, 4)):
+        assert option(v) == q
+        m.write(SLAVE+sy['mouse_rem'], bytes(4)); rem = [0, 0]
+        room(); w(mc['pos'], '>hh', 160, 100); assert room() == (160, 100)
+        got = []
+        for dx, dy in ((1, 1), (1, -1), (3, -3), (-5, 2), (7, 0), (-1, -1), (20, -20)):
+            sx, sy0 = var('mouse_sum_x'), var('mouse_sum_y')
+            hx, hy = var('mouse_x'), var('mouse_y')
+            moves = event(dx, dy)
+            want = []
+            for i, c in enumerate((dx, dy)):
+                t = c*q+rem[i]; want.append(t >> 2); rem[i] = t & 3
+            assert (C.c_int16(var('mouse_sum_x')-sx).value, C.c_int16(var('mouse_sum_y')-sy0).value) == tuple(want), (v, dx, dy, want)
+            assert (var('mouse_x')-hx, var('mouse_y')-hy) == tuple(want), (v, 'pointer')
+            assert bool(moves) == (want != [0, 0]), (v, dx, dy, moves)
+            got.append(want)
+        speeds[str(v)] = got
+    out['speed'] = speeds
     m.close()
     # VBL pad read: the left button (CIA-A bit 6 low) adds the red button.
     pads = {}
@@ -927,7 +952,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path)
     p.add_argument('--output', required=True, type=Path)
-    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored', 'roll-native', 'return-ignored', 'esc-ignored'),
+    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored', 'roll-native', 'return-ignored', 'esc-ignored', 'speed-ignored'),
                    help='negative control: the check must fail')
     a = p.parse_args()
     out = a.output.resolve()
@@ -967,6 +992,9 @@ def main():
         elif a.sabotage == 'esc-ignored':  # the cutscene waits never take the right button
             at = blob.index(bytes.fromhex('701b4e75'), sy['mouse_esc'])   # moveq #27,d0; rts
             blob[at:at+2] = bytes.fromhex('70ff')
+        elif a.sabotage == 'speed-ignored':  # every option gives the normal speed
+            at = blob.index(bytes.fromhex('0400020306080c10'), sy['mouse_option'])
+            blob[at:at+8] = bytes([4]*8)
         elif a.sabotage == 'mask-ignored':  # the pointer drawn over the cockpit too
             at = blob.index(bytes.fromhex('c052'), sy['stick_show'])
             blob[at:at+2] = bytes.fromhex('3012')
@@ -992,9 +1020,15 @@ def main():
         apply(blob, sy[cfg['fix']], fixed, fixlog)
         mc = cfg['mouse']
         sc = cfg['scores']
-        assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']), (3, cfg['peek']['site']),
-                          (3, mc['room']), (3, mc['exit']), (3, mc['pad']), (3, mc['guard']), (3, mc['name']),
-                          (3, mc['esc'][0]), (3, mc['esc'][1]), (3, mc['steer']), (3, mc['poll']), (3, mc['scans'][0]), (3, mc['scans'][1]), (3, sc['site'])], fixlog
+        assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']), (3, cfg['peek']['site']), (3, sc['site'])], fixlog
+        # The mouse option off installs only fix_patch: no mouse site changes.
+        unmoused = bytes(fixed)
+        mouse_sites = [mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], mc['poll']]+list(mc['scans'])+list(mc['esc'])
+        assert all(unmoused[x:x+6] == psy[x:x+6] for x in mouse_sites)
+        mouselog = []
+        apply(blob, sy[cfg['fix'].replace('fix_', 'mouse_')], fixed, mouselog)
+        assert mouselog == [(3, mc['room']), (3, mc['exit']), (3, mc['pad']), (3, mc['guard']), (3, mc['name']),
+                            (3, mc['esc'][0]), (3, mc['esc'][1]), (3, mc['steer']), (3, mc['poll']), (3, mc['scans'][0]), (3, mc['scans'][1])], mouselog
         assert original[sc['site']:sc['site']+6] == bytes.fromhex('397c00018034')
         assert original[sc['restore']:sc['restore']+4] == bytes.fromhex('48e70030')
         assert all(original[x:x+2] == b'\x4e\xb9' for x in (sc['site']-12, sc['site']-6))

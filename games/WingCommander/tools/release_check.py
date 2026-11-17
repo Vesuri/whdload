@@ -44,7 +44,7 @@ def main():
     options=[]
     for model,flags in ((2,2),(4,8)):
         for custom in (0,1,2,3,4,5,0xffffffff):
-            for pace in (0,1,2,3,4,5,8,9,10,0xffffffff):
+            for pace in (0,1,2,3,4,5,8,9,10,0x10,0x13,0x23,0x59,0x73,0x7a,0x80,0x83,0xffffffff):
                 for policy in (0,256):
                     c=CPU(blob,model);c.write(BASE+0x1de4,struct.pack('>I',custom));c.write(BASE+0x1e04,struct.pack('>I',pace))
                     c.write(BASE+0x121e,struct.pack('>I',0x80000));c.write(4,struct.pack('>I',0x2000));c.write(0x2128,struct.pack('>H',flags))
@@ -54,8 +54,11 @@ def main():
                     c.write(STACK,struct.pack('>I',STOP));c.reg(8,STACK);c.reg(3,0x80000)
                     c.reg(9,0x32a);c.reg(10,0x7f3f);c.reg(11,0x7654)
                     ck(u.uc_emu_start(c.h,BASE+sy['release_setcpu'],STOP,1000000,20000));assert c.reg(18)==STOP and c.reg(11)==0x7654
-                    # CUSTOM5 bit 0 framerate, bits 1-3 world speed (0 Original = Psygore's normal game).
-                    rejected=custom>1 or pace>9
+                    # CUSTOM5 bit 0 framerate, bits 1-3 world speed (0 Original = Psygore's normal game),
+                    # bits 4-6 the mouse (0 normal, 1 off, 2-7 0.5x-4x in quarter counts).
+                    rejected=custom>1 or pace&~0x70>9
+                    mouse=(pace>>4)&7
+                    pace&=~0x70
                     enhanced=pace>>1!=0
                     if rejected:assert c.read(c.reg(8),4)==struct.pack('>I',9)
                     else:
@@ -63,6 +66,7 @@ def main():
                         # German keeps 1 for Psygore's loader; release_patchseg maps it.
                         assert int.from_bytes(c.read(BASE+0x1de4,4),'big')==(3 if custom==0 and enhanced else custom)
                         assert int.from_bytes(c.read(BASE+0x1e04,4),'big')==0
+                        assert int.from_bytes(c.read(BASE+sy['mouse_speed'],2),'big')==(4,0,2,3,6,8,12,16)[mouse],(pace,mouse)
                         assert int.from_bytes(c.read(BASE+sy['release_german'],2),'big')==(custom and (2 if enhanced else 1))
                         if enhanced:
                             assert int.from_bytes(c.read(BASE+sy['timing_flight_rate'],4),'big')==(10,12,15,20)[(pace>>1)-1]
@@ -73,7 +77,7 @@ def main():
                         # German rewrites the enhanced code to the German assembly.
                         memory=c.read(BASE,sy['german_fixups'])
                         assert all(memory[o:o+2]==(german if custom else blob)[o:o+2] for o in fixups)
-                    options.append(dict(model=model,mode=custom,pace=pace,policy=policy,rejected=rejected));c.close()
+                    options.append(dict(model=model,mode=custom,pace=pace,mouse=mouse,policy=policy,rejected=rejected));c.close()
     rng=random.Random(12);pictures=0
     for model in (2,4):
         c=CPU(blob,model);c.write(BASE+0x17b8,bytes.fromhex('4e75'));c.selected=sy['render_selected']

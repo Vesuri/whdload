@@ -1,6 +1,8 @@
 ; Translate public language/speed options once before language selection.
 ; CUSTOM5 bit 0 enables the enhanced framerate; bits 1-3 select the world
-; speed: 0 Original (Psygore's normal game), 1-4 a 10/12/15/20 Hz world.
+; speed: 0 Original (Psygore's normal game), 1-4 a 10/12/15/20 Hz world;
+; bits 4-6 the mouse (mouse_option: 0 normal, 1 off, 2-7 speeds), taken out
+; before the rest is read.
 ; Internal CUSTOM1=3 is enhanced; 0/1 are Psygore's English/German. German
 ; keeps 1 until Psygore's loader has chosen wing.german (S:142a), so the
 ; converter setup sees 3 only for its call; release_patchseg then maps German
@@ -11,10 +13,16 @@ release_setcpu:
         lea     slave+$1e04(pc),a1
         move.l  (a0),d2
         cmpi.l  #1,d2
-        bhi.s   .bad
+        bhi.w   .bad
         move.l  (a1),d2
+        moveq   #$70,d0
+        and.l   d2,d0
+        eor.l   d0,d2            ; bits 4-6 the mouse
         cmpi.l  #9,d2            ; bit 0 framerate, bits 1-3 world speed 0..4
-        bhi.s   .bad
+        bhi.w   .bad
+        move.l  d2,(a1)
+        lsr.w   #4,d0
+        bsr.w   mouse_option
         tst.l   (a0)
         beq.s   .language
         bsr.w   release_german_install
@@ -150,10 +158,22 @@ release_patchseg:
         movea.l d7,a1
         jsr     116(a2)          ; resload_PatchSeg
         movea.l (sp)+,a0
+        tst.w   mouse_speed(pc)
+        beq.s   .no_mouse        ; mouse off: the game's own input only
+        move.l  a0,-(sp)
+        lea     mouse_patch_en(pc),a0
+        tst.w   release_german(pc)
+        beq.s   .mouse_en
+        lea     mouse_patch_de(pc),a0
+.mouse_en:
+        movea.l d7,a1
+        jsr     116(a2)          ; resload_PatchSeg
+        movea.l (sp)+,a0
         move.l  d7,d0
         lsl.l   #2,d0
         addq.l  #4,d0
         bsr.w   mouse_init
+.no_mouse:
         move.l  d7,d0
         lsl.l   #2,d0
         addq.l  #4,d0
@@ -378,42 +398,47 @@ fix_patch_en:
         dc.w    3                ; PL_PS TrainSim selection pad read: keep clicks
         dc.l    $181e0
         dc.w    pad_peek-fix_patch_en
-        dc.w    3                ; PL_PS room routine position stores
-        dc.l    $273fc
-        dc.w    mouse_room-fix_patch_en
-        dc.w    3                ; PL_PS room exit sprite move
-        dc.l    $27362
-        dc.w    mouse_exit-fix_patch_en
-        dc.w    3                ; PL_PS VBL port-1 pad read, after Psygore's
-        dc.l    $33e78
-        dc.w    mouse_pad-fix_patch_en
-        dc.w    3                ; PL_PS pad record reset: click release guard
-        dc.l    $33de6
-        dc.w    mouse_guard-fix_patch_en
-        dc.w    3                ; PL_PS name entry grid poll
-        dc.l    $16ed0
-        dc.w    mouse_name-fix_patch_en
-        dc.w    3                ; PL_PS cutscene waits' key reads: the right button as Esc
-        dc.l    $18990
-        dc.w    mouse_esc-fix_patch_en
-        dc.w    3
-        dc.l    $18a90
-        dc.w    mouse_esc-fix_patch_en
-        dc.w    3                ; PL_PS flight controller pitch/yaw ramp stores
-        dc.l    $19064
-        dc.w    mouse_steer-fix_patch_en
-        dc.w    3                ; PL_PS flight poll epilogue: right and middle buttons
-        dc.l    $18d82
-        dc.w    mouse_poll_cd32-fix_patch_en
-        dc.w    3                ; PL_PS cockpit aperture scan calls: the pointer mask
-        dc.l    $1784c
-        dc.w    mouse_scan-fix_patch_en
-        dc.w    3
-        dc.l    $1bd2e
-        dc.w    mouse_scan-fix_patch_en
         dc.w    3                ; PL_PS pilot restore: its last store
         dc.l    $268be
         dc.w    scores_load_en-fix_patch_en
+        dc.w    0
+; The mouse: the mouse_ routines here and in mouse.s, installed after
+; fix_patch unless the mouse option is off. Then the game reads only its pad,
+; stick and keys, as in Psygore's slave.
+mouse_patch_en:
+        dc.w    3                ; PL_PS room routine position stores
+        dc.l    $273fc
+        dc.w    mouse_room-mouse_patch_en
+        dc.w    3                ; PL_PS room exit sprite move
+        dc.l    $27362
+        dc.w    mouse_exit-mouse_patch_en
+        dc.w    3                ; PL_PS VBL port-1 pad read, after Psygore's
+        dc.l    $33e78
+        dc.w    mouse_pad-mouse_patch_en
+        dc.w    3                ; PL_PS pad record reset: click release guard
+        dc.l    $33de6
+        dc.w    mouse_guard-mouse_patch_en
+        dc.w    3                ; PL_PS name entry grid poll
+        dc.l    $16ed0
+        dc.w    mouse_name-mouse_patch_en
+        dc.w    3                ; PL_PS cutscene waits' key reads: the right button as Esc
+        dc.l    $18990
+        dc.w    mouse_esc-mouse_patch_en
+        dc.w    3
+        dc.l    $18a90
+        dc.w    mouse_esc-mouse_patch_en
+        dc.w    3                ; PL_PS flight controller pitch/yaw ramp stores
+        dc.l    $19064
+        dc.w    mouse_steer-mouse_patch_en
+        dc.w    3                ; PL_PS flight poll epilogue: right and middle buttons
+        dc.l    $18d82
+        dc.w    mouse_poll_cd32-mouse_patch_en
+        dc.w    3                ; PL_PS cockpit aperture scan calls: the pointer mask
+        dc.l    $1784c
+        dc.w    mouse_scan-mouse_patch_en
+        dc.w    3
+        dc.l    $1bd2e
+        dc.w    mouse_scan-mouse_patch_en
         dc.w    0
 fix_patch_de:
         dc.w    3
@@ -432,41 +457,43 @@ fix_patch_de:
         dc.l    $1829a
         dc.w    pad_peek-fix_patch_de
         dc.w    3
-        dc.l    $275be
-        dc.w    mouse_room-fix_patch_de
-        dc.w    3
-        dc.l    $27524
-        dc.w    mouse_exit-fix_patch_de
-        dc.w    3
-        dc.l    $3403a
-        dc.w    mouse_pad-fix_patch_de
-        dc.w    3
-        dc.l    $33fa8
-        dc.w    mouse_guard-fix_patch_de
-        dc.w    3
-        dc.l    $16f6e
-        dc.w    mouse_name-fix_patch_de
-        dc.w    3
-        dc.l    $18a4a
-        dc.w    mouse_esc-fix_patch_de
-        dc.w    3
-        dc.l    $18b4a
-        dc.w    mouse_esc-fix_patch_de
-        dc.w    3
-        dc.l    $1911e
-        dc.w    mouse_steer-fix_patch_de
-        dc.w    3
-        dc.l    $18e3c
-        dc.w    mouse_poll_cd32-fix_patch_de
-        dc.w    3
-        dc.l    $178e4
-        dc.w    mouse_scan-fix_patch_de
-        dc.w    3
-        dc.l    $1bdd8
-        dc.w    mouse_scan-fix_patch_de
-        dc.w    3
         dc.l    $26a6a
         dc.w    scores_load_de-fix_patch_de
+        dc.w    0
+mouse_patch_de:
+        dc.w    3
+        dc.l    $275be
+        dc.w    mouse_room-mouse_patch_de
+        dc.w    3
+        dc.l    $27524
+        dc.w    mouse_exit-mouse_patch_de
+        dc.w    3
+        dc.l    $3403a
+        dc.w    mouse_pad-mouse_patch_de
+        dc.w    3
+        dc.l    $33fa8
+        dc.w    mouse_guard-mouse_patch_de
+        dc.w    3
+        dc.l    $16f6e
+        dc.w    mouse_name-mouse_patch_de
+        dc.w    3
+        dc.l    $18a4a
+        dc.w    mouse_esc-mouse_patch_de
+        dc.w    3
+        dc.l    $18b4a
+        dc.w    mouse_esc-mouse_patch_de
+        dc.w    3
+        dc.l    $1911e
+        dc.w    mouse_steer-mouse_patch_de
+        dc.w    3
+        dc.l    $18e3c
+        dc.w    mouse_poll_cd32-mouse_patch_de
+        dc.w    3
+        dc.l    $178e4
+        dc.w    mouse_scan-mouse_patch_de
+        dc.w    3
+        dc.l    $1bdd8
+        dc.w    mouse_scan-mouse_patch_de
         dc.w    0
 
 ; StoreNV(a1 item name, a2 data, d0 size): as Psygore's S:16b6, but returns
@@ -672,5 +699,6 @@ release_config:
         dc.b 'C3:L:System:Default,Enyo,McAuliffe,Gateway,Gimle,Brimstone,Chengdu,Dakota,Port Hedland,Kurasawa,Rostov,Hubble''s Star,Venice,Hell''s Kitchen;'
         dc.b 'C4:L:Mission:1,2,3;'
         dc.b 'C5:X:Enhanced framerate:0;'
-        dc.b 'C5:M:World speed:Original,1.0x,1.2x,1.5x,2.0x:1-3;',0
+        dc.b 'C5:M:World speed:Original,1.0x,1.2x,1.5x,2.0x:1-3;'
+        dc.b 'C5:M:Mouse:Normal,Off,0.5x,0.75x,1.5x,2x,3x,4x:4-6;',0
         cnop 0,4

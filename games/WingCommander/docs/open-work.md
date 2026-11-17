@@ -967,8 +967,8 @@ if available.
 
 A user who developed a separate slave reported a delayed bunk save, a TrainSim
 selection fault with number keys, non-persistent TrainSim high scores and missing
-mouse control. His base, "Psygore 1.1", is not listed on whdload.de (only 1.0);
-his remaining fixes are not yet known. Static evidence for everything below is
+mouse control. Their base, "Psygore 1.1", is not listed on whdload.de (only 1.0);
+their remaining fixes are not yet known. Static evidence for everything below is
 in [input, saves and TrainSim](internals.md#input-devices-bunk-saves-and-trainsim-selection);
 only the mouse has been run live. It covers the three pinned executables only; the
 two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files.
@@ -1111,8 +1111,12 @@ Firing and mouse:
 - **UR8 (H): missiles on left+right together or the middle button.**
   Implemented with UR7; the same checks. The middle button is only checked
   in the emulator.
-- **UR9 (H): mouse speed setting** (`MOUSE=nn` tooltype). Not implemented; the
-  pointer moves two counts a pixel, as the PC's.
+- **UR9 (H): mouse speed setting** (`MOUSE=nn` tooltype). Implemented
+  (2026-11-17) as CUSTOM5 bits 4-6, a splash-window gadget: normal (the PC's
+  two counts a pixel), 0.5x, 0.75x, 1.5x, 2x, 3x, 4x, or off, which installs
+  no mouse patch at all (internals, "Mouse speed and off"). WHDLoad has no
+  named tooltypes and the other Custom options are in use. Checked natively
+  on both variants and live at the start menu; not yet played by the user.
 
 Graphics:
 - **UR10 (H): glyphs differ from the PC:** the simulator's "0", W/M missing

@@ -4,8 +4,17 @@ ocs_option_gate:
         lea     ocs_option_tags(pc),a0
         jsr     $34(a2)                 ; resload_Control, CUSTOM5_GET
         ; CUSTOM5 bit 0 enables the enhanced framerate; bits 1-3 select the
-        ; world speed: 0 Original, 1-4 a 10/12/15/20 Hz world.
+        ; world speed: 0 Original, 1-4 a 10/12/15/20 Hz world; bits 4-6 the
+        ; mouse (mouse_option), taken out first and kept for word_fixes.
         move.l  ocs_option_value(pc),d0
+        moveq   #$70,d1
+        and.l   d0,d1
+        eor.l   d1,d0
+        lsr.w   #4,d1
+        lea     ocs_option_value(pc),a0
+        move.l  d0,(a0)
+        lea     ocs_option_mouse(pc),a0
+        move.w  d1,(a0)
         cmpi.l  #9,d0
         bhi.w   .off
         lsr.l   #1,d0
@@ -62,3 +71,5 @@ ocs_option_tags:
 ocs_option_value:
         dc.l    0                      ; absent/zero means original
         dc.l    0
+ocs_option_mouse:
+        dc.w    0                      ; CUSTOM5 bits 4-6

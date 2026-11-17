@@ -10,6 +10,9 @@
 ; only between the room routine's first call and the room exit, and only while
 ; the pointer is not hidden. The variant supplies the left button as port-1
 ; fire and calls mouse_init with its parameter table and game H0 base.
+; The mouse option (CUSTOM5 bits 4-6, mouse_option) scales every count in
+; mouse_event, so all uses below move alike; off makes the variant install
+; none of the mouse hooks.
 ;
 ; Mouse flight: the PC version's pointer and stick. The flight controller's
 ; ramp stores call mouse_steer, which moves the pointer by the mouse motion
@@ -198,8 +201,28 @@ mouse_exit:
         move.l  mouse_move(pc),-(sp)
         rts
 
-; RAWMOUSE slot, called from the game's input handler with a3 = event. Every
-; relative event also adds to mouse_sum_x/y, which only their reader consumes.
+; The mouse speed option, from the variant's option code before mouse_init:
+; d0 = 0 normal, 1 off, 2-7 0.5x, 0.75x, 1.5x, 2x, 3x, 4x (other bits ignored).
+; Returns d0 = mouse_speed and Z set when off, which the variant takes as
+; "install no mouse patch". Every other register is kept.
+mouse_option:
+        move.l  a0,-(sp)
+        andi.w  #7,d0
+        move.b  .speeds(pc,d0.w),d0
+        ext.w   d0
+        lea     mouse_speed(pc),a0
+        move.w  d0,(a0)
+        movea.l (sp)+,a0
+        tst.w   d0
+        rts
+.speeds:
+        dc.b    4,0,2,3,6,8,12,16       ; quarter counts per mouse count
+
+; RAWMOUSE slot, called from the game's input handler with a3 = event. Each
+; relative event's counts are first scaled by mouse_speed, in quarters, the
+; remainder carried to the next event; everything below sees only the scaled
+; counts. Every relative event also adds to mouse_sum_x/y, which only their
+; reader consumes.
 ; The handler keeps d2/a2/a3 only: preserve everything except d0-d1/a0-a1.
 mouse_event:
         tst.b   8(a3)                   ; IEQUALIFIER_RELATIVEMOUSE
@@ -207,15 +230,35 @@ mouse_event:
         move.w  10(a3),d0
         or.w    12(a3),d0
         beq.w   .out
+        movem.l d2-d3/a2/a4/a6,-(sp)
+        move.w  10(a3),d2
+        move.w  12(a3),d3
+        move.w  mouse_speed(pc),d0
+        cmpi.w  #4,d0
+        beq.s   .scaled                 ; normal: the counts as they are
+        lea     mouse_rem(pc),a0
+        muls.w  d0,d2
+        add.w   (a0),d2
+        moveq   #3,d1
+        and.w   d2,d1
+        move.w  d1,(a0)+
+        asr.w   #2,d2
+        muls.w  d0,d3
+        add.w   (a0),d3
+        moveq   #3,d1
+        and.w   d3,d1
+        move.w  d1,(a0)
+        asr.w   #2,d3
+        move.w  d2,d0
+        or.w    d3,d0
+        beq.w   .done                   ; less than a count so far
+.scaled:
         lea     mouse_sum_x(pc),a0      ; running counts for a variant's grid screens
-        move.w  10(a3),d0
-        add.w   d0,(a0)+
-        move.w  12(a3),d0
-        add.w   d0,(a0)
+        add.w   d2,(a0)+
+        add.w   d3,(a0)
         lea     mouse_active(pc),a0
         tst.w   (a0)
-        beq.s   .out
-        movem.l d2-d3/a2/a4/a6,-(sp)
+        beq.w   .done
         movea.l mouse_a4(pc),a4
         movea.l mouse_params(pc),a2
         move.w  MP_HIDE(a2),d0
@@ -239,10 +282,10 @@ mouse_event:
         move.w  d1,-(a1)
 .synced:
         lea     mouse_x(pc),a1
-        move.w  10(a3),d0
+        move.w  d2,d0
         moveq   #24,d1
         bsr.s   .axis
-        move.w  12(a3),d0
+        move.w  d3,d0
         moveq   #26,d1
         bsr.s   .axis
         addq.w  #1,(a1)                 ; mouse_seq
@@ -1165,6 +1208,8 @@ mouse_last:     dc.w 0,0                ; position the room routine last stored
 mouse_active:   dc.w 0
 mouse_sum_x:    dc.w 0                  ; counts, wrapping; mouse_sum_y follows
 mouse_sum_y:    dc.w 0
+mouse_speed:    dc.w 4                  ; quarter counts per mouse count (mouse_option)
+mouse_rem:      dc.w 0,0                ; x, y quarters not yet a count
 mouse_fields:   dc.w 0                  ; VBL fields (mouse_vbl)
 stick_x:        dc.w 0                  ; stick units (+-8 steps); stick_y follows
 stick_y:        dc.w 0

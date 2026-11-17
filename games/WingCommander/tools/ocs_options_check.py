@@ -268,7 +268,7 @@ def check(build, mutation=None):
     require(payload[info:].startswith(b'2.0b (17.11.2026)\n'), 'public release information missing')
     require(b'$VER: WingCommander 2.0b (17.11.2026)\0' in payload, 'public version missing')
     config=int.from_bytes(payload[0x32:0x34],'big')
-    require(payload[config:].split(b'\0',1)[0].endswith(b'C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):Original,1.0x,1.2x,1.5x,2.0x:1-3;'),'public config missing')
+    require(payload[config:].split(b'\0',1)[0].endswith(b'C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):Original,1.0x,1.2x,1.5x,2.0x:1-3;C5:M:Mouse:Normal,Off,0.5x,0.75x,1.5x,2x,3x,4x:4-6;'),'public config missing')
     if mutation:
         start,end=sy['ocs_option_gate'],sy['ocs_option_tags']
         segment=payload[start:end]
@@ -281,7 +281,9 @@ def check(build, mutation=None):
     from ocs_memory_build import ALWAYS
     exact=[h for h in meta['hooks'] if h[1] in ALWAYS]
     require(len(exact)==len(ALWAYS),'always-on hooks missing from build')
-    from ocs_memory_build import WORDS
+    from ocs_memory_build import WORDS, MOUSE
+    MOUSE_LABELS={label for _,label,_ in MOUSE}
+    mouse_off=[]
     words=[(at,guard,value) for at,guard,value in meta['word_fixes']]
     require(words==[list(w) for w in WORDS] or words==[tuple(w) for w in WORDS],'word fixes missing from build')
     game=(ROOT/'tmp/game/WingCommander/data/Wing.english').read_bytes()
@@ -294,14 +296,18 @@ def check(build, mutation=None):
     mouse_runs=set()
     for slave,kind,bank in banks:
         for flags in (0,1,2,3,4,8,128):
-            for option in (0,1,3,8,10,0xffffffff):
+            for option in (0,1,3,8,10,0xffffffff,0x13,0x10,0x73,0x2b):
+                # CUSTOM5 bits 4-6 the mouse: 0 normal, 1 off, 2-7 0.5x-4x.
+                mouse=(option>>4)&7;opt=option&~0x70
+                speed=(4,0,2,3,6,8,12,16)[mouse]
+                if option>>4 and option!=0xffffffff and (flags not in (0,2) or bank not in ('z2-fast','chip')):continue
                 for revision in (0x1302,0x12bc,0x1348):
-                    enabled=2<=option<=9 and bool(flags&0x8e) and bank in ('z2-fast','high-fast','chip-slave-fast') and revision==0x1302
+                    enabled=2<=opt<=9 and bool(flags&0x8e) and bank in ('z2-fast','high-fast','chip-slave-fast') and revision==0x1302
                     # A damaged enhancement-only site must only be examined
                     # when enabled. A damaged exact site makes original mode
                     # fall back to the untouched game instead of aborting.
                     # A damaged word-fix site skips only that fix.
-                    for corrupt in (False,'enhanced','exact','word'):
+                    for corrupt in ((False,) if option>>4 and option!=0xffffffff else (False,'enhanced','exact','word')):
                         c=Native(ROOT/'tmp/game/WingCommander/data/Wing.english')
                         events=[]
                         try:
@@ -340,20 +346,25 @@ def check(build, mutation=None):
                             elif enabled:
                                 require(events[-1]=='flush','missing enhancement flush')
                                 for at,label,opcode in meta['hooks']:
-                                    require(c.get(CODE+at,2)==opcode and c.get(CODE+at+2,4)==slave+sy[label],'missing enhanced hook')
+                                    if speed==0 and label in MOUSE_LABELS:
+                                        require(c.read(CODE+at,6)==before[at:at+6],'mouse off kept a mouse hook')
+                                    else:require(c.get(CODE+at,2)==opcode and c.get(CODE+at+2,4)==slave+sy[label],'missing enhanced hook')
+                                require(c.get(slave+sy['mouse_speed'],2)==speed,'mouse option not decoded')
                                 for at,guard,value in words:
                                     require(c.read(CODE+at,2)==(before[at:at+2] if corrupt=='word' else bytes.fromhex(value)),'word fix state')
                                 rate=struct.unpack('>I',c.read(slave+sy['timing_flight_rate'],4))[0]
                                 framerate=struct.unpack('>H',c.read(slave+sy['timing_high_framerate'],2))[0]
-                                require(rate==(10,12,15,20)[(option>>1)-1] and framerate==option&1,'world speed/framerate option not decoded')
-                                if 'enhanced' not in mouse_runs and not corrupt:
+                                require(rate==(10,12,15,20)[(opt>>1)-1] and framerate==opt&1,'world speed/framerate option not decoded')
+                                if 'enhanced' not in mouse_runs and not corrupt and speed==4:
                                     mouse_scenario(c,slave,sy);mouse_runs.add('enhanced')
                             elif revision==0x1302 and corrupt!='exact':
                                 # Original mode: only the E1 shortcuts, waypoint marker order and mouse.
                                 after=bytearray(c.read(CODE,0x358c8))
                                 for at,label,opcode in exact:
+                                    if speed==0 and label in MOUSE_LABELS:continue   # put back: compared below
                                     require(after[at:at+6]==word(opcode)+long(slave+sy[label]),'missing exact hook')
                                     after[at:at+6]=before[at:at+6]
+                                require(c.get(slave+sy['mouse_speed'],2)==speed,'mouse option not decoded')
                                 for at,guard,value in words:
                                     require(after[at:at+2]==(before[at:at+2] if corrupt=='word' else bytes.fromhex(value)),'word fix state')
                                     after[at:at+2]=before[at:at+2]
@@ -362,7 +373,7 @@ def check(build, mutation=None):
                                 for pos in meta['fixups']:
                                     value=int.from_bytes(payload[pos:pos+4],'big')
                                     require(c.read(slave+pos,4)==long((value&0x0fffffff)+CODE),'exact native operand unresolved')
-                                if 'original' not in mouse_runs and not corrupt:
+                                if 'original' not in mouse_runs and not corrupt and speed==4:
                                     mouse_scenario(c,slave,sy);mouse_runs.add('original')
                             else:
                                 require(c.read(CODE,0x358c8)==before and c.read(STARTUP,0x1d94)==opening_before,'original mode modified game')
@@ -372,7 +383,8 @@ def check(build, mutation=None):
                             if not (enabled and fatal):
                                 expected=dict(regs);expected.update({1:regs[4],2:regs[16]})
                                 require(all(c.reg(r)==v for r,v in expected.items()),'startup register ABI changed')
-                            results.append(dict(bank=bank,flags=flags,option=option,revision=revision,corrupt=corrupt,enhanced=enabled,events=events))
+                            if speed==0 and revision==0x1302:mouse_off.append('enhanced' if enabled else 'original')
+                            results.append(dict(bank=bank,flags=flags,option=option,mouse=speed,revision=revision,corrupt=corrupt,enhanced=enabled,events=events))
                         finally:c.close()
     original=(ROOT/'tmp/game/WingCommander/WingCommander.info').read_bytes()
     icon=(build/'WingCommander.info').read_bytes()
@@ -384,6 +396,7 @@ def check(build, mutation=None):
         except (ValueError,IndexError):rejected+=1
     require(rejected==3,'unsafe icon accepted')
     require(mouse_runs=={'enhanced','original'},'mouse scenario not run on both install paths')
+    require(set(mouse_off)=={'enhanced','original'},'mouse off not checked on both install paths')
     return dict(passed=True,sha256=meta['sha256'],cases=results,icon_rejections=rejected)
 
 

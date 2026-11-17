@@ -68,6 +68,11 @@
  afterburner. Press both buttons together, or the middle button, to fire the
  selected missile or drop a mine. The right button also works as Esc in the
  cutscenes: it skips them as Esc does.
+ The mouse speed is set in the WHDLoad splash window or with CUSTOM5 (below):
+ normal is two mouse counts a screen pixel, as the PC's default; 0.5x to 4x
+ scale every use of the mouse alike. Off removes the mouse support
+ altogether: the game then reads only the joystick, CD32 pad and keys, as in
+ Psygore's slave.
  On CD32, saving a pilot in the barracks also saves the Training Simulator high
  scores, as Bed_N.hi beside the Bed_N save, and loading that pilot restores
  them. Saves without this file still load, with the game's usual scores.
@@ -91,11 +96,15 @@
   12 Venice       13 Hell's Kitchen
  CUSTOM4: 0 = mission 1, 1 = mission 2, 2 = mission 3 (cheat mode required).
 
- CUSTOM5 combines two options; add their values:
+ CUSTOM5 combines three options; add their values:
    World speed:          0 = Original     2 = 1.0x (10 updates/s)
                          4 = 1.2x         6 = 1.5x         8 = 2.0x
    Enhanced framerate:  +1 = smooth in-between pictures in flight
- The installed icon uses CUSTOM5=3: enhanced framerate at 1.0x.
+   Mouse:                0 = normal      16 = off         32 = 0.5x
+                        48 = 0.75x       64 = 1.5x        80 = 2x
+                        96 = 3x         112 = 4x
+ The installed icon uses CUSTOM5=3: enhanced framerate at 1.0x, normal mouse.
+ For example CUSTOM5=67 is the same with the mouse at 1.5x.
  Original speed is the original game, whose world advances once per picture,
  so its speed depends on the processor; the framerate option is then ignored.
  A fixed world speed keeps flight at that speed on every fast enough machine.
@@ -143,6 +152,7 @@
    double-click fires the afterburner, and both buttons or the middle button
    fire missiles, as on the PC (thanks hexaae!).
  - The right mouse button skips cutscenes, as Esc does.
+ - Mouse speed option, 0.5x to 4x, or the mouse off (thanks hexaae!).
  - Enhanced framerate: rotating ships and the title logo keep their centre
    instead of shaking as they turn, and a ship at the edge of the view no
    longer shifts by a pixel.

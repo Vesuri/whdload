@@ -489,7 +489,22 @@ exact_hooks_done:
             words+=(f' movea.l d6,a5\n adda.l #${off:x},a5\n cmpi.l #${guard[:8]},(a5)\n'
                     f' bne.s .skip{off:x}\n cmpi.w #${guard[8:]},4(a5)\n bne.s .skip{off:x}\n'
                     f' move.w #${value},(a5)\n.skip{off:x}:\n')
-        words+=' lea ocs_mouse_params(pc),a0\n move.l d6,d0\n bsr.w mouse_init\n rts\n'
+        # The mouse option: off puts back the bytes of every mouse hook site,
+        # which both install paths have written by now (the guards checked
+        # them), so the game reads only its stick and keys, as Psygore's.
+        words+=(' lea word_fixes(pc),a0\n adda.l #ocs_option_mouse-word_fixes,a0\n move.w (a0),d0\n'
+                ' bsr.w mouse_option\n beq.s mouse_off\n'
+                ' lea ocs_mouse_params(pc),a0\n move.l d6,d0\n bsr.w mouse_init\n rts\n'
+                'mouse_off:\n lea mouse_sites(pc),a0\n'
+                'mouse_site:\n move.l (a0)+,d0\n bmi.s mouse_sites_done\n movea.l d6,a5\n adda.l d0,a5\n'
+                ' move.w (a0)+,(a5)+\n move.w (a0)+,d0\n move.l (a0)+,d1\n tst.w d0\n beq.s mouse_site_put\n add.l d6,d1\n'
+                'mouse_site_put:\n move.l d1,(a5)\n bra.s mouse_site\n'
+                'mouse_sites_done:\n rts\n'
+                'mouse_sites:\n')
+        for off,_,_ in MOUSE:
+            raw=game[44+off:44+off+6];first=int.from_bytes(raw[:2],'big')
+            words+=f' dc.l ${off:x}\n dc.w ${first:x},{int(first in (0x4eb9,0x4ef9))}\n dc.l ${int.from_bytes(raw[2:],"big"):x}\n'
+        words+=' dc.l -1\n'
         # The left button (CIA-A PRA bit 6) is sampled as port-1 fire too.
         # Replaces btst #7,$bfe001 / seq d0 / neg.b d0 (12 bytes).
         words+='''
@@ -556,7 +571,7 @@ ocs_mouse_params:
         text=text.replace('display_create_checked:',exact+words+'\ndisplay_create_checked:',1)
         # Keep option code/data in PC-relative range of the startup seam.
         config=original[32+0xf81:].split(b'\0',1)[0].rstrip(b';')
-        config+=b';C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):Original,1.0x,1.2x,1.5x,2.0x:1-3;\0'
+        config+=b';C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):Original,1.0x,1.2x,1.5x,2.0x:1-3;C5:M:Mouse:Normal,Off,0.5x,0.75x,1.5x,2x,3x,4x:4-6;\0'
         options=(ROOT/'src/ocs_options.s').read_text()
         options+='\nocs_public_info: dc.b "2.0b (17.11.2026)",10,"Original slave: Psygore",10,"Enhancements: Vesuri",0\nocs_public_version: dc.b "$VER: WingCommander 2.0b (17.11.2026)",0\n even\n'
         options+='\nocs_public_config: dc.b '+','.join(str(x) for x in config)+'\n even\n'

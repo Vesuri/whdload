@@ -65,6 +65,9 @@ def main():
     p.add_argument('--german', action='store_true', help='CD32: the German executable (CUSTOM1=1)')
     p.add_argument('--esc', action='store_true',
                    help='only the intro: the right button as Esc in its two waits, then the start menu')
+    p.add_argument('--mouse-option', type=int, choices=range(1, 8),
+                   help='only the start menu, with CUSTOM5 bits 4-6 set to this: 1 off (no pointer motion or '
+                        'click, the hook sites native), 2-7 0.5x-4x (the room position moves that much more)')
     p.add_argument('--direct-flight', action='store_true',
                    help='CD32 English --flight only, on a tools/flight_fixture.py --release build: the mission flight, no menu')
     a = p.parse_args()
@@ -78,6 +81,8 @@ def main():
         p.error('--fire: CD32 English --flight only')
     if a.buttons and (a.german or not a.flight or a.fire):
         p.error('--buttons: English --flight only, without --fire')
+    if a.mouse_option and (a.flight or a.name_entry or a.esc or a.direct_flight):
+        p.error('--mouse-option: the start menu only')
     game = GAMES['cd32-de' if a.german else a.variant]
     out = new_output(a.output); out.mkdir(parents=True)
     v = get(a.variant); ocs = a.variant == 'ocs'
@@ -94,6 +99,8 @@ def main():
             locate = functools.partial(locate, german=True)
         if a.direct_flight:     # the fixture's direct-flight argument (docs/development.md)
             whd = 'CUSTOM2=2 CUSTOM3=1 CUSTOM4=0 '+whd
+    if a.mouse_option:
+        whd = whd.replace('CUSTOM5=0', f'CUSTOM5={16*a.mouse_option}').replace('CUSTOM5=3', f'CUSTOM5={3+16*a.mouse_option}')
     length = 0x400000 if ocs else 0x800000
     env = wc_run.run_env(out, variant=a.variant, SLAVE=str(slave.resolve()),
                          WARP='1', NTSC='0', WINDOW='front', JOY0='none', JOY1='none',
@@ -380,6 +387,51 @@ def main():
             shot('menu-after-esc')
             rows['menu_after_esc'] = True
             (out/'report.json').write_text(json.dumps(rows, indent=2)+'\n')
+            print(json.dumps(rows))
+            return
+        if a.mouse_option:
+            # The mouse option at the start menu. Off: the intro skipped with
+            # Esc; the room hook site keeps the game's bytes, motion leaves the
+            # pointer where it is and the left button selects nothing. A speed:
+            # 2 counts a field for 12 fields move the room position 3/4 of the
+            # speed's quarters in pixels (24 counts, 2 a pixel, times q/4).
+            q = (4, 0, 2, 3, 6, 8, 12, 16)[a.mouse_option]
+            for wait, done in game['intro']:
+                until(h0+wait)
+                cmd('monitor key 45 1' if q == 0 else 'monitor input JOY1_FIRE_BUTTON 1')
+                until(h0+done)
+                cmd('monitor key 45 0' if q == 0 else 'monitor input JOY1_FIRE_BUTTON 0')
+            menu, chosen = game['menu']
+            until(h0+menu); cmd('monitor fields 4'); until(h0+menu)
+            if ocs:
+                sym = json.loads((a.build/'build.json').read_text())['symbols']
+            else:
+                sym = {n: int(o, 16) for o, n in re.findall(r'^([0-9A-F]{8}) (\S+)$', (a.build/'slave.lst').read_text(), re.M)}
+            rows['mouse_speed'] = number(f'*(short*){layout["slave"]+sym["mouse_speed"]:#x}')
+            assert rows['mouse_speed'] == q, rows
+            room_site = 0x2651a if ocs else (0x275be if a.german else 0x273fc)
+            rows['room_site'] = number(f'*(unsigned short*){h0+room_site:#x}')
+            assert (rows['room_site'] == 0x4eb9) == (q != 0), rows
+            start = dict(x=number(f'*(short*){a4+pos:#x}'), y=number(f'*(short*){a4+pos+2:#x}'))
+            shot('menu-before')
+            for _ in range(12):
+                cmd('monitor mouse 2 0'); cmd('monitor fields 1')
+            cmd('monitor fields 10'); until(h0+menu)
+            moved = dict(x=number(f'*(short*){a4+pos:#x}'), y=number(f'*(short*){a4+pos+2:#x}'))
+            shot('menu-moved')
+            rows.update(start=start, moved=moved, expected_dx=3*q)
+            assert moved == dict(x=start['x']+3*q, y=start['y']), rows
+            if q == 0:
+                cmd('monitor input JOY1_FIRE_BUTTON 1'); cmd('monitor fields 3')
+                cmd('monitor input JOY1_FIRE_BUTTON 0')
+                results = []
+                for _ in range(3):
+                    until(h0+menu+10); results.append(number('(short)$d0'))
+                rows['click_results'] = results
+                assert all(r < 0 for r in results), rows
+            (out/'report.json').write_text(json.dumps(dict(complete=True, variant=a.variant, german=a.german,
+                original_mode=a.original_mode, mouse_option=a.mouse_option,
+                slave_sha256=hashlib.sha256(slave.read_bytes()).hexdigest(), **rows), indent=2)+'\n')
             print(json.dumps(rows))
             return
         if not a.direct_flight:
