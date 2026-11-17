@@ -51,8 +51,11 @@ CMD='gdb monitor key 01 1'` and so on). For anything repeatable use the harness 
 | Tool | Does |
 |---|---|
 | `tools/boot.sh` | boots a server (`tools/zanygolf.py serve`): warp, deterministic, nothing in port 0, no window; run options pass through |
-| `tools/route.py STEPS` | drives it: `stop`, `f N`, `key RAW N`, `click N`, `play`, `mouse DX DY N`, `shot`, `prof`, `gdb`; the route `hole1` reaches hole 1 in play (the credits and title, 1, then clicks until frames are shown) |
+| `tools/route.py STEPS` | drives it: `stop`, `f N`, `key RAW N`, `click N`, `press`, `release`, `title`, `play`, `mouse DX DY N`, `shot`, `prof`, `track`, `frametrack`, `gdb`. The route `hole1` reaches hole 1 in play (it waits for the title's state, presses 1, then clicks through the hole's intro and the pause screen); `putt` then plays one putt (`internals.md`, "Game time") |
 | `tools/zanygolf.py frames N [DX DY K]` | counts the frames shown in N fields from the flips of the copper list's plane pointer, optionally moving the mouse every field; no breakpoint, so it works on every CPU, MMU cores included |
+| `tools/zanygolf.py track N FILE` | a line a field for N fields: the field counter, whether a frame was shown, the game clock, the ball's position and velocity; every CPU |
+| `tools/zanygolf.py frametrack N FILE` | a line a frame for N frames, at a breakpoint on the flip: the field counter, the clock and the object table $5c7a-$5d29; not on MMU cores |
+| `tools/thread.py START [END]` | lists the threaded code at `FILE1` offsets as 65xx-style instructions (the primitives read so far by name, the rest with their 68000 body) |
 | `tools/bench.py OUT [FIELDS [DX DY ...]]` | traces FIELDS fields (default 120) in 2-field chunks with the mouse moving and writes `OUT/report.txt`: frame pacing, tiles a frame, cycles by range and a per-frame split |
 | `tools/profile.py TRACE...` | the call-profile reduction the bench uses (below) |
 
@@ -61,9 +64,11 @@ SETUP=a1200-030 tools/boot.sh && python3 tools/route.py hole1
 python3 tools/zanygolf.py frames 240 5 3; python3 tools/zanygolf.py quit
 SETUP=a1200-030 EXTRA_ARGS=--uae_mmu_model=0 tools/boot.sh && python3 tools/route.py hole1
 python3 tools/bench.py tmp/prof/030-move; python3 tools/zanygolf.py quit
+INSTANCE=a500 SETUP=a500 tools/boot.sh && INSTANCE=a500 python3 tools/route.py hole1 putt 'track 900 a500'
 ```
 
-On `a1200-030` the route takes about 20 seconds and the bench about a minute.
+On `a1200-030` the route takes about 20 seconds and the bench about a minute. Instances
+(`INSTANCE`) run side by side, so the machines of a comparison can run at once.
 
 Traps:
 
@@ -86,5 +91,13 @@ Traps:
   is below the interrupts' supervisor stack ($7fff0), so no interrupt frame ever pops;
   `tools/profile.py` keeps one stack per CPU mode. Most game code is threaded and reached
   by `jmp`, so the call tree is flat anyway: the bench reports by address range instead.
-- The click that leaves the pause screen is lost when it comes before the screen takes
-  input, which depends on the machine; `play` clicks until frames are shown.
+- **Frame flips do not tell where the game is.** The title draws frames too, and a key or
+  click that comes before a screen takes input is lost; when that is depends on the
+  machine (the credits take about 1350 fields on `a1200-030` and 2200 on `a500`). The
+  route waits for the state at `FILE1` $0ea8 and the drawing flag at $0ea0 instead
+  (`internals.md`, "Game time"). After the click on the hole's intro the game loads the
+  hole for about 400 fields with interrupts off, and the field counter stops.
+- **Per-frame timers carry the frames drawn before a putt.** Friction applies every fifth
+  frame from the hole's start, so the same putt on two machines takes different paths
+  unless the timer at $5cd2 has the same value at the release; change the hold before
+  the release until it does (37 fields on `a500` against `putt`'s 30 on the 68030).

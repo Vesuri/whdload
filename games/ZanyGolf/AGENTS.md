@@ -18,5 +18,6 @@ Read `docs/open-work.md` first.
 | `docs/internals.md` | how the game loads, every slave patch, the program, display and time, measurements |
 
 The slave source is `src/`. `tools/` is the harness and never ships: `boot.sh`, `route.py`
-(routes into play), `zanygolf.py` (the gdb-stub server, with `frames`), `bench.py` (traced
-benchmark) and `profile.py` ([development.md](docs/development.md), "Harness").
+(routes into play and a putt), `zanygolf.py` (the gdb-stub server, with `frames`, `track` and
+`frametrack`), `bench.py` (traced benchmark), `profile.py` and `thread.py` (a threaded-code
+lister) ([development.md](docs/development.md), "Harness").
