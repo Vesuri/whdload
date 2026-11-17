@@ -375,8 +375,7 @@ _stepped	dc.b	0			;a step ran since $4fd0 last did
 ;   step before and the last, (fields since the step was due + 1)/6 of the way, to the
 ;   nearest pixel, and for the first half the step before's frame of the object, so an
 ;   animation keeps with its moves: the frame, shown from the next field, is a step
-;   behind the world at most; an object whose frame changed by the middle of its frame's
-;   box, between the two frames' middles (.anim);
+;   behind the world at most;
 ; - the course pieces each step draws over the objects, on every pass (.mask);
 ; - while the player points or draws a stroke back ($5e1a 0, $9676 0 or 1, in play):
 ;   the pointer ($5e1c), where the next step will put it by the counts gathered so far
@@ -491,11 +490,7 @@ Present		movem.l	d0-d6/a1-a3,-(sp)
 		LEW	$0f9a(a0),d3
 		bsr	.lerp
 		bcs.b	.onext
-		move.b	IP_PFRAME(a2),d0	;a new frame: the frames' middles
-		cmp.b	$0f1a(a0),d0		;between the steps instead
-		beq.b	.oput
-		bsr	.anim
-.oput		SEW	d5,$0f5a(a0)
+		SEW	d5,$0f5a(a0)
 		SEW	d3,$0f9a(a0)
 		cmp.w	#3,d6			;the frame with the position: the step
 		bcc.b	.onext			;before's for the first half
@@ -692,79 +687,6 @@ Present		movem.l	d0-d6/a1-a3,-(sp)
 		bne.b	.mpiece
 		rts
 
-; An object whose frame changed (a0 it in the table, a2 in the buffer, d0 the step
-; before's frame): d5 and d3 its x and y, the shown frame placed for its middle to be
-; d6/6 of the way between the two frames' middles. The burger of hole 2 grows down from
-; its top, 2 to 5 lines a frame: the change of a frame is then split between its top and
-; its bottom, half each, instead of all at its bottom while its top moves smoothly.
-.anim		movem.l	d1/d7,-(sp)
-		bsr.b	.fmid			;the step before's frame's middle
-		move.w	d4,d1
-		move.w	d5,d7
-		move.b	$0f1a(a0),d0
-		bsr.b	.fmid			;the last's
-		move.w	d5,-(sp)
-		move.w	d4,d5
-		move.w	d1,d4
-		LEW	(a2),d0
-		LEW	$0f5a(a0),d3
-		bsr.b	.half
-		move.w	d3,d1
-		move.w	d7,d4
-		move.w	(sp)+,d5
-		LEW	64(a2),d0
-		LEW	$0f9a(a0),d3
-		bsr.b	.half
-		move.w	d1,d5
-		movem.l	(sp)+,d1/d7
-		rts
-
-; d0 the frame of the object a0: d4 and d5 the middle of its frame's box, x and y, from
-; the position in half pixels (as Frame and NewShape find the record: x from byte 0 and
-; the width, y from the first line, byte 2, and the rows). d0, a3.
-.fmid		LEW	$109a(a0),d4		;the shape set
-		swap	d4
-		LEW	$105a(a0),d4
-		lea	(a4,d4.l),a3
-		moveq	#0,d4
-		move.b	$0eda(a0),d4
-		lsl.w	#3,d4
-		move.w	(a3,d4.w),d4		;the shape's frames
-		ror.w	#8,d4
-		and.w	#$ff,d0
-		add.w	d0,d0
-		add.w	d0,d4
-		move.w	(a3,d4.w),d4		;the frame's record
-		ror.w	#8,d4
-		adda.w	d4,a3
-		moveq	#0,d0
-		moveq	#0,d4
-		move.b	(a3),d4
-		add.w	d4,d4
-		move.b	4(a3),d0
-		add.w	d0,d4
-		move.b	2(a3),d5
-		ext.w	d5
-		add.w	d5,d5
-		move.b	6(a3),d0
-		add.w	d0,d5
-		rts
-
-; d0 the step before's position, d3 the last's, d4 and d5 their frames' middles (half
-; pixels): d3 where the shown frame goes (the step before's for d6 below 3).
-.half		add.w	d0,d0
-		add.w	d4,d0
-		move.w	d0,d2
-		add.w	d3,d3
-		add.w	d5,d3
-		cmp.w	#3,d6
-		bcc.b	.hcur
-		move.w	d4,d5
-.hcur		bsr.b	.lerpn
-		sub.w	d5,d3
-		asr.w	#1,d3
-		rts
-
 ; d2 the step before's, d3 the last's: d3 d6/6 of the way, to the nearest pixel (a
 ; half away from 0, so a pixel's move comes at d6 3, with the frame). Carry set: a cut.
 .lerp		sub.w	d2,d3
@@ -774,7 +696,7 @@ Present		movem.l	d0-d6/a1-a3,-(sp)
 		neg.w	d4
 .lpos		cmp.w	#IP_JUMP,d4
 		bhi.b	.cut
-.lmul		muls	d6,d3
+		muls	d6,d3
 		add.w	d3,d3
 		bmi.b	.lneg
 		addq.w	#6,d3
@@ -786,9 +708,6 @@ Present		movem.l	d0-d6/a1-a3,-(sp)
 		rts
 .cut		ori	#1,ccr
 		rts
-
-.lerpn		sub.w	d2,d3			;the same without the cut
-		bra.b	.lmul
 
 ; After a draw-only pass (DrawOnly, native from primitive $0138): the world's state
 ; back, then on to the thread's JMP $5232.
