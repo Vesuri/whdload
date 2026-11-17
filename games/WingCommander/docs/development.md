@@ -4697,6 +4697,27 @@ Both live runs pass in `tmp/title-{ocs,cd32}-live/report.json`, with two PNG
 captures each. The existing OCS launcher builds these changes automatically.
 
 
+### Player bolts' near plane
+
+`src/near_plane.s` ([internals](internals.md#player-bolts-near-plane-both-release-builds)):
+
+```sh
+. ../../common/env.sh
+python3 tools/near_plane_check.py tmp/build/release/WingCommanderCD32 --output tmp/near-check
+python3 tools/near_plane_check.py tmp/build/release/WingCommanderCD32 --german --output tmp/near-check-de
+python3 tools/near_plane_check.py tmp/build/release/WingCommander --variant ocs --output tmp/near-check-ocs
+python3 tools/flight_fixture.py --release --output tmp/fx-gimle
+python3 tools/near_plane_live_check.py tmp/fx-gimle --output tmp/near-live
+python3 tools/near_plane_live_check.py tmp/fx-gimle --original-mode --output tmp/near-live-orig
+```
+
+The three native runs are part of `make check`. The live run boots the
+direct-flight fixture into the first Gimle mission (`CUSTOM2=2 CUSTOM3=4
+CUSTOM4=0`), fires the neutron gun and the mass driver with Space (G between
+them), and stops at the draw-list build of each picture until the burst's bolt
+is projected; `--original-mode` is the control.
+
+
 ### Rotated bitmaps: centred tables
 
 The rotate/scale renderers with `src/rotation.s`

@@ -4339,6 +4339,48 @@ no new live flight capture or exact PC-screen pixel equivalence is claimed.
 The small code increase moves the OCS intro-stop drain beyond a short branch's
 range; that call now uses a 68000-safe local anchor plus long offset.
 
+## Player bolts' near plane (both release builds)
+
+The projection (CD32 `E:2a086`, OCS `O:290fa`, file `2a0b2` / `29126`) culls a
+slot until its distance and its camera-space forward distance pass the near
+plane, 256 times the word at A4+`7030` (OCS A4+`4868`). Each view change sets
+that word to the radius of the ship the view belongs to, at least 10 (`E:713e`,
+`O:6eb4`): 100 in the Hornet, 180 in the first Gimle mission's ship. Player
+bolts leave their gun mounts inside that radius, so a wide ship's bolts stayed
+hidden for several fields of their travel and first appeared well inside the
+screen, while a Hornet's appear at the canopy edges. It is the ship, not the
+gun: measured live in the first Gimle mission, the neutron gun's mounts are
+at forward distance 10240 and lateral ±23040, the mass drivers' at 0 and
+±30720, and both bolts were hidden until past 46080. Original mode shows them
+later still, since it draws only completed world steps.
+
+With the enhanced framerate, `src/near_plane.s` replaces the word's load at
+both near tests (CD32 `E:2a166` and `E:2a1b0`, OCS `O:291da` and `O:29224`:
+`moveq #0,d0; move.w near(a4),d0`, 6 bytes). In the forward view, outside
+the intro, the player's own cannon bolts (class 8, shooter slot 0) take at
+most the Hornet's plane, 100. Every other object, the other views and the
+intro keep the native plane, and so does a ship whose plane is 100 or less.
+The distance, cone and scale tests are unchanged; the closest bolts are
+drawn larger, within the native scale cap (8192), which the renderer's clip
+handles (rotated bitmaps below).
+
+How it is checked:
+- **Native.** `tools/near_plane_check.py` runs each site's patched 6 bytes in
+  the game's memory with the release slave loaded, CD32 English and German on
+  the 68020 and 68040 models, OCS on the 68000 and 68020: the player's bolt,
+  planes of 400, 180, 100, 60 and 10, enemy bolts, ships, missiles, effects,
+  the left and external views and the intro, 13 cases a site. d0 must be the
+  expected plane, zero-extended, with every other register kept. The same
+  sites with the native bytes are the control: the player's bolt keeps 180.
+- **Live.** `tools/near_plane_live_check.py` (CD32 English) fires the neutron
+  gun and then the mass driver in the first Gimle mission and reads, at the
+  first picture that projects each burst's bolt, its forward distance. On
+  17.11.2026, enhanced: neutron 29142, mass driver 27742 (the Hornet's plane is
+  25600). The control in original mode: 81183 and 60404, past the ship's 46080.
+  In the screenshots the mass driver now enters from the canopy edges and the
+  neutron gun from about a fifth of the width in (before: about a quarter). The OCS hook has no
+  live run.
+
 ## Cannon spawn: first-interval prediction hold
 
 The enhanced English release now predicts newly constructed projectiles in their

@@ -72,6 +72,7 @@ waypoint_original_install:
         lines.insert(-1,unit(root, 'view_regions', v.CPU))
         if variant == 'cd32':
             lines.insert(-1,(root/'src/rotation.s').read_text())
+            lines.insert(-1,(root/'src/near_plane.s').read_text())
         lines.insert(-1,(root/'src/cinematic_background.s').read_text().replace(
             '        CINEMATIC_DRAW','        movea.l timing_game(pc),a0\n        jmp E_2efe8(a0)'))
     if buffered:lines += [' bsr.w opening_guard',' bsr.w modal_guard']

@@ -55,6 +55,9 @@ ROTATION=((0x2d134,'rot_setup',0x4eb9),
           (0x2de78,'rot_row_end',0x4eb9),
           (0x2ded2,'rot_shear_clip',0x4eb9),
           (0x2deec,'rot_origin_clip',0x4eb9))    # 8 bytes: returns past 2def2
+# Player bolts' near plane (src/near_plane.s with NEAR_OCS), public builds,
+# enhanced only: the projection O:290fa's two near tests, as CD32's.
+NEAR=((0x291da,'near_plane',0x4eb9),(0x29224,'near_plane',0x4eb9))
 # The TrainSim enemy details (modal_source.py modal_info_native sets the flag
 # around each pass's publish): conversions while it is set use the changed-block
 # adapter; any other conversion, or one the adapter refuses, drops both
@@ -129,7 +132,7 @@ def build(out,option,exit_probe=False,changed="off", clock=False, prediction=Fal
         from ocs_intro_source import NATIVE as intro_native, HOOKS as intro_hooks
         native.update(intro_native);hooks+=intro_hooks
     if public:
-        hooks+=MOUSE+ROTATION
+        hooks+=MOUSE+ROTATION+NEAR
         native.update(ROTATION_NATIVE)
         hooks+=tuple((off,'cinematic_background',0x4eb9) for off in (0x1d0f2,0x1d10e,0x1d222,0x1d23e))
         native['OCS_CINEMATIC_DRAW']=0x2f9a6
@@ -550,6 +553,7 @@ ocs_mouse_params:
         text+=(ROOT/'src/cinematic_background.s').read_text().replace(
             '        CINEMATIC_DRAW','        jmp OCS_CINEMATIC_DRAW')
         text+='\nROT_OCS = 1\n'+(ROOT/'src/rotation.s').read_text()
+        text+='\nNEAR_OCS = 1\n'+(ROOT/'src/near_plane.s').read_text()
     if public:
         # The enlarged payload needs a long address calculation for this call.
         text+=modal_source(ROOT,'ocs').replace('        bsr.w timing_rate', '        lea modal_room_begin(pc),a0\n        adda.l #timing_rate-modal_room_begin,a0\n        jsr (a0)')

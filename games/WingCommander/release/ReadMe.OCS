@@ -137,6 +137,8 @@
  - Enhanced framerate: the ship on the TrainSim enemy details screen turns
    smoothly, and the screen no longer slows down while the details appear (on
    the disk edition, with a 68020 or better and Fast memory).
+ - Enhanced framerate: cannon fire from ships wider than the Hornet shows from
+   the guns, as the Hornet's does, instead of appearing well inside the screen.
  - Disk edition: faster arithmetic and collision checks in every mode, including
    the Amiga 500, without changing game behaviour.
  - Enhanced framerate at 1.0x world speed and caches enabled in newly

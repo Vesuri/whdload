@@ -2,6 +2,13 @@
 
 ## Current state
 
+With the enhanced framerate the player's cannon bolts use at most the
+Hornet's near plane in both variants, so on ships wider than the Hornet they
+show from the guns instead of appearing well inside the screen (UR5). Native
+checks pass on both variants and the live CD32 check in the first Gimle
+mission; a user look is pending. See
+[near plane](internals.md#player-bolts-near-plane-both-release-builds).
+
 The TrainSim enemy details screen now draws a picture between its passes from
 pass 30 on, in both enhanced variants: 2 pictures per 3 PAL fields instead of 1,
 with unchanged timing. Both also convert the passes with a changed-block
@@ -1078,9 +1085,14 @@ Firing and mouse:
   click and hold. Fixed: in flight the left button now fires while held (the
   game's one-button scheme made a hold alone the modifier; internals, "Left
   button in flight"). Checked natively on both variants and live on CD32. U:
-  shooting feels laggy on later ships (mass drivers). Open. Enhanced fire is
-  committed on world ticks only (up to 100 ms at 1.0x); the Rapier, Scimitar
-  and Raptor cockpits are not checked live.
+  shooting feels laggy on later ships (mass drivers). The user found nothing
+  sluggish in the first Gimle mission except where the bolts appear: well
+  inside the screen instead of at its edges. Fixed with the enhanced
+  framerate: the projection hid anything nearer than the ship's own radius
+  (180 there, 100 in the Hornet), and the player's bolts now use at most the
+  Hornet's (internals, "Player bolts' near plane"). Checked natively on both
+  variants and live on CD32; a user look is pending. Enhanced fire is still
+  committed on world ticks only (up to 100 ms at 1.0x).
 - **UR6 (H): flight pointer briefly over the HUD or past the edges** when moved
   fast, especially vertically; positioning less accurate than H's. Open. A
   likely cause is the masked image and the sprite position updating a field

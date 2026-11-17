@@ -89,4 +89,7 @@ BUFFERED_HOOKS = (
     (0x2e556, 'rot_row_end', 0x4eb9),
     (0x2e5ac, 'rot_shear_clip', 0x4eb9),
     (0x2e5c6, 'rot_origin_clip', 0x4eb9),
+    # Player bolts' near plane (src/near_plane.s): both projection tests.
+    (0x2a166, 'near_plane', 0x4eb9),
+    (0x2a1b0, 'near_plane', 0x4eb9),
 )
