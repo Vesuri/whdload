@@ -72,6 +72,7 @@ HIDE_GAP = 25                   ; fields without one before the pointer hides
 IDLE_GAP = 500                  ; fields without motion before it hides (10 s PAL)
 POINTER_SPRITE = 7              ; odd: its colour bank leaves sprites 0-6 alone
 SPRITE_BANK = 12                ; sprite colours from 192: sprite 7 colour 3 is 207
+BANKS = SPRITE_BANK<<4!SPRITE_BANK ; BPLCON4's ESPRM and OSPRM
 MASK_STRIDE = 44                ; bytes per mask row: a pad byte, 40, three pad bytes
 MASK_SIZE = 200*MASK_STRIDE     ; the aperture's rows at most
 STAGE = SS_SIZE+MASK_SIZE       ; stick_ss offset: the next image's control words and lines
@@ -966,6 +967,7 @@ mouse_esc:
 ; Hide the flight pointer by clearing its image's control words, with no
 ; library call. Keeps every register.
 stick_hide:
+        bsr.w   stick_unbank
         movem.l d0/a0,-(sp)
         lea     stick_shown(pc),a0
         clr.w   (a0)
@@ -1156,12 +1158,51 @@ stick_commit:
         rts
 
 ; CD32: the sprites' colour banks in each of the game's two flight copper
-; lists (their BPLCON4 move, found once per list). OCS has no bank (0). Both
-; ESPRM and OSPRM: a real A1200 takes sprite 7's bank from ESPRM (bits 7-4),
-; the AGA documentation and FS-UAE from OSPRM (bits 3-0). No even sprite
-; shows in flight.
+; lists (their BPLCON4 move, found once per list) while the pointer shows;
+; stick_unbank puts the game's back. OCS has no bank (0). Both ESPRM and
+; OSPRM: a real A1200 takes sprite 7's bank from ESPRM (bits 7-4) and sprite
+; 2's from OSPRM, the AGA documentation and FS-UAE the other way round. No
+; even sprite shows in flight; the rooms show the same lists, with the room
+; pointer as sprite 2.
 ; a4 = game A4; uses d0-d3/a0-a2.
 BANK_SEARCH = 1024              ; copper moves searched for BPLCON4
+
+; Hiding the pointer: each flight list's BPLCON4 byte that stick_bank set
+; gets the game's back, so the rooms' pointer keeps its colours. A list the
+; game has replaced since, or whose byte it has changed, is left alone.
+; Keeps every register.
+stick_unbank:
+        movem.l d0-d2/a0-a2,-(sp)
+        movea.l mouse_params(pc),a1
+        move.w  MP_COPPER(a1),d0
+        beq.s   .done
+        move.l  mouse_a4(pc),d1
+        beq.s   .done
+        movea.l d1,a1
+        lea     (a1,d0.w),a1            ; the game's two cprlist pointers
+        lea     bank_lists(pc),a2
+        moveq   #2-1,d1
+.list:
+        move.l  (a1)+,d0
+        beq.s   .next
+        movea.l d0,a0
+        move.l  4(a0),d0
+        beq.s   .next
+        cmp.l   (a2),d0
+        bne.s   .next
+        movea.l d0,a0
+        move.w  4(a2),d2
+        cmpi.w  #$010c,(a0,d2.w)
+        bne.s   .next
+        cmpi.b  #BANKS,3(a0,d2.w)
+        bne.s   .next
+        move.b  6(a2),3(a0,d2.w)
+.next:
+        addq.l  #8,a2
+        dbf     d1,.list
+.done:
+        movem.l (sp)+,d0-d2/a0-a2
+        rts
     ifd BANK_DIAG
 stick_bank:
         DIAGINC D_CALLS
@@ -1258,7 +1299,11 @@ stick_bank:
         move.l  a0,(a2)
         move.w  d2,4(a2)
 .set:
-        move.b  #SPRITE_BANK<<4!SPRITE_BANK,3(a0,d2.w)
+        move.b  3(a0,d2.w),d0
+        cmpi.b  #BANKS,d0
+        beq.s   .next                   ; still ours
+        move.b  d0,6(a2)                ; the game's, for stick_unbank
+        move.b  #BANKS,3(a0,d2.w)
 .next:
         addq.l  #8,a2
         dbf     d1,.list
@@ -1448,7 +1493,7 @@ stick_image:    dc.l 0                  ; Chip pointer image, 0 without one
 stick_ss:       dc.l 0                  ; SimpleSprite, then the mask
 stick_gfx:      dc.l 0                  ; GfxBase
 mouse_scan_native: dc.l 0               ; H0 aperture scan
-bank_lists:     dc.l 0,0,0,0            ; per copper list: start, BPLCON4 offset
+bank_lists:     dc.l 0,0,0,0            ; per copper list: start, BPLCON4 offset, game's byte
     ifd BANK_DIAG
 diag_buf:       dc.l 0
 diag_shown:     dc.w 0                  ; VBLs with the pointer shown

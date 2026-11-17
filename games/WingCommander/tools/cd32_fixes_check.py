@@ -803,10 +803,15 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         assert struct.unpack('>H', m.read(new+6, 2))[0] == 0x00cc
         out['colour_bank'] = 'pass'
         # The stick or keys steer: re-centred, pointer hidden, native ramps.
+        # Hidden, the list has the game's bank again (the rooms show the same
+        # lists, with their pointer as an even sprite); shown, ours.
+        con4 = lambda: struct.unpack('>H', m.read(new+6, 2))[0]
         tick(); assert steer((0, -9), (0, 1, 0, 0, 0)) == ((0, 1), []) and not shown()
+        assert con4() == 0x0011, 'bank kept with the pointer hidden'
         ptr.centre()
         tick(); assert steer((0, 0)) == ((0, 0), []), 'not re-centred'
         ev(-80, 0); tick(); assert steer() == want() and want()[0] == (0, -2) and shown()
+        assert con4() == 0x00cc
         # The modifier routes the stick to throttle and roll: the mouse still steers.
         ev(80, 80); tick()
         assert steer(flags=(1, 0, 0, 0, 1)) == want() and want()[0] == (-5, 0)
@@ -827,6 +832,7 @@ def steer_cases(cfg, psy, fixed, blob, sy):
             tick(); assert steer() == ((0, 5), [])
         assert shown()
         tick(); assert not shown(), 'idle pointer not hidden'
+        assert con4() == 0x0011, 'bank kept with the idle pointer hidden'
         tick(); assert steer() == ((0, 5), []) and not shown(), 'idle pointer shown again'
         ev(1, 0); tick(); assert steer() == want(), 'pointer not shown on motion'
         out['idle'] = 'pass'
@@ -970,7 +976,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path)
     p.add_argument('--output', required=True, type=Path)
-    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored', 'roll-native', 'return-ignored', 'esc-ignored', 'speed-ignored', 'stage-ignored'),
+    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored', 'roll-native', 'return-ignored', 'esc-ignored', 'speed-ignored', 'stage-ignored', 'unbank-ignored'),
                    help='negative control: the check must fail')
     a = p.parse_args()
     out = a.output.resolve()
@@ -1013,6 +1019,10 @@ def main():
         elif a.sabotage == 'speed-ignored':  # every option gives the normal speed
             at = blob.index(bytes.fromhex('0400020306080c10'), sy['mouse_option'])
             blob[at:at+8] = bytes([4]*8)
+        elif a.sabotage == 'unbank-ignored':  # hiding keeps our bank in the lists
+            at = sy['stick_hide']
+            assert blob[at:at+2] == bytes.fromhex('6100'), blob[at:at+4].hex()   # bsr.w stick_unbank
+            blob[at:at+4] = bytes.fromhex('4e714e71')
         elif a.sabotage == 'stage-ignored':  # the lines straight to the Chip image, as before UR6
             at = blob.index(bytes.fromhex('43ed2270'), sy['stick_show'])   # lea STAGE+4(a5),a1
             blob[at:at+4] = bytes.fromhex('43eb0004')                   # lea 4(a3),a1

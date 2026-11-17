@@ -275,6 +275,16 @@ def main():
         assert r[4]['sprite'] == (0-5, 0-4) and r[4]['drawn'] == 0, r[4]
         assert r[5]['sprite'] == (220-5, 0-4) and r[5]['drawn'] == 0, r[5]
         assert r[6]['sprite'] == (220-5, top) and r[6]['drawn'] > 0 and r[6]['pitch'] == 9, r[6]
+        if copper:
+            # Idle for 10 s: the pointer hides and both lists get the game's
+            # BPLCON4 back (the rooms show them, with an even-sprite pointer).
+            # Read directly: the flight may end meanwhile, which hides it too.
+            cmd('monitor fields 520', 120)
+            lists = sb+sym['bank_lists']
+            hidden = dict(motion='idle', control=number(f'*(int*){var("stick_image", "int"):#x}'),
+                          bplcon4=[number(f'*(unsigned short*)(*(int*){lists+8*i:#x}+*(short*){lists+8*i+4:#x}+2)') for i in range(2)])
+            rows.append(hidden)
+            assert hidden['control'] == 0 and all(v & 0xff == 0x11 for v in hidden['bplcon4']), hidden
         return rows
 
     def bank_diag(var, state):

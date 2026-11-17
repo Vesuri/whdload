@@ -9217,8 +9217,15 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   after the colour loads) and searches again when a list changes. Both,
   because a real A1200 takes sprite 7's bank from ESPRM (bits 7–4), where the
   AGA documentation and FS-UAE (`drawing.cpp`, `sbasecol[1]` for the higher
-  sprite of a pair) take it from OSPRM (bits 3–0). No even sprite shows in
-  flight; the room and Intuition pointers keep bank 16 in the rooms.
+  sprite of a pair) take it from OSPRM (bits 3–0). The A1200's room pointer
+  (sprite 2) kept its colours with only OSPRM changed, so there the even
+  sprites take OSPRM: the two fields are the other way round from the
+  documentation. No even sprite shows in flight, but the rooms show the same
+  two lists with their pointer as sprite 2 (it was green in the bar after a
+  flight with both fields set). So the slave sets the banks only while the
+  pointer shows: `stick_bank` keeps each list's byte as the game set it, and
+  `stick_unbank`, from `stick_hide` (the flight's end, a pause, the stick, 10 s
+  idle), puts it back where the list is still the game's and still has ours.
   The pointer's colour on screen was (243,255,235) in the first mission of
   systems 1, 2, 4, 6, 9 and 12 too (2026-11-17, `--direct-flight --system`;
   all six had the 320×105 aperture). On the user's real Amiga (with an Indivision) the pointer
