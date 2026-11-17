@@ -30,6 +30,7 @@ The loader, first hunk:
 | Offset | Original | Patch | Why |
 |---|---|---|---|
 | $1f38 | `move.w #300,d0; dbf d0,*` (the keyboard handshake delay, a CPU loop) | `nop; jsr FixKey` | a delay on the beam, and the trainer |
+| $14a4 | the flip's `move.w d0,$2312(a4); move.w #$8000,d0` | `jsr FrameCap; nop` | ours: at most one frame each 6 fields ("Game time") |
 
 `FixKey` decodes the raw key the game pushed at $1f20 (from 4(sp)). On F10 ($59) it writes 9
 to $15ca2 (`FILE1` $5ca2), the strokes left. Then it
@@ -168,6 +169,25 @@ from the putt's third frame on the A500 lost speed at different frames. Holding 
 button 37 or 40 fields instead of 30 put the A500's timer in phase. Then the A500's object
 table matched the 68030's at every frame except $5d12, which differed by a constant $80
 gathered at rest before the putt, and the ball came to rest at 154, 229.
+
+**With the frame cap** (ours, `FrameCap` at the flip): before flipping, the renderer waits
+until 6 fields have passed since the previous flip, by the game's counter. The counter
+advances at the copper interrupt at line $90, after the copper has loaded the field's plane
+pointers, so the new frame shows from the top of the next field while the renderer starts
+on the old buffer above the beam. A frame that took longer flips at once; with the
+interrupts off it never waits. The same putt, 17.11.2026 (rest positions move by a pixel
+or two with the friction timer's phase, which the cap shifts):
+
+| Machine | WHDLoad option | Fields between flips | Game speed |
+|---|---|---|---:|
+| `a500` | | 6.25 (6 x100, 7 x41, 8 x1) | 0.96x, as before |
+| `a1200` | | 6.02 (6 x147, one 5, one 7) | 1.00x |
+| `a1200-030`, no MMU model | | 6 x149 | 1.00x |
+| `a1200-030`, no MMU model | `CACHE` | 6 x149 | 1.00x |
+
+With the pointer moving (`frames 240 5 3`), the `a1200-030` preset shows 10.00 frames a
+second, every flip 6 fields apart, and the `a500` 9.50 with this slave and with the
+original alike.
 
 **The intended speed is 10 frames a second at NTSC**, 6 fields a frame: that is what the
 game takes a frame to be. The stock NTSC A500 comes close and stays below it: hole 1 draws

@@ -1,7 +1,7 @@
 # Open work
 
 `src/ZanyGolf.asm` is Bored Seal's v1.1 source with three encoding edits that make the
-build byte-identical to the shipped slave (`development.md`). No slave change yet. The
+build byte-identical to the shipped slave (`development.md`), and since then a frame cap. The
 first analysis is done (17.11.2026, `internals.md`, "The program" to "Measurements"): the
 game runs entirely in chip RAM with the caches off, and redraws all 800 tiles of the view
 with byte copies every frame. On `a1200-030` that is 13.75 frames a second (NTSC); the
@@ -9,41 +9,36 @@ renderer takes two thirds of a frame and the threaded-code interpreter most of t
 
 Game time is confirmed (17.11.2026, `internals.md`, "Game time"): the world advances one
 fixed step a drawn frame, and the game counts that step as 6 fields, so the intended speed
-is 10 frames a second at NTSC. Nothing limits the frame rate. The stock A500 plays at 0.96x
-in the measured putt (0.90x with the view scrolling), an A1200 at 1.24x and a 68030/50 at
-1.38x. Every speed-up so far planned makes the game faster, not smoother: `CACHE` alone
-takes the 68030 to 2.11x.
+is 10 frames a second at NTSC. The original has no limit, so an A1200 played at 1.24x and a
+68030/50 at 1.38x (2.11x with `CACHE`). The slave now caps the frame rate (`FrameCap`): 10
+frames a second exactly on every machine tried that draws faster, the A500 unchanged at
+0.96x.
 
 ## Next
 
-1. **The time model** (the user's decision; it gates items 2 to 4). The candidates:
-   - *A frame cap*: start a frame's draw no sooner than 6 fields after the previous one.
-     The intended speed exactly on every machine that draws faster than 10 frames a
-     second; the A500 unchanged (it never waits). The simplest change and faithful to the
-     original, but a faster renderer then buys idle time, not smoothness.
-   - *A cap plus catch-up on slow machines*: when a frame took more than 6 fields, run
-     world-only passes until game time catches up. The main loop already skips the draw
-     while the flag at $0ea0 is clear, but the clock then counts real fields, so the
-     passes need their own switch. That would bring the A500 to 1.00x. It needs the cost
-     of a world-only pass on the 68000 (not measured yet), and input applied once.
-   - *10 steps a second, presented at the display rate*: draw extra frames between steps
-     with the ball, scroll and animations interpolated. Smooth on fast machines, the
-     original physics untouched. It needs every moving thing's state found and the
-     renderer fast enough for more than 10 frames a second (21 with `CACHE` on the 68030
-     already).
-   - *A finer step* (3 or 2 fields, 20 or 30 steps a second) on fast CPUs: rescale every
-     per-frame quantity in the translated 65816 code: the position update, friction every
-     fifth frame (`internals.md`), the $5d12 accumulator, the clock's 6, collisions,
-     slopes and the obstacles' timing. The most work and a change of feel to verify in
-     play; the 68000 keeps the native step.
-   Acceptance for any of them: the putt (`tools/route.py hole1 putt`, with the friction
-   timer in phase, `internals.md`) still takes 44 steps and comes to rest at 154, 229, and
-   wherever the machine is fast enough it lasts 44 x 6 = 264 fields, within a frame.
-2. **The caches** (the user's decision, after item 1). Enabling the instruction cache for
-   BaseMem in the slave (`resload_SetCACR`) gives 55 % more frames on a 68030 (13.5 to
+1. **Separate the simulation from the frame rate** (decided 17.11.2026): keep the world at
+   10 steps a second and draw as many frames as the machine manages between steps, at most
+   one a field, with the moving things interpolated between the last two steps. What is
+   needed, in order:
+   - the pass split: a pass now draws, then updates the world. Steps must run every 6
+     fields by the counter (as the cap does now), and the passes between draw only. The
+     drawing flag at $0ea0 cannot be the switch (clearing it also makes the clock count
+     real fields); find where the draw and the world update can be called apart.
+   - the presented state: the view position ($0e9c/$0e9e, the fine scroll), the ball
+     (object table at $5c7a), the other objects the shape drawer ($16f2) draws, and the
+     animations the clock drives. Each needs its previous and current step kept, and the
+     renderer drawing from interpolated copies without the world seeing them.
+   - what may not be interpolated: cuts (a new hole, the ball sunk or reset), and
+     anything drawn into the tile map.
+   - cost: on the 68030 a frame takes 2.84 fields with `CACHE` and 4.4 without, so without
+     items 2 to 4 this gives about 2 frames a step at best; the renderer work (item 3) is
+     what turns it into one frame a field.
+   Acceptance: the putt's world steps as now (44 steps, 264 fields), and presented frames
+   at most one a field, each between the two steps around it.
+2. **The caches** (the user's decision). They no longer change the game's speed, now that
+   the frame rate is capped. Enabling the instruction cache for BaseMem in the slave (`resload_SetCACR`) gives 55 % more frames on a 68030 (13.5 to
    21.0) and helps a 68020 too (not measured yet); the alternative is a ReadMe
-   recommendation of WHDLoad's `Cache`. Either one, without item 1, runs the game at 2.1x
-   on a 68030. The data cache does nothing for chip RAM on hardware.
+   recommendation of WHDLoad's `Cache`. The data cache does nothing for chip RAM on hardware.
 3. **The renderer**, two thirds of a frame. Candidates, to price one at a time with the
    bench:
    - draw only the tiles that differ from what the back buffer holds (it was drawn two

@@ -26,12 +26,17 @@ anything else.
 
 ## Build
 
-`make slave` builds a slave byte-identical to the shipped one (`release/slaves.sha256` holds
-the shipped hash). The shipped slave was assembled with optimisations: PC-relative `lea` and
+The source was first made to build byte-identical to the shipped slave (SHA-256 above),
+before any change of ours; `SLAVE=original` runs the shipped one, and
+`release/slaves.sha256` holds the hash of the current build. The shipped slave was
+assembled with optimisations: PC-relative `lea` and
 `pea` for labels (so no relocation hunk), short branches, `moveq` for `clr.l`, `abs.w` for
 `4` and `TDREASON_WRONGVER`. game.conf therefore leaves out `-devpac` (which turns vasm's
 optimisations off) and adds `-pic`, so any relocation fails the build. Three edits to the
 source, each commented in place, cover the rest:
+
+These edits keep Bored Seal's code assembling as it shipped; new code follows them (`-pic`
+holds for it too).
 
 - `opt o4-`: vasm would turn `move.l #65536,d0` into `moveq #1,d0; swap d0`, which the
   shipped slave does not.

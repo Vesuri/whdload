@@ -76,8 +76,42 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		pea	FixKey
 		move.l	(sp)+,$1f3c(a3)
 
+		move.w	#$4eb9,$14a4(a3)	;the renderer's flip: at most one frame
+		pea	FrameCap		;each FRAME_FIELDS fields
+		move.l	(sp)+,$14a6(a3)
+		move.w	#$4e71,$14aa(a3)
+
 		movem.l	(sp)+,d0-d7/a0-a6
 		jmp	(a3)
+
+; The game advances its world one step a drawn frame and counts the step as 6 fields
+; (10 frames a second at NTSC), with nothing to limit the frame rate, so a fast machine
+; played it fast. Replaces the flip's first two instructions (FILE1 $14a4: the fine scroll
+; into the copper list, and d0 = $8000) and first waits until FRAME_FIELDS fields have
+; passed since the previous flip, by the game's field counter (FILE1 $145c, low byte). The
+; counter advances at the copper interrupt (line $90), after the copper has loaded the
+; field's plane pointers, so a flip there shows from the top of the next field. A frame
+; that took longer does not wait. No wait while the interrupts are off (the counter would
+; not move). a4 is FILE1's base here.
+FRAME_FIELDS	= 6
+FrameCap	move.w	d0,$2312(a4)		;displaced: the fine scroll
+		movem.l	d1/a0,-(sp)
+		lea	(_lastflip,pc),a0
+		move.w	$dff01c,d1		;INTENAR: master, COPER and VERTB on?
+		and.w	#$4030,d1
+		cmp.w	#$4030,d1
+		bne.b	.go
+.wait		move.b	$145c(a4),d1
+		sub.b	(a0),d1
+		cmp.b	#FRAME_FIELDS,d1
+		bcs.b	.wait
+.go		move.b	$145c(a4),(a0)
+		movem.l	(sp)+,d1/a0
+		move.w	#$8000,d0		;displaced
+		rts
+
+_lastflip	dc.b	0
+		even
 
 FixKey		move.w	4(sp),d0
 		ror.b	#1,d0

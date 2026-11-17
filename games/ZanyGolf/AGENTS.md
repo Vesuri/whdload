@@ -1,7 +1,8 @@
 # Zany Golf
 
 Electronic Arts' Zany Golf (1988, by Will Harvey) under WHDLoad. The slave is Bored Seal's
-v1.1 (23-Jul-2006; v1.0 05-Aug-2000), an OSEmu slave, unchanged so far. The original slave
+v1.1 (23-Jul-2006; v1.0 05-Aug-2000), an OSEmu slave, with a frame cap added (10 frames a
+second at most, the game's intended speed). The original slave
 is by Bored Seal (game.conf `AUTHOR`, `UPSTREAM`): neither JOTD's nor StingRay's repository
 holds it, so `src/ZanyGolf.asm` is the source from the whdload.de install package
 (`ZanyGolfHD/src/ZanyGolf.asm`). The ReadMe also thanks Jan Vieten for the disk image and
@@ -14,7 +15,7 @@ Read `docs/open-work.md` first.
 | Doc | Read it for |
 |---|---|
 | `docs/open-work.md` | where the work stands and the ordered next items |
-| `docs/development.md` | what differs from the shared workflow: inputs, the byte-identical build, the harness and its traps |
+| `docs/development.md` | what differs from the shared workflow: inputs, the build, the harness and its traps |
 | `docs/internals.md` | how the game loads, every slave patch, the program, display and time, measurements |
 
 The slave source is `src/`. `tools/` is the harness and never ships: `boot.sh`, `route.py`
