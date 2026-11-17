@@ -9284,8 +9284,9 @@ How it is checked:
   commit, which then changes the lines and the position together (the
   MoveSprite stand-in writes its x, y as the control words).
   Psygore's list alone is the control (the mouse does not steer);
-  `--sabotage steer-ignored`, `mask-ignored` and `stage-ignored` (the lines
-  straight to the Chip image, as before UR6) must fail.
+  `--sabotage steer-ignored`, `mask-ignored`, `stage-ignored` (the lines
+  straight to the Chip image, as before UR6) and `unbank-ignored` (the banks
+  kept with the pointer hidden) must fail.
 - **OCS, native.** `tools/ocs_options_check.py` runs the same controller and
   mask scenario on the 68000 model after both installs.
 - **Live.** `tools/mouse_live_check.py --flight` enters the simulator flight
