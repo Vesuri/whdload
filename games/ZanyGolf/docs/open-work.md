@@ -33,7 +33,8 @@ rest the sprite covers the same pixels as the game's shape on every hole.
 
 The frames between the steps are interpolated (17.11.2026, `internals.md`, "Game time"):
 the view and the objects are drawn between the last two steps, a step behind the world at
-most, with each object's animation frame switched halfway; the course pieces drawn over
+most, with each object's animation frame switched halfway and, when its frame changes, its
+frame's middle interpolated, so a growing frame (the hamburger) jumps half at each end; the course pieces drawn over
 the ball are drawn in every frame, not only the first after a step; while the player
 points or draws a stroke back, the frames draw what the next step will make of the
 pointer's predicted point (the scroll, the aiming line), so they move with the sprite. The
