@@ -375,8 +375,8 @@ _stepped	dc.b	0			;a step ran since $4fd0 last did
 ;   step before and the last, (fields since the step was due + 1)/6 of the way, to the
 ;   nearest pixel, and for the first half the step before's frame of the object, so an
 ;   animation keeps with its moves: the frame, shown from the next field, is a step
-;   behind the world at most; an object whose frame changed by the middle of its frame's
-;   box, between the two frames' middles (.anim);
+;   behind the world at most; an object whose frame changed by its frame's box, x its
+;   middle and y its bottom, between the two frames' (.anim);
 ; - the course pieces each step draws over the objects, on every pass (.mask);
 ; - while the player points or draws a stroke back ($5e1a 0, $9676 0 or 1, in play):
 ;   the pointer ($5e1c), where the next step will put it by the counts gathered so far
@@ -491,7 +491,7 @@ Present		movem.l	d0-d6/a1-a3,-(sp)
 		LEW	$0f9a(a0),d3
 		bsr	.lerp
 		bcs.b	.onext
-		move.b	IP_PFRAME(a2),d0	;a new frame: the frames' middles
+		move.b	IP_PFRAME(a2),d0	;a new frame: the frames' boxes
 		cmp.b	$0f1a(a0),d0		;between the steps instead
 		beq.b	.oput
 		bsr	.anim
@@ -693,12 +693,13 @@ Present		movem.l	d0-d6/a1-a3,-(sp)
 		rts
 
 ; An object whose frame changed (a0 it in the table, a2 in the buffer, d0 the step
-; before's frame): d5 and d3 its x and y, the shown frame placed for its middle to be
-; d6/6 of the way between the two frames' middles. The burger of hole 2 grows down from
-; its top, 2 to 5 lines a frame: the change of a frame is then split between its top and
-; its bottom, half each, instead of all at its bottom while its top moves smoothly.
+; before's frame): d5 and d3 its x and y, the shown frame placed for the middle of its
+; box (x) and its bottom (y) to be d6/6 of the way between the two frames'. The burger
+; of hole 2 grows down from its top, 2 to 5 lines a frame, while the game moves it up by
+; about as much: its bottom bun then stays put and its top takes the frame's change,
+; where with its top interpolated its bottom jumped at each frame.
 .anim		movem.l	d1/d7,-(sp)
-		bsr.b	.fmid			;the step before's frame's middle
+		bsr.b	.fmid			;the step before's frame's box
 		move.w	d4,d1
 		move.w	d5,d7
 		move.b	$0f1a(a0),d0
@@ -719,9 +720,9 @@ Present		movem.l	d0-d6/a1-a3,-(sp)
 		movem.l	(sp)+,d1/d7
 		rts
 
-; d0 the frame of the object a0: d4 and d5 the middle of its frame's box, x and y, from
-; the position in half pixels (as Frame and NewShape find the record: x from byte 0 and
-; the width, y from the first line, byte 2, and the rows). d0, a3.
+; d0 the frame of the object a0: d4 the middle of its frame's box and d5 its bottom,
+; from the position in half pixels (as Frame and NewShape find the record: x from byte 0
+; and the width, y from the first line, byte 2, and the rows). d0, a3.
 .fmid		LEW	$109a(a0),d4		;the shape set
 		swap	d4
 		LEW	$105a(a0),d4
@@ -743,14 +744,14 @@ Present		movem.l	d0-d6/a1-a3,-(sp)
 		add.w	d4,d4
 		move.b	4(a3),d0
 		add.w	d0,d4
-		move.b	2(a3),d5
+		move.b	2(a3),d5		;y: the bottom, below its last line
 		ext.w	d5
-		add.w	d5,d5
 		move.b	6(a3),d0
 		add.w	d0,d5
+		add.w	d5,d5
 		rts
 
-; d0 the step before's position, d3 the last's, d4 and d5 their frames' middles (half
+; d0 the step before's position, d3 the last's, d4 and d5 their frames' points (half
 ; pixels): d3 where the shown frame goes (the step before's for d6 below 3).
 .half		add.w	d0,d0
 		add.w	d4,d0

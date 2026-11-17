@@ -363,14 +363,15 @@ The draw-only frames are drawn between the last two steps (`IpSnap`, `Present`,
   first half of the way an object keeps the step before's frame, so an animation keeps
   with its moves (the hamburger on hole 2 bobs a pixel as its frame changes; with the new
   frame at once the frame led the move by 2 fields of each 6). An object whose frame
-  changed is placed so that the middle of its frame's box (byte 0 and the width, the
-  first line, byte 2, and the rows of the frame's record) moves that fraction of the way
-  between the two frames' middles. Clicked, the hamburger bounces through frames 0-7 of
-  shape 4, all with the same top and 33, 35, 38, 42, 47, 52, 56 and 59 rows: the layers
-  spread down a step at a time. With its top interpolated the bottom moved by the whole
-  2 to 5 lines at the frame change; with the middle each end moves by half (traced on
-  hole 2: from frame 2 to 3 the top -3 and the bottom +1 lines in a field that moves the
-  burger a line up). A frame is a single picture, so half each way is the least jump.
+  changed is placed so that its frame's box (byte 0 and the width, the first line, byte
+  2, and the rows of the frame's record) moves that fraction of the way between the two
+  frames' boxes, by the box's middle in x and its bottom in y. Clicked, the hamburger
+  bounces through frames 0-7 of shape 4, all with the same top and 33, 35, 38, 42, 47,
+  52, 56 and 59 rows, and the game moves it up by about the growth: the bottom bun stays
+  about put and the stack grows up. With its top interpolated the bottom bun jumped the
+  whole 2 to 5 lines at each frame change, and with the box's middle both ends jumped
+  half; with the bottom the bottom bun moves a line a field at most and the top takes the
+  frame's change (traced on hole 2), which looked right.
 - while the player points or draws a stroke back, in play with the ball at rest: the
   pointer at `PtrPredict`'s point, the view scrolled to it as $8afe scrolls, the pointer's
   object ($8dd6) or, drawing back, the ball's mark, the three dots, their flags and the
