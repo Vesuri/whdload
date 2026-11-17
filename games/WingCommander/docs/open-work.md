@@ -1096,13 +1096,14 @@ Firing and mouse:
   Hornet's (internals, "Player bolts' near plane"). Checked natively on both
   variants and live on CD32. Enhanced fire is still committed on world ticks
   only (up to 100 ms at 1.0x).
-- **UR6 (H): flight pointer briefly over the HUD or past the edges** when moved
+- **UR6 (H): flight pointer briefly over the HUD or past the edges. Closed
+  (2026-11-17):** when moved
   fast, especially vertically; positioning less accurate than H's. The masked
   image and the sprite position were written at different points of a field.
   Implemented (2026-11-17): both are staged and written together in the VBL
   (internals, "Image and position in the same field"). The emulator reproduces
   the report with the old code and shows no pixel over the cockpit with the
-  fix, on both variants (`--fast-motion`); not yet played by the user. The
+  fix, on both variants (`--fast-motion`); the user confirmed it in play. The
   reference centre is the gunsight by choice, not the PC's window middle.
 - **UR7 (H): right button for PC-style actions. Closed (user decision,
   2026-11-17):** roll left/right, throttle forward/back, double-click (and hold) for afterburner. Implemented as the PC
@@ -1114,12 +1115,13 @@ Firing and mouse:
 - **UR8 (H): missiles on left+right together or the middle button.**
   Implemented with UR7; the same checks. The middle button is only checked
   in the emulator.
-- **UR9 (H): mouse speed setting** (`MOUSE=nn` tooltype). Implemented
+- **UR9 (H): mouse speed setting** (`MOUSE=nn` tooltype). Closed; implemented
   (2026-11-17) as CUSTOM5 bits 4-6, a splash-window gadget "Mouse speed": 1.0x (the PC's
   two counts a pixel), 0.5x, 0.75x, 1.5x, 2.0x, 3.0x, 4.0x, or off, which installs
   no mouse patch at all (internals, "Mouse speed and off"). WHDLoad has no
   named tooltypes and the other Custom options are in use. Checked natively
-  on both variants and live at the start menu; not yet played by the user.
+  on both variants and live at the start menu; the user confirmed it in play
+  (2026-11-17).
 
 Graphics:
 - **UR10 (H): glyphs differ from the PC:** the simulator's "0", W/M missing
