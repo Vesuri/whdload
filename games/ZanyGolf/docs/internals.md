@@ -57,7 +57,8 @@ chip RAM, where the whole game is, non-cacheable for data in hardware, and on a 
 `cache.html`).
 
 The slave header is version 17, for `ws_config`: the splash window's "Start on hole
-(debug)" list sets `CUSTOM1` to 0-9, and `CUSTOM1=N` starts every game on hole N+1 instead
+(debug)" list, the holes by the names of the score card ("1. Windmill" to "10. Mystery"),
+sets `CUSTOM1` to 0-9, and `CUSTOM1=N` starts every game on hole N+1 instead
 of hole 1, the windmill (for profiling the later holes). The game plays the hole files in
 the order of the table at $bb02 (3, 8, 0, 9, 4, 5, 1, 7, 6, 2: hole 1 is `HOLE3`), with the
 position in it at $bb23 and the hole file's number at $5c5a. A game's start ($7a86) sets the

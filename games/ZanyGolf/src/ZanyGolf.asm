@@ -21,7 +21,8 @@ _expmem		dc.l	-EXPSIZE		;optional: the renderer's caches (NewDraw)
 		dc.w	0			;ws_kickcrc
 		dc.w	_config-_base		;ws_config
 _data		dc.b	"data",0
-_config		dc.b	"C1:L:Start on hole (debug):1,2,3,4,5,6,7,8,9,10",0
+_config		dc.b	"C1:L:Start on hole (debug):1. Windmill,2. Hamburger,3. Walls,4. Pinball,5. Fans,"
+		dc.b	"6. Carpets,7. Castle,8. Ant Hill,9. Energy,10. Mystery",0
 _name		dc.b	"Zany Golf",0
 _copy		dc.b	"1988 Electronic Arts",0
 _info		dc.b	"installed & fixed by Bored Seal",10
