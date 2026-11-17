@@ -99,11 +99,11 @@ def main():
     if ocs:
         from ocs_runtime import locate
         slave = a.build/'WingCommander.Slave'
-        whd = 'CUSTOM5=0 DCACHE' if a.original_mode else 'CUSTOM5=3 DCACHE'
+        whd = 'CUSTOM5=8 DCACHE' if a.original_mode else 'CUSTOM5=1 DCACHE'
     else:
         from cd32_runtime import locate
         slave = a.build/'WingCommanderCD32.Slave'
-        whd = 'CUSTOM5=0 DCACHE' if a.original_mode else 'CUSTOM5=3 DCACHE'
+        whd = 'CUSTOM5=8 DCACHE' if a.original_mode else 'CUSTOM5=1 DCACHE'
         whd = whd.replace('DCACHE', a.cache+(' NoMMU' if a.setup in ('a1200-040', 'a1200-060') else ''))
         if a.german:
             whd = 'CUSTOM1=1 '+whd
@@ -111,7 +111,7 @@ def main():
         if a.direct_flight:     # the fixture's direct-flight argument (docs/development.md)
             whd = f'CUSTOM2=2 CUSTOM3={a.system} CUSTOM4={a.mission} '+whd
     if a.mouse_option:
-        whd = whd.replace('CUSTOM5=0', f'CUSTOM5={16*a.mouse_option}').replace('CUSTOM5=3', f'CUSTOM5={3+16*a.mouse_option}')
+        whd = whd.replace('CUSTOM5=8', f'CUSTOM5={8+16*a.mouse_option}').replace('CUSTOM5=1 ', f'CUSTOM5={1+16*a.mouse_option} ')
     length = 0x400000 if ocs else 0x800000
     env = wc_run.run_env(out, variant=a.variant, SLAVE=str(slave.resolve()),
                          WARP='1', NTSC='0', WINDOW='front', JOY0='none', JOY1='none',

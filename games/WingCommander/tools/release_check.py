@@ -44,7 +44,7 @@ def main():
     options=[]
     for model,flags in ((2,2),(4,8)):
         for custom in (0,1,2,3,4,5,0xffffffff):
-            for pace in (0,1,2,3,4,5,8,9,10,0x10,0x11,0x13,0x23,0x59,0x73,0x7a,0x80,0x83,0xffffffff):
+            for pace in (0,1,2,3,4,5,6,7,8,9,10,0x10,0x11,0x13,0x19,0x23,0x59,0x73,0x7a,0x80,0x83,0xffffffff):
                 for policy in (0,256):
                     c=CPU(blob,model);c.write(BASE+0x1de4,struct.pack('>I',custom));c.write(BASE+0x1e04,struct.pack('>I',pace))
                     c.write(BASE+0x121e,struct.pack('>I',0x80000));c.write(4,struct.pack('>I',0x2000));c.write(0x2128,struct.pack('>H',flags))
@@ -54,12 +54,12 @@ def main():
                     c.write(STACK,struct.pack('>I',STOP));c.reg(8,STACK);c.reg(3,0x80000)
                     c.reg(9,0x32a);c.reg(10,0x7f3f);c.reg(11,0x7654)
                     ck(u.uc_emu_start(c.h,BASE+sy['release_setcpu'],STOP,1000000,20000));assert c.reg(18)==STOP and c.reg(11)==0x7654
-                    # CUSTOM5 bit 0 framerate, bits 1-3 world speed (0 Original = Psygore's normal game),
+                    # CUSTOM5 bit 0 framerate, bits 1-3 world speed (0-3 1.0x-2.0x, 4 CPU-dependent = Psygore's normal game),
                     # bits 4-6 the mouse (0 normal, 1 off, 2-7 0.5x-4x in quarter counts).
                     rejected=custom>1 or pace&~0x70>9
                     mouse=(pace>>4)&7
                     pace&=~0x70
-                    if pace==1:pace=3     # the framerate with Original speed: 1.0x
+                    if pace<=9:pace=(pace+2)%10     # the list: 1.0x-2.0x, then CPU-dependent (internal 0)
                     enhanced=pace>>1!=0
                     if rejected:assert c.read(c.reg(8),4)==struct.pack('>I',9)
                     else:

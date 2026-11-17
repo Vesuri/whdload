@@ -9,13 +9,12 @@ and their save/load stash remain separate.
 
 Build with `--public` to generate `WingCommander.Slave`, `WingCommander.info`
 and the OCS `ReadMe`. The generated icon, used for test boots (`make run`), contains
-`CUSTOM5=3` and `DCACHE` (instruction/data caches); in a release the installer writes the
+`CUSTOM5=1` and `DCACHE` (instruction/data caches); in a release the installer writes the
 same tooltypes into the installed icon. Command-line launches must supply them
-explicitly. CUSTOM5 bit 0 is the framerate checkbox, bits 1-3 the world speed. Select
-Original without the framerate, use `CUSTOM5=0`, or omit the option for original
-per-frame simulation, rendering, waits and cache behaviour in the same slave. `CUSTOM5=1`
-(the framerate with Original) is taken as 3, 1.0x. Values 1-9 therefore request
-enhancements; values above 9 stay original.
+explicitly. CUSTOM5 bit 0 is the framerate checkbox, bits 1-3 the world speed (0-3
+1.0x-2.0x, 4 CPU-dependent). Select CPU-dependent (`CUSTOM5=8` or `9`) for original
+per-frame simulation, rendering, waits and cache behaviour in the same slave. Values
+0-7, an omitted option included, request enhancements; values above 9 stay original.
 
 Regardless of the options, 68000/68010 and systems without verified true Fast
 RAM retain original behaviour. The gate checks Exec CPU flags and memory headers,
@@ -136,9 +135,9 @@ Original OCS CUSTOM1–4 tooltypes remain unchanged; the public build adds CUSTO
 | `CUSTOM2=0`, `1`, `2` | No cheats, cheat mode, cheat mode with invincibility |
 | `CUSTOM3=1..13` | Original system selection; requires cheat mode |
 | `CUSTOM4=0..2` | Original mission selection; requires cheat mode |
-| `CUSTOM5=2`, `4`, `6`, `8` | Request a 10/12/15/20 Hz flight and intro world (1.0x-2.0x), one picture per world tick; CPU/Fast gate still applies |
-| `CUSTOM5=3`, `5`, `7`, `9` | The same world speeds with the enhanced framerate (in-between pictures) |
-| `CUSTOM5=0`, `1` / omitted / other | Original simulation, rendering, waits and cache request; bit-exact E1 shortcuts; waypoint marker drawn over the scene |
+| `CUSTOM5=0`, `2`, `4`, `6` / omitted | Request a 10/12/15/20 Hz flight and intro world (1.0x-2.0x), one picture per world tick; CPU/Fast gate still applies |
+| `CUSTOM5=1`, `3`, `5`, `7` | The same world speeds with the enhanced framerate (in-between pictures) |
+| `CUSTOM5=8`, `9` / other | Original simulation, rendering, waits and cache request; bit-exact E1 shortcuts; waypoint marker drawn over the scene |
 | `PRELOAD` | Used by the tested launcher; RAM floor includes that setup |
 | Quit | Original `*` / PrtSc key (raw key `$5d`); WHDLoad's `QUITKEY` may override |
 
@@ -154,7 +153,7 @@ host OS version. Never include those dependencies in a game archive.
 The OCS slave ships only in the combined installer archive,
 `WingCommanderEnhanced-<version>-<YYYYMMDD>.lha` (`make dist`,
 [development](development.md)), as `WingCommanderECS.slave`; its Install script
-writes `CUSTOM5=3` and `DCACHE` into the OCS game icon. No preinstalled archive
+writes `CUSTOM5=1` and `DCACHE` into the OCS game icon. No preinstalled archive
 is made: a release never carries game data.
 
 ## Release checklist
@@ -171,7 +170,7 @@ or CD32 version and installs `WingCommanderECS.slave` or `WingCommanderCD32.slav
    changes need the affected native and live gates again, not an assumed carry-over
    of E2.
 3. Review the public option/rollback UX, the ReadMe and the installer's choices: both
-   versions' icons get `CUSTOM5=3` (enhanced framerate, 1.0x world) and `DCACHE`. If changing runtime options, changing metadata or
+   versions' icons get `CUSTOM5=1` (enhanced framerate, 1.0x world) and `DCACHE`. If changing runtime options, changing metadata or
    combining C6 histories, validate those new binaries.
 4. `make dist` stages the package from Psygore's verified installer archive
    (`tools/release_install.py`), packs `WingCommanderEnhanced-<version>-<YYYYMMDD>.lha`,

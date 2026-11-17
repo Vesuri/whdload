@@ -118,7 +118,7 @@ confirmation remains. See
 [afterburner continuity](internals.md#afterburner-prediction-continuity).
 
 Both public slaves share one option layout in CUSTOM5: bit 0 **Enhanced framerate**,
-bits 1-3 **World speed** (CPU-dependent, the original; 1.0x, 1.2x, 1.5x, 2.0x). Icons use `CUSTOM5=3`.
+bits 1-3 **World speed** (1.0x, 1.2x, 1.5x, 2.0x, then CPU-dependent, the original). Icons use `CUSTOM5=1`.
 Original speed, absent options or (OCS) ineligible hardware keep original
 simulation/rendering/waits in the same slave; CD32 Original is Psygore's normal mode
 (his unlimited/relaxed/slow modes were removed). See [world speed](#world-speed-option). Earlier
@@ -441,17 +441,18 @@ If these disagree, all of them are recorded and the user chooses.
 The user chose (2026-11-15) to offer the flight world's speed as a player option,
 separate from the framerate, for players used to faster animation or faster play.
 Both public slaves read CUSTOM5 as bit 0 **Enhanced framerate** and bits 1-3
-**World speed**: CPU-dependent (the original game), 1.0x, 1.2x, 1.5x, 2.0x (10, 12, 15, 20 world ticks per
-second; whole rates keep the clock's debt unit, which 1.25x would not). Original is
-the original game. The framerate needs a fixed speed, so with Original it selects
-1.0x: `CUSTOM5=1` is `3` (the user's choice, 2026-11-17; before, the checkbox
-alone did nothing). A fixed speed without the
+**World speed**: 1.0x, 1.2x, 1.5x, 2.0x (10, 12, 15, 20 world ticks per second;
+whole rates keep the clock's debt unit, which 1.25x would not), then CPU-dependent,
+the original game, where the framerate bit is ignored. The fixed speeds come first
+(fields 0-3, CPU-dependent 4), so no option is 1.0x and the checkbox alone always has
+an effect (the user's choice, 2026-11-17, for players upgrading from 1.0, which had
+no such option). A fixed speed without the
 framerate draws one picture per world tick. Ordinary flight and the intro's world
 (title battle and asteroid credits; the user asked for it, 2026-11-16) change speed;
 the fly-by, launch, ejection and room clocks run at 10 Hz whatever the option
 (internals, "World speed"). The intro's title-logo script runs on the same ticks, so
 it finishes sooner at a faster speed; credit text deadlines (fields) and music are
-unchanged. Icons and run defaults use `CUSTOM5=3`.
+unchanged. Icons and run defaults use `CUSTOM5=1`.
 
 Measured in emulated time on the cached 030 model (`tools/world_speed_live_check.py`,
 simulator flight, 2 or 4 s windows), every combination runs at its rate exactly:

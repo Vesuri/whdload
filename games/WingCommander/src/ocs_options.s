@@ -4,17 +4,13 @@ ocs_option_gate:
         lea     ocs_option_tags(pc),a0
         jsr     $34(a2)                 ; resload_Control, CUSTOM5_GET
         ; CUSTOM5 bit 0 enables the enhanced framerate; bits 1-3 select the
-        ; world speed: 0 Original, 1-4 a 10/12/15/20 Hz world (Original with
-        ; the framerate is 1.0x with it); bits 4-6 the
+        ; world speed: 0-3 a 10/12/15/20 Hz world, 4 CPU-dependent (the
+        ; original game); bits 4-6 the
         ; mouse (mouse_option), taken out first and kept for word_fixes.
         move.l  ocs_option_value(pc),d0
         moveq   #$70,d1
         and.l   d0,d1
         eor.l   d1,d0
-        cmpi.l  #1,d0
-        bne.s   .fixed
-        moveq   #3,d0                   ; Enhanced framerate with Original speed: 1.0x
-.fixed:
         lsr.w   #4,d1
         lea     ocs_option_value(pc),a0
         move.l  d0,(a0)
@@ -22,6 +18,17 @@ ocs_option_gate:
         move.w  d1,(a0)
         cmpi.l  #9,d0
         bhi.w   .off
+        ; The splash list has the fixed speeds first (0-3: 1.0x-2.0x, 4:
+        ; CPU-dependent), so no option is 1.0x; below 0 is CPU-dependent and
+        ; 1-4 1.0x-2.0x, the framerate bit kept (ignored when CPU-dependent).
+        addq.l  #2,d0
+        moveq   #10,d1
+        cmp.l   d1,d0
+        bcs.s   .fixed
+        sub.l   d1,d0
+.fixed:
+        lea     ocs_option_value(pc),a0
+        move.l  d0,(a0)
         lsr.l   #1,d0
         beq.w   .off
         movea.l 4.w,a6

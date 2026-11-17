@@ -2,7 +2,7 @@
 """Bounded live world-speed check on a release build (English).
 
 Boots the release slave with one CUSTOM5 value (bit 0 enhanced framerate,
-bits 1-3 world speed: 1-4 = 1.0x/1.2x/1.5x/2.0x), skips the intro with the
+bits 1-3 world speed: 0-3 = 1.0x/1.2x/1.5x/2.0x), skips the intro with the
 left button, clicks into the simulator flight (as mouse_live_check.py --flight
 does) and counts world ticks and drawn flight pictures over a fixed number of
 emulated display fields. The rate is emulated time, not wall time: it shows
@@ -34,7 +34,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('variant', choices=('ocs', 'cd32'))
     p.add_argument('build', type=Path)
-    p.add_argument('--custom5', type=int, required=True, choices=range(2, 10))
+    p.add_argument('--custom5', type=int, required=True, choices=range(0, 8))
     p.add_argument('--fields', type=int, default=100,
                    help='measured span in display fields; the simulator flight ends after about 55 world ticks')
     p.add_argument('--setup', default='a1200-030', help='AMIGA_SETUP')
@@ -44,7 +44,7 @@ def main():
     a = p.parse_args()
     out = new_output(a.output); out.mkdir(parents=True)
     ocs = a.variant == 'ocs'; game = GAMES[a.variant]; v = get(a.variant)
-    speed, framerate = a.custom5 >> 1, a.custom5 & 1
+    speed, framerate = (a.custom5 >> 1)+1, a.custom5 & 1     # speed 1-4: 1.0x-2.0x
     if ocs:
         from ocs_runtime import locate
         slave = a.build/'WingCommander.Slave'

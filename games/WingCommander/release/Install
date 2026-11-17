@@ -109,8 +109,8 @@
     (help @askchoice-help)
   )))
   (if (= #version 3)
-    ((set #prefix "WingCommander") (set #prefix-slave "WingCommanderECS") (set #enhanced "3"))
-    ((set #prefix "WingCommanderCD32") (set #prefix-slave "WingCommanderCD32") (set #enhanced "3"))
+    ((set #prefix "WingCommander") (set #prefix-slave "WingCommanderECS") (set #enhanced "1"))
+    ((set #prefix "WingCommanderCD32") (set #prefix-slave "WingCommanderCD32") (set #enhanced "1"))
   )
 )
 

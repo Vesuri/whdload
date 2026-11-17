@@ -32,7 +32,7 @@ def main():
     env=wc_run.run_env(out,variant=a.variant,SLAVE=str(slave.resolve()),
              WARP='1',NTSC='0',WINDOW='front',DEBUG_PORT=a.port,
              JOY0='none',JOY1='none',DETERMINISTIC='1',AMIGA_SETUP='a1200-030',
-             WHD_ARGS='CUSTOM5=3 DCACHE' if a.variant=='ocs' else 'CUSTOM5=3 CUSTOM3=1 CUSTOM4=0 DCACHE',
+             WHD_ARGS='CUSTOM5=1 DCACHE' if a.variant=='ocs' else 'CUSTOM5=1 CUSTOM3=1 CUSTOM4=0 DCACHE',
              EXTRA_ARGS='--fast_memory=4096',OCS_STOCK_CLOCK='0',INTRO_STOCK_CLOCK='0',
              WC_BASELINE_CACHE_MODEL='1')
     g=None

@@ -36,7 +36,7 @@ def main():
     env=wc_run.run_env(out,variant=a.variant,SLAVE=str(slave.resolve()),
              WARP='1',NTSC='0',WINDOW='front',
              JOY0='none',JOY1='none',DETERMINISTIC='1',AMIGA_SETUP='a500' if a.variant=='ocs' else 'a1200-fast',
-             WHD_ARGS='CUSTOM5=3 DCACHE',
+             WHD_ARGS='CUSTOM5=1 DCACHE',
              EXTRA_ARGS='--uae_cpu_model=68020 --fast_memory=4096' if a.variant=='ocs' else '',
              OCS_STOCK_CLOCK='1' if a.variant=='ocs' else '0',INTRO_STOCK_CLOCK='0')
     if a.exhaust_only or a.camera_only:

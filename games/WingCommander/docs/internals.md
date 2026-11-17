@@ -2142,6 +2142,12 @@ show which scenes level off at a designed maximum.
 
 ### World speed
 
+CUSTOM5 bits 1-3 are the splash list's field: 0-3 1.0x-2.0x, 4 CPU-dependent.
+`release_setcpu` and `ocs_option_gate` turn it into the internal value the rest
+reads, 0 CPU-dependent and 1-4 1.0x-2.0x (field + 1, 4 to 0), keeping the
+framerate bit. Measurements recorded below with CUSTOM5 values used the builds of
+their time, whose values differed.
+
 The player's World speed option (open-work, "World speed option") changes only the
 rate of the shared scheduler, `timing_advance` (`src/timing_clock.s`). It issues
 `fields * timing_world_rate / Hz` ticks and keeps the remainder as debt, with Hz debt

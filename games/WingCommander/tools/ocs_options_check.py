@@ -278,7 +278,7 @@ def check(build, mutation=None):
     require(payload[info:].startswith(b'2.0b (17.11.2026)\n'), 'public release information missing')
     require(b'$VER: WingCommander 2.0b (17.11.2026)\0' in payload, 'public version missing')
     config=int.from_bytes(payload[0x32:0x34],'big')
-    require(payload[config:].split(b'\0',1)[0].endswith(b'C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):CPU-dependent,1.0x,1.2x,1.5x,2.0x:1-3;C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2.0x,3.0x,4.0x:4-6;'),'public config missing')
+    require(payload[config:].split(b'\0',1)[0].endswith(b'C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):1.0x,1.2x,1.5x,2.0x,CPU-dependent:1-3;C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2.0x,3.0x,4.0x:4-6;'),'public config missing')
     if mutation:
         start,end=sy['ocs_option_gate'],sy['ocs_option_tags']
         segment=payload[start:end]
@@ -306,10 +306,10 @@ def check(build, mutation=None):
     mouse_runs=set()
     for slave,kind,bank in banks:
         for flags in (0,1,2,3,4,8,128):
-            for option in (0,1,3,8,10,0xffffffff,0x13,0x10,0x11,0x73,0x2b):
+            for option in (0,1,3,6,8,9,10,0xffffffff,0x13,0x10,0x11,0x19,0x73,0x2b):
                 # CUSTOM5 bits 4-6 the mouse: 0 normal, 1 off, 2-7 0.5x-4x.
                 mouse=(option>>4)&7;opt=option&~0x70
-                if opt==1:opt=3     # the framerate with Original speed: 1.0x
+                if opt<=9:opt=(opt+2)%10     # the list: 1.0x-2.0x, then CPU-dependent (internal 0)
                 speed=(4,0,2,3,6,8,12,16)[mouse]
                 if option>>4 and option!=0xffffffff and (flags not in (0,2) or bank not in ('z2-fast','chip')):continue
                 for revision in (0x1302,0x12bc,0x1348):
@@ -400,7 +400,7 @@ def check(build, mutation=None):
     original=(ROOT/'tmp/game/WingCommander/WingCommander.info').read_bytes()
     icon=(build/'WingCommander.info').read_bytes()
     require(icon==enhanced_icon(original),'generated icon mismatch')
-    require(tooltypes(icon)[2][:2]==[b'CUSTOM5=3\0',b'DCACHE\0'],'icon defaults disabled')
+    require(tooltypes(icon)[2][:2]==[b'CUSTOM5=1\0',b'DCACHE\0'],'icon defaults disabled')
     rejected=0
     for bad in (icon,b'bad icon',original[:80]):
         try:enhanced_icon(bad)

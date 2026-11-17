@@ -38,9 +38,9 @@ game_build() {
 }
 
 # Run defaults (they apply only to what the caller did not set):
-# - a build (no SLAVE) gets the release options: CUSTOM5=3 DCACHE (enhanced framerate, 1.0x world)
+# - a build (no SLAVE) gets the release options: CUSTOM5=1 DCACHE (enhanced framerate, 1.0x world)
 #   (CUSTOM5 bit 0 enhanced framerate, bits 1-3 world speed; on 68000/68010 or without true
-#   Fast RAM the OCS slave keeps the original behaviour). WHD_ARGS= (empty) selects the
+#   Fast RAM the OCS slave keeps the original behaviour). WHD_ARGS="CUSTOM5=8" selects the
 #   original behaviour;
 # - an explicit OCS SLAVE (original or a diagnostic build) boots the A500 baseline, which
 #   game_setup gives 4 MB of Zorro II Fast RAM and no slow RAM;
@@ -52,8 +52,8 @@ game_prepare() {
   if [ -z "${SLAVE:-}" ]; then
     if ! user_set WHD_ARGS; then
       case "$VARIANT" in
-        WingCommanderCD32) WHD_ARGS="CUSTOM5=3 DCACHE" ;;
-        WingCommander) WHD_ARGS="CUSTOM5=3 DCACHE" ;;
+        WingCommanderCD32) WHD_ARGS="CUSTOM5=1 DCACHE" ;;
+        WingCommander) WHD_ARGS="CUSTOM5=1 DCACHE" ;;
       esac
     fi
   elif [ "$VARIANT" = WingCommander ] && ! user_set SETUP && ! user_set AMIGA_SETUP; then

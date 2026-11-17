@@ -37,7 +37,7 @@ def main():
     p.add_argument('--machine', choices=('a1200-fast', 'a1200-030', 'a1200-040', 'a1200-060'), required=True)
     p.add_argument('--timing-core', action='store_true', help='project cycle-exact timing core (WC_NOMMU_CORE / stock 020 clock)')
     p.add_argument('--baseline-cache-model', action='store_true', help='030 phase-8 emulated cache model')
-    p.add_argument('--custom5', type=int, choices=(0, 1, 2, 3, 4), default=None)
+    p.add_argument('--custom5', type=int, choices=(0, 1, 2, 3, 4, 5, 7), default=None)
     p.add_argument('--options', default='', help='extra WHDLoad options, e.g. NoMMU or DCache')
     p.add_argument('--debugger', action='store_true', help='boot through the gdb stub (FSUAE must be a debugger build)')
     p.add_argument('--held-key', help='raw key held through the window; requires --debugger')
@@ -65,9 +65,9 @@ def main():
     if not re.fullmatch(r'[A-Za-z ]*', a.options):
         raise ValueError('unexpected WHDLoad options')
     if a.custom5 is None:
-        a.custom5=3 if fixture.get('release') else 1
-    if fixture.get('release') and a.custom5 not in (3,5,7,9):
-        p.error('public-option frame recorder requires the enhanced framerate and a fixed world speed (CUSTOM5=3/5/7/9)')
+        a.custom5=1
+    if fixture.get('release') and a.custom5 not in (1,3,5,7):
+        p.error('public-option frame recorder requires the enhanced framerate and a fixed world speed (CUSTOM5=1/3/5/7)')
     if not fixture.get('release') and a.custom5==4:
         p.error('experimental timing build does not support CUSTOM5=4')
     language=0 if fixture.get('release') else 3

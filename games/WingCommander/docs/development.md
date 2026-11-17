@@ -93,9 +93,10 @@ which needs `wing.german` and `wing.english` from the CD32 install in
 `tmp/game/WingCommanderCD32/data/`.
 
 `make run` boots the release build (common/run.sh, the repository's `docs/running.md`):
-CD32 on `a1200-fast` with `WHD_ARGS` defaulting to `CUSTOM5=0 DCACHE`, OCS
-(`VARIANT=WingCommander`) on `a3000` with `CUSTOM5=1 DCACHE`. An explicitly empty
-`WHD_ARGS=` selects the original behaviour. A run with `SLAVE` (`SLAVE=original`, the
+CD32 on `a1200-fast` and OCS (`VARIANT=WingCommander`) on `a3000`, both with
+`WHD_ARGS` defaulting to `CUSTOM5=1 DCACHE` (enhanced framerate, 1.0x world).
+`WHD_ARGS=CUSTOM5=8` selects the original behaviour (CPU-dependent); an empty
+`WHD_ARGS=` gives the release slaves 1.0x without the framerate. A run with `SLAVE` (`SLAVE=original`, the
 shipped slave, or any build) gets no default options, and for OCS boots the `a500`
 baseline unless `SETUP` is given. On `a500` the OCS variant gets 4 MB of Zorro II Fast RAM
 and no slow RAM. `a1200-040` and `a1200-060` boot `FSUAE_MMU` (AmigaXDev's build with the
@@ -4503,9 +4504,9 @@ referenced by reports while they remain the evidence for this hand-off.
 The user-facing build is now distinct from the preserved ungated diagnostic
 builds used by P13C–E. `--public` implies all E1 enhancements, defaults to the CPU
 backend, uses changed-block histories only for the TrainSim enemy details, and emits an OCS launch icon with
-`CUSTOM5=1` plus an OCS ReadMe. An absent or zero option means original behaviour;
-the icon, not an implicit slave default, requests enhancements. CPU and true-Fast
-checks always apply. Existing original/CD32 input trees are not modified.
+`CUSTOM5=1` plus an OCS ReadMe. An absent or zero option means a 1.0x world
+without the framerate (the World speed list has the fixed speeds first); `CUSTOM5=8`
+or `9` means original behaviour. CPU and true-Fast checks always apply. Existing original/CD32 input trees are not modified.
 
 ```sh
 . ../../common/env.sh
@@ -4546,8 +4547,8 @@ A clock fixture requires installed enhancements and is deliberately rejected for
 a public build with an off option or 68000. These original-mode runs stop at the
 menu, sufficient to inspect unchanged hook sites and native intro rendering.
 
-Interactive launches use `WHD_ARGS='CUSTOM5=3'` explicitly with `VARIANT=WingCommander`
-and the selected public `SLAVE`; clearing that argument selects original mode.
+Interactive launches use `WHD_ARGS='CUSTOM5=1'` explicitly with `VARIANT=WingCommander`
+and the selected public `SLAVE`; `CUSTOM5=8` selects original mode.
 The runtime preparer only enables the icon in a fresh OCS tree when a public
 slave is selected. CD32 and original OCS icon contents remain unchanged. Merely
 copying the slave over an old installation does not silently change its tooltypes.
@@ -4609,7 +4610,7 @@ candidate (`tmp/build/release/WingCommander/`), then boots the A3000 preset with
 make run VARIANT=WingCommander
 make stop
 make run VARIANT=WingCommander SETUP=a500
-make run VARIANT=WingCommander WHD_ARGS='CUSTOM5=0'
+make run VARIANT=WingCommander WHD_ARGS='CUSTOM5=8'
 make run VARIANT=WingCommander INSTANCE=ocs    # beside a CD32 run
 ```
 
@@ -4617,10 +4618,10 @@ A500 automatically retains original behaviour despite the requested toggle.
 `SLAVE` replaces the automatic build; it also drops the default `WHD_ARGS` and selects
 the A500 baseline unless `SETUP` is given, so a diagnostic slave on the A3000 with the
 toggle is `SLAVE=... SETUP=a3000 WHD_ARGS='CUSTOM5=1 DCACHE'`. `SETUP`, `WHD_ARGS`,
-`INSTANCE` and the shared sound/window settings remain overridable. An explicitly
-empty `WHD_ARGS=` also selects original behaviour. `make stop` does not build a slave.
+`INSTANCE` and the shared sound/window settings remain overridable. `WHD_ARGS='CUSTOM5=8'`
+selects original behaviour. `make stop` does not build a slave.
 `make run` builds and runs the latest enhanced CD32 slave by default
-(`tmp/build/release/WingCommanderCD32/`), with `CUSTOM5=0 DCACHE`. An explicit
+(`tmp/build/release/WingCommanderCD32/`), with `CUSTOM5=1 DCACHE`. An explicit
 `SLAVE` (`SLAVE=original` for the shipped slave) bypasses this build for original or
 diagnostic runs; explicit `WHD_ARGS` overrides the defaults.
 
@@ -5602,7 +5603,7 @@ A direction held in the new flight must still respond normally.
 ## World speed option
 
 Both public builds (`make build`) decode CUSTOM5 bit 0 (framerate) and bits 1-3 (world
-speed). CPU checks of the decoding and the scheduler at 10/12/15/20 Hz:
+speed: 0-3 1.0x-2.0x, 4 CPU-dependent). CPU checks of the decoding and the scheduler at 10/12/15/20 Hz:
 
 ```
 python3 tools/release_check.py tmp/build/release/WingCommanderCD32 --output tmp/speed-release.json --negative-controls
@@ -5610,13 +5611,13 @@ python3 tools/ocs_options_check.py tmp/build/release/WingCommander --output tmp/
 python3 tools/timing_clock_check.py --output tmp/speed-clock
 ```
 
-The live check boots one CUSTOM5 value (2-9) into the simulator flight and counts world
+The live check boots one CUSTOM5 value (0-7, the fixed speeds) into the simulator flight and counts world
 ticks and drawn pictures over emulated fields. The simulator flight ends after about 55
 world ticks, so keep the window short (default 100 fields; 200 at 1.0x and 1.2x):
 
 ```
-python3 tools/world_speed_live_check.py cd32 tmp/build/release/WingCommanderCD32 --custom5 9 --output tmp/speed-cd32-9
-python3 tools/world_speed_live_check.py ocs tmp/build/release/WingCommander --custom5 3 --fields 200 --output tmp/speed-ocs-3
+python3 tools/world_speed_live_check.py cd32 tmp/build/release/WingCommanderCD32 --custom5 7 --output tmp/speed-cd32-7
+python3 tools/world_speed_live_check.py ocs tmp/build/release/WingCommander --custom5 1 --fields 200 --output tmp/speed-ocs-1
 ```
 
 `--intro` measures the title world instead (from `intro_title`, no clicks; 200 fields
@@ -5625,6 +5626,6 @@ the end of N staged pictures; every bolt step must move at exactly its rate per
 display field. Pictures at the predictor's lead bound are excluded and counted:
 
 ```
-python3 tools/world_speed_live_check.py cd32 tmp/build/release/WingCommanderCD32 --custom5 9 --intro --fields 200 --output tmp/speed-intro-cd32
-python3 tools/world_speed_live_check.py ocs tmp/build/release/WingCommander --custom5 9 --bolts 80 --output tmp/speed-bolts-ocs
+python3 tools/world_speed_live_check.py cd32 tmp/build/release/WingCommanderCD32 --custom5 7 --intro --fields 200 --output tmp/speed-intro-cd32
+python3 tools/world_speed_live_check.py ocs tmp/build/release/WingCommander --custom5 7 --bolts 80 --output tmp/speed-bolts-ocs
 ```

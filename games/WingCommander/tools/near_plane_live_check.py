@@ -35,11 +35,11 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path, help='a tools/flight_fixture.py --release build')
     p.add_argument('--output', required=True)
-    p.add_argument('--original-mode', action='store_true', help='the control: CUSTOM5=0, no hook')
+    p.add_argument('--original-mode', action='store_true', help='the control: CUSTOM5=8 (CPU-dependent, the original game), no hook')
     a = p.parse_args()
     out = new_output(a.output); out.mkdir(parents=True)
     v = get('cd32')
-    whd = 'CUSTOM2=2 CUSTOM3=4 CUSTOM4=0 '+('CUSTOM5=0' if a.original_mode else 'CUSTOM5=3')+' DCACHE'
+    whd = 'CUSTOM2=2 CUSTOM3=4 CUSTOM4=0 '+('CUSTOM5=8' if a.original_mode else 'CUSTOM5=1')+' DCACHE'
     env = wc_run.run_env(out, variant='cd32', SLAVE=str((a.build/'WingCommanderCD32.Slave').resolve()),
                          WARP='1', NTSC='0', WINDOW='front', JOY0='none', JOY1='none',
                          DETERMINISTIC='1', AMIGA_SETUP='a1200-030', WHD_ARGS=whd, EXTRA_ARGS='',
