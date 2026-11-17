@@ -15,12 +15,14 @@ machine tried.
 Rendering (17.11.2026, `internals.md`, "Display" and "Game time"): with an optional ExpMem
 the slave redraws only the cells whose map word changed or that a shape covered, and copies
 the other buffer with the blitter when the view scrolled (`NewDraw`, `ShapeHook`); draw-only
-passes skip $4fd0 between steps; the instruction cache is on for BaseMem. Frames a second
+passes skip $4fd0 between steps; the draw list and the shape drawer are native code
+(`NewList`, `NewShape`); the instruction cache is on for BaseMem. Frames a second
 with the pointer moving: `a500` 9.25 to 37, `a1200` 13.25 to 58.5, the 68030 setups 57 to 60
 (one a field). No buffer is drawn into while it is on screen (`Hidden`): a frame that ends
 while the playfield shows waits for its end, which costs the `a500` a fifth of its frames.
 The verify build found no cell differing from its tile on every CPU from 68000 to 68060,
-with `DCACHE` too. The debug option `CUSTOM1=N` starts every game on hole
+with `DCACHE` too, and no draw list or shape differing from the game's on the 68030 and the
+68000. The debug option `CUSTOM1=N` starts every game on hole
 N+1, for measuring the later holes (`internals.md`, "Slave patches").
 
 ## Next
@@ -40,29 +42,45 @@ N+1, for measuring the later holes (`internals.md`, "Slave patches").
      copy (about 7 % of the A500's time now). The A500 draws about 4.7 frames a step.
    Acceptance: the putt's world steps as now (6 fields apart), and each presented frame
    between the two steps around it.
-2. **The A500's frame.** The native draw list (`NewList`) took hole 1 from 37 to 44.25
-   frames a second with the pointer moving. Each hole on `a500`, 17.11.2026, this slave
-   (`CUSTOM1`, the view still for the trace, 60 fields; frames from `frames 240` and
-   `frames 240 5 3`). The columns are per cent of all the A500's time:
+2. **The pointer as a hardware sprite** (asked 17.11.2026): the pointer is drawn into the
+   frame and moves once a step. It should be a hardware sprite moved
+   by the interrupt every field, smoothly, whatever the frame rate. The aiming line, drawn
+   into the frame, may lag behind it while dragging; interpolation (item 1) should close
+   that. Known so far: the interrupt adds JOY0DAT's changes to $1d54/$1d56 every run; the
+   input routine ($1d5c, once a step) takes a quarter of each (the rest kept), clamped to
+   ±31, into $0e80/$0e88 for player $0c54; threaded code at $86ce reads them with an
+   acceleration ($0e60/$0e68) and keys ($0e58) into $88a4/$88a6 and $889c/$889e. Still
+   to find: the pointer's object and position, its bounds, and what else draws it (the
+   intro, the pause screen, the title).
+3. **The A500's frame.** The native draw list (`NewList`) took hole 1 from 37 to 44.25
+   frames a second with the pointer moving, and the native shape drawer (`NewShape`) hole
+   2 from 12.5 to 25. Each hole on `a500`, 17.11.2026, before `NewShape` (`CUSTOM1`, the
+   view still for the trace, 60 fields; frames from `frames 240` and `frames 240 5 3`),
+   with the frames after it. The columns but the frames are per cent of all the A500's
+   time:
 
-   | Hole | Still | Moving | Shapes ($16ec) | Cells (`NewDraw`) | Draw list | $4fd0 | Waits |
-   |---:|---:|---:|---:|---:|---:|---:|---:|
-   | 1 | 47.25 | 44.25 | 17.5 | 24.4 | 10.7 | 3.9 | 16.1 |
-   | 2 | 12.5 | 12.75 | 56.3 | 7.8 | 4.5 | 1.5 | 5.0 |
-   | 3 | 30 | 30 | 18.2 | 18.8 | 11.3 | 3.2 | 22.2 |
-   | 4 | 40 | 38.5 | 14.1 | 13.5 | 9.5 | 5.7 | 26.1 |
-   | 5 | 30 | 30 | 18.2 | 15.6 | 11.9 | 5.3 | 23.5 |
-   | 6 | 40 | 40 | 18.5 | 13.5 | 9.1 | 4.1 | 27.9 |
-   | 7 | 38.5 | 39.5 | 32.4 | 16.3 | 12.1 | 5.1 | 7.3 |
-   | 8 | 30.25 | 31.75 | 17.7 | 17.0 | 11.8 | 6.1 | 20.6 |
-   | 9 | 22 | 21 | 32.7 | 11.4 | 11.0 | 6.6 | 9.9 |
-   | 10 | 20 | 20 | 35.2 | 9.1 | 6.4 | 14.4 | 5.0 |
+   | Hole | Still | Moving | Shapes ($16ec) | Cells (`NewDraw`) | Draw list | $4fd0 | Waits | `NewShape`: still | moving |
+   |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+   | 1 | 47.25 | 44.25 | 17.5 | 24.4 | 10.7 | 3.9 | 16.1 | 47.5 | 45.75 |
+   | 2 | 12.5 | 12.75 | 56.3 | 7.8 | 4.5 | 1.5 | 5.0 | 25 | 24.75 |
+   | 3 | 30 | 30 | 18.2 | 18.8 | 11.3 | 3.2 | 22.2 | 30 | 30 |
+   | 4 | 40 | 38.5 | 14.1 | 13.5 | 9.5 | 5.7 | 26.1 | 40 | 38.5 |
+   | 5 | 30 | 30 | 18.2 | 15.6 | 11.9 | 5.3 | 23.5 | 30 | 30 |
+   | 6 | 40 | 40 | 18.5 | 13.5 | 9.1 | 4.1 | 27.9 | 48.25 | 47 |
+   | 7 | 38.5 | 39.5 | 32.4 | 16.3 | 12.1 | 5.1 | 7.3 | 40 | 40 |
+   | 8 | 30.25 | 31.75 | 17.7 | 17.0 | 11.8 | 6.1 | 20.6 | 33 | 32 |
+   | 9 | 22 | 21 | 32.7 | 11.4 | 11.0 | 6.6 | 9.9 | 28.5 | 28.25 |
+   | 10 | 20 | 20 | 35.2 | 9.1 | 6.4 | 14.4 | 5.0 | 30 | 29.75 |
 
    "Draw list" is `NewList` and the threaded sort and draw calls after it; "Waits" is
-   `FrameCap`'s and `Hidden`'s busy waits. Candidates:
-   - the shape drawer ($16f2), the largest on holes 2, 7, 9 and 10: it plots each pixel with
-     four `bclr` and up to four `bset`. In the slave it could write a byte of each plane at a
-     time with a mask;
+   `FrameCap`'s and `Hidden`'s busy waits. Holes 3-8 draw a frame in about a field, and
+   `Hidden` rounds a frame up to one or two fields, so their rates move in steps with
+   small changes: hole 3 measured 50 and hole 6 40 with an earlier `NewShape`. With
+   `NewShape` the drawer is still 51.5 % of hole 2's time (75 shapes in 60 fields, about
+   280 pair bytes a shape), 32.3 % of hole 9's and 26.3 % of hole 10's: building the 16
+   pixels is 19 % of hole 2's, the masked writes 14 %. Candidates:
+   - the shape drawer again: the blitter could draw the rows (a mask and four planes a
+     shape, made once per frame of a shape and kept), or shapes could be kept as planes;
    - a third buffer: with two, a frame that ends while the playfield shows waits for its
      end (`Hidden`), a fifth to a quarter of the time on holes 3-6 and 8, which run at
      exactly 2 fields a frame. With three, the next frame could start at once (32 KB more
@@ -70,14 +88,14 @@ N+1, for measuring the later holes (`internals.md`, "Slave patches").
    - $4fd0's own threaded code on hole 10 (14.4 %, after each step);
    - the steps (10 a second) are threaded code throughout.
    A 68000 must still draw correctly whatever the 68020+ path does.
-3. **Fast memory.** In fast memory now: the slave's code (the renderer, `Split`), the
+4. **Fast memory.** In fast memory now: the slave's code (the renderer, `Split`), the
    renderer's caches and the tile copy (ExpMem). What cannot move: `FILE1` is the 65xx
    machine's bank 0, and every other address the game uses is a4-relative too (the hole
    block at a4+$11d0a, the screen buffers at a4+$30000, the copper list inside `FILE1` at
    $2272), so moving `FILE1` would move an address space with chip-only data in it. Native
    code also reads its variables PC-relative and resets a4 with `lea (pc)`, and the
    dispatch takes the primitives' bank from a4. Hot threaded or native routines can move
-   only as slave copies (item 2). The game's user stack ($9570) could move: small gain, not
+   only as slave copies (item 3). The game's user stack ($9570) could move: small gain, not
    tried.
 
 ## Also seen

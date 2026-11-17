@@ -4,7 +4,7 @@ Electronic Arts' Zany Golf (1988, by Will Harvey) under WHDLoad. The slave is Bo
 v1.1 (23-Jul-2006; v1.0 05-Aug-2000), an OSEmu slave, with the world stepped on its own
 clock at the game's intended 10 steps a second and frames drawn between the steps, at most
 one a field, by a renderer that redraws only the cells that changed (the blitter copies the
-scrolled view) and builds the draw list in native code, and the instruction cache on. The original slave
+scrolled view) and builds the draw list and draws the shapes in native code, and the instruction cache on. The original slave
 is by Bored Seal (game.conf `AUTHOR`, `UPSTREAM`): neither JOTD's nor StingRay's repository
 holds it, so `src/ZanyGolf.asm` is the source from the whdload.de install package
 (`ZanyGolfHD/src/ZanyGolf.asm`). The ReadMe also thanks Jan Vieten for the disk image and

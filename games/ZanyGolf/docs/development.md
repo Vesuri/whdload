@@ -58,7 +58,7 @@ CMD='gdb monitor key 01 1'` and so on). For anything repeatable use the harness 
 | `tools/boot.sh` | boots a server (`tools/zanygolf.py serve`): warp, deterministic, nothing in port 0, no window; run options pass through |
 | `tools/route.py STEPS` | drives it: `stop`, `f N`, `key RAW N`, `click N`, `press`, `release`, `title`, `play`, `mouse DX DY N`, `shot`, `prof`, `track`, `frametrack`, `gdb`. The route `hole1` reaches hole 1 in play (it waits for the title's state, presses 1, then clicks through the hole's intro, and the pause screen when one comes, until the ball is active); `putt` then plays one putt (`internals.md`, "Game time") |
 | `WHD_ARGS=CUSTOM1=N` | the slave's debug option (`internals.md`, "Slave patches"): every game starts on hole N+1 (N 0-9); `route.py hole1` then reaches that hole, e.g. `WHD_ARGS=CUSTOM1=9 tools/boot.sh && python3 tools/route.py hole1` for hole 10 |
-| `make build BUILD=verify` | the slave with `VERIFY`: after every frame `NewDraw` checks each cell of the back buffer against its tile in the hole block. Low memory (fill $cc..) counts: $1f0 cells that differed, $1f4 frames checked, $1f8 the first difference (frame, row, column), $1e0/$1e4/$1e8 frames drawn at the same origin, scrolled, from nothing. With ExpMem it also runs the game's draw-list phases after `NewList` on the same input and compares what both wrote: $1d0 lists that differed, $1d4 lists checked, $1d8 the first difference, $1dc course-piece entries, $1cc lists that filled up. Run it with `BUILD=verify tools/boot.sh`; frames are several times slower |
+| `make build BUILD=verify` | the slave with `VERIFY`: after every frame `NewDraw` checks each cell of the back buffer against its tile in the hole block. Low memory (fill $cc..) counts: $1f0 cells that differed, $1f4 frames checked, $1f8 the first difference (frame, row, column), $1e0/$1e4/$1e8 frames drawn at the same origin, scrolled, from nothing. With ExpMem it also runs the game's draw-list phases after `NewList` on the same input and compares what both wrote: $1d0 lists that differed, $1d4 lists checked, $1d8 the first difference, $1dc course-piece entries, $1cc lists that filled up. It also draws each shape with `NewShape` and then the game's drawer on the same buffer and compares the planes and variables: $1c0 shapes that differed, $1c4 shapes checked, $1c8 the first difference, $1b8 and $1bc rows inside 0-319 and across an edge, $1b4 status-line shapes (not compared). Run it with `BUILD=verify tools/boot.sh`; frames are several times slower |
 | `tools/zanygolf.py frames N [DX DY K]` | counts the frames shown in N fields from the flips of the copper list's plane pointer, optionally moving the mouse every field; no breakpoint, so it works on every CPU, MMU cores included |
 | `tools/zanygolf.py track N FILE` | a line a field for N fields: the field counter, whether a frame was shown, the game clock, the ball's position and velocity; every CPU |
 | `tools/zanygolf.py frametrack N FILE` | a line a frame for N frames, at a breakpoint on the flip: the field counter, the clock and the object table $5c7a-$5d29; not on MMU cores |
@@ -113,6 +113,11 @@ Traps:
 - **The flip patch moved the flip.** `FrameCap`'s `jsr` covers $14a4-$14a9, so the harness
   marks a frame at $14ac (`SWAP` in `zanygolf.py` and `bench.py`); `bench.py`'s tile counts
   are the game's renderer's and read 0 under `NewDraw`.
+- **The verify build needs more than the stock A500's memory.** Its ExpMem (the saved
+  buffers of the shape check) leaves too little of the `a500`'s 512 KB slow RAM for the
+  preloaded files and the title never comes; use `a500-1.5m`, the same 68000.
+- **Four boots at once can fail one** (`boot failed`, no detail in the server log);
+  three at once have not failed.
 - **Per-frame timers carry the frames drawn before a putt.** Friction applies every fifth
   frame from the hole's start, so the same putt on two machines takes different paths
   unless the timer at $5cd2 has the same value at the release; change the hold before

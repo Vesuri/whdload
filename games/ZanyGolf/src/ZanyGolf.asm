@@ -125,6 +125,17 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		move.w	#$4eb9,$173c(a3)	;the shape drawer: jsr ShapeHook
 		pea	ShapeHook
 		move.l	(sp)+,$173e(a3)
+		movea.l	V_EXP(a0),a0		;the shape drawer: jmp NewShape
+		lea	EX_STAB(a0),a0
+		bsr	ShapeTable
+		move.w	#$4ef9,$16f2(a3)
+		pea	NewShape
+		move.l	(sp)+,$16f4(a3)
+	ifd VERIFY
+		move.w	#$4ef9,$18d4(a3)	;the game's drawer's end: jmp ShapeCheck
+		pea	ShapeCheck
+		move.l	(sp)+,$18d6(a3)
+	endc
 .norender
 		move.l	#$01384ef9,$48d4(a3)	;the draw list: jmp NewList
 		pea	NewList
@@ -348,7 +359,11 @@ CROWS		= 21
 CSIZE		= CROWS*40*2
 EX_TILES	= $1000		;ExpMem: the caches at 0 and CSIZE, the tiles here
 TILESIZE	= $10020	;map words are 16-bit offsets of 32-byte tiles
-EXPSIZE		= (EX_TILES+TILESIZE+$fff)&$fffff000	;WHDLoad wants whole $1000s
+	ifd VERIFY				;WHDLoad wants whole $1000s
+EXPSIZE		= (EX_VLIST+2*VL_SIZE+$fff)&$fffff000
+	else
+EXPSIZE		= (EX_STAB+STABSIZE+$fff)&$fffff000
+	endc
 
 V_EXP		= 0		;l ExpMem, 0 without
 V_TILEM		= 4		;l the hole block copied to ExpMem, 0 none
@@ -709,7 +724,7 @@ Scroll		movem.w	d0/d5,V_DROW(a5)
 ; $40000 (the status line) instead: if that reaches the playfield, drop both caches.
 ShapeHook	addq.w	#8,a3			;displaced
 		movea.l	$32(a4),a0		;displaced
-		movem.l	d0-d7/a0-a3/a5,-(sp)
+ShapeMark	movem.l	d0-d7/a0-a3/a5,-(sp)	;NewShape's entry: a0 = $32 as read
 		lea	(_v,pc),a5
 		move.l	a0,d0
 		ror.w	#8,d0
@@ -808,6 +823,409 @@ ShapeHook	addq.w	#8,a3			;displaced
 		rts
 
 ;=============================================================================
+; The shape drawer. $16ec (entered from threaded code, which saved d0-d2 at $16ee) draws
+; a frame of a shape: $2a the shape bank (a little-endian pointer), $22 the shape, $24 the
+; frame, $26/$28 its x and y on the map, $32 where to draw ($30000: the status line, at
+; fixed lines). A frame's record holds its rows (byte 6), the offset of its first line
+; (byte 2), then the rows: an x step (signed, plus the previous row's count, in pixel
+; pairs), a count of pixel pairs and two more bytes, then the pairs, a byte each: the left
+; pixel in the high nibble, bit 3 of a nibble plane 0 to bit 0 plane 3, 0 transparent. Rows
+; are clipped to the buffer's 160 lines and pixels to 0-319. The game plots each pixel
+; with four bclr and up to four bset. NewShape replaces $16f2-$18de with every write the
+; game makes ($26/$28 made screen-relative, $16d2-$16dd), and d3, d4 and d6 left as the
+; game leaves them: a row is built 16 pixels at a time, a word per plane from the table
+; at EX_STAB (2 bits a plane for each byte, at its position), the pixels outside 0-319 masked off, and
+; written with one masked long read-modify-write a plane at the row's word (a long may
+; reach a word past the row's either end, which it writes back unchanged). The status
+; line's path stays the game's ($18e2). Installed with ExpMem, which holds the table. Replaces $16f2-$16f7 (clr.w $16da(a4); movea.l $2a(a4),a0).
+EX_STAB		= EX_TILES+TILESIZE	;ExpMem: 256 bytes by 8 positions, planes 0/1 and 2/3
+STABSIZE	= 256*64
+
+LEW		macro			;\1: the little-endian word at the even address \1
+		move.w	\1,\2
+		ror.w	#8,\2
+		endm
+SEW		macro			;store \1 little-endian at the even address \2
+		ror.w	#8,\1
+		move.w	\1,\2
+		ror.w	#8,\1
+		endm
+LEL		macro			;\1: the little-endian long at the even address \1
+		move.l	\1,\2
+		ror.w	#8,\2
+		swap	\2
+		ror.w	#8,\2
+		endm
+TBIT		macro			;bit \2 of \1 set: set bit \4 of \3
+		btst	#\2,\1
+		beq.b	.\@
+		bset	#\4,\3
+.\@
+		endm
+
+; A pair byte b at position j of 16 pixels (0 the leftmost pair), at b*64+j*8: planes 0
+; and 1 at bits 31-30 and 15-14 shifted right by 2*j (left pixel the higher bit), then
+; planes 2 and 3 the same. a0: the table.
+ShapeTable	moveq	#0,d0
+.e		move.w	d0,d1
+		lsr.w	#4,d1			;left pixel
+		move.w	d0,d2
+		and.w	#15,d2			;right pixel
+		moveq	#0,d3
+		moveq	#0,d4
+		TBIT	d1,3,d3,31
+		TBIT	d2,3,d3,30
+		TBIT	d1,2,d3,15
+		TBIT	d2,2,d3,14
+		TBIT	d1,1,d4,31
+		TBIT	d2,1,d4,30
+		TBIT	d1,0,d4,15
+		TBIT	d2,0,d4,14
+		moveq	#8-1,d5
+.j		move.l	d3,(a0)+
+		move.l	d4,(a0)+
+		lsr.l	#2,d3
+		lsr.l	#2,d4
+		dbf	d5,.j
+		addq.w	#1,d0
+		cmp.w	#256,d0
+		bcs.b	.e
+		rts
+
+NewShape	movem.l	d3-d4/a2,-(sp)		;the game keeps d3 (the carry) and a2
+	ifd VERIFY
+		bsr	ShapeSave
+	endc
+		clr.w	$16da(a4)		;the previous row's count
+		LEL	$2a(a4),d0		;the bank
+		movea.l	d0,a0
+		adda.l	a4,a0
+		movea.l	a0,a3
+		movea.l	a0,a5
+		moveq	#0,d0
+		move.b	$22(a4),d0
+		asl.w	#3,d0
+		adda.w	d0,a0
+		LEW	(a0),d0			;the shape's frames
+		movea.l	a5,a0
+		adda.w	d0,a0
+		moveq	#0,d0
+		move.b	$24(a4),d0
+		add.w	d0,d0
+		adda.w	d0,a0
+		LEW	(a0),d0			;the frame's record
+		adda.w	d0,a3
+		moveq	#0,d6
+		move.b	6(a3),d6		;rows
+		beq	.end
+		moveq	#0,d7
+		move.b	2(a3),d7
+		ext.w	d7
+		move.w	d7,$16d2(a4)		;the first line's offset
+		addq.w	#8,a3
+		movea.l	$32(a4),a0
+		bsr	ShapeMark		;the cells it covers
+		LEL	$32(a4),d0
+		cmp.l	#$30000,d0
+		bne.b	.buf
+		movea.l	d0,a0			;the status line: the game's path, with
+	ifd VERIFY				;its registers as at $174e
+		addq.l	#1,$1b4.w
+	endc
+		movem.l	(sp)+,d3-d4/a2
+		jmp	$18e2(a4)
+.buf		LEW	$28(a4),d0		;y and x on the screen
+		sub.w	$1476(a4),d0
+		SEW	d0,$28(a4)
+		LEW	$26(a4),d0
+		move.w	$1474(a4),d1
+		and.w	#$fff0,d1
+		sub.w	d1,d0
+		SEW	d0,$26(a4)
+		move.l	$1462(a4),d0		;the back buffer
+		move.w	$2326(a4),d0
+		eori.w	#$8000,d0
+		movea.l	d0,a0
+		move.l	a0,$16dc(a4)
+		LEW	$28(a4),d0
+		add.w	$16d2(a4),d0
+		muls	#40,d0
+		adda.l	d0,a0			;the first row's line
+		LEW	$26(a4),d0
+		move.w	d0,$16d6(a4)		;x
+		lea	(_v,pc),a2
+		movea.l	V_EXP(a2),a2
+		lea	EX_STAB(a2),a2
+
+.row		move.b	(a3),d0			;the row's x
+		ext.w	d0
+		add.w	$16da(a4),d0
+		add.w	d0,d0
+		add.w	$16d6(a4),d0
+		move.w	d0,$16d6(a4)
+		move.w	d0,d4
+		moveq	#0,d5
+		move.b	2(a3),d5		;pairs
+		move.b	d5,$16db(a4)
+		addq.w	#4,a3
+		cmpa.l	$16dc(a4),a0		;lines 0-159
+		blt.b	.skip
+		move.l	a0,d1
+		subi.l	#6400,d1
+		cmp.l	$16dc(a4),d1
+		blt.b	.draw
+.skip		ext.w	d5			;as the game: a signed count
+		adda.w	d5,a3
+		bra	.next
+.draw		tst.w	d5
+		beq	.next
+		move.w	d5,d1
+		add.w	d1,d1
+		add.w	d4,d1			;the x the game ends the row at
+		move.w	d1,-(sp)
+	ifd VERIFY
+		tst.w	d4
+		bmi.b	.vedge
+		cmp.w	#320,d1
+		bhi.b	.vedge
+		addq.l	#1,$1b8.w
+		bra.b	.vin
+.vedge		addq.l	#1,$1bc.w
+.vin
+	endc
+		move.w	d6,a5			;rows
+		movea.w	d4,a6			;the chunk's first pixel
+		move.w	d4,d1
+		asr.w	#4,d1
+		add.w	d1,d1
+		lea	(a0,d1.w),a1		;the row's first word
+		and.w	#15,d4			;its shift
+		move.w	d5,d2			;pairs left
+.chunk		moveq	#8,d3
+		cmp.w	d3,d2
+		bcc.b	.c8
+		move.w	d2,d3
+.c8		sub.w	d3,d2
+		moveq	#0,d0
+		moveq	#0,d1
+		moveq	#8,d6			;k pairs: the last k positions, from
+		sub.w	d3,d6			;step 8-k (14 bytes a step)
+		move.w	d6,d3
+		lsl.w	#4,d6
+		sub.w	d3,d6
+		sub.w	d3,d6
+		jmp	.pairs(pc,d6.w)
+.pairs
+J		set	0
+		rept	8
+		moveq	#0,d7
+		move.b	(a3)+,d7
+		lsl.w	#6,d7
+		or.l	J*8(a2,d7.w),d0
+		or.l	J*8+4(a2,d7.w),d1
+J		set	J+1
+		endr
+		tst.w	d3			;fewer than 8: left-align them
+		beq.b	.full
+		add.w	d3,d3
+		lsl.l	d3,d0
+		lsl.l	d3,d1
+.full		move.w	a6,d6			;the 16 pixels inside 0-319?
+		bmi.b	.clip
+		cmp.w	#320-16,d6
+		bgt.b	.clip
+.mask		move.l	d0,d5			;the mask: any plane set
+		or.l	d1,d5
+		move.l	d5,d6
+		swap	d6
+		or.w	d6,d5
+		beq	.empty
+		swap	d5
+		clr.w	d5
+		lsr.l	d4,d5
+		not.l	d5
+		move.l	d0,d6			;plane 0
+		clr.w	d6
+		lsr.l	d4,d6
+		move.l	(a1),d7
+		and.l	d5,d7
+		or.l	d6,d7
+		move.l	d7,(a1)
+		move.w	d0,d6			;plane 1
+		swap	d6
+		clr.w	d6
+		lsr.l	d4,d6
+		move.l	$2000(a1),d7
+		and.l	d5,d7
+		or.l	d6,d7
+		move.l	d7,$2000(a1)
+		move.l	d1,d6			;plane 2
+		clr.w	d6
+		lsr.l	d4,d6
+		move.l	$4000(a1),d7
+		and.l	d5,d7
+		or.l	d6,d7
+		move.l	d7,$4000(a1)
+		move.w	d1,d6			;plane 3
+		swap	d6
+		clr.w	d6
+		lsr.l	d4,d6
+		move.l	$6000(a1),d7
+		and.l	d5,d7
+		or.l	d6,d7
+		move.l	d7,$6000(a1)
+.empty		addq.w	#2,a1
+		lea	16(a6),a6
+		tst.w	d2
+		bne	.chunk
+		move.w	a5,d6
+		move.w	(sp)+,d4
+		bra.b	.next
+.clip		moveq	#-1,d7			;the pixels inside 0-319 (a chunk is
+		tst.w	d6			;narrower than the screen: one edge)
+		bpl.b	.cr
+		neg.w	d6			;left of 0
+		cmp.w	#16,d6
+		bcc.b	.empty
+		lsr.w	d6,d7
+		bra.b	.cm
+.cr		sub.w	#320-16,d6		;right of 319
+		cmp.w	#16,d6
+		bcc.b	.empty
+		lsr.w	d6,d7
+		lsl.w	d6,d7
+.cm		move.w	d7,d6
+		swap	d7
+		move.w	d6,d7
+		and.l	d7,d0
+		and.l	d7,d1
+		bra	.mask
+.next		lea	40(a0),a0
+		subq.w	#1,d6
+		bne	.row
+.end
+	ifd VERIFY
+		bra	ShapeDone
+	endc
+		move.l	(sp)+,d3		;d4 as the game leaves it
+		addq.w	#4,sp
+		movea.l	(sp)+,a2
+		movem.l	(sp)+,d0-d2		;displaced: $18d4-$18de
+		lea	$18e0(a4),a5
+		jmp	$0106(a4)
+
+	ifd VERIFY
+; Debug builds: NewShape saves the back buffer's 160 lines of each plane (and a word
+; more, which a long write may read and write back) and $26-$29 and $16d2-$16dd
+; (ShapeSave), draws, keeps what it drew with its d4 and a3, puts the saved state back
+; (ShapeDone) and runs the game's drawer from $16f2 (put back for the run) with d3, d4 and
+; a2 as they came; at its end ($18d4, ShapeCheck) the planes, the variables, d4 and a3
+; are compared with NewShape's and the hook goes back. Low memory (fill $cc): $1c0 counts
+; the shapes that differed, $1c4 the shapes checked, $1c8 the first difference (the low
+; word of $1c4 then, and the byte's offset: plane p at p*VS_PLANE, then the variables,
+; d4 and a3). $1b8 counts the rows NewShape drew inside 0-319, $1bc those across an
+; edge, $1b4 the status line's shapes (not checked).
+VS_PLANE	= 6400+4
+VS_VARS		= 4+12
+VS_SIZE		= 4*VS_PLANE+VS_VARS+6
+EX_VSHAPE	= EX_STAB+STABSIZE	;the saved state, then NewShape's
+EX_VLIST	= EX_VSHAPE+2*VS_SIZE
+
+VSREGS		macro			;\1: copy the regions between (a0) and a1
+		move.l	$1462(a4),d0
+		move.w	$2326(a4),d0
+		eori.w	#$8000,d0
+		movea.l	d0,a0
+		moveq	#4-1,d6
+.p\@		move.w	#VS_PLANE-1,d7
+		bsr	\1
+		lea	$2000-VS_PLANE(a0),a0
+		dbf	d6,.p\@
+		lea	$26(a4),a0
+		moveq	#4-1,d7
+		bsr	\1
+		lea	$16d2(a4),a0
+		moveq	#12-1,d7
+		bsr	\1
+		endm
+
+ShapeSave	movem.l	d0/d6-d7/a0-a1,-(sp)
+		movea.l	(_v,pc),a1
+		lea	EX_VSHAPE(a1),a1
+		VSREGS	VLOut
+		movem.l	(sp)+,d0/d6-d7/a0-a1
+		rts
+
+; The end of NewShape: on the stack d3, d4, a2 as they came, then the thread's d0-d2.
+ShapeDone	movem.l	d0/d6-d7/a0-a1,-(sp)
+		movea.l	(_v,pc),a1
+		lea	EX_VSHAPE+VS_SIZE(a1),a1	;keep NewShape's
+		VSREGS	VLOut
+		move.w	d4,(a1)+
+		move.l	a3,(a1)+
+		movea.l	(_v,pc),a1
+		lea	EX_VSHAPE(a1),a1		;and put the input back
+		VSREGS	VLIn
+		move.l	#$426c16da,$16f2(a4)	;the game's drawer for the run
+		move.w	#$206c,$16f6(a4)
+		bsr	ListFlush
+		movem.l	(sp)+,d0/d6-d7/a0-a1
+		movem.l	(sp)+,d3-d4/a2
+		jmp	$16f2(a4)
+
+ShapeCheck	movem.l	d0-d7/a0-a6,-(sp)
+		movea.l	(_v,pc),a1
+		lea	EX_VSHAPE+VS_SIZE(a1),a1
+		move.l	$1462(a4),d0
+		move.w	$2326(a4),d0
+		eori.w	#$8000,d0
+		movea.l	d0,a0
+		moveq	#0,d5			;bytes that differ
+		moveq	#0,d6			;offset
+		moveq	#4-1,d4
+.pl		move.w	#VS_PLANE,d7
+		bsr.b	.cmp
+		lea	$2000-VS_PLANE(a0),a0
+		dbf	d4,.pl
+		lea	$26(a4),a0
+		moveq	#4,d7
+		bsr.b	.cmp
+		lea	$16d2(a4),a0
+		moveq	#12,d7
+		bsr.b	.cmp
+		lea	4*4(sp),a0		;d4 and a3 as the game left them
+		moveq	#2,d7
+		addq.w	#2,a0
+		bsr.b	.cmp
+		lea	11*4(sp),a0
+		moveq	#4,d7
+		bsr.b	.cmp
+		tst.w	d5
+		beq.b	.same
+		addq.l	#1,$1c0.w
+.same		addq.l	#1,$1c4.w
+		move.w	#$4ef9,$16f2(a4)	;the hook back
+		pea	NewShape
+		move.l	(sp)+,$16f4(a4)
+		bsr	ListFlush
+		movem.l	(sp)+,d0-d7/a0-a6
+		movem.l	(sp)+,d0-d2		;displaced: $18d4-$18de
+		lea	$18e0(a4),a5
+		jmp	$0106(a4)
+.cmp		subq.w	#1,d7			;d7 bytes at a0 against a1; d5 counts
+.c		cmpm.b	(a0)+,(a1)+		;differing bytes, d6 the offset
+		beq.b	.ok
+		addq.w	#1,d5
+		cmp.l	#$cccccccc,$1c8.w	;the fill: none recorded yet
+		bne.b	.ok
+		move.w	$1c6.w,$1c8.w
+		move.w	d6,$1ca.w
+.ok		addq.w	#1,d6
+		dbf	d7,.c
+		rts
+	endc
+
+;=============================================================================
 ; The draw list. $48d4 (threaded code, once a frame) builds the list of what the frame
 ; draws (eight tables of 16 entries at $46a2-$4791, an entry per 2 bytes: shape or piece
 ; and frame $46a2/$46c2, depth $46e2, x $4702, y $4722, width $4742, height $4762, kind
@@ -823,16 +1241,6 @@ ShapeHook	addq.w	#8,a3			;displaced
 ; opcode), entered by $0138 from the routine's JSR, so the caller's return is on the stack.
 ; a4 is FILE1's base; the threaded code's registers are d0-d4 (A, X, Y, carry, NZ) and
 ; $0106 sets them up again from the low bytes of d0-d2.
-
-LEW		macro			;\1: the little-endian word at the even address \1
-		move.w	\1,\2
-		ror.w	#8,\2
-		endm
-SEW		macro			;store \1 little-endian at the even address \2
-		ror.w	#8,\1
-		move.w	\1,\2
-		ror.w	#8,\1
-		endm
 
 NewList		movem.l	d3-d7/a1-a3,-(sp)
 	ifd VERIFY
@@ -1090,7 +1498,6 @@ Frame		move.l	$24(a4),d0
 ; checked (from $cccccccc), $1d8 the first difference (the low word of $1d4 then, and the
 ; byte's offset in the regions: $000a 0, $0022 4, $111a 12, $46a2 268, $4eba 748, X 762,
 ; Y 763). $1dc counts NewList's course-piece entries and $1cc its lists that filled up.
-EX_VLIST	= EX_TILES+TILESIZE	;ExpMem: the saved state, then NewList's
 VL_SIZE		= 4+8+$100+$1e0+14+2	;$000a, $0022, $111a, $46a2, $4eba, X and Y
 
 VLREGS		macro			;\1: copy the regions between (a4) and a1

@@ -38,6 +38,7 @@ The loader, first hunk:
 | $1de2 | the input's `move.b $bfe001,d1` | `jsr ReadButton` | ours: a click between two steps is not lost ("Game time") |
 | $14c4 | the renderer's tile redraw ($14c4-$15dd) | `jmp NewDraw` | ours, with ExpMem: only the cells that changed ("Display") |
 | $173c | the shape drawer's `addq.w #8,a3; movea.l $32(a4),a0` | `jsr ShapeHook` | ours, with ExpMem: marks the cells a shape covers ("Display") |
+| $16f2 | the shape drawer's `clr.w $16da(a4); movea.l $2a(a4),a0` | `jmp NewShape` | ours, with ExpMem: the shape drawer with 16 pixels a write ("Display"); `ShapeHook` stays for the game's drawer, which the verify build runs |
 | $48d4 | the draw list's `LDX #0; TXY` and `STX $4ec0`'s opcode (threaded) | primitive $0138, `jmp NewList` | ours: the draw list's first two phases in native code ("Display") |
 | $7a9c | a game's start: the immediate of `LDY #0` (threaded), the position in the hole order | `CUSTOM1` | ours, debug, only with `CUSTOM1`=1-9: start on that hole (below) |
 
@@ -139,6 +140,21 @@ fewer tiles instead. With ExpMem, `NewDraw` replaces the redraw (step 2):
   the cells it covers in the back buffer's cache. A shape drawn at fixed screen lines from
   $40000 (`$32` = $30000, the status line) that reaches line 33, where buffer 0's tiles
   start, drops both caches.
+- The shape drawer ($16f2, entered at $16ec from the threaded code) draws a frame of a
+  shape: `$2a` the shape bank, `$22` the shape, `$24` the frame, `$26`/`$28` the map
+  position (made screen-relative in place), `$32` the target. A frame's record holds its
+  row count (byte 6) and first line's offset (byte 2), then the rows: an x step (signed,
+  plus the previous row's count, in pixel pairs), a count of pixel pairs, two more bytes and
+  the pairs, a byte each with the left pixel in the high nibble (bit 3 plane 0 to bit 0
+  plane 3, 0 transparent). Rows are clipped to lines 0-159 and pixels to 0-319, and the
+  game plots each pixel with four `bclr` and up to four `bset`. With ExpMem, `NewShape`
+  replaces it: a row inside 0-319 is built 16 pixels at a time, a word a plane from a 2 KB
+  table in ExpMem (each byte gives 2 bits of each plane), the pixels outside 0-319 masked
+  off, and written with one masked long read-modify-write a plane (a long may reach a word
+  past either end of the row, which it writes back unchanged).
+  It makes every write the game makes ($26-$29, $16d2-$16dd) and leaves d3, d4 and d6 as
+  the game does. The status line's shapes (`$32` = $30000) keep the game's path ($18e2).
+  The verify build draws each shape both ways on the same buffer and compares.
 - The draw list ($48d4, threaded code, once a frame) fills eight tables of 16 entries at
   $46a2-$4791 (shape or piece and frame $46a2/$46c2, depth $46e2, x $4702, y $4722, width
   $4742, height $4762, kind $4782: 0 a shape, 1 a course piece) in two phases, then sorts
@@ -293,13 +309,15 @@ with `CACHE` and with `DCACHE` (FS-UAE then caches chip data, so the flush after
 exercised), and `a1200-040` and `a1200-060` with `DCACHE`: 120 to 1500 frames each, scrolled
 frames among them.
 
-Where the A500's time goes now (`bench.py`, scrolling, 38 frames a second before $4fd0 was
+Where the A500's time went (`bench.py`, scrolling, 38 frames a second before $4fd0 was
 skipped between steps; and a trace of 60 fields with the view still, by threaded routine):
 the threaded-code primitives 53 %, the slave's renderer 26 % (the cell compare and the tiles
 19 %, the scroll copy with its blitter waits and the cache shift 7 %), the shape drawer 11 %
 (it plots shapes pixel by pixel with `bclr`/`bset`). With the view still, a frame took 0.25
 fields in the renderer, 0.16 in $4fd0 (now skipped between steps), 0.33 in $48d4's threaded
 code (the object draw list) and 0.22 in the shape drawer it calls.
+These are before `NewList` and `NewShape`; `open-work.md` (item 3) has each hole's
+frames and costs since.
 
 **The intended speed is 10 frames a second at NTSC**, 6 fields a frame: that is what the
 game takes a frame to be. The stock NTSC A500 comes close and stays below it: hole 1 draws
