@@ -1116,7 +1116,7 @@ Firing and mouse:
   in the emulator.
 - **UR9 (H): mouse speed setting** (`MOUSE=nn` tooltype). Implemented
   (2026-11-17) as CUSTOM5 bits 4-6, a splash-window gadget "Mouse speed": 1.0x (the PC's
-  two counts a pixel), 0.5x, 0.75x, 1.5x, 2x, 3x, 4x, or off, which installs
+  two counts a pixel), 0.5x, 0.75x, 1.5x, 2.0x, 3.0x, 4.0x, or off, which installs
   no mouse patch at all (internals, "Mouse speed and off"). WHDLoad has no
   named tooltypes and the other Custom options are in use. Checked natively
   on both variants and live at the start menu; not yet played by the user.

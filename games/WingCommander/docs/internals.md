@@ -9453,7 +9453,7 @@ icon, and no tooltype at all) keep the mouse as it was; off is therefore 1:
 
 | Bits 4-6 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
 |---|---|---|---|---|---|---|---|---|
-| Mouse speed | 1.0x | off | 0.5x | 0.75x | 1.5x | 2x | 3x | 4x |
+| Mouse speed | 1.0x | off | 0.5x | 0.75x | 1.5x | 2.0x | 3.0x | 4.0x |
 | CUSTOM5 add | 0 | 16 | 32 | 48 | 64 | 80 | 96 | 112 |
 | Quarter counts per count | 4 | (none) | 2 | 3 | 6 | 8 | 12 | 16 |
 
@@ -9497,8 +9497,8 @@ How it is checked:
   nothing; a speed: 24 counts move the room position 3q pixels, q its
   quarter counts.
   Results (2026-11-17, enhanced mode): CD32 English and OCS off (room site
-  `3942`, pointer still, three room results -1), CD32 English 4x (+48),
-  CD32 German 2x (+24), OCS 0.5x (+6). The normal mouse's menu runs on
+  `3942`, pointer still, three room results -1), CD32 English 4.0x (+48),
+  CD32 German 2.0x (+24), OCS 0.5x (+6). The normal mouse's menu runs on
   both variants are unchanged (two pixels a field, out and back). Not run
   in flight or in the name entry at another speed; not played.
 

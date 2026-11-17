@@ -278,7 +278,7 @@ def check(build, mutation=None):
     require(payload[info:].startswith(b'2.0b (17.11.2026)\n'), 'public release information missing')
     require(b'$VER: WingCommander 2.0b (17.11.2026)\0' in payload, 'public version missing')
     config=int.from_bytes(payload[0x32:0x34],'big')
-    require(payload[config:].split(b'\0',1)[0].endswith(b'C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):Original,1.0x,1.2x,1.5x,2.0x:1-3;C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2x,3x,4x:4-6;'),'public config missing')
+    require(payload[config:].split(b'\0',1)[0].endswith(b'C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):Original,1.0x,1.2x,1.5x,2.0x:1-3;C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2.0x,3.0x,4.0x:4-6;'),'public config missing')
     if mutation:
         start,end=sy['ocs_option_gate'],sy['ocs_option_tags']
         segment=payload[start:end]
