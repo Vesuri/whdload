@@ -28,7 +28,8 @@ from mouse_model import POINTER, Pointer
 from PIL import Image
 
 # Per game: A4 offsets of the room pointer position, the pointer SimpleSprite
-# (x at +6) and the field clock; H0 intro waits (wait, done), menu (ready,
+# (x at +6) and the field clock; H0 intro waits (wait, done) and the wait's
+# Esc branch (its abort flag store), menu (ready,
 # accepted); name entry (input loop, poll result) and its A4 selected cell and
 # columns, then its Return case (H0); flight: ramp store site (H0), ramps, view, aperture block and copper
 # list pair (A4; OCS none). German CD32 addresses map the English ones by
@@ -38,14 +39,14 @@ from PIL import Image
 # ship: the player's ship type (A4, its C type) and the ship table (A4, 104
 # bytes a type; the roll rate at +38, which E:7a4 multiplies by the roll ramp).
 GAMES = {
-    'ocs': dict(pointer=(0x19c, -2150), field=-0x800, intro=((0x180c4, 0x1edde), (0x180c4, 0x1f396)),
+    'ocs': dict(pointer=(0x19c, -2150), field=-0x800, intro=((0x180c4, 0x1edde), (0x180c4, 0x1f396)), esc=0x180da,
                 menu=(0x1f43c, 0x1f44e), flight=(0x1869e, 3720, -18318, -4188, 0),
                 buttons=(4430, 3724, 3316, 0x18d88, 0x18d9a), ship=('short', 2170, -11224)),
-    'cd32': dict(pointer=(0xa88, -1156), field=-252, intro=((0x1898a, 0x1fbba), (0x1898a, 0x20164)),
+    'cd32': dict(pointer=(0xa88, -1156), field=-252, intro=((0x1898a, 0x1fbba), (0x1898a, 0x20164)), esc=0x1899c,
                  menu=(0x20214, 0x20226), name=(0x16fc6, 0x16fd0, 17716, 17706, 0x170b8),
                  flight=(0x19064, 5882, -18280, -4318, -532), fire=(0x9546, 18120),
                  buttons=(6592, 5886, 5478, 0x197e6, 0x197f8), ship=('unsigned char', 4367, -11354)),
-    'cd32-de': dict(pointer=(2740, -1112), field=-208, intro=((0x18a44, 0x1fcbe), (0x18a44, 0x2026c)),
+    'cd32-de': dict(pointer=(2740, -1112), field=-208, intro=((0x18a44, 0x1fcbe), (0x18a44, 0x2026c)), esc=0x18a56,
                     menu=(0x2031c, 0x2032e), name=(0x17064, 0x1706e, 17766, 17756, 0x17156),
                     flight=(0x1911e, 5926, -18236, -4274, -488)),
 }
@@ -62,6 +63,8 @@ def main():
     p.add_argument('--buttons', choices=('keys', 'stick'),
                    help='English --flight: instead of steering, the buttons: keys (missile, afterburner) or stick (right button: throttle, roll)')
     p.add_argument('--german', action='store_true', help='CD32: the German executable (CUSTOM1=1)')
+    p.add_argument('--esc', action='store_true',
+                   help='only the intro: the right button as Esc in its two waits, then the start menu')
     p.add_argument('--direct-flight', action='store_true',
                    help='CD32 English --flight only, on a tools/flight_fixture.py --release build: the mission flight, no menu')
     a = p.parse_args()
@@ -361,6 +364,24 @@ def main():
         field = a4+game['field']
         pos, sprite = game['pointer']
         steps = None
+        if a.esc:
+            # The right button in the intro's two key-or-fire waits (title,
+            # credits; Esc takes two presses too): each time the wait's own
+            # Esc branch (esc: its abort flag store) runs, then the stage
+            # ends, and the start menu follows.
+            for wait, done in game['intro']:
+                until(h0+wait)
+                cmd('monitor input JOY1_2ND_BUTTON 1')
+                until(h0+game['esc'], 30)
+                cmd('monitor input JOY1_2ND_BUTTON 0')
+                until(h0+done)
+            rows['esc_branch'] = len(game['intro'])
+            until(h0+game['menu'][0], 120)
+            shot('menu-after-esc')
+            rows['menu_after_esc'] = True
+            (out/'report.json').write_text(json.dumps(rows, indent=2)+'\n')
+            print(json.dumps(rows))
+            return
         if not a.direct_flight:
             # Intro: the left button where modal_live_check presses Esc.
             for wait, done in game['intro']:

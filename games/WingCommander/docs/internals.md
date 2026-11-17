@@ -9371,6 +9371,45 @@ start the emulator (`common/run.sh`); the rerun passed. Not yet checked:
 real hardware (the OCS POTGO state under the OS is unmeasured), CD32 German
 flight live, and play by the user.
 
+### Right button as Esc in cutscenes (both release builds, every mode)
+
+User request (2026-11-17): the right button skips cutscenes as Esc does.
+The cutscenes take input through two native waits, which read a key and
+then test fire (or the pad): Return and Space continue, and Esc continues
+and sets the abort flag that the cutscene loops test. That flag is OCS
+A4 `-28796`, CD32 A4 `-28820` (`MODAL_ABORT`). The enhanced adapters poll
+the key-or-fire wait too (`modal_input`).
+
+| Wait | OCS | CD32 English | CD32 German |
+|---|---|---|---|
+| Key-or-fire (36 callers); its key read (hooked, 6 bytes) | `O:180c4`; `O:180ce` | `E:1898a`; `E:18990` | `G:18a44`; `G:18a4a` |
+| Timed wait; its key read (hooked) | `O:18126`; `O:1814c` | `E:18a58`; `E:18a90` | `G:18b12`; `G:18b4a` |
+| Native key read | `O:345a8` | `E:34318` | `G:344da` |
+
+- `mouse_vbl` latches each right press with its field (a line counts only
+  once it has read up).
+- `mouse_esc` replaces the two key reads. A press latched in the last 50
+  fields reads as Esc (27), once; otherwise the native read runs.
+- The flight poll (`mouse_poll`), the room routine (`mouse_room`) and the
+  CD32 name entry (`mouse_name`) drop the latch, so presses there never
+  reach a cutscene that follows.
+- The game's other key reads keep their meaning: flight, the nav map, the
+  bar, the name entry, the TrainSim enemy selection (whose Esc leaves the
+  simulator) and the Esc loop at `O:142ac` are not hooked.
+
+How it is checked:
+- **Native.** `cd32_fixes_check.py` (both languages) and `ocs_options_check.py`
+  (after both installs) run the whole key-or-fire wait after `mouse_vbl`
+  fields. A new press must make it return 'continue' with the abort flag
+  set, once. No press, a held press, a press older than 50 fields, a press
+  the flight poll took and lines that never read up must stay native.
+  `--sabotage esc-ignored` must fail.
+- **Live.** `mouse_live_check.py --esc` presses the right button at the
+  intro's two waits (title and credits; Esc natively takes two presses
+  too). Each time the wait's own Esc branch (its abort flag store, `O:180da`,
+  `E:1899c`, `G:18a56`) must run and the stage end, and the start menu must
+  follow.
+
 ### CD32 bunk save: Psygore's StoreNV return value
 
 Barracks saving (`E:26c60` actions, common tail `E:26dc0` rebuilding the bunks

@@ -259,6 +259,8 @@ mouse_name:
         move.l  2(sp),(sp)              ; return address below the column word
         move.w  d0,4(sp)
         movem.l d1-d4/a0-a1,-(sp)       ; column at 28(sp), row at 30(sp)
+        lea     btn(pc),a0
+        clr.w   BT_ESC(a0)              ; name entry presses are not Esc
         movea.l mouse_params(pc),a1
         move.w  MP_SLOT(a1),d1
         lea     mouse_event(pc),a0
@@ -333,7 +335,7 @@ mouse_name:
 ; native sprite move (H0); flight: pitch ramp, view, direction flags,
 ; aperture, flight copper lists (A4), aperture scan (H0); then name entry:
 ; selected cell, columns (A4), native grid step (H0), pad read (H0); key
-; FIFO read index and buffer (A4).
+; FIFO read index and buffer (A4); the native key read (H0).
 mouse_params_en:
         dc.w    2696,2728,162,-1160
         dc.l    $3171e
@@ -344,6 +346,7 @@ mouse_params_en:
         dc.l    $33dfc
         dc.w    94,-38
         dc.l    0
+        dc.l    $34318
 mouse_params_de:
         dc.w    2740,2772,206,-1116
         dc.l    $318e0
@@ -354,6 +357,7 @@ mouse_params_de:
         dc.l    $33fbe
         dc.w    138,6
         dc.l    0
+        dc.l    $344da
 name_step:      dc.l 0
 name_used:      dc.w 0,0,0,0            ; used x, used y, last poll field, right button
 
@@ -389,6 +393,12 @@ fix_patch_en:
         dc.w    3                ; PL_PS name entry grid poll
         dc.l    $16ed0
         dc.w    mouse_name-fix_patch_en
+        dc.w    3                ; PL_PS cutscene waits' key reads: the right button as Esc
+        dc.l    $18990
+        dc.w    mouse_esc-fix_patch_en
+        dc.w    3
+        dc.l    $18a90
+        dc.w    mouse_esc-fix_patch_en
         dc.w    3                ; PL_PS flight controller pitch/yaw ramp stores
         dc.l    $19064
         dc.w    mouse_steer-fix_patch_en
@@ -436,6 +446,12 @@ fix_patch_de:
         dc.w    3
         dc.l    $16f6e
         dc.w    mouse_name-fix_patch_de
+        dc.w    3
+        dc.l    $18a4a
+        dc.w    mouse_esc-fix_patch_de
+        dc.w    3
+        dc.l    $18b4a
+        dc.w    mouse_esc-fix_patch_de
         dc.w    3
         dc.l    $1911e
         dc.w    mouse_steer-fix_patch_de

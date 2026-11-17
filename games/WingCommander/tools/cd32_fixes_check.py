@@ -41,7 +41,8 @@ GAMES = {
                                slot=162, hide=-1160, image=-1164, gfx=-778, params='mouse_params_en',
                                name=0x16ed0, step=0x16c66, sel=17716, cols=17706,
                                steer=0x19064, poll=0x18d82, poll_entry=0x18c5e, keys=94, keybuf=-38, controller=0x18daa, ramp=5882, view=-18280,
-                               aperture=-4318, copper=-532, scan=0x2cc36, scans=(0x1784c, 0x1bd2e))),
+                               aperture=-4318, copper=-532, scan=0x2cc36, scans=(0x1784c, 0x1bd2e),
+                               esc=(0x18990, 0x18a90), wait=0x1898a, keyread=0x34318)),
     'german': dict(path='tmp/game/WingCommanderCD32/data/wing.german',
                    sha='2047da69f2c83803675921afd86204747609a5c59dd3e7f67d954d785677dabe',
                    psygore=0x1cf4, fix='fix_patch_de', save=0x277a0, a4=0x7ffe,
@@ -54,7 +55,8 @@ GAMES = {
                               slot=206, hide=-1116, image=-1120, gfx=-734, params='mouse_params_de',
                               name=0x16f6e, step=0x16d04, sel=17766, cols=17756,
                               steer=0x1911e, poll=0x18e3c, poll_entry=0x18d18, keys=138, keybuf=6, controller=0x18e64, ramp=5926, view=-18236,
-                              aperture=-4274, copper=-488, scan=0x2cdf8, scans=(0x178e4, 0x1bdd8))),
+                              aperture=-4274, copper=-488, scan=0x2cdf8, scans=(0x178e4, 0x1bdd8),
+                              esc=(0x18a4a, 0x18b4a), wait=0x18a44, keyread=0x344da)),
 }
 SLAVE = 0x200000          # slave payload
 RES = 0x280000            # resload jump table, each entry an RTS
@@ -420,6 +422,54 @@ def mouse_cases(cfg, psy, fixed, blob, sy):
     out['name_entry'] = name_cases(cfg, fixed, blob, sy)
     out['flight'] = steer_cases(cfg, psy, fixed, blob, sy)
     out['buttons'] = button_cases(cfg, fixed, blob, sy)
+    out['cutscene_esc'] = esc_cases(cfg, fixed, blob, sy)
+    return out
+
+
+def esc_cases(cfg, fixed, blob, sy):
+    """The right button as Esc in the cutscene waits: the game's whole
+    key-or-fire wait with the slave's key read hook, after mouse_vbl fields
+    with the right button. It must return 'continue' and set the abort flag
+    for a recent press, once, and stay native for no press, a held one, a
+    stale one, one taken by the flight poll and lines that never read up."""
+    mc = cfg['mouse']
+    for x in mc['esc']:
+        assert fixed[x:x+6] == struct.pack('>HI', 0x4eb9, SLAVE+sy['mouse_esc']), hex(x)
+    abort = struct.unpack('>h', fixed[mc['esc'][0]+16:mc['esc'][0]+18])[0]
+    m = Machine(fixed, blob, cfg, {}, os=True)
+    m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
+    assert struct.unpack('>I', m.read(SLAVE+sy['mouse_keyread'], 4))[0] == mc['keyread']
+    fields = lambda: struct.unpack('>H', m.read(SLAVE+sy['mouse_fields'], 2))[0]
+
+    def vbl(right, n=1, lines=True):
+        for _ in range(n):
+            m.write(SLAVE+sy['stick_field'], struct.pack('>H', (fields()-100) & 0xffff))
+            m.write(0xbfe001, b'\xff')
+            m.write(0xdff016, struct.pack('>H', (0xffff & ~(right << 10)) if lines else 0))
+            m.call(SLAVE+sy['mouse_vbl'], b'')
+
+    def wait():
+        m.write(m.a4+abort, bytes(2))
+        m.call(mc['wait'], b'')
+        return m.reg(9) & 0xffff, struct.unpack('>h', m.read(m.a4+abort, 2))[0]
+    out = {}
+    vbl(0, 2)
+    out['none'] = wait()
+    vbl(1); out['press'] = wait(); out['held'] = wait()
+    vbl(1, 3); out['still_held'] = wait()
+    vbl(0); vbl(1); vbl(1, 60); out['stale'] = wait()
+    vbl(0); vbl(1)
+    m.write(SLAVE+sy['stick_field'], m.read(SLAVE+sy['mouse_fields'], 2))
+    m.call(SLAVE+sy['mouse_poll'], b'')
+    out['flight'] = wait()
+    vbl(0); vbl(1, 2); out['again'] = wait()
+    m.close()
+    m = Machine(fixed, blob, cfg, {}, os=True)
+    m.call(SLAVE+sy['mouse_init'], b'', [(1, SLAVE+sy[mc['params']]), (9, 0)])
+    vbl(0, 2, lines=False); vbl(1, 2, lines=False); out['lines_low'] = wait()
+    m.close()
+    want = dict(none=(0, 0), press=(1, 1), held=(0, 0), still_held=(0, 0), stale=(0, 0), flight=(0, 0), again=(1, 1), lines_low=(0, 0))
+    assert out == want, out
     return out
 
 
@@ -877,7 +927,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('build', type=Path)
     p.add_argument('--output', required=True, type=Path)
-    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored', 'roll-native', 'return-ignored'),
+    p.add_argument('--sabotage', choices=('store-failure', 'list-stub', 'mouse-ignored', 'name-ignored', 'scores-ignored', 'steer-ignored', 'mask-ignored', 'buttons-ignored', 'roll-native', 'return-ignored', 'esc-ignored'),
                    help='negative control: the check must fail')
     a = p.parse_args()
     out = a.output.resolve()
@@ -914,6 +964,9 @@ def main():
         elif a.sabotage == 'return-ignored':  # the name entry's right button queues nothing
             at = blob.index(bytes.fromhex('700d6100'), sy['mouse_name'])
             blob[at+2:at+6] = bytes.fromhex('4e714e71')
+        elif a.sabotage == 'esc-ignored':  # the cutscene waits never take the right button
+            at = blob.index(bytes.fromhex('701b4e75'), sy['mouse_esc'])   # moveq #27,d0; rts
+            blob[at:at+2] = bytes.fromhex('70ff')
         elif a.sabotage == 'mask-ignored':  # the pointer drawn over the cockpit too
             at = blob.index(bytes.fromhex('c052'), sy['stick_show'])
             blob[at:at+2] = bytes.fromhex('3012')
@@ -941,11 +994,15 @@ def main():
         sc = cfg['scores']
         assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']), (3, cfg['peek']['site']),
                           (3, mc['room']), (3, mc['exit']), (3, mc['pad']), (3, mc['guard']), (3, mc['name']),
-                          (3, mc['steer']), (3, mc['poll']), (3, mc['scans'][0]), (3, mc['scans'][1]), (3, sc['site'])], fixlog
+                          (3, mc['esc'][0]), (3, mc['esc'][1]), (3, mc['steer']), (3, mc['poll']), (3, mc['scans'][0]), (3, mc['scans'][1]), (3, sc['site'])], fixlog
         assert original[sc['site']:sc['site']+6] == bytes.fromhex('397c00018034')
         assert original[sc['restore']:sc['restore']+4] == bytes.fromhex('48e70030')
         assert all(original[x:x+2] == b'\x4e\xb9' for x in (sc['site']-12, sc['site']-6))
         assert original[mc['name']:mc['name']+4] == bytes.fromhex('3f004eba')
+        # The cutscene waits: the key read, then Return/Esc/Space with Esc
+        # setting the abort flag.
+        assert all(original[x:x+16] == struct.pack('>HI', 0x4eb9, mc['keyread'])+bytes.fromhex('34003002600a397c0001') for x in mc['esc'])
+        assert mc['esc'][0]-mc['wait'] == 6 and original[mc['wait']:mc['wait']+6] == bytes.fromhex('48e730007600')
         assert original[mc['reset']:mc['guard']+8] == bytes.fromhex('224870094259 51c8fffc 317cffff0012 4e75'.replace(' ', ''))
         assert original[mc['steer']:mc['steer']+8] == struct.pack('>HhHh', 0x3942, mc['ramp'], 0x3943, mc['ramp']+2)
         assert original[mc['controller']:mc['controller']+4] == bytes.fromhex('4e55fffa')
@@ -961,7 +1018,7 @@ def main():
         assert original[t:t+4] == bytes.fromhex('3f04486c') and original[t+6:t+8] == bytes.fromhex('4eba')
         assert fixed[t:t+2] == bytes.fromhex('3f12') and fixed[t+2:t+8] == original[t+2:t+8]
         changed = [i for i in range(len(psy)) if psy[i] != fixed[i]]
-        assert all(any(x <= i < x+6 for x in list(s.values())+[cfg['peek']['site'], mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], mc['poll'], sc['site']]+list(mc['scans'])) or t <= i < t+2
+        assert all(any(x <= i < x+6 for x in list(s.values())+[cfg['peek']['site'], mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], mc['poll'], sc['site']]+list(mc['scans'])+list(mc['esc'])) or t <= i < t+2
                    for i in changed)
         cases = {}
         # Negative control: Psygore's list writes the file but clears the name.

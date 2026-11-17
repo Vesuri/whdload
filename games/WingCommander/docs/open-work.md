@@ -1025,8 +1025,11 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   - CD32 German passes the same live check (intro, menu, name entry).
   - The user reports the mouse working in play (2026-11-13). Not separately
     recorded: the bar, barracks and TrainSim rooms.
-  - Unchanged: key-only waits such as the nav map, and the right button
-    outside flight and the CD32 name entry.
+  - The right button is Esc in the cutscene waits (user request,
+    2026-11-17), so it skips cutscenes; see
+    [the right button as Esc](internals.md#right-button-as-esc-in-cutscenes-both-release-builds-every-mode).
+  - Unchanged: key-only waits such as the nav map, and the right button in
+    the rooms.
 
   See [mouse](internals.md#mouse-in-rooms-and-menus-both-release-builds-every-mode).
 - **Mouse flight: done in both release builds, every mode (2026-11-13).** The

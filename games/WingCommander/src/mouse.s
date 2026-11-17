@@ -57,6 +57,7 @@ MP_SCAN = 22                    ; H0 offset: native aperture scan (long)
 MP_KEYS = 38                    ; A4 offset: key FIFO read index; the write index follows
 MP_KEYBUF_A4 = 40               ; A4 offset: the FIFO's 64 bytes, when MP_KEYBUF is 0
 MP_KEYBUF = 42                  ; H0 offset: the FIFO's 64 bytes (long), or 0
+MP_KEYREAD = 46                 ; H0 offset: the native key read (long)
 
 STICK_LEVEL = 9                 ; stick units per PC step: steps 1-5 and 8 give ramps 1-5 and 9
 STICK_STEP = 8                  ; stick units per ramp step: ramps reach +-9
@@ -72,6 +73,7 @@ RIGHT_STEP = 4                  ; counts in the last four fields: a direction
 CLICK_MAX = 15                  ; fields: a shorter right press is a click
 DCLICK_GAP = 15                 ; fields from a click's release to a double click
 BURN_REPEAT = 5                 ; fields between the afterburner's Tabs (key repeat)
+ESC_AGE = 50                    ; fields: a right press this recent is Esc in a cutscene wait
 ROLL_SCALE = 4                  ; the right button's roll: native ramp steps, decay and cap times this
 
 ; a0 = parameter table, d0 = game H0 base.
@@ -92,6 +94,10 @@ mouse_init:
         add.l   d0,d1
 .keybuf:
         lea     mouse_keybuf(pc),a1
+        move.l  d1,(a1)
+        move.l  MP_KEYREAD(a0),d1
+        add.l   d0,d1
+        lea     mouse_keyread(pc),a1
         move.l  d1,(a1)
         add.l   MP_SCAN(a0),d0
         lea     mouse_scan_native(pc),a1
@@ -131,6 +137,8 @@ mouse_init:
 ; d2/d3 hold the native stepped and clamped position.
 mouse_room:
         movem.l d0-d1/a0-a1,-(sp)
+        lea     btn(pc),a0
+        clr.w   BT_ESC(a0)              ; room presses are not Esc
         lea     mouse_a4(pc),a0
         move.l  a4,(a0)
         movea.l mouse_params(pc),a1
@@ -619,6 +627,13 @@ mouse_buttons:
         and.w   d1,d0                   ; a line never seen up stays up
         move.w  BT_NOW(a0),d1           ; the last field's
         move.w  d0,BT_NOW(a0)
+        btst    #BT_RIGHT,d0
+        beq.s   .no_esc
+        btst    #BT_RIGHT,d1
+        bne.s   .no_esc
+        move.w  #1,BT_ESC(a0)           ; a right press: Esc for a cutscene wait
+        move.w  mouse_fields(pc),BT_ESCAT(a0)
+.no_esc:
         move.w  BT_IDX(a0),d2
         addq.w  #2,d2
         andi.w  #6,d2
@@ -712,6 +727,7 @@ mouse_poll:
         clr.w   BT_MISSILE(a1)
         bra.w   .done
 .flight:
+        clr.w   BT_ESC(a1)              ; flight presses are not Esc
         movea.l mouse_params(pc),a0
         move.w  MP_FLAGS(a0),d0
         lea     (a4,d0.w),a0
@@ -800,6 +816,30 @@ mouse_key:
 .full:
         jsr     -138(a6)                ; Permit
         movem.l (sp)+,d0-d2/a0-a1/a6
+        rts
+
+; Replaces the native key read call (6 bytes) in the cutscene waits that
+; turn Esc into the game's abort flag: the key-or-fire wait (OCS O:180ce,
+; CD32 E:18990, G:18a4a) and the timed wait (O:1814c, E:18a90, G:18b4a).
+; A right press in the last ESC_AGE fields reads as Esc (27), once; else the
+; native read. Flight, the rooms and the name entry drop their presses, so
+; the right button is Esc only here. Returns d0 as the native read does.
+mouse_esc:
+        move.l  a0,-(sp)
+        lea     btn(pc),a0
+        tst.w   BT_ESC(a0)
+        beq.s   .native
+        clr.w   BT_ESC(a0)
+        move.w  mouse_fields(pc),d0
+        sub.w   BT_ESCAT(a0),d0
+        cmpi.w  #ESC_AGE,d0
+        bhi.s   .native                 ; stale
+        movea.l (sp)+,a0
+        moveq   #27,d0
+        rts
+.native:
+        movea.l (sp)+,a0
+        move.l  mouse_keyread(pc),-(sp)
         rts
 
 ; Hide the flight pointer by clearing its image's control words, with no
@@ -1110,6 +1150,8 @@ BT_LAST = 18                    ; mouse_sum_x/y at the last field
 BT_DX = 22                      ; the last four fields' x motion
 BT_DY = 30                      ; and y motion
 BT_SEEN = 38                    ; button bits whose line has read up
+BT_ESC = 40                     ; a right press not yet taken (mouse_esc)
+BT_ESCAT = 42                   ; mouse_fields at that press
 
         cnop    0,4
 mouse_a4:       dc.l 0
@@ -1138,9 +1180,10 @@ mask_rows:      dc.w 0                  ; mask rows (0: no aperture)
 roll_mouse:     dc.w 0                  ; the right button has rolled: scaled until the ramp settles
 fire_held:      dc.w 0                  ; left button fire: fields held (0: native)
 btn:            dc.w 7                  ; button record (BT_): all down, so no first press
-                dcb.w 19,0
+                dcb.w 21,0
         cnop    0,4
 mouse_keybuf:   dc.l 0                  ; the key FIFO, 0: at MP_KEYBUF_A4
+mouse_keyread:  dc.l 0                  ; the native key read
 stick_image:    dc.l 0                  ; Chip pointer image, 0 without one
 stick_ss:       dc.l 0                  ; SimpleSprite, then the mask
 stick_gfx:      dc.l 0                  ; GfxBase

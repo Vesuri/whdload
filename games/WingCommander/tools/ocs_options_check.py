@@ -111,7 +111,7 @@ def buttons_scenario(c,slave,sy):
         c.write(EVENT,struct.pack('>IBBHHhh',0,2,0,0xff,0x8000,dx,dy))
         c.run(slave-CODE+sy['mouse_event'],registers={4:EVENT})
     def reset():
-        c.write(slave+sy['btn'],word(7)+bytes(38))
+        c.write(slave+sy['btn'],word(7)+bytes(42))
         c.write(a4-2036,word(c.get(a4-2038,2)))
     def run(sequence,flight=True,lines=True):
         rows=[]
@@ -160,6 +160,29 @@ def buttons_scenario(c,slave,sy):
     require(got==[-4,-8,-12,-16,-20,-24,-28,-32,-36,-36,4,8,0,0],f'mouse roll {got}')
     got=[roll(1,1) for _ in range(9)]+[roll(0,0) for _ in range(6)]+[roll(0,1) for _ in range(2)]
     require(got==[4,8,12,16,20,24,28,32,36,28,20,12,4,0,0,1,2],f'released roll {got}')
+    # The right button as Esc in the cutscene waits (key reads O:180ce in the
+    # key-or-fire wait O:180c4, O:1814c in the timed wait): the whole wait
+    # returns 'continue' and sets the abort flag (A4-28796) for a recent
+    # press, once; native for none, held, stale, a flight press, low lines.
+    for site in (0x180ce,0x1814c):
+        require(c.read(CODE+site,6)==bytes.fromhex('4eb9')+long(slave+sy['mouse_esc']),f'cutscene key read O:{site:x} not hooked')
+    require(c.get(slave+sy['mouse_keyread'],4)==CODE+0x345a8,'native key read')
+    def vbl(right,n=1,lines=True):
+        for _ in range(n):
+            c.write(slave+sy['stick_field'],word((fields()-100)&0xffff));c.write(0xbfe001,b'\xff')
+            c.write(0xdff016,word((0xffff&~(right<<10)) if lines else 0));c.run(slave-CODE+sy['mouse_vbl'])
+    def wait():
+        c.write(a4-28796,word(0));c.run(0x180c4)
+        return c.reg(9)&0xffff,c.get(a4-28796,2)
+    got={}
+    reset();vbl(0,2);got['none']=wait()
+    vbl(1);got['press']=wait();got['held']=wait()
+    vbl(1,3);got['still_held']=wait()
+    vbl(0);vbl(1);vbl(1,60);got['stale']=wait()
+    vbl(0);vbl(1);c.write(slave+sy['stick_field'],word(fields()));c.run(slave-CODE+sy['mouse_poll']);got['flight']=wait()
+    vbl(0);vbl(1,2);got['again']=wait()
+    reset();vbl(0,2,False);vbl(1,2,False);got['lines_low']=wait()
+    require(got==dict(none=(0,0),press=(1,1),held=(0,0),still_held=(0,0),stale=(0,0),flight=(0,0),again=(1,1),lines_low=(0,0)),f'cutscene Esc {got}')
     c.write(0xdff016,word(0))
 
 
