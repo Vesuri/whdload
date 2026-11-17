@@ -26,7 +26,9 @@ _config		dc.b	"C1:L:Start on hole (debug):1. Windmill,2. Hamburger,3. Walls,4. P
 _name		dc.b	"Zany Golf",0
 _copy		dc.b	"1988 Electronic Arts",0
 _info		dc.b	"installed & fixed by Bored Seal",10
-		dc.b	"V1.1 (23-Jul-2006)",0
+		dc.b	"enhanced by Vesuri",10
+		dc.b	"V2.0b (17.11.2026)",0
+		dc.b	"$VER: ZanyGolf.slave 2.0b (17.11.2026)",0
 		even
 
 Start		lea	_resload(pc),a1

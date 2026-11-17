@@ -1,10 +1,11 @@
-Short : HD-Installer for Zany Golf
+Short : Zany Golf Enhanced 2.0b: HD-Installer with smooth frames
 Type : game/patch
-Author : Bored Seal
+Author : Vesuri, after Bored Seal (v1.0, v1.1)
 
 This patch applies to "Zany Golf" by Electronic Arts (c) 1988.
-Slave requires WHDLOAD V10+.
-Game requires 0.5MB ChipRAM (+ 0.7MB RAM for PreLoad)
+Slave requires WHDLOAD V17+.
+Game requires 0.5MB ChipRAM (+ 0.7MB RAM for PreLoad,
++ 88KB for faster drawing, best Fast memory)
 
 FEATURES:
 - Full load from HD
@@ -15,6 +16,19 @@ FEATURES:
 - Quit option (your default key)
 
 HISTORY:
+version 2.0b (17.11.2026) done by Vesuri:
+- smooth movement at the game's intended speed on every Amiga: frames are
+  drawn between the game's steps, up to one per display frame on a 68030,
+  and drawn faster on every Amiga, the A500 included
+- the mouse pointer moves every display frame, fast strokes stay straight
+  and clicks are no longer missed
+- Esc or the mouse button skips the opening credits
+- no pause after pressing 1-4 at the title
+- the bonus, award and game over screens and the fades last as long on
+  every Amiga as on an A500
+- uses fast memory and the instruction cache when available
+- "Start on hole" option in the WHDLoad splash window
+
 v1.0 (05-Aug-2000) - first release
 V1.1 (23-Jul-2006) - disk access removed, files moved to "data" subdirectory
 

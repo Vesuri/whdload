@@ -111,6 +111,7 @@ CPU is what shows the sign.
 - The keyboard delay is nine `VHPOSR` line-byte changes, counted by polling; a CIA timer
   would be exact on any CPU.
 
-## Before a first release
+## Release
 
-A dated `$VER` in the slave and the info text, and a ReadMe entry above Bored Seal's.
+2.0b (17.11.2026): `$VER` and the info text in the slave, the ReadMe entry above Bored
+Seal's.
