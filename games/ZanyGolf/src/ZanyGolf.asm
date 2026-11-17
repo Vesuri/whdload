@@ -375,8 +375,9 @@ _stepped	dc.b	0			;a step ran since $4fd0 last did
 ;   step before and the last, (fields since the step was due + 1)/6 of the way, to the
 ;   nearest pixel, and for the first half the step before's frame of the object, so an
 ;   animation keeps with its moves: the frame, shown from the next field, is a step
-;   behind the world at most; an object whose frame changed by its frame's box, x its
-;   middle and y its bottom, between the two frames' (.anim);
+;   behind the world at most; an object that has moved on this screen (IpSnap) and whose
+;   frame changed by its frame's box, x its middle and y its bottom, between the two
+;   frames' (.anim);
 ; - the course pieces each step draws over the objects, on every pass (.mask);
 ; - while the player points or draws a stroke back ($5e1a 0, $9676 0 or 1, in play):
 ;   the pointer ($5e1c), where the next step will put it by the counts gathered so far
@@ -392,7 +393,8 @@ IP_MASK		= IP_SAVE+256+8		;the last step's pieces: bit 1 of $111a 64, $119a 64,
 IP_MASKP	= IP_MASK+128		;the step before's the same
 IP_MSAVE	= IP_MASKP+128		;$111a 64, $119a 64, for Restore
 IP_PFRAME	= IP_MSAVE+128		;the step before's frames ($0f1a) 64
-IP_SIZE		= IP_PFRAME+64
+IP_MOVED	= IP_PFRAME+64		;each object moved on this screen: 64
+IP_SIZE		= IP_MOVED+64
 
 IpInit		movem.l	d0-d1/a0-a1/a6,-(sp)
 		move.l	#IP_SIZE,d0
@@ -405,11 +407,44 @@ IpInit		movem.l	d0-d1/a0-a1/a6,-(sp)
 		rts
 
 ; Before a step (Split; d7 and a0 scratch).
-IpSnap		movem.l	d0/a1-a2,-(sp)
+IpSnap		movem.l	d0-d1/a1-a2,-(sp)
 		move.l	(_ipbuf,pc),d0
-		beq.b	.out
+		beq	.out
 		movea.l	d0,a1
-		lea	$0f5a(a4),a2		;x, y, active
+		moveq	#0,d1			;X: marks the objects that moved since
+		move.b	$0ea8(a4),d0		;the last snapshot, on the same screen
+		cmp.b	IP_PSTATE(a1),d0	;and hole, with the same shape
+		bne.b	.mclr
+		move.b	$5c5a(a4),d0
+		cmp.b	IP_PSTATE+1(a1),d0
+		bne.b	.mclr
+.mobj		lea	(a4,d1.w),a0
+		lea	(a1,d1.w),a2
+		tst.b	$0fda(a0)
+		beq.b	.mnot
+		tst.b	128(a2)
+		beq.b	.mnot
+		move.b	$0eda(a0),d0
+		cmp.b	192(a2),d0
+		bne.b	.mnot
+		move.w	$0f5a(a0),d0
+		cmp.w	(a2),d0
+		bne.b	.mset
+		move.w	$0f9a(a0),d0
+		cmp.w	64(a2),d0
+		beq.b	.mnext
+.mset		st	IP_MOVED(a2)
+		bra.b	.mnext
+.mnot		clr.b	IP_MOVED(a2)
+.mnext		addq.w	#2,d1
+		cmp.w	#64,d1
+		bne.b	.mobj
+		bra.b	.snap
+.mclr		lea	IP_MOVED(a1),a2
+		moveq	#64/4-1,d0
+.mc		clr.l	(a2)+
+		dbf	d0,.mc
+.snap		lea	$0f5a(a4),a2		;x, y, active
 		moveq	#192/4-1,d0
 .xya		move.l	(a2)+,(a1)+
 		dbf	d0,.xya
@@ -431,7 +466,7 @@ IpSnap		movem.l	d0/a1-a2,-(sp)
 		dbf	d0,.frame
 		lea	(_ipvalid,pc),a2
 		st	(a2)
-.out		movem.l	(sp)+,d0/a1-a2
+.out		movem.l	(sp)+,d0-d1/a1-a2
 		rts
 
 IpCut		lea	(_ipvalid,pc),a0	;no step before to draw from
@@ -494,6 +529,8 @@ Present		movem.l	d0-d6/a1-a3,-(sp)
 		move.b	IP_PFRAME(a2),d0	;a new frame: the frames' boxes
 		cmp.b	$0f1a(a0),d0		;between the steps instead
 		beq.b	.oput
+		tst.b	IP_MOVED(a2)		;not an animation in place
+		beq.b	.oput
 		bsr	.anim
 .oput		SEW	d5,$0f5a(a0)
 		SEW	d3,$0f9a(a0)
@@ -502,7 +539,7 @@ Present		movem.l	d0-d6/a1-a3,-(sp)
 		move.b	IP_PFRAME(a2),$0f1a(a0)
 .onext		addq.w	#2,d1
 		cmp.w	#$40,d1
-		bne.b	.obj
+		bne	.obj
 		LEW	320(a1),d2		;the view
 		LEW	$0e9c(a4),d3
 		bsr	.lerp

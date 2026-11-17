@@ -371,7 +371,18 @@ The draw-only frames are drawn between the last two steps (`IpSnap`, `Present`,
   about put and the stack grows up. With its top interpolated the bottom bun jumped the
   whole 2 to 5 lines at each frame change, and with the box's middle both ends jumped
   half; with the bottom the bottom bun moves a line a field at most and the top takes the
-  frame's change (traced on hole 2), which looked right.
+  frame's change (traced on hole 2), which looked right. Only objects that have moved on
+  this screen are placed so (`IpSnap` marks them, and clears the mark when an object goes
+  or changes shape, or the state or hole changes): hole 9 has five objects (shape 4) that
+  animate in place with frames whose boxes differ by a line or two, which a box would
+  move by a pixel between the steps. The burger keeps its y for a step at the top of a
+  bounce while its frame shrinks by 5 lines, so marking only a move in that step let its
+  bottom bun jump there. The other shapes whose frames differ in size: the ball's
+  frames 0-3 and 4-7 by a line and a pixel; shape 3 of every hole and shape 5 of hole 6
+  share a bottom; hole 9's shape 5 slides with one frame and then animates in place, and
+  shape 6 moves while frames 0-3 grow down from a fixed top (its top moves a line and back
+  each step, as with its position interpolated); hole 7's shape 4 did not animate
+  without input.
 - while the player points or draws a stroke back, in play with the ball at rest: the
   pointer at `PtrPredict`'s point, the view scrolled to it as $8afe scrolls, the pointer's
   object ($8dd6) or, drawing back, the ball's mark, the three dots, their flags and the
