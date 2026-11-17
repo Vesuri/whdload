@@ -1,0 +1,25 @@
+Short : HD-Installer for Zany Golf
+Type : game/patch
+Author : Bored Seal
+
+This patch applies to "Zany Golf" by Electronic Arts (c) 1988.
+Slave requires WHDLOAD V10+.
+Game requires 0.5MB ChipRAM (+ 0.7MB RAM for PreLoad)
+
+FEATURES:
+- Full load from HD
+- Disk protection removed
+- Trainer key added (pressing F10 will give you 9 strokes)
+- OS emulation module used
+- ROM/NI icon (created by JHZ)
+- Quit option (your default key)
+
+HISTORY:
+v1.0 (05-Aug-2000) - first release
+V1.1 (23-Jul-2006) - disk access removed, files moved to "data" subdirectory
+
+
+Thanks to Jan Vieten for disk image.
+
+         Bug report form, full WHDLoad package and other installs:
+                          http://www.whdload.de

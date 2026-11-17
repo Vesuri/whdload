@@ -1,5 +1,6 @@
 		incdir	"include:"
 		include	whdload.i
+		opt	o4-		; the shipped slave keeps move.l #65536,d0, not moveq+swap
 
 _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	10			;ws_Version
@@ -68,7 +69,7 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 		move.l	#65536,d0
 		move.l	(_resload,pc),a2
 		jsr     (resload_CRC16,a2)
-		cmp.w	#$9cc8,d0
+		cmpi.w	#$9cc8,d0	; cmpi as the shipped slave has it: vasm encodes cmp #,Dn as CMP
 		bne	Unsupported
 
 		move.l	#$4e714eb9,$1f38(a3)	;fix keyboard and set cheat
@@ -81,7 +82,7 @@ Patch		movem.l	d0-d7/a0-a6,-(sp)
 FixKey		move.w	4(sp),d0
 		ror.b	#1,d0
 		not.b	d0
-		cmp.b	#$59,d0
+		cmpi.b	#$59,d0		; cmpi as the shipped slave has it: vasm encodes cmp #,Dn as CMP
 		bne	BeamDelay
 		move.b	#9,$15ca2	;set 9 strokes
 BeamDelay	moveq	#8,d0

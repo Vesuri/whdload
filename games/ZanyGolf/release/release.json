@@ -1,0 +1,15 @@
+{
+  "archives": [
+    {
+      "input": "ZanyGolf.lha",
+      "output": "ZanyGolfEnhanced-{version}-{date}.lha",
+      "replace": {
+        "ZanyGolfHD/ZanyGolf.slave": "build:ZanyGolf",
+        "ZanyGolfHD/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {"dir": "ZanyGolfHD/src", "variants": ["ZanyGolf"]}
+    }
+  ]
+}
