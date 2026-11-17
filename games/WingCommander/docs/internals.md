@@ -9213,8 +9213,11 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   The pointer's colour on screen was (243,255,235) in the first mission of
   systems 1, 2, 4, 6, 9 and 12 too (2026-11-17, `--direct-flight --system`;
   all six had the 320×105 aperture). On the user's real Amiga (with an Indivision) the pointer
-  shows black in flight, which is what colour 31 would show if the bank change
-  did not reach the display; not explained yet.
+  shows black in flight (CD32, a 68040 card with Zorro III RAM, CACHE),
+  which is what colour 31 would show if the bank change did not reach the
+  display. The emulator's 68040 model with CACHE (and NoMMU: the gdb-driven
+  build has no MMU) shows it in the right colour too, in the simulator and
+  the Nav-1 mission; not explained yet.
 - **Hiding.** `mouse_vbl`, called from each variant's VBL hook (CD32 the port-1
   pad read, OCS the port-1 fire sample), counts fields. Once the controller has
   not run for 25 fields (a pause, the map, the end of the flight), or the mouse

@@ -77,7 +77,9 @@ A real mission cockpit (the Nav-1 Hornet) needs the direct-flight fixture,
 CD32 English only: the release slave with the game's direct-flight argument.
 `--direct-flight` boots it with `CUSTOM2=2 CUSTOM3=1 CUSTOM4=0` (`--system N`
 and `--mission M` choose others) and runs the flight steps without the intro
-and menu:
+and menu (`--cache CACHE` sets that tooltype instead of DCACHE;
+on `--setup a1200-040` or `a1200-060` the check adds NoMMU and needs
+`FSUAE="$FSUAE_ARM"`, since `FSUAE_MMU` has no harness input commands):
 
 ```
 python3 tools/flight_fixture.py --release --nav 1 --output tmp/mouse-nav1-fixture

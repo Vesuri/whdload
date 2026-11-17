@@ -56,6 +56,8 @@ def main():
     p.add_argument('build', type=Path)
     p.add_argument('--output', required=True)
     p.add_argument('--original-mode', action='store_true', help='CUSTOM5 original behaviour')
+    p.add_argument('--cache', choices=('DCACHE', 'CACHE'), default='DCACHE',
+                   help='CD32: the cache tooltype (a1200-040/060 add NoMMU: the gdb-driven FSUAE_ARM has no MMU)')
     p.add_argument('--setup', default='a1200-030', help='AMIGA_SETUP (OCS also a500: 68000, 4 MiB Fast)')
     p.add_argument('--name-entry', action='store_true', help='CD32: also the TrainSim name entry grid')
     p.add_argument('--flight', action='store_true', help='mouse steering and the pointer in the simulator flight')
@@ -102,6 +104,7 @@ def main():
         from cd32_runtime import locate
         slave = a.build/'WingCommanderCD32.Slave'
         whd = 'CUSTOM5=0 DCACHE' if a.original_mode else 'CUSTOM5=3 DCACHE'
+        whd = whd.replace('DCACHE', a.cache+(' NoMMU' if a.setup in ('a1200-040', 'a1200-060') else ''))
         if a.german:
             whd = 'CUSTOM1=1 '+whd
             locate = functools.partial(locate, german=True)
