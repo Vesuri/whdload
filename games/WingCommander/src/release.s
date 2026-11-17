@@ -700,5 +700,5 @@ release_config:
         dc.b 'C4:L:Mission:1,2,3;'
         dc.b 'C5:X:Enhanced framerate:0;'
         dc.b 'C5:M:World speed:Original,1.0x,1.2x,1.5x,2.0x:1-3;'
-        dc.b 'C5:M:Mouse:Normal,Off,0.5x,0.75x,1.5x,2x,3x,4x:4-6;',0
+        dc.b 'C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2x,3x,4x:4-6;',0
         cnop 0,4

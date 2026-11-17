@@ -100,10 +100,10 @@
    World speed:          0 = Original     2 = 1.0x (10 updates/s)
                          4 = 1.2x         6 = 1.5x         8 = 2.0x
    Enhanced framerate:  +1 = smooth in-between pictures in flight
-   Mouse:                0 = normal      16 = off         32 = 0.5x
+   Mouse speed:          0 = 1.0x        16 = off         32 = 0.5x
                         48 = 0.75x       64 = 1.5x        80 = 2x
                         96 = 3x         112 = 4x
- The installed icon uses CUSTOM5=3: enhanced framerate at 1.0x, normal mouse.
+ The installed icon uses CUSTOM5=3: enhanced framerate at 1.0x, mouse at 1.0x.
  For example CUSTOM5=67 is the same with the mouse at 1.5x.
  Original speed is the original game, whose world advances once per picture,
  so its speed depends on the processor; the framerate option is then ignored.

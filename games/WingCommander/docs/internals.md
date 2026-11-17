@@ -9447,13 +9447,13 @@ How it is checked:
 
 UR9 asks for a mouse speed setting (`MOUSE=nn`). WHDLoad passes a slave only
 Custom1-5, all in use, so the setting is CUSTOM5 bits 4-6, a splash-window
-cycle gadget `C5:M:Mouse:...:4-6` beside the world speed and framerate. Field
-0 must stay the normal speed, so that icons without the bits (every 2.0b
+cycle gadget `C5:M:Mouse speed:...:4-6` beside World speed and Enhanced framerate.
+Field 0 must stay the normal speed (1.0x), so that icons without the bits (every 2.0b
 icon, and no tooltype at all) keep the mouse as it was; off is therefore 1:
 
 | Bits 4-6 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
 |---|---|---|---|---|---|---|---|---|
-| Mouse | normal | off | 0.5x | 0.75x | 1.5x | 2x | 3x | 4x |
+| Mouse speed | 1.0x | off | 0.5x | 0.75x | 1.5x | 2x | 3x | 4x |
 | CUSTOM5 add | 0 | 16 | 32 | 48 | 64 | 80 | 96 | 112 |
 | Quarter counts per count | 4 | (none) | 2 | 3 | 6 | 8 | 12 | 16 |
 
