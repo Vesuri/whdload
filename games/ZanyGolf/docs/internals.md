@@ -46,6 +46,7 @@ The loader, first hunk:
 | $2338 | the copper list's tail, after its wait for line $90: `DMACON` = $0020 (sprite DMA off), the data registers of sprites 0-7 = 0 | a wait for line $f8, the eight sprite pointers | ours, likewise |
 | $1dfe | the input's end, `movem.l (sp)+,d0-d2; lea $1e0a(a4),a5` | `jmp PtrStep` | ours, likewise: where the step puts the pointer |
 | $2246 | the interrupt's `bsr.w $1f0c; tst.b $126e(a4)` | `jsr PtrVbi; nop` | ours, likewise: the sprites placed every field |
+| $1d88, $1d8e, $1d92, $1d98; $1dae, $1db4, $1db8, $1dbe | the input's clamps of a step's move, ±31 | ±100 (`PTR_MAX`) | ours, likewise: a fast stroke stays straight ("The pointer") |
 | $7a9c | a game's start: the immediate of `LDY #0` (threaded), the position in the hole order | `CUSTOM1` | ours, debug, only with `CUSTOM1`=1-9: start on that hole (below) |
 
 Then `Patch` flushes the caches and turns on the instruction cache for BaseMem
@@ -210,8 +211,9 @@ and objects 5-7 are the dots between. While the ball rolls ($9676 = 2) there is 
 pointer, and a new turn puts it on the ball ($854e).
 
 Each step, the input routine ($1d5c) takes a quarter of the mouse's counts gathered by the
-interrupt ($1d54/$1d56; the rest stays for the next step), clamped to ±31, into
-$0e80/$0e88. $86ce turns those into the step's move (plus cursor keys, $0e58, and an
+interrupt ($1d54/$1d56; the counts' remainder of 4 stays for the next step), clamped
+to ±31 into $0e80/$0e88 (signed bytes); the counts beyond the clamp are lost, each axis
+on its own. $86ce turns those into the step's move (plus cursor keys, $0e58, and an
 acceleration from $0e60/$0e68, 0 with the mouse), $88a8 adds it to the position, and
 $8afe keeps the position 8 pixels inside the hole ($5e20/$5e22 its size) and the view,
 scrolling the view ($0e9c/$0e9e) when it comes within 8 pixels of an edge (304 pixels
@@ -226,10 +228,16 @@ colours (the interrupt copies the copper list's COLOR01-15 into COLOR17-31 each 
   sprite pointers (sprites 2-7 an empty sprite). Its top turns sprite DMA on and sets
   BPLCON2 to $24, sprites in front of the playfield. The playfield's fetch starts at
   DDFSTRT $30, which takes sprite 7's slot; sprites 0 and 1 keep theirs.
+- The input routine clamps a step's move to ±100 instead of ±31 (`PTR_MAX`; the cursor
+  keys add at most 14 to the signed byte). With ±31, shown every field, a stroke faster
+  than 310 pixels a second on one axis stopped that axis for the rest of the step while
+  the other went on, so a fast straight stroke wobbled: with the mouse moving 10 pixels
+  right and 5 up a field on `a1200` the sprite went 3 fields diagonally and 3 straight
+  up. With ±100 it goes straight (1000 pixels a second before the clamp).
 - `PtrStep` (at the input routine's end) keeps where this step puts the pointer: the
   position plus $0e80/$0e88.
 - `PtrVbi` (in the interrupt, after it has added the counts, at the vertical blank's run)
-  adds a quarter of the counts gathered since, clamped to ±31 as the next step will clamp
+  adds a quarter of the counts gathered since, clamped as the next step will clamp
   them, keeps the result inside the hole and the view as $8afe does, and writes the
   sprites' control words for the frame on screen. `FrameCap` keeps that frame's view at
   the flip ($1474/$1476 of the frame drawn before). A flip before line $48 shows in the

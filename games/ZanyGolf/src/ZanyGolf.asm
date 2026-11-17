@@ -379,10 +379,12 @@ TBIT		macro			;bit \2 of \1 set: set bit \4 of \3
 ; position on the course map ($5e1c x, $5e1e y, little-endian) less 8: object 4 (X=8)
 ; while the player points ($9676 0), object 8 (X=$10) while a stroke is drawn back ($9676
 ; 1). Each step moves the position by the input routine's ($1d5c) quarter of the mouse's
-; counts, clamped to +-31 ($0e80/$0e88; the rest of the counts stays for the next step),
+; counts, clamped to +-31 ($0e80/$0e88; the counts beyond are lost, each axis on its own),
 ; and keeps it 8 pixels inside the hole ($5e20/$5e22) and the view, which it scrolls. With
 ; a chip block (PtrInit), sprites 0 and 1, attached (15 colours, COLOR17-31 copied from the
 ; playfield's), show it instead, moved by the interrupt every field:
+; - the clamp is PTR_MAX instead: shown every field, the clamped axis stopped while the
+;   other went on, and a fast straight stroke wobbled;
 ; - PtrStep, at the input routine's end, keeps where the step puts the pointer: its
 ;   position plus the counts the routine took;
 ; - PtrVbi, at each vertical blank, adds the quarter of the counts gathered since,
@@ -403,6 +405,8 @@ PTR_SIZE	= 2*PTR_SPR+8		;sprites 0 and 1, the empty sprite
 PTR_HPOS	= $7f			;HSTART at the view's left edge
 PTR_VPOS	= $52			;VSTART at its top: the playfield's first line
 PTR_VBL		= $48			;the interrupt's runs before this line are the VERTB's
+PTR_MAX		= 100			;a step's move from the mouse, at most (the game's 31;
+					;the cursor keys add up to 14 to the signed byte)
 
 PtrInit		movem.l	d0-d2/a0-a2/a6,-(sp)	;a3 = FILE1
 		move.l	#PTR_SIZE,d0
@@ -433,6 +437,14 @@ PtrInit		movem.l	d0-d2/a0-a2/a6,-(sp)	;a3 = FILE1
 .rest		move.l	a2,d0
 		bsr.b	.ptr
 		dbf	d2,.rest
+		moveq	#2-1,d1			;the input routine's clamps, x and y
+		lea	$1d88(a3),a0
+.max		move.w	#PTR_MAX,(a0)		;cmp.w #31,d0
+		move.w	#PTR_MAX,6(a0)		;move.w #31,d0
+		move.w	#-PTR_MAX,10(a0)	;cmp.w #-31,d0
+		move.w	#-PTR_MAX,16(a0)	;move.w #-31,d0
+		lea	$1dae-$1d88(a0),a0
+		dbf	d1,.max
 		move.w	#$4ef9,$1dfe(a3)	;the input routine's end: jmp PtrStep
 		pea	PtrStep
 		move.l	(sp)+,$1e00(a3)
@@ -553,12 +565,12 @@ PtrPlace	move.l	(_ptrspr,pc),d0
 ; One axis: d0 where the step put the pointer, d1 the counts since, d2 the hole's size,
 ; d3 the view, d4 the last place in the view. Out: d0 in the view.
 .axis		asr.w	#2,d1			;as $1d5c takes them
-		cmp.w	#31,d1
+		cmp.w	#PTR_MAX,d1
 		ble.b	.a1
-		moveq	#31,d1
-.a1		cmp.w	#-31,d1
+		moveq	#PTR_MAX,d1
+.a1		cmp.w	#-PTR_MAX,d1
 		bge.b	.a2
-		moveq	#-31,d1
+		moveq	#-PTR_MAX,d1
 .a2		add.w	d1,d0
 		cmp.w	#8,d0			;in the hole, as $8afe
 		bge.b	.a3

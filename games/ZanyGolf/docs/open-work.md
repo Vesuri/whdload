@@ -27,7 +27,8 @@ N+1, for measuring the later holes (`internals.md`, "Slave patches").
 
 The pointer is a pair of hardware sprites (17.11.2026, `internals.md`, "The pointer"),
 placed by the interrupt every field from the mouse's counts the next step will take, on
-the frame on screen; the game's shape for it is taken out of the draw list. The aiming
+the frame on screen; the game's shape for it is taken out of the draw list. A step's move
+is clamped to ±100 pixels instead of the game's ±31, so a fast stroke stays straight. The aiming
 line and the dots, drawn into the frame, still move once a step (item 1). At rest the
 sprite covers the same pixels as the game's shape on every hole.
 
