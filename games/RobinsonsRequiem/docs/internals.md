@@ -77,11 +77,11 @@ The low-memory jumps at `$100` and `$106` sit in the CPU vector table (user vect
 ## AGA improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan. All but the two options
-(items 19 and 20) are the splash window's "Enhanced framerate", `CUSTOM2` (`_enhget`), on in
+(items 19 and 20) and the planes' alignment (item 21) are the splash window's "Enhanced framerate", `CUSTOM2` (`_enhget`), on in
 the installed icon. Without it `_bootdos` installs none of them and puts v1.2's caches back
 (`_cpu12`: `resload_SetCPU` with v1.2's `CACHE` value over the KickEmu's `CACHECHIPDATA`), so
 the game runs as v1.2 did, with START's fast pool given up as before (item 1). The two options
-work either way. `_hunks` finds START's hunks 1 and 2 for all of them.
+work either way, and item 21 is always made. `_hunks` finds START's hunks 1 and 2 for all of them.
 
 1. **START's fast pool kept** (`_fastpool`): with the 1 MB ExpMem (not with `MemConfig=1`),
    hunk 0 `+$196` [`$1c2`], `move.l #0,<hunk 1 +$f4>` (`23fc 0000 0000`, checked first),
@@ -535,6 +535,24 @@ work either way. `_hunks` finds START's hunks 1 and 2 for all of them.
       map's cells along the axis with the fraction, was tried in commit 181fd616 and taken
       out: 109 frames against 162, and close to a hill whole strips still change colour
       from frame to frame, their sides upright at the samples' x.
+
+21. **The bitplanes on 8-byte boundaries** (`_planepatch`, `_planealloc`; on every CPU and
+    without Enhanced framerate, a fix of v1.2's display): START sets FMODE 3 (hunk 0
+    `+$710`, `33fc 0003 00df f1fc`), so the planes are fetched 64 bits at a time and each
+    plane's address must be a multiple of 8, or each of its lines is fetched from the
+    boundary below. Its copper list (the template at hunk 0 `+$810`-`+$1240`, copied to
+    chip at `<hunk 1 +$d4>`) has DDFSTRT `$38`, DDFSTOP `$d0` (48 bytes a line at FMODE 3)
+    and both modulos `$20`: rows of 80 bytes, the second buffer at +40, planes 16,000
+    bytes apart, all multiples of 8. The first two planes are CFou!'s block at `$190000`;
+    the other six (hunk 0 `+$5ba`, 96,000 bytes, `<hunk 1 +$13e>`-`<+$152>`) and the plane
+    at `+$4ba` (8,000 bytes, `<hunk 1 +$b6>`) are `AllocMem(CHIP|CLEAR)`, which promises
+    only 4-byte alignment. On a real A1200/040 with Zorro III fast memory every menu screen
+    was skewed. Each call's 16 bytes, `+$5c0`-`+$5cf` and `+$4c0`-`+$4cf`
+    (`48e7 0002 2c78 0004 4eae ff3a 4cdf 4000`, checked with the sizes before them), become
+    `jsr _planealloc` and `bra.s` to the store, and `_planealloc` asks for 8 bytes more and
+    rounds the address up to 8. START never frees either block. FS-UAE gave 8-byte aligned
+    blocks with and without it (`$181e8`) on the `a1200-fast`, `a1200-040` and the
+    `a1200-040` with 32 MB of Zorro III only.
 
 ## ECS improvements
 

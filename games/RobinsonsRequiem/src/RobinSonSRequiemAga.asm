@@ -184,6 +184,72 @@ _TakeChipBPL1AdrFixPrep
 ;********************************************************
 ;********************************************************
 
+; The bitplanes on 8-byte boundaries. START sets FMODE 3 (hunk 0 +$710), which fetches the
+; planes 64 bits at a time: each plane's address must be a multiple of 8, or every line is
+; fetched from the boundary below it. Its own planes come from AllocMem (CHIP|CLEAR), which
+; guarantees only 4: the six at hunk 0 +$5ba (96,000 bytes, the pointers at hunk 1 +$13e
+; to +$152) and the eighth at +$4ba (8,000 bytes, hunk 1 +$b6). Each call's 16 bytes,
+; +$5c0-+$5cf and +$4c0-+$4cf (movem.l a6 / movea.l 4,a6 / jsr -198(a6) / movem.l), become
+; jsr _planealloc and bra.s to the store after them, checked first. START never frees
+; them. The first two planes are CFou!'s block at _ChipSCRAbs, already aligned. On every
+; CPU, also without Enhanced framerate: a fix of v1.2's display on real AGA machines.
+; a1 START's segment list (its first hunk's link).
+
+_planepatch
+        movem.l d0-d1/a0-a2,-(a7)
+        lea     4(a1),a0                ; hunk 0
+        lea     $5ba(a0),a1
+        cmp.l   #$203c0001,(a1)         ; move.l #96000,d0
+        bne     .x
+        cmp.w   #$7700,4(a1)
+        bne     .x
+        lea     $4ba(a0),a1
+        cmp.l   #$203c0000,(a1)         ; move.l #8000,d0
+        bne     .x
+        cmp.w   #$1f40,4(a1)
+        bne     .x
+        lea     $5c0(a0),a1
+        bsr     .site
+        bne     .x
+        lea     $4c0(a0),a1
+        bsr     .site
+        bne     .x
+        lea     $5c0(a0),a1
+        bsr     .set
+        lea     $4c0(a0),a1
+        bsr     .set
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+.x      movem.l (a7)+,d0-d1/a0-a2
+        rts
+.site   cmp.l   #$48e70002,(a1)         ; movem.l a6,-(sp)
+        bne     .r
+        cmp.l   #$2c780004,4(a1)        ; movea.l 4.w,a6
+        bne     .r
+        cmp.l   #$4eaeff3a,8(a1)        ; jsr _LVOAllocMem(a6)
+        bne     .r
+        cmp.l   #$4cdf4000,12(a1)       ; movem.l (sp)+,a6
+.r      rts
+.set    move.w  #$4eb9,(a1)+            ; jsr _planealloc
+        pea     _planealloc(pc)
+        move.l  (a7)+,(a1)+
+        move.w  #$6008,(a1)             ; bra.s past the call's 16 bytes
+        rts
+
+; START's AllocMem for its planes (d0 the size, d1 the requirements): 8 bytes more, the
+; address rounded up to a multiple of 8; 0 if none.
+_planealloc
+        move.l  a6,-(a7)
+        addq.l  #8,d0
+        move.l  4.w,a6
+        jsr     _LVOAllocMem(a6)
+        move.l  (a7)+,a6
+        tst.l   d0
+        beq.s   .x
+        addq.l  #7,d0
+        and.w   #-8,d0
+.x      rts
+
 
 ;============================================================================
 ; like a program from "startup-sequence" executed, full dos process,
@@ -271,6 +337,10 @@ _cont
 
                 move.l  d7,d0
 		bsr _TakeChipBPL1AdrFixPrep
+            move.l  d7,a1
+            add.l   a1,a1
+            add.l   a1,a1
+            bsr _planepatch
 
 
 ;******************** PRESTIGE_CRACKDEB
