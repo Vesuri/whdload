@@ -20,6 +20,10 @@ release_setcpu:
         eor.l   d0,d2            ; bits 4-6 the mouse
         cmpi.l  #9,d2            ; bit 0 framerate, bits 1-3 world speed 0..4
         bhi.w   .bad
+        cmpi.l  #1,d2
+        bne.s   .fixed
+        moveq   #3,d2            ; Enhanced framerate with Original speed: 1.0x
+.fixed:
         move.l  d2,(a1)
         lsr.w   #4,d0
         bsr.w   mouse_option

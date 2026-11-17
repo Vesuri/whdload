@@ -12,9 +12,10 @@ and the OCS `ReadMe`. The generated icon, used for test boots (`make run`), cont
 `CUSTOM5=3` and `DCACHE` (instruction/data caches); in a release the installer writes the
 same tooltypes into the installed icon. Command-line launches must supply them
 explicitly. CUSTOM5 bit 0 is the framerate checkbox, bits 1-3 the world speed. Select
-Original, use `CUSTOM5=0` or `1`, or omit the option for original per-frame simulation,
-rendering, waits and cache behaviour in the same slave. Values 2-9 with a fixed speed
-request enhancements; values above 9 stay original.
+Original without the framerate, use `CUSTOM5=0`, or omit the option for original
+per-frame simulation, rendering, waits and cache behaviour in the same slave. `CUSTOM5=1`
+(the framerate with Original) is taken as 3, 1.0x. Values 1-9 therefore request
+enhancements; values above 9 stay original.
 
 Regardless of the options, 68000/68010 and systems without verified true Fast
 RAM retain original behaviour. The gate checks Exec CPU flags and memory headers,

@@ -443,7 +443,9 @@ separate from the framerate, for players used to faster animation or faster play
 Both public slaves read CUSTOM5 as bit 0 **Enhanced framerate** and bits 1-3
 **World speed**: Original, 1.0x, 1.2x, 1.5x, 2.0x (10, 12, 15, 20 world ticks per
 second; whole rates keep the clock's debt unit, which 1.25x would not). Original is
-the original game, so the framerate bit is then ignored. A fixed speed without the
+the original game. The framerate needs a fixed speed, so with Original it selects
+1.0x: `CUSTOM5=1` is `3` (the user's choice, 2026-11-17; before, the checkbox
+alone did nothing). A fixed speed without the
 framerate draws one picture per world tick. Ordinary flight and the intro's world
 (title battle and asteroid credits; the user asked for it, 2026-11-16) change speed;
 the fly-by, launch, ejection and room clocks run at 10 Hz whatever the option

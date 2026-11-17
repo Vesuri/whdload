@@ -306,9 +306,10 @@ def check(build, mutation=None):
     mouse_runs=set()
     for slave,kind,bank in banks:
         for flags in (0,1,2,3,4,8,128):
-            for option in (0,1,3,8,10,0xffffffff,0x13,0x10,0x73,0x2b):
+            for option in (0,1,3,8,10,0xffffffff,0x13,0x10,0x11,0x73,0x2b):
                 # CUSTOM5 bits 4-6 the mouse: 0 normal, 1 off, 2-7 0.5x-4x.
                 mouse=(option>>4)&7;opt=option&~0x70
+                if opt==1:opt=3     # the framerate with Original speed: 1.0x
                 speed=(4,0,2,3,6,8,12,16)[mouse]
                 if option>>4 and option!=0xffffffff and (flags not in (0,2) or bank not in ('z2-fast','chip')):continue
                 for revision in (0x1302,0x12bc,0x1348):

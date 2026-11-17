@@ -44,7 +44,7 @@ def main():
     options=[]
     for model,flags in ((2,2),(4,8)):
         for custom in (0,1,2,3,4,5,0xffffffff):
-            for pace in (0,1,2,3,4,5,8,9,10,0x10,0x13,0x23,0x59,0x73,0x7a,0x80,0x83,0xffffffff):
+            for pace in (0,1,2,3,4,5,8,9,10,0x10,0x11,0x13,0x23,0x59,0x73,0x7a,0x80,0x83,0xffffffff):
                 for policy in (0,256):
                     c=CPU(blob,model);c.write(BASE+0x1de4,struct.pack('>I',custom));c.write(BASE+0x1e04,struct.pack('>I',pace))
                     c.write(BASE+0x121e,struct.pack('>I',0x80000));c.write(4,struct.pack('>I',0x2000));c.write(0x2128,struct.pack('>H',flags))
@@ -59,6 +59,7 @@ def main():
                     rejected=custom>1 or pace&~0x70>9
                     mouse=(pace>>4)&7
                     pace&=~0x70
+                    if pace==1:pace=3     # the framerate with Original speed: 1.0x
                     enhanced=pace>>1!=0
                     if rejected:assert c.read(c.reg(8),4)==struct.pack('>I',9)
                     else:

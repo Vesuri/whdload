@@ -106,7 +106,8 @@
  The installed icon uses CUSTOM5=3: enhanced framerate at 1.0x, mouse at 1.0x.
  For example CUSTOM5=67 is the same with the mouse at 1.5x.
  Original speed is the original game, whose world advances once per picture,
- so its speed depends on the processor; the framerate option is then ignored.
+ so its speed depends on the processor. The enhanced framerate needs a fixed
+ speed: with Original it runs at 1.0x (CUSTOM5=1 is the same as 3).
  A fixed world speed keeps flight at that speed on every fast enough machine.
  Without the enhanced framerate it draws one picture per world update.
  World speed applies to flight and to the intro's battle and asteroid field;
