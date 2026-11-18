@@ -74,7 +74,7 @@ requirements remain; no game-heap allocation is added. See
 
 Release ReadMe/Install now follow the WHDLoad templates, retaining Psygore's
 original media handling, documentation, options and credits. Both enhanced
-slaves identify as 2.0b (18.11.2026). Installer structure/package and release
+slaves identify as 2.0b (19.11.2026). Installer structure/package and release
 option checks pass; interactive media installation and release acceptance
 remain open.
 

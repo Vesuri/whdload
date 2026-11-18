@@ -11,7 +11,7 @@
  This install applies to "Wing Commander" (c) 1994 Origin.
  Disk versions (SPS #824 and #1657) and the CD32 Dangerous Streets /
  Wing Commander compilation are supported in English and German.
- Wing Commander Enhanced 2.0b (18.11.2026)
+ Wing Commander Enhanced 2.0b (19.11.2026)
  Original install: Psygore. Version 2.0b improvements: Vesuri.
 
  Requirements:
@@ -125,7 +125,7 @@
 
  History:
  --------
- Version 2.0b (18.11.2026) by Vesuri:
+ Version 2.0b (19.11.2026) by Vesuri:
  - CD32 edition: every change works in English and German. Disk edition: the
    changes apply to the English SPS #1657 version; other disk versions keep
    the 1.0 behaviour.
@@ -151,15 +151,17 @@
  - CD32 edition: Training Simulator high scores are kept with each saved pilot
    (thanks hexaae!).
  - Mouse control of the room and menu pointer, and on CD32 of the name entry
-   box, where the right button is Return; the left mouse button works as fire. The first click after entering a
-   screen is no longer ignored (thanks hexaae!).
+   box, where the right button is Return; the left mouse button works as
+   fire. The first click after entering a screen is no longer ignored
+   (thanks hexaae!).
  - Mouse flight: the mouse steers as in the PC version, and the left button
    fires while held (thanks hexaae!).
  - Mouse flight: the right button changes speed and rolls, a right
    double-click fires the afterburner, and both buttons or the middle button
    fire missiles, as on the PC (thanks hexaae!).
  - The right mouse button skips cutscenes, as Esc does.
- - Mouse speed option, 0.5x to 4.0x, or the mouse off (thanks hexaae!).
+ - Mouse speed option, 0.5x to 4.0x, or the mouse off, and a "Mouse forward
+   dives" option for flight-stick pitch (thanks hexaae!).
  - Enhanced framerate: rotating ships and the title logo keep their centre
    instead of shaking as they turn, and a ship at the edge of the view no
    longer shifts by a pixel.
