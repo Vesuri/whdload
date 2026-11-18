@@ -1,8 +1,9 @@
 # Gunship 2000
 
 MicroProse's Gunship 2000 (1991-1994) under WHDLoad, in its three Amiga releases: the floppy
-ECS version (kick13), the floppy AGA version and the CD32 version (both kick31). No
-improvement work yet: `src/` is JOTD's v3.1 (28.03.06) source made to assemble with vasm.
+ECS version (kick13), the floppy AGA version and the CD32 version (both kick31). `src/` is
+JOTD's v3.1 (28.03.06) source made to assemble with vasm; the AGA flight is profiled, with
+a plan toward 50 fps on the a1200-030, and no slave changes yet.
 The original slave is by JOTD (game.conf `AUTHOR`, `UPSTREAM`): his `G/Gunship2000/usr` in
 whdload_slaves at 6046174e, the same source as in the whdload.de install package. Its
 ECS slave starts from Wepl's Wild West World slave and KickStarter 34.005, its
@@ -16,9 +17,11 @@ Read `docs/open-work.md` first.
 | Doc | Read it for |
 |---|---|
 | `docs/open-work.md` | where the work stands and the ordered next items |
-| `docs/development.md` | inputs, the build against the shipped slaves, running each variant, traps |
-| `docs/internals.md` | how each version loads, memory, every slave patch |
+| `docs/development.md` | inputs, the build against the shipped slaves, running each variant, the in-flight profile, traps |
+| `docs/internals.md` | how each version loads, memory, every slave patch; the AGA flight's frame loop, timing, renderer and memory |
 
 The slave source is `src/`: one `Gunship2000<Variant>HD.s` per variant, `fakepad.s` (the
 CD32 pad emulation, included by the CD32 slave), `slave_version` and the include bridge
-`include/lvo/lowlevel.i`. There is no `tools/` yet.
+`include/lvo/lowlevel.i`. `tools/` is the harness: `gunship2000.py` (the session),
+`profile_flight.py` (the front-end route and the in-flight profile), `aprof_report.py`,
+`gs2.py` (the flight program in memory) and `route.py`.

@@ -67,3 +67,64 @@ layout) it applies the ECS install-check patches instead.
 
 CD32: `_patch_gs2000` returns at once, so its patch list (`$154` two `nop`, `$168` `bra`) is
 not applied; the game runs unpatched apart from `fakepad.s`.
+
+## Flight (AGA `gs2.run`)
+
+`gs2.run` has five hunks: code $19014 (offsets below), data $d578 (D+), BSS $e1c4 (B+), all
+three any-memory, and the chip hunks data $2c2c and BSS $18. On the a1200-030 the first three
+load into ExpMem. `tools/gs2.py` finds them in a running game and reads the clocks below.
+
+### Frame loop
+
+| Offset | What |
+|---|---|
+| $1c | `jsr $13d48`: moves the stack onto the work area ("Memory in flight") |
+| $28 | takes the 64 Hz ticks B+$c680 and clears them; dt B+$c67e = ticks × 32768 / 15, 32767 from 15 ticks up (`divs` overflow) |
+| $4a | B+$c698 = the time acceleration B+$c696 - 1: the frame's work from $52 repeats that many times (`dbf` at $2c2) |
+| $78 | mission clock: B+$c684 += dt × 15360 / 32768 (1024 per tick, 65536 a second); on the carry B+$c682 (seconds) + 1 and `bsr $308`, the once-a-second work |
+| $2a8-$2b4 | per-frame phases: B+$c68b flips, B+$c68c counts 0-3 |
+| $2c6-$2d0 | **the frame cap**: spins until B+$c680 is 6 ticks |
+| $2d2, $2e6 | `jsr $9e78`, `jsr $9614` (not yet identified) |
+| $2ec | `jsr $129c4`, present: rotates the three screens (B+$b8e4/$b8e8/$b8ec; shown B+$b8dc) and writes `COP1LC` from the chip BSS |
+| $2fe | B+$c68a flips (a blink phase, read at $1c7c) |
+
+The ticks come from a CIA-B timer server (code $133b2; the latch is 11084 E-clocks, 64.0 Hz
+on PAL, 64.6 on NTSC) that adds 1 to B+$c680 unless B+$c738 is set (pause). The VBL server
+(code $133f4) counts fields in B+$b8fc (code $608).
+
+So the step is variable and in real time: every frame advances the simulation by the ticks
+since the last, in 64ths of a second, between 6 (the cap: at most 10.67 frames a second) and
+15 (below 4.27 frames a second the game slows down). dt has 91 readers, mostly
+`muls.w B+$c67e`. The truncation in dt costs the mission clock 1/65536 s a frame (32 in 32 frames, measured).
+What runs per frame rather than per dt: the phases B+$c68a, B+$c68b and B+$c68c (instrument
+blink, alternate-frame work) and everything the loop does once a frame.
+
+### Rendering
+
+The view is three interleaved 320×200 4-plane screens (32000 bytes each, rows of 160 bytes),
+drawn by the blitter one span at a time:
+
+| Offset | What |
+|---|---|
+| $fab6 | polygon span filler: per scanline one blit, B (the colour pattern, D+$1ea0/D+$23a0 the edge masks) and C to D, minterm $ca, 4 rows (the planes); waits for the blitter before each |
+| $dda0 | general blit (`btst #14` waits) |
+| $fd3c | lines |
+| $13832 | rectangle clear |
+| $109ba | object transform: a 3×3 word matrix copied in, then CPU maths |
+| $e3de | a list walk ahead of the drawing (to identify) |
+
+In the measured flights $fab6 made 650-760 blits a frame, each about 330 CPU cycles of setup.
+The chip bus still had 37-40% free slots: the blitter time is latency (setup, start, wait),
+not bandwidth.
+
+### Memory in flight
+
+The front end hands `gs2.run` its work area (code $18f62: a0 base, d0 size, a1 a table of
+blocks). On the a1200-030 it is in chip RAM: the heap pointer D+$2c3e and end D+$2c42 ran to
+$a2580, about 600 KB, with the three screens in it, and the blocks D+$922a and D+$9232 were
+also in chip (D+$8d6a in fast). Which allocations the blitter or the display needs, and
+which only the CPU touches, is not yet sorted out. ExpMem had 84 KB free.
+
+At $13d48 the flight saves its process stack pointer (D+$2dfc) and moves the stack onto the
+first 2000 bytes of the heap (D+$2c3e moves up by 2000). The process stack (13000 bytes,
+`slv_` stack size) is in ExpMem; the flight's stack is chip.
