@@ -90,7 +90,8 @@ DECL_VERSION:MACRO
 
 slv_name		dc.b	"Gunship 2000 AGA",0
 slv_copy		dc.b	"1993 Microprose",0
-slv_info		dc.b	"adapted by JOTD",10,10
+slv_info		dc.b	"adapted by JOTD",10
+		dc.b	"enhanced by Vesuri",10,10
 		dc.b	"Version "
 		DECL_VERSION
 		dc.b	0
@@ -107,7 +108,7 @@ _args_end
 _rampath:
 	dc.b	"RAM:",0
 
-	dc.b	"$","VER: slave "
+	dc.b	"$","VER: Gunship2000AGA.slave "
 	DECL_VERSION
 	dc.b	$A,$D,0
 

@@ -63,6 +63,9 @@
 
 features:
 
+ version 4.0b (18.11.2026) done by Vesuri
+ - rebuilt with the KickStarter emulation of WHDLoad 20.1
+
  version 3.1 (28.03.06) done by JOTD
  - AGA version *really* fixed
  - protection removed (signal locked)

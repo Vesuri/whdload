@@ -91,6 +91,7 @@ DECL_VERSION:MACRO
 slv_name		dc.b	"Gunship 2000",0
 slv_copy		dc.b	"1993 Microprose",0
 slv_info		dc.b	"adapted by JOTD",10
+		dc.b	"enhanced by Vesuri",10
 		dc.b	"from Wepl excellent KickStarter 34.005",10,10
 		dc.b	"Set CUSTOM1=1 to skip introduction",10,10
 		dc.b	"Version "
@@ -109,7 +110,7 @@ _args_end
 	dc.b	0
 
 
-	dc.b	"$","VER: slave "
+	dc.b	"$","VER: Gunship2000ECS.slave "
 	DECL_VERSION
 	dc.b	$A,$D,0
 

@@ -8,9 +8,10 @@ it, equivalent to the shipped slaves apart from the newer KickEmu (`development.
 
 1. **Choose the work.** Profile each version in flight on its machines (AmigaXDev's
    playbook) before choosing; the flight engine (`gs2.run`) is the likely target.
-2. **A first release** needs a dated `$VER` and info string in each slave
-   (`$VER: slave <version> (dd.mm.yyyy)`, `docs/releasing.md`), and the ReadMe entry
-   above JOTD's.
+2. **Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
+   `$VER: Gunship2000<Variant>.slave 4.0b (18.11.2026)`, the info text credits Vesuri, and
+   the ReadMe entry above JOTD's says what changed (the WHDLoad 20.1 KickEmu). `make dist`
+   packs it; not yet published. Bump the version and the entry as improvements land.
 
 ## Also seen
 

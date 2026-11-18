@@ -94,6 +94,7 @@ DECL_VERSION:MACRO
 slv_name		dc.b	"Gunship 2000 CD³²",0
 slv_copy		dc.b	"1992 Microprose",0
 slv_info		dc.b	"adapted by JOTD",10
+		dc.b	"enhanced by Vesuri",10
 		dc.b	"Version "
 		DECL_VERSION
 		dc.b	0
@@ -108,7 +109,7 @@ _args_end
 	dc.b	0
 
 
-	dc.b	"$","VER: slave "
+	dc.b	"$","VER: Gunship2000CD32.slave "
 	DECL_VERSION
 	dc.b	$A,$D,0
 
