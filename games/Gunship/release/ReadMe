@@ -1,5 +1,5 @@
 
- Gunship Enhanced 2.0b (12.11.2026)
+ Gunship Enhanced 2.0b (18.11.2026)
 
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
@@ -75,7 +75,7 @@
 
  History:
  --------
- version 2.0b (12.11.2026) done by Vesa Halttunen:
+ version 2.0b (18.11.2026) done by Vesa Halttunen:
  - Enhanced framerate for the PAL 0658 and NTSC 1489 releases on 68020 and
    later: smoother 3D view and more responsive controls, enabled in the
    installed icon (CUSTOM1=1)
