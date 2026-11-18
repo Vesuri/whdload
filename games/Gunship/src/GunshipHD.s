@@ -181,6 +181,7 @@ _cb_dosLoadSeg
 	PATCH_EXE	titlmule_german
 
 .gamemule
+	bsr	sound_hunk_find
 	CMP_EXE	4CDF4CFC,2F2A,gamemule_1489	; OK for Xavier version
 	CMP_EXE	51CFFFCE,2F2A,gamemule_658
 	CMP_EXE	201AD089,2F2A,gamemule_german	; also german
@@ -319,6 +320,9 @@ pl_gamemule_658
 
 	PL_PS	$826A,avoid_af_game
 
+	; sound table pointers above 16 MB
+	PL_PS	$A16A,sound_entry_fix
+
 	PL_END
 
 ; -------- version 1489 --------
@@ -346,6 +350,9 @@ pl_gamemule_1489
 	; fix access fault
 
 	PL_PS	$8282,avoid_af_game
+
+	; sound table pointers above 16 MB
+	PL_PS	$A186,sound_entry_fix
 
 	PL_END
 
@@ -416,6 +423,40 @@ avoid_af_game:
 	ADDA.L	D5,A0
 	BTST	D0,(A0)
 	rts
+
+; The sound routine +0A150 (1489 +0A16C) reads a 16-entry table in which each
+; entry is a pointer into hunk 6 with a repeat count in its top byte. When hunk
+; 6 is loaded above 16 MB, relocation carries into that byte and the original
+; ANDI.L #$FFFFFF drops address bits: the sequencer then reads unmapped memory.
+; < d2: relocated entry   > d1: count, d2: pointer   CCR unspecified
+sound_entry_fix:
+	sub.l	sound_hunk(pc),d2
+	move.l	d2,d1
+	rol.l	#8,d1
+	andi.l	#$ff,d1
+	andi.l	#$ffffff,d2
+	add.l	sound_hunk(pc),d2
+	rts
+
+; < d1: gamemule seglist (hunk 0's link, APTR); keeps all registers
+sound_hunk_find:
+	movem.l	d0/d2/a0,-(sp)
+	movea.l	d1,a0
+	moveq	#6-1,d2
+.link
+	move.l	(a0),d0
+	beq.b	.store
+	lsl.l	#2,d0
+	movea.l	d0,a0
+	dbf	d2,.link
+	addq.l	#4,d0		; hunk 6's data
+.store
+	lea	sound_hunk(pc),a0
+	move.l	d0,(a0)
+	movem.l	(sp)+,d0/d2/a0
+	rts
+
+sound_hunk	dc.l	0
 
 ; < a0: program name
 ; < a1: arguments

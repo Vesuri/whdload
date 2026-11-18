@@ -37,7 +37,7 @@
  Features:
  ---------
  - Disk and password protections removed on the supported original versions.
- - Access fault fixed; fast memory and caches supported.
+ - Access faults fixed; fast memory, also above 16 MB, and caches supported.
  - Quick manual, source code and icons by Exoticons and Chris Vella included.
  - Enhanced framerate for the PAL 0658 and NTSC 1489 releases, enabled in the
    installed icon.
@@ -80,6 +80,7 @@
    later: smoother 3D view and more responsive controls, enabled in the
    installed icon (CUSTOM1=1)
  - blitter waits fixed for fast CPUs, in all modes and releases
+ - crash on sound effects with fast memory above 16 MB fixed (PAL and NTSC)
  - updated installer with PAL/NTSC selection
 
  version 1.2 (15.02.2020) done by JOTD:
