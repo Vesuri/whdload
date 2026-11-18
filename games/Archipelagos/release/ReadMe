@@ -66,6 +66,8 @@
  --------
 
  version 2.0b (18.11.2026) done by Vesuri:
+ - faster Amigas no longer speed the game up: moves, terrain animation and
+   spreading keep a fixed pace, and moves are smoother
  - quitting no longer hangs on NTSC Amigas (StingRay's fix of 31.08.2023,
    which the previous install package did not include)
 

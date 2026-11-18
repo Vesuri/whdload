@@ -3,13 +3,16 @@
 Set up from StingRay's v1.2 slave. Both variants boot to the title and into archipelago
 1, SPS 627 on the a500 and SPS 628 (NTSC) on the a1200, and F10 quits cleanly on both. The
 frame loop, the game's clocks and the rendering cost are measured
-([internals.md](internals.md#the-frame)). Nothing is changed yet.
+([internals.md](internals.md#the-frame)). Game time is decoupled from the frame rate
+(step 1 below); the rest of the 50 fps plan is still to do.
 
 ## Release
 
 2.0b (18.11.2026): StingRay's v1.2 code, which the whdload.de install package lacked, with
-`$VER` and the info text in the slave and the ReadMe entry above StingRay's. Still to do:
-play-test both versions on every machine in `SETUPS`, including saving and loading a game.
+`$VER` and the info text in the slave and the ReadMe entry above StingRay's, and game time
+decoupled from the frame rate. Still to do: play-test both versions on every machine in
+`SETUPS`, including saving and loading a game, destroying stones and finishing an
+archipelago (the two decoupled effects have no route yet).
 
 ## 50 fps on the a1200-030
 
@@ -34,36 +37,26 @@ waiting for fields. The causes, largest first:
 
 What does not matter: the world update (0.03%), interrupts (1-2%) and the swap (0.1%).
 
-The first step has to be the decoupling. Each later step makes frames faster, and at the
-moment that also makes moves, the spread and the animations faster. Measure every step
-with `tools/archipelagos.py frames 250 4` on the a1200-030, a1200 and a500, and with
-`tools/bench.py` (030 without the MMU model) for the breakdown. The a500 must neither slow
-down nor change behaviour.
+The decoupling came first: without it every later step would also speed up moves, the
+spread and the animations. Measure every step with `tools/archipelagos.py frames 250 4` on
+the a1200-030, a1200 and a500, with `tools/bench.py` (030 without the MMU model) for the
+breakdown, and with `tools/timecheck.py` for game time. The a500 must neither slow down
+nor change behaviour.
 
-1. **Decouple game time** (`playbooks/fixed-time-simulation.md`). Needs a decision first:
-   the pace R, in fields, of one frame-counted step on a fast machine. Candidates:
-   - R = 6: the game's own world tick, 8.33 Hz. This keeps today's a1200-030 pace: a move
-     takes 8 R fields and its final frame, about 49 fields against 56 now.
-   - R = 9: the a500's pace on this scene.
-
-   Slow machines stay as they are under either choice. Every frame-counted quantity
-   advances by the smaller of one frame's worth and the elapsed fields divided by R:
-   - **The renderer's steps** (`$11AC6`-`$11AE5`: the spread, the terrain phase, the two
-     object timers). A slave routine in their place adds the fields elapsed since the last
-     frame (the counter at offset `$12862`) to an accumulator capped at R. It runs the
-     original steps once when the accumulator reaches R and subtracts R.
-   - **Moves** (`$11FA8`). Interpolate the position by elapsed fields over 8 R, at most an
-     eighth of the move a frame. Then end on the cell with the original final frame. At 50
-     fps a move draws about 48 frames instead of 9, so it is smoother as well.
-   - **The world tick** (`$F700`) already never runs faster than every 6 fields. A second
-     decision: keep it (the a500's world goes at its frame rate, 5.4 Hz), or carry the
-     phase (add 6 instead of reloading 5) so slow machines get 8.33 Hz too.
-
-   Two more pieces belong here. Identify what the spread is in play (and the second queue
-   `$CAA4`, which no direct call reaches), and search the input dispatch for more frame counters (the
-   code that branches back to the frame routine, from `$118AC`-`$11AC2`). Check the step with a field-by-field state dump: fields a move
-   takes, spread cells and terrain phase steps a second, all with an artificial delay in
-   the renderer. The a500's per-frame state sequence must be unchanged.
+1. **Decouple game time.** Done (`src/timing.s`; [internals.md](internals.md#decoupled-srctimings-20b)).
+   Decided 18.11.2026: every frame-counted step takes at least 6 fields (the game's world
+   tick, 8.33 Hz), so today's a1200-030 pace holds on faster machines. The world tick stays
+   as the game has it unless the a500 gets faster too. Checked with `tools/timecheck.py`:
+   on the a500 and the US a1200 every field's state is the original's; on the cached 030 a
+   move takes 46 fields in 17 frames instead of 25 in 9, and the renderer's steps run at
+   8.33 a second instead of 12.83. Left:
+   - play-test the two effects (a stone's, `$CD1C`; the ramps, `$C5D0`) and give them a
+     route;
+   - identify what the spread is in play, and the second queue `$CAA4`, which no direct
+     call reaches;
+   - the audit covered every call of the renderer, its drawing and the swap. Other
+     per-frame counters in the input dispatch (`$118AC`-`$11AC2`) would still follow the
+     frame rate.
 2. **Instruction cache.** First fix the one piece of self-modifying code: point the four
    writes of the level 3 handler's `jsr` target (`$E490`, `$10BB4`, `$1187E`, `$118B0`) at
    a slave variable, and make the `jsr` (`$CE92`) jump through it. Then call
@@ -71,8 +64,7 @@ down nor change behaviour.
    on a 68040/060 with the MMU it would make the screens data-cacheable.
    - Run `tools/smc.py` on runs through the title, the archipelago screen, the map, saving
      and loading, a level's end and a death.
-   - Expected from the `CACHE` measurement: 15 fps on the 030 (and faster moves without
-     step 1). The 68000 is unaffected.
+   - Expected from the `CACHE` measurement: 15 fps on the 030. The 68000 is unaffected.
 3. **One field wait a frame.** Drop the wait before the swap (`$1185C`). The renderer's wait
    (`$11AE6`) keeps the buffers safe, as it already does in the move routine. Guard the swap
    (`$12306`) so it never rewrites the bitplane pointers while the copper is loading them at

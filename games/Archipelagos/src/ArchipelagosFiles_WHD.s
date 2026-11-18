@@ -21,6 +21,10 @@
 *** History			***
 ***********************************
 
+; 18-Nov-2026	- game time no longer follows the frame rate: the renderer's
+;		  steps, moves and two effects advance with the fields their frames
+;		  take, at most a step every 6 fields (timing.s; Vesuri)
+
 ; 31-Aug-2023	- WaitRaster waits for the start of a frame (VPOSR V8 set, then
 ;		  clear) instead of line 303, which NTSC never reaches
 ;		  (reconstructed from the shipped v1.2 slave, which has no source)
@@ -129,9 +133,11 @@ Patch	lea	resload(pc),a1
 	move.l	a5,a0
 	jsr	resload_CRC16(a2)
 	lea	PLGAME(pc),a3
+	lea	GT627(pc),a4
 	cmpi.w	#$55bf,d0		; SPS 627 (cmpi: the shipped slave's encoding)
 	beq.b	.ok
 	lea	PLGAME_US(pc),a3
+	lea	GT628(pc),a4
 	cmpi.w	#$f600,d0		; SPS 628 (cmpi: the shipped slave's encoding)
 	beq.b	.ok
 
@@ -139,7 +145,8 @@ Patch	lea	resload(pc),a1
 	pea	(TDREASON_WRONGVER).w
 	bra.b	EXIT
 
-.ok
+.ok	lea	t_table(pc),a0
+	move.l	a4,(a0)
 
 ; relocate Atari-ST binary
 	move.l	a5,a0
@@ -222,6 +229,13 @@ PLGAME	PL_START
 	PL_PSS	$c4aa,delay10000,2	; fix CPU dependent delay in writer
 	PL_P	$1118,FixDMAWait	; fix DMA wait in replayer
 	PL_PSS	$1098c,SaveGame,2
+
+	PL_PSA	$11ac6,t_steps,$11ae6	; game time: the renderer's steps,
+	PL_P	$11fa8,t_move		; moves,
+	PL_PSS	$cd4e,t_pace,2		; the six-frame effect,
+	PL_PSS	$c5f2,t_pacedraw,6	; the two ramps
+	PL_PSS	$c60e,t_pacedraw,6
+	PL_P	$12220,t_swapend	; the swap measures each frame
 	PL_END
 
 
@@ -292,6 +306,13 @@ PLGAME_US
 	PL_PS	$125ce,.intro		; exit "Fanfare intro" with LMB
 
 	PL_P	$9e60,SaveGame
+
+	PL_PSA	$11d7e,t_steps,$11d9e	; game time: the renderer's steps,
+	PL_P	$12260,t_move		; moves,
+	PL_PSS	$cd7a,t_pace,2		; the six-frame effect,
+	PL_PSS	$c61e,t_pacedraw,6	; the two ramps
+	PL_PSS	$c63a,t_pacedraw,6
+	PL_P	$124d8,t_swapend	; the swap measures each frame
 	PL_END
 
 ; add LMB check to "Fanfare intro"
@@ -358,6 +379,8 @@ FixDMAWait
 	dbf	d1,.loop
 	movem.l	(a7)+,d0/d1
 	rts
+
+	INCLUDE	timing.s
 
 ***********************************
 *** Level 2 IRQ			***

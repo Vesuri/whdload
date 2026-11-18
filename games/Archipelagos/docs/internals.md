@@ -35,6 +35,10 @@ byte ST header (so at runtime `$201C` + offset).
 | `$1118` | same | the replayer's DMA wait: five raster lines |
 | `$1098C` | `$9E60` | save game to a file |
 | | `$125CE` | the US "Fanfare" intro ends with the left mouse button |
+| `$11AC6`-`$11AE5` | `$11D7E`-`$11D9D` | game time: the renderer's frame-counted steps, at most one every 6 fields ([Game time](#decoupled-srctimings-20b)) |
+| `$11FA8` | `$12260` | game time: a move, interpolated over 48 fields |
+| `$CD4E`; `$C5F2`, `$C60E` | `$CD7A`; `$C61E`, `$C63A` | game time: the effects' frames, until each step has had 6 fields |
+| `$12220` | `$124D8` | the swap's end: it also measures each frame |
 
 ## Memory
 
@@ -91,12 +95,12 @@ runs the music. So the clocks are:
 |---|---|
 | fields (the level 3 handler) | the field counter, the sky's colour changes, the `$CF16` countdown, pan turning (the mouse's X counts added to the heading, offset `$12880`, 0-719 half degrees, each field), buttons, music |
 | world tick: every 6 fields, checked once a frame | the world update `$F700`: spawning near the player and other world events. It runs when the countdown is below zero and reloads it with 5 (offset `$129B4`), so it never runs more than once a frame and a late check loses the time it was late |
-| frames | at the start of the renderer (`$11AC6`-`$11AE5`): one step of a spread across connected land (`$C99E`: a queue at offset `$13426`, head and tail at offsets `$129EA`/`$129E8`, one cell a frame; what it shows in play is still to be identified), the terrain animation phase (offset `$12DAC`, every 10 frames), two object animation timers (offsets `$12DB8`, `$12DC8`, 2 a frame). And moves: 9 frames each, whatever they take |
+| frames | at the start of the renderer (`$11AC6`-`$11AE5`): one step of a spread across connected land (`$C99E`: a queue at offset `$13426`, head and tail at offsets `$129EA`/`$129E8`, one cell a frame; what it shows in play is still to be identified), the terrain animation phase (offset `$12DAC`, every 10 frames), two object animation timers (offsets `$12DB8`, `$12DC8`, 2 a frame). Moves: 9 frames each, whatever they take. Two effects: six frames (`$CD1C`, counting at offset `$12B96`), run when the count at offset `$129DC` drops; two ramps of 32 frames (`$C5D0`, offsets `$CF1C` and `$CF1E`), run from the input dispatch (`$1196C`) |
 
-So game time is partly tied to the frame rate. It can only get slower than nominal, never
-faster, as the game stands: the world tick lags below 8.33 fps and loses time when frames
-end late, and frame-counted things go at whatever the frame rate is. Measured on
-archipelago 1, panning, in 250 fields (`tools/archipelagos.py frames 250 4`):
+The game's own speed therefore depends on the CPU. The world tick lags below 8.33 fps
+and loses the time a late check was late, but never runs faster than every 6 fields.
+Everything counted in frames goes at whatever the frame rate is. Measured with the original
+slave on archipelago 1, panning, in 250 fields (`tools/archipelagos.py frames 250 4`):
 
 | Machine (emulated) | fps | fields a frame | world ticks | a move takes |
 |---|---|---|---|---|
@@ -106,10 +110,37 @@ archipelago 1, panning, in 250 fields (`tools/archipelagos.py frames 250 4`):
 | a1200-030, WHDLoad `CACHE` (instruction cache) | 15.00 | 3.36 | 38 (7.6 Hz) | about 27 fields |
 
 A move's length is from a field-by-field dump of the player's position (offsets `$129BE`,
-`$129C0`) on the a500, a1200-030 and a cached a1200-030. At 50 fps a move would take 9 fields.
-Anything that speeds the frame up makes moves, the spread and the animations faster in
-the same proportion, so the game's time has to be decoupled before any of it ships
-(`open-work.md`).
+`$129C0`). At 50 fps a move would take 9 fields.
+
+### Decoupled (`src/timing.s`, 2.0b)
+
+Every frame-counted step now takes at least 6 fields, the world tick's period
+(`STEP_FIELDS`), and never more than one step a frame. So a machine whose frames take 6
+fields or more runs as before, and a faster one runs at that pace. The world tick is left as
+the game has it. Time is the level 3 handler's field counter, each interval clamped to 6
+fields (the game clears the counter when an archipelago starts).
+
+- The renderer's steps (`$11AC6`) run when the fields since the previous render add up to
+  6, with the rest carried. A render with no swap since the previous one also runs them, as
+  the original did: an archipelago's opening renders twice in one field.
+- A move (`$11FA8`) is interpolated: the start plus the original's eighth of the way times
+  the fields into the move / 6. It takes 48 fields plus the frame on the cell, drawn in as
+  many frames as fit. At 6 fields a frame its positions are the original's.
+- Each step of the two effects (`$CD4E`, `$C5F2`, `$C60E`) draws frames until it has had 6
+  fields, the swap measuring each frame.
+
+Checked with `tools/timecheck.py` (300 fields from the first interactive field, a move to
+the cell ahead), the original slave against this one:
+
+| Machine (emulated) | | fps | the move | renderer steps a second |
+|---|---|---|---|---|
+| a500 | original, decoupled | 5.67 | 65 fields, 9 frames | 5.67 |
+| a1200, US version (60 Hz) | original, decoupled | 6.80 | 65 fields, 9 frames | 6.80 |
+| a1200-030, `CACHE` | original | 12.83 | 25 fields, 9 frames | 12.83 |
+| a1200-030, `CACHE` | decoupled | 13.33 | 46 fields, 17 frames | 8.33 |
+
+On the a500 and the US a1200 every field's state (position, buffer, phase, timer, world
+tick) is the original's. The two effects have no route yet: play-test them.
 
 ## Rendering cost
 
