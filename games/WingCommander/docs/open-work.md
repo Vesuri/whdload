@@ -1127,8 +1127,19 @@ Firing and mouse:
 
 Graphics:
 - **UR10 (H): glyphs differ from the PC:** the simulator's "0", W/M missing
-  pixels in the small hull display. Won't fix: the slaves keep the Amiga game's
-  own font data and need not match the PC glyphs.
+  pixels in the small hull display. A renderer bug, not font data (examined
+  2026-11-18). The glyph row dispatch (code hunk `2fdd6` CD32 English, `2ff98`
+  German, `3065c` floppy) draws each row byte's low nibble, bit 3 leftmost,
+  through a 16-entry jump table. The `$0D` (%1101) entry (`2ff7e`, `30140`,
+  `30804`) is a copy of the `$0C` code, so pixel 3 is never drawn. The other 15
+  entries are right. `fonts.pkt` (LZNP, three fonts) matches the PC's
+  `FONTS.FNT` (LZW, the same three fonts) on 89 to 91 of the 94 printable
+  glyphs; the rest are small redrawings unrelated to the bug (font 0 `6u~`,
+  font 1 `@B^_s`, font 2 `@_~`). The PC's font 1 "0" is a
+  slashed zero; the Amiga draws its third row `##..` where the data and the PC
+  have `##.#`. Glyphs that use `$0D`: font 0 `"&0ABDHPR^bempw`, font 1 `*0`,
+  font 2 `MNW`. Not fixed yet; the fix is 8 bytes in place: x0, x1, then the
+  `$01` handler for x3.
 - **UR11 (H): wrong palette after skipping** Game Over, ejection or the player
   explosion (for example a red space colour in the funeral); H asks for our
   "skip routines" to be removed. Open. The slaves add no skipping: the native
@@ -1158,9 +1169,8 @@ H's second report (2026-11-18, against 2.0b of 18.11.2026):
   stick give the same signs, and the right button's roll matches the PC's
   (internals, "The PC's signs"). Needs H's exact input and the direction
   seen, compared in play with the PC.
-- UR10's glyphs: H now attributes them to the renderer, not the font data:
-  the `$0D` (%1101) nibble case of the glyph row dispatch (their `GAME+$02FDD6`,
-  handler `GAME+$02FF7E`) draws pixels 0 and 1 but not 3. Not yet examined.
+- UR10's glyphs: H attributes them to the renderer (their `GAME+` offsets are
+  our code-hunk offsets). Confirmed; see UR10.
 
 Deferred local work: the pre-existing save/load length guard and native checks
 are preserved in stash `5237ca28782a8e1fd1f615c91232c80b2fd93391`
