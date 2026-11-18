@@ -29,11 +29,14 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOL = [sys.executable, str(ROOT / 'tools/archipelagos.py')]
 
 # Program addresses: the program loads to $2000 and its body (offsets in docs/internals.md)
-# starts at $201c, so address = offset + $201c.
-TITLE_LOOP = 0x13520     # offset $11504: the title polls the key byte $10356 (and counts d0)
-ARCH_LOOP = 0x12484      # offset $10468: the archipelago screen asks for a key (Space, Return)
-GAME_LOOP = 0x13806      # offset $117ea: the in-game loop; its first pass follows the
-                         # archipelago's opening tune, when the crosshair appears
+# starts at $201c, so address = offset + $201c. SPS 627's, or SPS 628's when VARIANT is
+# ArchipelagosNTSC (set it for boot.sh and the tools alike).
+US = os.environ.get('VARIANT') == 'ArchipelagosNTSC'
+TITLE_LOOP = 0x13768 if US else 0x13520   # offset $1174C / $11504: the title polls a key byte
+ARCH_LOOP = 0x1250e if US else 0x12484    # $104F2 / $10468: the archipelago screen asks for a key
+GAME_LOOP = 0x13abc if US else 0x13806    # $11AA0 / $117EA: the in-game loop; its first pass
+                                          # follows the archipelago's opening tune
+VARS = 0x3a4 if US else 0                 # SPS 628's variables are $3A4 above SPS 627's
 
 # 'start': boot to archipelago 1 in play, stopped at the in-game loop's first pass.
 ROUTES = {

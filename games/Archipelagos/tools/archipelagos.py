@@ -6,8 +6,8 @@
                                              run N fields one at a time (moving the mouse DX
                                              counts right before each, default 0) and count
                                              the frames shown: flips of the back buffer
-                                             pointer $14886, which the swap (program offset
-                                             $12210) exchanges. A frame takes at least two
+                                             pointer (SPS 627 $14886), which the swap (program
+                                             offset $12210) exchanges. A frame takes at least two
                                              fields, so reading it each field misses none.
                                              No breakpoint and no trace, so it works on every
                                              CPU, MMU cores included. Also reports the world
@@ -17,15 +17,18 @@
 Stop the CPU first (`stop`, or tools/route.py's routes do): the server resumes a CPU that was
 running before a command.
 """
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
 from game_server import game_server  # noqa: E402
 
-BACK = 0x14886       # the buffer being drawn: $5c780 or $663c0
-TICK = 0x149d2       # the world tick countdown (the VBL decrements it; a tick reloads it)
-HEADING = 0x1489c    # 0..719, half degrees
+# SPS 627's addresses; SPS 628's are $3A4 higher (VARIANT=ArchipelagosNTSC)
+SHIFT = 0x3a4 if os.environ.get('VARIANT') == 'ArchipelagosNTSC' else 0
+BACK = 0x14886 + SHIFT       # the buffer being drawn: $5c780 or $663c0
+TICK = 0x149d2 + SHIFT       # the world tick countdown (the VBL decrements it; a tick reloads it)
+HEADING = 0x1489c + SHIFT    # 0..719, half degrees
 
 
 def _peek(g, addr, n, signed=False):
@@ -58,7 +61,7 @@ def frames(server, g, rest):
             ticks += 1
         turned += (h - head) % 720
         back, tick, head = b, t, h
-    fps = flips * 50 / n
+    fps = flips * (60 if SHIFT else 50) / n
     span = (f', fields a frame {min(gaps)}-{max(gaps)} mean {sum(gaps) / len(gaps):.2f}'
             if gaps else '')
     return (f'{n} fields: {flips} frames, {fps:.2f} fps{span}; {ticks} world ticks; '

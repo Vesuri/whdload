@@ -75,6 +75,14 @@ python3 tools/archipelagos.py quit
 - `tools/reduction.py` is the reduction behind it. On a 68010+ WHDLoad enters the game's
   interrupt handlers through its own vector table, so an interrupt is counted where a
   handler in the game's vectors starts, and trace gaps go to the running code.
+- `tools/timecheck.py OUT [FIELDS]` checks game time: from the first interactive field it
+  holds the left button (a move to the cell ahead) and reads the game's clocks every field:
+  fps, the move's fields and frames, renderer steps and world ticks a second. Run it with
+  the original slave (`SLAVE=tmp/game/Archipelagos/Archipelagos.slave`) and the build on
+  the same setup and compare `OUT/state.tsv`: on a machine whose frames take 6 fields or
+  more they must be identical.
+- The US version: `VARIANT=ArchipelagosNTSC` for `boot.sh` and for the tools (they read
+  SPS 628's addresses then).
 - `tools/cpuchip.py FILE` splits the CPU's chip-bus accesses in one trace by target, and
   `tools/smc.py OUT` checks a bench run's executed code against the relocated file.
 
