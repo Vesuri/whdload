@@ -203,7 +203,7 @@ of the type) from its start to its last word's end, read-modify-writing its firs
 chip memory, and later spans write over the rest. So a row is a function of its list: the
 slave builds each 32 pixels of the three planes in registers and writes them once, 24 long
 writes a row (the rows are long-aligned) and no reads, with one paint routine for each
-terrain type. Object cells are noted and cleared in the map as the game does. The far rows'
+terrain type. Object cells are noted and cleared in the map as the game does: a cell with an object joins the list (offset `$12F26`) the first time a span crosses it, up to row `$12892` (126, so not in the three farthest rows), and the object's size comes later from its screen line (`$B0A4`, table `$A5FA`); the lists at 80 frames of turning and moving, both versions, are step 5's. The far rows'
 loop steps x a pixel at a time, adding a step to each of two 16-bit accumulators, a carry
 ending a span: 256 steps a row for about 23 spans. The slave works out each carry instead:
 the first one (65535 - acc) / step + 1 steps on, then, as the accumulator is below the step
