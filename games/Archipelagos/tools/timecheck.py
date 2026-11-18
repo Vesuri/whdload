@@ -2,6 +2,7 @@
 """Game time against frames: a move and the renderer's steps, field by field.
 
     python3 tools/timecheck.py OUT [FIELDS]
+    python3 tools/timecheck.py OUT effects
 
 Needs a server just booted with tools/boot.sh (any setup). Runs tools/route.py's 'start',
 holds the left button 4 fields (a move to the cell ahead), then reads the game's clocks
@@ -18,6 +19,12 @@ OUT/state.tsv and prints:
 
 Compare two slaves on one setup by their frame sequences: OUT/frames.tsv has the clocks at
 each frame shown (the field after a flip).
+
+`effects` plays archipelago 1 to its end instead (tools/play.py): both stones,
+then the Obelisk, reading tools/play.py's CLOCKS every field from the first interactive
+one to 700 fields after the Obelisk's click. Writes OUT/effects.tsv and prints, for each
+stone's collapse (the six-frame effect: its count at offset $12B96 non-zero) and for the
+Obelisk's two ramps (offsets $CF1C, $CF1E non-zero), the fields and frames it took.
 """
 import os
 import struct
@@ -42,9 +49,47 @@ VARS = [  # (name, SPS 627 address, size, signed); SPS 628's are route.VARS high
 ]
 
 
+def effects(out):
+    import play
+    route.run(['start'])
+    play.record()
+    play.stones(log=lambda s: None)
+    play.obelisk(log=lambda s: None)
+    play.fields(700)
+    rows = play.RECORD
+    names = [c[0] for c in play.CLOCKS]
+    with open(out / 'effects.tsv', 'w') as f:
+        f.write('\t'.join(names) + '\n')
+        for r in rows:
+            f.write('\t'.join(str(v) for v in r) + '\n')
+    col = {k: i for i, k in enumerate(names)}
+    flips = {i for i in range(1, len(rows)) if rows[i][col['back']] != rows[i - 1][col['back']]}
+
+    def spans(on):
+        out, start = [], None
+        for i, r in enumerate(rows):
+            if on(r) and start is None:
+                start = i
+            elif not on(r) and start is not None:
+                out.append((start, i))
+                start = None
+        return out
+
+    print(f'{len(rows)} fields, {len(flips)} frames')
+    for name, on in (('stone', lambda r: r[col['stone']]),
+                     ('ramps', lambda r: r[col['ramp1']] or r[col['ramp2']])):
+        for a, b in spans(on):
+            print(f'{name}: fields {a}-{b - 1} ({b - a} fields), '
+                  f'{sum(1 for i in flips if a < i <= b)} frames')
+
+
 def main(args):
     if not args:
         sys.exit(__doc__)
+    if args[1:] == ['effects']:
+        out = Path(args[0]).resolve()
+        out.mkdir(parents=True, exist_ok=True)
+        return effects(out)
     out = Path(args[0]).resolve()
     n = int(args[1]) if len(args) > 1 else 300
     shift = route.VARS

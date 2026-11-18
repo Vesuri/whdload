@@ -12,6 +12,8 @@ A step is one of
     play           run to the first pass of the in-game loop: archipelago 1 takes input
     rmb N          hold the right mouse button N fields, release it (toggles pan mode)
     mouse DX DY N  N times: add DX, DY to the mouse counters, run one field
+    stones         collapse every stone of archipelago 1 (tools/play.py)
+    obelisk        then destroy the Obelisk
     shot NAME      screenshot to tmp/shots/NAME.png (traces one field)
     gdb TEXT...    one raw gdb command (the rest of the step)
 Named routes (ROUTES below) expand in place.
@@ -96,6 +98,9 @@ def run(steps):
             for _ in range(int(w[3])):
                 req('gdb', f'monitor mouse {w[1]} {w[2]}')
                 req('gdb', 'monitor fields 1')
+        elif w[0] in ('stones', 'obelisk'):
+            import play
+            getattr(play, w[0])()
         elif w[0] == 'shot':
             req('shot', str(ROOT / f'tmp/shots/{w[1]}.png'))
         elif w[0] == 'gdb':

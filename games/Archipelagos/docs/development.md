@@ -81,6 +81,12 @@ python3 tools/archipelagos.py quit
   the original slave (`SLAVE=tmp/game/Archipelagos/Archipelagos.slave`) and the build on
   the same setup and compare `OUT/state.tsv`: on a machine whose frames take 6 fields or
   more they must be identical.
+  `tools/timecheck.py OUT effects` plays archipelago 1 to its end and measures both effects
+  (`OUT/effects.tsv`, the clocks every field).
+- `tools/play.py stones|obelisk|goto X Y` (route steps `stones` and `obelisk`) plays from
+  the game's state: it reads the crosshair's row table, turns and moves until a cell is in
+  reach, aims and clicks. A whole archipelago 1 takes about 20 s. It sends its gdb commands
+  through the server's `batch` command, many to one request.
 - The US version: `VARIANT=ArchipelagosNTSC` for `boot.sh` and for the tools (they read
   SPS 628's addresses then).
 - `tools/cpuchip.py FILE` splits the CPU's chip-bus accesses in one trace by target, and

@@ -2,6 +2,8 @@
 
     python3 tools/archipelagos.py serve      boot with DEBUG=1 (common/run.sh options apply)
     python3 tools/archipelagos.py wait 20    then shot, gdb, profile, quit, ...
+    python3 tools/archipelagos.py batch CMD ;; CMD ...
+                                             gdb commands in one request (tools/play.py)
     python3 tools/archipelagos.py frames N [DX]
                                              run N fields one at a time (moving the mouse DX
                                              counts right before each, default 0) and count
@@ -68,7 +70,13 @@ def frames(server, g, rest):
             f'heading turned {turned / 2:.0f} degrees\n')
 
 
-server = game_server('archipelagos', commands={'frames': frames})
+def batch(server, g, rest):
+    """gdb commands separated by ' ;; ', run in order with the CPU stopped; their replies."""
+    g.stop()
+    return ''.join(g.cmd(c, timeout=600).rstrip('\n') + '\n' for c in rest.split(' ;; ') if c.strip())
+
+
+server = game_server('archipelagos', commands={'frames': frames, 'batch': batch})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])
