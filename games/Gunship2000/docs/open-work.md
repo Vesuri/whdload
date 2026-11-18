@@ -4,12 +4,13 @@ Set up 18.11.2026: `src/` is JOTD's v3.1 source with three changes that make vas
 it, equivalent to the shipped slaves apart from the newer KickEmu (`development.md`,
 "Build"). All three variants boot to the duty roster. The AGA flight is profiled
 (`development.md`, "Profiling in flight"); the target is 50 fps in flight on the a1200-030
-(soft). P1-P4, P5a/P5c, P6 and P7 of the plan are done (P5b measured, not done): the VERIFY
-build pins the mission, the release AGA slave keeps the flight's stack and its model data in
-fast RAM and turns the instruction cache on, `CUSTOM2=1` ("Enhanced framerate") lifts the
+(soft). P1-P4, P5a/P5c and P6-P8 of the plan are done (P5b measured, not done): the VERIFY
+build pins the mission, the release slaves keep the flight's stack and its model data in
+fast RAM and turn the instruction cache on, `CUSTOM2=1` ("Enhanced framerate") lifts the
 frame cap with the simulation kept at its rate, and the CPU fills the polygons (68030 or
-later) and the one-colour rectangles and draws the lines instead of the blitter. None of it
-is in the ECS and CD32 slaves yet (P8).
+later) and the one-colour rectangles and draws the lines instead of the blitter where that is
+faster. Since P8 all three slaves do it, from one file (`src/flight.s`); the CD32 slave also
+has ExpMem now.
 
 ## The AGA flight, 18.11.2026
 
@@ -216,29 +217,81 @@ F1/F5/F6 fps:
   7%. On the a1200-fast the transform is 15-16% and $e3de 8-12%: there the game's own maths
   is the limit.
 
+## P8, the ECS and CD32 slaves, 18.11.2026
+
+The three `gs2.run` files are builds of one source: aligning the code hunks (relocations
+masked) maps every AGA place to the others, and the renderer's routines are the same code
+apart from the ECS rectangles, which queue their blits. The flight's patches moved into
+`src/flight.s` with the offsets per slave (`internals.md`, "The flight's patches in all
+three"); the AGA slave draws the same 90 of 90 frames as P7's. The harness takes `VARIANT`
+(the ECS route has its own steps, `development.md`), and on the 68000, which aprof does not
+profile, it counts the presented frames (`COUNT`). VERIFY builds, the pinned mission (each
+version its own), `CUSTOM2=1` unless said, fps:
+
+| ECS | A500 (68000), F1/F5 | a1200-030, F1/F5/F6 |
+|---|---:|---:|
+| the cap (no `CUSTOM2`), no other patch | 4.31/4.23 | |
+| `CUSTOM2=1`, no other patch | 4.39/4.17 | 15.89/16.31/14.48 |
+| + the fast stack and models | 4.40/4.20 | |
+| + the CPU lines | 4.37/4.09 | |
+| + lines and spans, JOTD's `CACHE` | | 22.05/22.46/19.05 |
+| + lines and spans, `CACHECHIP` (the release) | 4.40/4.20 (no lines) | 24.96/24.71/22.38 |
+| the release without the spans | | 20.97/19.39/17.39 |
+| the release without the lines | | 20.97/24.46/21.55 |
+
+On the a1200-fast (68020, 1500 fields, F1/F5) the ECS release gives 13.15/12.45 fps, 12.48/12.45
+without the lines.
+
+| CD32, cockpit view | a1200-fast (68020) | a1200-030 |
+|---|---:|---:|
+| JOTD's memory (all chip) and `CACHE` | 4.99 | 5.57 |
+| + `CACHECHIP` (the instruction cache was off) | 6.66 | |
+| + ExpMem $130000 | 9.98 | |
+| + the fast stack and models | 10.57 | |
+| the release (1500 fields) | 10.92 (lines off) | 23.96 |
+| the release without the rectangles | 10.48 | 22.00 |
+| the release with the lines (68020) / without them (68030) | 10.98 | 23.66 |
+
+- **On the 68000 nothing in flight is faster**: the frame rate is under the cap, the fast stack
+  and models gain nothing measurable, and the CPU lines lose (the CPU spans were never a
+  candidate there). The ECS slave keeps them for its 68020+ users: on the a1200-030 the ECS
+  version gains 57% (F1), `CACHECHIP` 13% of it.
+- **The CD32 version had no fast memory**: code, data, stack and screens all in chip, and the
+  instruction cache off. ExpMem doubles its frame rate on the 68020 and quadruples it on the
+  68030. It raises the slave's needs to $1ff000 chip and $1b0000 ExpMem (with the Kickstart);
+  JOTD's needed $80000 ExpMem besides the chip, so a CD32 never ran it without fast RAM.
+- **The CD32 rectangles first drew garbage** in the panel (and looked slower, 4.08 fps): its
+  build runs the rectangle's blit list again after some rectangles, so `cf_rect` now leaves
+  the list as the game's routine does.
+- **Lines and spans by CPU**: as on the AGA version, the spans from the 68030; the lines from
+  the 68020 in the ECS version (5% in the cockpit view there) and the 68030 in the CD32 one,
+  where the 68020 gains nothing (10.98 fps without them, 10.92 with).
+- **Frames** (`screens.py`, `CUSTOM2=1 CUSTOM3=10`, a1200-030, against each version's build
+  without the flight patches): the ECS release draws 90 of 90 the same, the CD32 one F5 and
+  F6 60 of 60 and the cockpit 27 of 30. The cockpit frames differ by 1 to 4 radar pixels, which
+  the game plots by CPU (code $b774) beside the panel's blits and which follow the CPU's and the
+  blitter's timing: the CD32 build without patches on the a1200-fast differs from itself on
+  the a1200-030 in the same bytes and more (0 of 30). The game state (data, bss) is the same
+  at every frame.
+
 ## Next
 
-P8-P9 of the plan:
+P9 of the plan, and what is left:
 
-1. **P8 Port to the ECS and CD32 slaves.** Everything the AGA slave does in flight: the fast
-   stack and model data, the instruction cache, `CUSTOM2=1` (the frame cap and its patches,
-   the dither sites), the CPU fills and lines, and the VERIFY mission pin. The ECS version
-   (kick13, the 68000) and the CD32 one (kick31) have their own `gs2.run` builds: every code
-   offset, the BSS layout and the renderer need finding again, and on a 68000 the CPU fills
-   are probably slower than the blitter (measure, as the 68020 spans). The CD32 slave's patch
-   list is dead code now ("Also seen"). The harness drives the AGA version only.
-2. **P9 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
+1. **P9 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
    `$VER: Gunship2000<Variant>.slave 4.0b (18.11.2026)`, the info text credits Vesuri, and
    the ReadMe entry above JOTD's says what changed (the WHDLoad 20.1 KickEmu, the faster AGA
    flight, Enhanced framerate). `make dist` packs it; not yet published. Bump the version and
    the entry as improvements land.
-3. **P4 follow-ups.** The coupling test for the AI and weapons (a mission with moving units,
+2. **P4 follow-ups.** The coupling test for the AI and weapons (a mission with moving units,
    targets fired at); the joystick control mode (code $142c ramps the pitch command per step);
    `CUSTOM2` with time acceleration (`]`).
-4. **P5b**, only if the rest is done (above); the cockpit panel's sources in fast RAM with it.
+3. **P5b**, only if the rest is done (above); the cockpit panel's sources in fast RAM with it.
 
-Not yet checked: long flights, a second flight in one session with `CUSTOM2=1`, and the CPU
-fills and lines in the views other than cockpit, F5 and F6 (the other cameras, the map, night).
+Not yet checked: long flights, a second flight in one session with `CUSTOM2=1`, the CPU
+fills and lines in the views other than cockpit, F5 and F6 (the other cameras, the map, night),
+the coupling test on the ECS and CD32 versions, and how the CD32
+version switches views (its function keys are the pad's buttons).
 
 ## Also seen
 

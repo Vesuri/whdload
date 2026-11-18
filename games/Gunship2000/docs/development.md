@@ -59,7 +59,7 @@ differs only in equivalent encodings:
 - alignment padding (`nop` or zeroes after `cnop`).
 
 Every other operand is equal, or a PC-relative target at the same KickEmu routine or the same
-string. `release/slaves.sha256` records this build.
+string. (That compares JOTD's source; 4.0b adds the patches since, and `src/flight.s`.) `release/slaves.sha256` records this build.
 
 ## Running
 
@@ -78,13 +78,14 @@ Traps:
 
 ## Profiling in flight
 
-`tools/` drives the AGA version on a native FS-UAE (`$AMIGA_SHARE/fs-uae-aprof`, which has
+`tools/` drives each version (`VARIANT`, default `Gunship2000AGA`; `gs2.py` has each
+`gs2.run` build's offsets) on a native FS-UAE (`$AMIGA_SHARE/fs-uae-aprof`, which has
 `monitor key`, `mouse`, `input`, `fields` and `aprof`):
 
 | Tool | What |
 |---|---|
-| `gunship2000.py` | `Session`: boots `common/run.sh` as its own instance in warp, deterministic, nothing in port 0; fields, keys, mouse, clicks, screenshots, Barto traces, aprof, memory reads. `MACHINE` = `a1200-030` (default), `a1200-030-mmu` or `a1200-fast`; `SLAVE`, `VARIANT` pass through |
-| `profile_flight.py OUT [REFERENCE]` | the front-end route to the cockpit and the profile: a window per key of `VIEWS` (default `f5 f6`, the chase and tactical views; `f1` the cockpit view), each `OUT/<key>.prof` of 150 fields (`SEGMENT`), with `OUT/route/*.png`, `layout.json` and `state.json`; `FLY=N` first takes off and flies forward N fields (7000 reach the pinned mission's enemy units); with REFERENCE (an earlier OUT) it stops unless the cockpit is the reference's |
+| `gunship2000.py` | `Session`: boots `common/run.sh` as its own instance in warp, deterministic, nothing in port 0; fields, keys, mouse, clicks, screenshots, Barto traces, aprof, memory reads. `MACHINE` = `a1200-030` (default), `a1200-030-mmu`, `a1200-fast` or `a500` (game.conf's ECS machine); `SLAVE`, `VARIANT` pass through |
+| `profile_flight.py OUT [REFERENCE]` | the front-end route to the cockpit and the profile: a window per key of `VIEWS` (default `f5 f6`, the chase and tactical views; `f1` the cockpit view, `cockpit` the view the flight starts in, without a key), each `OUT/<key>.prof` of 150 fields (`SEGMENT`); `COUNT=1` (the default on the `a500`) counts the presented frames instead, `OUT/<key>.frames`, with `OUT/route/*.png`, `layout.json` and `state.json`; `FLY=N` first takes off and flies forward N fields (7000 reach the pinned mission's enemy units); with REFERENCE (an earlier OUT) it stops unless the cockpit is the reference's |
 | `aprof_report.py OUT [TOP]` | per window (`OUT/*.prof`): frames (presents at code $129c4) and fps over the window's seconds (PAL or NTSC), CACR, the chip-bus share, the time by kind (frame cap, blitter waits, stack and calls, other, outside) and the top routines |
 | `gs2.py` | finds `gs2.run`'s hunks in memory (by the installed file), the memory lists, the clocks |
 | `coupling.py OUT [REFERENCE...]` | the coupling test: the same flight inputs at the same game time, the player's state sampled at mission seconds 25-90 and interpolated to the second; with REFERENCEs, the quantities outside their envelope. `coupling.py compare OUT REFERENCE...` compares saved runs |
@@ -155,6 +156,17 @@ Traps:
 - One frame in a 150-field window is 0.33 fps: for changes of a few percent use
   `SEGMENT=600`. A change in the flight's start-up time (a copy, a wait) moves its timing and
   so the scenes against an older run; compare against a slave with the same delay.
+- **The ECS route differs**: its WOC ERASE-ME record is the last on the board, clicks hold 30
+  fields (the 68000 front end reads the buttons less often), there is no tent photo, the
+  crack enters the code, and each click on the safety switch the front end sees toggles its
+  cover, so the route clicks until the flight loads. The board's order also varies between
+  runs (once ERASE-ME was first): rerun when the route stops at the office.
+- aprof profiles the 68020 and up only; on the `a500` `profile_flight.py` counts frames.
+- The CD32 version's function keys are the pad's buttons (`fakepad.s`): F5 and F6 do not
+  change the view, so profile it with `VIEWS=cockpit`.
+- Frames compare between renderer builds only when every frame takes the same game time: at
+  the cap a frame slower than 6 ticks (the ECS chase view's first, on a 68030 with the blitter)
+  moves the game time on, so use `WHD_ARGS="CUSTOM2=1 CUSTOM3=10"` there.
 - `NTSC=1` (`common/run.sh`) boots NTSC: the route holds, but the front end then picks
   another mission, also in VERIFY builds, so NTSC runs compare only with each other.
 - The installed aprof writes `AITDPROF 1` for `APROF 1`; `aprof_report.py` reads either.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""The drawn frames of the AGA flight: screens.py OUT [REFERENCE]; screens.py compare OUT REFERENCE
+"""The drawn frames of the flight (VARIANT, default the AGA version): screens.py OUT [REFERENCE]; screens.py compare OUT REFERENCE
 
-Flies profile_flight's route to the cockpit and stops at every present (code $129c4) for FRAMES
+Flies profile_flight's route to the cockpit and stops at every present (AGA code $129c4) for FRAMES
 frames (default 30) in each of three views: the cockpit as it starts, F5 (chase), F6 (tactical).
 At the present B+$b8dc is the screen just drawn; its 32000 bytes (four interleaved planes, rows
 of 160 bytes) go to OUT/screens/<view>-<frame>.bin, their SHA-256 to OUT/screens.json.
@@ -22,8 +22,8 @@ import profile_flight as P  # noqa: E402
 import gs2  # noqa: E402
 from gunship2000 import Session  # noqa: E402
 
-PRESENT = 0x129c4
-DRAWN = 0xb8dc
+PRESENT = gs2.O['present']
+DRAWN = gs2.O['drawn']
 SIZE = 32000
 VIEWS = (('cockpit', None), ('f5', 'f5'), ('f6', 'f6'))
 

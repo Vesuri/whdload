@@ -9,8 +9,9 @@ profile(), aprof_start()/aprof_stop(), read() and quit().
 Server: `python3 tools/gunship2000.py serve` boots under the shared gdb-stub server
 (common/tools/game_server.py); `python3 tools/gunship2000.py <command>` sends it one command.
 
-Environment: MACHINE picks an entry of MACHINES (default a1200-030); VARIANT (default
-Gunship2000AGA), SLAVE, BUILD and the other common/run.sh options pass through;
+Environment: MACHINE picks an entry of MACHINES (default a1200-030; a500 is game.conf's ECS
+machine, VARIANT=Gunship2000ECS only); VARIANT (default Gunship2000AGA), SLAVE, BUILD and the
+other common/run.sh options pass through;
 GUNSHIP2000_FSUAE picks another native build (default the aprof one, which also has
 `monitor mouse`, `input`, `key` and `fields`).
 """
@@ -38,6 +39,7 @@ MACHINES = {
     'a1200-fast': dict(SETUP='a1200-fast'),
     'a1200-030': dict(SETUP='a1200-030', EXTRA_ARGS='--uae_mmu_model=0'),
     'a1200-030-mmu': dict(SETUP='a1200-030'),
+    'a500': dict(SETUP='custom'),   # game.conf's ECS machine: 68000, 1 MB chip, 2 MB fast
 }
 
 # Amiga raw key codes.
@@ -77,7 +79,8 @@ class Session:
         self.run = ROOT / 'tmp/run' / self.instance / '.run'
         self.s = Server('gunship2000', str(ROOT), run_script=str(COMMON / 'run.sh'),
                         run_dir=str(self.run), profile_window=False)
-        base = dict(GAME=ROOT.name, INSTANCE=self.instance, VARIANT='Gunship2000AGA', FSUAE=FSUAE,
+        base = dict(GAME=ROOT.name, INSTANCE=self.instance,
+                    VARIANT=os.environ.get('VARIANT') or 'Gunship2000AGA', FSUAE=FSUAE,
                     WARP='1', DETERMINISTIC='1', JOY0='none', WINDOW='none')
         if os.environ.get('SLAVE'):
             base['SLAVE'] = str(Path(os.environ['SLAVE']).resolve())

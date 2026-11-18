@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""In-flight profile of the AGA version: profile_flight.py OUT [REFERENCE]
+"""In-flight profile: profile_flight.py OUT [REFERENCE]
 
-Boots the AGA slave (gunship2000.Session: warp, deterministic, MACHINE default a1200-030 without
+Boots the VARIANT's slave (default the AGA one) (gunship2000.Session: warp, deterministic, MACHINE default a1200-030 without
 its MMU model, which aprof needs) and clicks through the front end to the cockpit:
 DUTY ROSTER (the whiteboard), right click on the WOC ERASE-ME record, name "test" + Return,
 Return (unit patch), unit "test" + Return, click the record, MISSION BRIEFING (the door), click
-the photo, BEGIN MISSION (the map), five clicks on the keypad, the Aux Power Unit tab, its switch.
+the photo (not in the ECS version), BEGIN MISSION (the map), five clicks on the keypad, the Aux Power Unit tab, its switch (in the ECS
+version until the flight starts).
 When the cockpit appears, for each key of VIEWS (default `f5 f6`: the chase and the tactical
-view; `f1` is the cockpit view): `monitor aprof start`, the key, SEGMENT fields (default 150,
+view; `f1` is the cockpit view, `cockpit` the view the flight starts in without a key: in the CD32
+version the function keys are the pad's buttons): `monitor aprof start`, the key, SEGMENT fields (default 150,
 3 s), `monitor aprof stop` to OUT/<key>.prof, and one unprofiled field for a screenshot. With
 FLY=N it first takes off and flies forward for N fields (fly(); FLY=7000 in the pinned mission
 is among the enemy units, the busy scene). Also writes OUT/route/*.png (a screenshot at
@@ -37,7 +39,12 @@ import gs2  # noqa: E402
 # Screenshot coordinates (754x576 shots; the pointer is Intuition's, at shot - SHOT_ORIGIN).
 SHOT_ORIGIN = (78, 37)
 WHITEBOARD = (443, 177)
-RECORD = (240, 240)          # the first squadron record, WOC ERASE-ME
+VARIANT = os.environ.get('VARIANT') or 'Gunship2000AGA'
+# WOC ERASE-ME: the first squadron record (AGA, CD32), the last one (ECS)
+RECORD = (480, 375) if VARIANT == 'Gunship2000ECS' else (240, 240)
+# Fields a click is held: the front end reads the buttons once per animation frame, which on
+# the ECS version's 68000 takes longer
+HOLD = 30 if VARIANT == 'Gunship2000ECS' else 10
 DOOR = (560, 215)
 PHOTO = (400, 250)           # the briefing tent picture shown first after the door
 MAP = (200, 150)
@@ -46,8 +53,11 @@ APU_TAB = (645, 280)
 APU_SWITCH = (645, 298)
 SEGMENT = int(os.environ.get('SEGMENT', '150'))   # fields a window: 3 s
 VIEWS = os.environ.get('VIEWS', 'f5 f6').split()  # the keys, one window each, in order
-SHOTS = dict(f1='cockpit-view', f5='chase', f6='tactical')
+SHOTS = dict(f1='cockpit-view', cockpit='cockpit-view', f5='chase', f6='tactical')
 FLY = int(os.environ.get('FLY', '0'))   # fields of forward flight before the windows
+# COUNT=1 (default on the a500): count the frames (OUT/<key>.frames) instead of aprof, which
+# profiles only the 68020 and up
+COUNT = os.environ.get('COUNT', '1' if os.environ.get('MACHINE') == 'a500' else '') == '1'
 
 
 def mean(a, box):
@@ -60,7 +70,7 @@ def screen(a):
     r, g, b = mean(a, (90, 80, 150, 260))            # the office window
     if b > r + 10 and r > 150 and mean(a, (74, 428, 714, 431)).max() < 40:   # NTSC too
         return 'office'
-    if mean(a, (120, 50, 600, 170)).min() > 210:      # the white squadron board
+    if mean(a, (120, 50, 600, 170)).min() > 200:      # the white squadron board
         return 'records'
     if mean(a, (90, 385, 220, 412)).min() > 230:      # the briefing's white orders bar
         return 'briefing'
@@ -109,7 +119,7 @@ class Flight:
         # The front end polls the buttons once per animation frame: hold for 10 fields.
         self.move_to(target)
         self.s.fields(4)
-        self.s.click(button, hold=10, after=after)
+        self.s.click(button, hold=HOLD, after=after)
 
     def type(self, text):
         for c in text:
@@ -152,8 +162,9 @@ def route(f):
     f.click_at(RECORD)
     f.wait_for('office')
     f.click_at(DOOR)
-    f.wait_for('photo')
-    f.click_at(PHOTO)
+    if VARIANT != 'Gunship2000ECS':      # the ECS version goes straight to the orders
+        f.wait_for('photo')
+        f.click_at(PHOTO)
     f.wait_for('briefing')
     f.click_at(MAP)
     f.wait_for('keypad')
@@ -161,16 +172,30 @@ def route(f):
     f.move_to(KEYPAD_5)
     s.fields(4)
     for _ in range(5):
-        s.click(1, hold=10, after=10)
+        s.click(1, hold=HOLD, after=10)
     s.fields(20)
     f.shot('code')
     f.click_at(APU_TAB)
     s.fields(50)
     f.shot('apu')
-    f.click_at(APU_SWITCH)
+    if VARIANT == 'Gunship2000ECS':
+        # Each click the 68000 front end sees toggles the safety cover, and it misses some;
+        # the flight starts on a click with the cover open: click until the screen goes black
+        for _ in range(8):
+            f.click_at(APU_SWITCH)
+            try:
+                f.wait_for('loading', limit=300, every=5, test=black)
+                break
+            except TimeoutError:
+                pass
+        else:
+            raise TimeoutError('the ECS flight did not start')
+    else:
+        f.click_at(APU_SWITCH)
     # The flight loads behind a black screen (seconds); the cockpit is the next lit picture.
     # Which helicopter and cockpit it is depends on the mission the front end picked.
-    f.wait_for('loading', every=5, test=black)
+    if VARIANT != 'Gunship2000ECS':
+        f.wait_for('loading', every=5, test=black)
     return f.wait_for('cockpit', every=5, test=lit)
 
 
@@ -181,6 +206,25 @@ def fly(s, fields):
     s.tap(0x0c, hold=200, after=10)      # =, collective up
     s.tap('up', hold=150, after=10)
     s.fields(fields)
+
+
+def count_frames(s, layout, fields):
+    """Frames presented over `fields` fields of the flight's VBL counter (a breakpoint at the
+    present: the emulated time is not changed). For the 68000, which aprof does not profile."""
+    h0, h2 = layout['hunks']['0']['base'], layout['hunks']['2']['base']
+    vbl = h2 + gs2.O['vbl']
+    s.cmd(f'break *{h0 + gs2.O["present"]:#x}')
+    s.cmd('continue', timeout=600)
+    v0, n = s.word(vbl), 0
+    while True:
+        s.cmd('continue', timeout=600)
+        n += 1
+        d = (s.word(vbl) - v0) & 0xffff
+        if d >= fields:
+            break
+    s.cmd('delete')
+    s.field += d
+    return dict(frames=n, fields=d, fps=round(n * 50 / d, 2))
 
 
 def same_mission(shot, reference, limit=1.0):
@@ -212,9 +256,18 @@ def main(out, reference=None):
             f.shot('flown')
         state = {'start': gs2.clocks(s, layout)}
         for view in VIEWS:
-            s.aprof_start()
-            s.tap(view, hold=10, after=SEGMENT - 10)
-            s.aprof_stop(s.out / f'{view}.prof')
+            if COUNT:
+                if view != 'cockpit':
+                    s.tap(view, hold=10, after=10)
+                state[view + '-frames'] = count_frames(s, layout, SEGMENT)
+                (s.out / f'{view}.frames').write_text(json.dumps(state[view + '-frames']))
+            else:
+                s.aprof_start()
+                if view == 'cockpit':                    # the view the flight starts in, no key
+                    s.fields(SEGMENT)
+                else:
+                    s.tap(view, hold=10, after=SEGMENT - 10)
+                s.aprof_stop(s.out / f'{view}.prof')
             state[view] = gs2.clocks(s, layout)
             f.shot(SHOTS.get(view, view))
         state['fields'] = s.field

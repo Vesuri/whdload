@@ -32,9 +32,9 @@ from gunship2000 import KEYS, Session  # noqa: E402
 KEYS.setdefault('=', 0x0c)
 SAMPLES = list(range(25, 95, 5))
 POSITIONS = 64
-PLAYER = 0xd348
-TABLE = 0x127a
-SECONDS, FRACTION = 0xc682, 0xc684
+PLAYER = gs2.O['player']
+TABLE = gs2.O['table']
+SECONDS, FRACTION = gs2.O['seconds'], gs2.O['fraction']
 
 
 def state(s, h2):
@@ -88,7 +88,7 @@ def sample(s, w, n):
     dump(s, w, n, 'a')
     a = state(s, w.h2)
     # At code $8e the clock holds the frame's end; the state is still its start.
-    dt = s.word(w.h2 + 0xc67e)
+    dt = s.word(w.h2 + gs2.O['dt'])
     a['time'] -= dt * 15 / 32 / 65536
     w.frame_start()
     dump(s, w, n, 'b')

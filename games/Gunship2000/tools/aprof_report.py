@@ -6,7 +6,7 @@ once per frame), the CACR, the chip-bus share, the time by kind (frame-cap spin,
 loops, stack and call instructions, the rest of gs2.run, outside gs2.run) and the TOP routines of
 gs2.run by self time (a routine is the code from one call target to the next; aprof's call tree
 is not used, its returns are unpaired). Shares are of all emulated time in the segment, chip-bus
-shares of the same total. Also written to OUT/report.txt.
+shares of the same total. Also written to OUT/report.txt. VARIANT as for the run (gs2.py).
 """
 import bisect
 import collections
@@ -22,9 +22,9 @@ from amigaxdev import aprof  # noqa: E402
 from amigaxdev.env import tool  # noqa: E402
 import gs2  # noqa: E402
 
-PRESENT = 0x129c4                  # rotates the three screens, writes COP1LC: once per frame
-CAP_SPIN = {0x2c6, 0x2cc, 0x2d0}   # main loop: wait until 6 ticks of 64 Hz since the frame began
-VBL_WAIT = {0x129aa, 0x129b0}      # wait for the next VBL (the VBL client sets a flag)
+PRESENT = gs2.O['present']             # rotates the three screens, writes COP1LC: once per frame
+CAP_SPIN = set(gs2.O['cap_spin'])      # main loop: wait until 6 ticks of 64 Hz since the frame began
+VBL_WAIT = set(gs2.O['vbl_wait'])      # wait for the next VBL (the VBL client sets a flag)
 
 
 def listing(out):
@@ -82,6 +82,10 @@ def kind(o, ins, waits):
 def report(out, top=15):
     out = Path(out)
     layout = json.loads((out / 'layout.json').read_text())
+    state = out / 'state.json'
+    ran = json.loads(state.read_text())['env'].get('VARIANT') if state.exists() else None
+    if (ran or 'Gunship2000AGA') != gs2.VARIANT:
+        raise SystemExit(f'{out} is a {ran} run: VARIANT={ran}')
     base, size = layout['hunks']['0']['base'], layout['hunks']['0']['size']
     ins, rel = listing(out)
     waits = blitter_waits(ins)

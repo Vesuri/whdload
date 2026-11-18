@@ -3,11 +3,12 @@
 MicroProse's Gunship 2000 (1991-1994) under WHDLoad, in its three Amiga releases: the floppy
 ECS version (kick13), the floppy AGA version and the CD32 version (both kick31). `src/` is
 JOTD's v3.1 (28.03.06) source made to assemble with vasm; the AGA flight is profiled, with
-a plan toward 50 fps on the a1200-030; the AGA slave keeps the flight's stack and model data in
-fast RAM and turns the instruction cache on, fills the polygons (68030+) and the one-colour
-rectangles and draws the lines with the CPU (the same pixels, checked frame by frame), `CUSTOM2=1` lifts the flight's frame cap
-(the simulation kept at its rate, checked by the coupling test), and its VERIFY build pins
-the mission.
+a plan toward 50 fps on the a1200-030; all three slaves (the flight's patches in
+`src/flight.s`, each version's offsets in its slave) keep the flight's stack and model data in
+fast RAM and turn the instruction cache on, fill the polygons (68030+) and the one-colour
+rectangles and draw the lines with the CPU where that is faster (the same pixels, checked
+frame by frame), `CUSTOM2=1` lifts the flight's frame cap (the simulation kept at its rate,
+checked by the coupling test), and their VERIFY builds pin the mission.
 The original slave is by JOTD (game.conf `AUTHOR`, `UPSTREAM`): his `G/Gunship2000/usr` in
 whdload_slaves at 6046174e, the same source as in the whdload.de install package. Its
 ECS slave starts from Wepl's Wild West World slave and KickStarter 34.005, its
@@ -24,8 +25,9 @@ Read `docs/open-work.md` first.
 | `docs/development.md` | inputs, the build against the shipped slaves, running each variant, the in-flight profile, traps |
 | `docs/internals.md` | how each version loads, memory, every slave patch; the AGA flight's frame loop, timing, renderer and memory |
 
-The slave source is `src/`: one `Gunship2000<Variant>HD.s` per variant, `fakepad.s` (the
-CD32 pad emulation, included by the CD32 slave), `slave_version` and the include bridge
+The slave source is `src/`: one `Gunship2000<Variant>HD.s` per variant, `flight.s` (the
+flight's patches, included by all three), `fakepad.s` (the CD32 pad emulation, included by
+the CD32 slave), `slave_version` and the include bridge
 `include/lvo/lowlevel.i`. `tools/` is the harness: `gunship2000.py` (the session),
 `profile_flight.py` (the front-end route and the in-flight profile), `aprof_report.py`,
 `coupling.py` (the frame-rate coupling test), `screens.py` (the drawn frames),

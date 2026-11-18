@@ -49,14 +49,58 @@ IOCACHE		= 10000
 SETPATCH
 BOOTDOS
 CBDOSLOADSEG
-CACHE
+; The instruction cache for all memory on a 68020 or later. JOTD's CACHE marks BaseMem
+; non-cacheable, and without WHDLoad's MMU (its default on a 68030) that switches both caches off.
+CACHECHIP
 
 ;============================================================================
 
 
-slv_Version	= 16
+slv_Version	= 17
 slv_Flags	= WHDLF_NoError|WHDLF_Examine|WHDLF_EmulTrap
 slv_keyexit	= $5D	; num '*'
+
+; The ECS build of gs2.run (flight.s; the AGA slave's offsets are the comments')
+G_DT		= $18
+G_CLOCK		= $68
+G_PHASE		= $292
+G_WAIT		= $2b0
+G_BLINK		= $2e2
+G_VBL		= $5ec
+G_COLLECTIVE_UP	= $11b0
+G_COLLECTIVE_DOWN = $1206
+G_SPEED		= $760e
+G_SPEED_STEP	= $7afc
+G_HEADING	= $7cd2
+G_CLIMB		= $7848
+G_FILL		= $f9ce
+G_COLOURS	= $fc10
+G_LINE		= $fc54
+G_STACK		= $13ac2	; the supervisor stack (SUPERVISOR_STACK)
+G_MODELS	= $182ac
+G_SEED		= $184dc
+G_START		= $18524
+G_SIZE		= $19108
+B_PATTERNS	= $1088
+B_DRAWN		= $b8d4
+B_VBL		= $b8f4
+B_DT		= $c5cc
+B_TICKS		= $c5ce
+B_BLINK		= $c5d8
+B_PHASE		= $c5d9
+B_PAUSE		= $c686
+B_CLIMB_TARGET	= $2c6
+B_CLIMB		= $2c8
+B_COLLECTIVE	= 6
+D_EDGES		= $1e9e
+D_HEAP		= $2c3c
+D_MODELS	= $93ce
+D_MODELS_NEXT	= $93d6
+SUPERVISOR_STACK
+LINES_CPU	= AFB_68020	; the CPU lines on a 68020 or later: slower on the 68000
+GS_RAND		= $326a
+GS_TIME_HUNK	= 96
+GS_MISSION_HUNK	= 21
 
 	INCLUDE	whdload/kick13.s
 
@@ -97,6 +141,8 @@ slv_info		dc.b	"adapted by JOTD",10
 		dc.b	"Version "
 		DECL_VERSION
 		dc.b	0
+slv_config	dc.b	"C1:B:Skip introduction;C2:B:Enhanced framerate;"
+		dc.b	0
 slv_CurrentDir:
 	dc.b	"data",0
 	EVEN
@@ -129,11 +175,46 @@ _cb_dosLoadSeg
 	move.l	d0,a0
 
 	cmp.b	#'g',1(A0)
-	bne.b	.nomain
+	bne.b	.flight
 	cmp.b	#'s',2(A0)
-	bne.b	.nomain
+	bne.b	.flight
 
-	bsr	.patch_segments
+	movem.l	d1/a0,-(a7)
+	bsr	.patch_segments		; JOTD's protection search, in every gs... file
+	movem.l	(a7)+,d1/a0
+	; the flight's patches (flight.s) by the name after any device, assign or drawer: gs2.run,
+	; and in VERIFY builds gs
+.flight	moveq	#0,d0
+	move.b	(a0)+,d0
+	lea	(a0,d0.w),a1		; the name's end
+	move.l	a0,a2
+.part	cmp.l	a1,a2
+	beq.b	.name
+	move.b	(a2)+,d0
+	cmp.b	#':',d0
+	beq.b	.after
+	cmp.b	#'/',d0
+	bne.b	.part
+.after	move.l	a2,a0
+	bra.b	.part
+.name	sub.l	a0,a1			; the file name's length
+	cmp.b	#'g',(a0)
+	bne.b	.nomain
+	cmp.b	#'s',1(a0)
+	bne.b	.nomain
+	cmp.w	#2,a1
+	beq.b	.gs
+	cmp.w	#7,a1
+	bne.b	.nomain
+	cmp.b	#'2',2(a0)
+	bne.b	.nomain
+	cmp.b	#'.',3(a0)
+	bne.b	.nomain
+	bra	flight_gs2
+.gs
+	IFD VERIFY
+	bra	flight_gs		; the mission pinned
+	ENDC
 .nomain:
 	rts
 
@@ -373,6 +454,8 @@ _hexsearch:
 _tag		dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0
 		dc.l	0
+
+	include	flight.s
 
 ;============================================================================
 

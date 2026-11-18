@@ -15,7 +15,7 @@ files.
 | KickEmu | `kick13.s` (`kick34005.A500`), `SETPATCH`, `BLACKSCREEN` | `kick31.s` (`kick40068.A1200`), `INITAGA` | `kick31.s`, `INITAGA`, `FORCEPAL`, `DEBUG` |
 | Assigns | `gs_dsk1`-`gs_dsk4` | `gs_dsk1`-`gs_dsk4`, `ENV:` to `RAM:` | `CD0`, `Gunship_2000`, `ENV:` to `RAM:` |
 | Runs | `Gunship 2000 Intro` (unless `CUSTOM1`), then `Gunship 2000` | `Gunship 2000` | `Gunship 2000` |
-| Patches by | `_cb_dosLoadSeg` (name `gs...`) and `patch_main` on `Gunship 2000` | `_cb_dosLoadSeg`: `gs`, `gs2.run`, `Gunship 2000` | `fakepad.s` (lowlevel.library) |
+| Patches by | `_cb_dosLoadSeg` (`gs...`, `gs2.run`) and `patch_main` on `Gunship 2000` | `_cb_dosLoadSeg`: `gs`, `gs2.run`, `Gunship 2000` | `_cb_dosLoadSeg` (4.0b: `gs2.run`, VERIFY `gs`), `fakepad.s` (lowlevel.library) |
 
 `Gunship 2000` is the front end; it runs `gs` (the base and menus) and `gs2.run` (the
 flight). The CD32 slave loads `lowlevel.library` and `nonvolatile.library` from disk
@@ -28,9 +28,13 @@ flight). The CD32 slave loads `lowlevel.library` and `nonvolatile.library` from 
 
 | | BaseMem (`CHIPMEMSIZE`) | ExpMem (`FASTMEMSIZE`) | Flags | `slv_Version` |
 |---|---|---|---|---|
-| ECS | $100000 | $100000 | `NoError`, `Examine`, `EmulTrap` | 16 |
+| ECS | $100000 | $100000 | `NoError`, `Examine`, `EmulTrap` | 17 (4.0b, JOTD's 16: `slv_config`, `C1:B:Skip introduction;C2:B:Enhanced framerate`) |
 | AGA | $100000 | $130000 (JOTD's $100000) | `NoError`, `Examine`, `ClearMem`; stack 13000 | 17 (4.0b: `slv_config`, `C2:B:Enhanced framerate`) |
-| CD32 | $1ff000 | 0 | `NoError`, `Examine` | 16 |
+| CD32 | $1ff000 | $130000 (4.0b; JOTD's 0) | `NoError`, `Examine` | 17 (4.0b: `slv_config`, `C2:B:Enhanced framerate`) |
+
+ExpMem also holds the Kickstart (KickEmu's `KICKSIZE` before `FASTMEMSIZE`). With JOTD's
+CD32 setup all of the game's memory was chip; the 4.0b CD32 slave's ExpMem gives the OS
+fast memory, and the flight's code, data and BSS (any-memory hunks) load there.
 
 The quit key is $5d (numeric `*`); the ReadMe says F10 and gives the older memory figures.
 
@@ -59,14 +63,37 @@ AGA, `_cb_dosLoadSeg` first clears long 0 (`clr.l 0`) on every `LoadSeg`, then b
 | `gs` (code $5ee0 at file $228), $4970 | `move.l -4(a5),d0` (the code entered) | `jsr $d0.w`, a `jmp crack` there | once five digits are in, replaces the entry with the right code (protection removed) |
 | `gs2.run` (code $19014 at file $30), $12780 | `jsr -270(a6)` (`WaitTOF` before `LoadView`) | two `nop` | |
 | `gs2.run`, $12834 | `lea $dff000,a5` | `jsr set_copperlist` | writes the copper end `$fffffffe` to address 0 (the game's `COPJMP2` to 0), sets `COP1LC` from the game's copper-list variable |
-| `gs2.run`, $13d52 (4.0b) | `movea.l D+$2c3e,sp; lea 2000(sp),sp; move.l sp,D+$2c3e` | `jsr fast_stack` (D+$2c3e += 2000), then a branch to $13d62 | the flight stays on its process stack in ExpMem instead of moving it onto its chip work area ("Memory in flight"); the 2000 bytes are still taken, so the heap is laid out as before |
-| `gs2.run`, $181c2 (4.0b) | `movea.l D+$922a,a0` (the model data, before $18b8c relocates it) | `jsr fast_models` | copies the block (up to D+$9232, at most $21000 bytes) into a fast buffer allocated on the first flight and points D+$922a at it; the transform and object code read it there ("Memory in flight"). Larger or no memory: the chip block |
 | `Gunship 2000` (code $6a4 at file $28), $122 | the `Install Gunship 2000` test | skip to $13e | |
 | `Gunship 2000`, $16c | an `OpenLibrary` and the test after it | skip to $1f4 | |
 
-The AGA slave (4.0b) sets KickEmu's `CACHECHIP` where JOTD's set `CACHE`: the instruction
+All three 4.0b slaves set KickEmu's `CACHECHIP` where JOTD's set `CACHE`: the instruction
 cache for all memory, BaseMem write-through. `CACHE` marks BaseMem non-cacheable, and without
-WHDLoad's MMU (the default on a 68030) one non-cacheable area switches both caches off.
+WHDLoad's MMU (the default on a 68030) one non-cacheable area switches both caches off; on the
+CD32 version's 68020 (all its memory BaseMem) the instruction cache was off too (CACR 0).
+
+### The flight's patches in all three (`src/flight.s`, 4.0b)
+
+The three `gs2.run` files are builds of one source; the flight's patches are one file,
+`src/flight.s`, and each slave defines where its build has each place (`G_*` code, `B_*`
+BSS, `D_*` data offsets, and the `gs` hunks), found by aligning the code hunks with the
+relocations masked; `tools/gs2.py` has the harness's subset. The offsets below are the AGA
+build's. The slave calls `flight_gs2` when `gs2.run` is loaded, by the name after any device,
+assign or drawer (the ECS one has one), and in VERIFY builds `flight_gs` for `gs`. The routines
+address the hunks $8000 on, so the same code runs on the ECS version's 68000.
+
+| | ECS | AGA | CD32 |
+|---|---|---|---|
+| code, data, BSS | $19108, $d71c, $e114 | $19014, $d578, $e1c4 | $19750, $d858, $e200 |
+| e.g. present, dt, the screen drawn | $125ca, B+$c5cc, B+$b8d4 | $129c4, B+$c67e, B+$b8dc | $12968, B+$c6ba, B+$b8dc |
+| `gs` hunks: `random()`, `time()`, the mission setup | 0 $3268, 96, 21 | 0 $35c4, 97, 22 | 0 $330c, 96, 21 |
+
+The fast stack and model data, every build:
+
+| Offset | Original | Patch | Why |
+|---|---|---|---|
+| $13d52 (AGA, CD32) | `movea.l D+$2c3e,sp; lea 2000(sp),sp; move.l sp,D+$2c3e` | `jsr fast_stack` (D+$2c3e += 2000), then a branch to $13d62 | the flight stays on its process stack in ExpMem instead of moving it onto its chip work area ("Memory in flight"); the 2000 bytes are still taken, so the heap is laid out as before |
+| ECS $13ac2 | the same, for the supervisor stack: the ECS flight takes the machine over (a `trap`, SR $2700, its own vectors) | `jsr fast_super_stack` | the supervisor stack in 2000 bytes of fast memory allocated when `gs2.run` loads; no memory: the work area, as before |
+| $181c2 | `movea.l D+$922a,a0` (the model data, before $18b8c relocates it) | `jsr fast_models` | copies the block (up to D+$9232, at most $21000 bytes) into a fast buffer allocated when `gs2.run` first loads (the ECS flight has the OS switched off) and points D+$922a at it; the transform and object code read it there ("Memory in flight"). Larger or no memory: the chip block |
 
 The VERIFY build pins the mission for measurements (`development.md`, "Profiling in flight"):
 
@@ -76,7 +103,7 @@ The VERIFY build pins the mission for measurements (`development.md`, "Profiling
 | `gs` hunk 22, $2a40 | `moveq #0,d0; move.l d0,d5; move.w d5,-18(a5)` | `jsr reseed_mission`, `nop` | the mission setup reseeds: the office animations call `random()` a timing-dependent number of times, and the setup rolls the time of day here (H78+$f6 = `random(5)` = 0, H78+$f7 = `random(100)` > 40) |
 | `gs2.run`, $183e8 | `move.w VHPOSR,B+$b8fe` | `jsr seed_flight` | the flight's own generator ($12aa0) seeds from the beam position |
 
-With `CUSTOM2=1` the AGA slave also applies `pl_gs2_fps` to `gs2.run` (4.0b, "Enhanced
+With `CUSTOM2=1` the slaves also apply `pl_gs2_fps` to `gs2.run` (4.0b, "Enhanced
 framerate"): a frame takes at least one field instead of 6 ticks, and the simulation keeps its
 rate ("Frame loop"). The slave keeps the fields since the last frame (`fps_fields`), the
 remainders, and k, the 6-tick periods of game time the current step completes (`fps_k`):
@@ -95,12 +122,19 @@ remainders, and k, the 6-tick periods of game time the current step completes (`
 | $1212, $1268 | `clr.w B+6` (keys `=` and `-`) | `jsr fps_collective` | the collective steps 1 a call while the key is held: only on steps with k > 0 |
 | 84 sites | `muls.w B+$c67e,Dn; add.l Dn,Dn; swap Dn` | `jsr fps_dtm<n>; nop; swap Dn` | found by `fps_dither_sites`: x × dt is truncated every frame; the product gets a uniform fraction (a golden-ratio sequence) before the swap, so it is right on average, and 0 stays 0 |
 
-All AGA builds (4.0b) also replace three of the renderer's blitter routines ("Rendering"),
-with the same pixels (`tools/screens.py`):
+The 4.0b builds also replace the renderer's blitter routines ("Rendering"), with the same
+pixels (`tools/screens.py`), where they are faster (`open-work.md`, "P8"):
+
+| | ECS | AGA | CD32 |
+|---|---|---|---|
+| rectangles ($13832) | no (the ECS build queues its rectangle blits) | every CPU | every CPU |
+| spans ($fab6) | 68030+ | 68030+ | 68030+ |
+| lines ($fd3c) | 68020+ (slower on the 68000) | every CPU | 68030+ (no faster on the 68020) |
+
 
 | Offset | Original | Patch | Why |
 |---|---|---|---|
-| $13832 | a D-only blit a plane through $dda0 | `jmp cf_rect` | the rectangle by CPU long writes; leaves the registers and the blitter registers as the blits did |
+| $13832 | a D-only blit a plane through $dda0 | `jmp cf_rect` | the rectangle by CPU long writes; leaves the registers, the blitter registers and the blit list at B+$b5b8 as the blits did (the CD32 build runs the list again after some rectangles, code $dd4a there) |
 | $fab6 (68030 or later, by `_attnflags`) | a blit a scanline span | `jmp cf_fill` | the spans by CPU writes, the edge words read and masked, longs between; the B rows as the blitter's pointer would give them. On the 68020/14 the blits are faster (with the CPU rectangles, CUSTOM2=1: 12.33/11.67 fps against 12.00/10.67), so it keeps them |
 | $fd3c | a line blit a plane | `jmp cl_line` | the blitter's line mode by the CPU: the game's octant and error terms, the error's sign taken before each step, the pixels of one word of a row written together; leaves the registers and the blitter registers as the last plane's blit did. Faster on both CPUs |
 
@@ -109,13 +143,15 @@ All three wait for the blitter first, so the game's own blits (the band, the pan
 The VERIFY build reads `CUSTOM3` as the least fields a frame takes (`fps_wait`), for the
 coupling test (`development.md`).
 
+The ECS slave's `_cb_dosLoadSeg` keeps JOTD's protection search in every `gs...` file.
+
 `_patch_exe` tells the AGA `Gunship 2000` by `$2c79` at $512; with `$2c79` at $66c (the ECS
 layout) it applies the ECS install-check patches instead.
 
 CD32: `_patch_gs2000` returns at once, so its patch list (`$154` two `nop`, `$168` `bra`) is
-not applied; the game runs unpatched apart from `fakepad.s`.
+not applied; apart from `fakepad.s` and the flight's patches the game runs unpatched.
 
-## Flight (AGA `gs2.run`)
+## Flight (AGA `gs2.run`; the other builds by the table above)
 
 `gs2.run` has five hunks: code $19014 (offsets below), data $d578 (D+), BSS $e1c4 (B+), all
 three any-memory, and the chip hunks data $2c2c and BSS $18. On the a1200-030 the first three

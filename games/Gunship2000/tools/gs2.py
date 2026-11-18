@@ -1,30 +1,57 @@
-"""gs2.run, the AGA flight program, in a running Session: where it is and its clocks.
+"""gs2.run, the flight program, in a running Session: where it is and its clocks.
 
 Nothing here carries game bytes: signatures come from the installed file
-(tmp/game/Gunship2000AGA/data/gs2.run) when needed.
+(tmp/game/<the variant's drawer>/data/gs2.run) when needed.
 
-Hunks: 0 code $19014, 1 data $d578, 2 BSS $e1c4 (any memory), 3 data $2c2c and 4 BSS $18 (chip).
+The three versions' gs2.run are builds of one source: VARIANT (default Gunship2000AGA) picks
+the file and OFFSETS, the same places in each (found by aligning the code hunks, P8). AGA
+hunks: 0 code $19014, 1 data $d578, 2 BSS $e1c4 (any memory), 3 data $2c2c and 4 BSS $18 (chip).
 """
+import os
 import struct
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GS2 = ROOT / 'tmp/game/Gunship2000AGA/data/gs2.run'
+VARIANT = os.environ.get('VARIANT') or 'Gunship2000AGA'
+DRAWERS = dict(Gunship2000ECS='Gunship2000', Gunship2000AGA='Gunship2000AGA',
+               Gunship2000CD32='Gunship2000CD32')
+GS2 = ROOT / 'tmp/game' / DRAWERS[VARIANT] / 'data/gs2.run'
 
-# BSS (hunk 2) words: see docs/internals.md, "Flight timing".
+# Code: present (rotates the screens, once per frame), the frame cap's spin, the VBL wait, the
+# renderer routines the slave may replace with a jmp (P5, P7). BSS (hunk 2): the screen just
+# drawn, the three screens, the player object, the position table, the clocks (see
+# docs/internals.md, "Flight timing").
+OFFSETS = {
+    'Gunship2000AGA': dict(present=0x129c4, cap_spin=(0x2c6, 0x2cc, 0x2d0), vbl_wait=(0x129aa, 0x129b0),
+                           slave_jumps=(0xfab6, 0x13832, 0xfd3c), drawn=0xb8dc,
+                           screens=(0xb8e4, 0xb8e8, 0xb8ec), player=0xd348, table=0x127a,
+                           ticks=0xc680, seconds=0xc682, fraction=0xc684, dt=0xc67e, accel=0xc696,
+                           vbl=0xb8fc),
+    'Gunship2000ECS': dict(present=0x125ca, cap_spin=(0x2b0, 0x2b6, 0x2ba), vbl_wait=(0x125b0, 0x125b6),
+                           slave_jumps=(0xf9ce, 0x1348a, 0xfc54), drawn=0xb8d4,
+                           screens=(0xb8dc, 0xb8e0, 0xb8e4), player=0xd296, table=0x1272,
+                           ticks=0xc5ce, seconds=0xc5d0, fraction=0xc5d2, dt=0xc5cc, accel=0xc5e4,
+                           vbl=0xb8f4),
+    'Gunship2000CD32': dict(present=0x12968, cap_spin=(0x2c4, 0x2ca, 0x2ce), vbl_wait=(0x1294e, 0x12954),
+                            slave_jumps=(0xfa70, 0x13806, 0xfcf6), drawn=0xb8dc,
+                            screens=(0xb8e4, 0xb8e8, 0xb8ec), player=0xd384, table=0x127a,
+                            ticks=0xc6bc, seconds=0xc6be, fraction=0xc6c0, dt=0xc6ba, accel=0xc6d2,
+                            vbl=0xb8fc),
+}
+O = OFFSETS[VARIANT]
+
 CLOCKS = {
-    'ticks': (0xc680, 2),       # 64 Hz CIA-B ticks since the main loop last took them
-    'seconds': (0xc682, 2),     # mission clock, whole seconds
-    'second_fraction': (0xc684, 2),
-    'dt': (0xc67e, 2),          # the last frame's time step, 32768 = 15 ticks
-    'accel': (0xc696, 2),       # time acceleration, steps per frame
-    'vbl': (0xb8fc, 2),         # +1 every field (the VBL client)
-    'tick64': (0x0004, 2),      # 64ths of a second
+    'ticks': (O['ticks'], 2),       # 64 Hz CIA-B ticks since the main loop last took them
+    'seconds': (O['seconds'], 2),   # mission clock, whole seconds
+    'second_fraction': (O['fraction'], 2),
+    'dt': (O['dt'], 2),             # the last frame's time step, 32768 = 15 ticks
+    'accel': (O['accel'], 2),       # time acceleration, steps per frame
+    'vbl': (O['vbl'], 2),           # +1 every field (the VBL client)
+    'tick64': (0x0004, 2),          # 64ths of a second
 }
 
-
-# Code offsets the slave may replace with a jmp to its own routine (the renderer, P5).
-SLAVE_JUMPS = (0xfab6, 0x13832, 0xfd3c)
+# Code offsets the slave may replace with a jmp to its own routine (the renderer, P5, P7).
+SLAVE_JUMPS = O['slave_jumps']
 
 
 def hunks(path=GS2):
@@ -143,7 +170,7 @@ def locate(s):
                       for h in sorted(bases)},
                memlist=mem)
     h2 = bases[2]
-    out['screens'] = [s.long(h2 + o) for o in (0xb8e4, 0xb8e8, 0xb8ec)]
+    out['screens'] = [s.long(h2 + o) for o in O['screens']]
     out['slave_jumps'] = slave_jumps(s, base0)
     return out
 
