@@ -38,7 +38,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | TFX Enhanced | JOTD | not yet released; merged upstream, not released there |
 | Their Finest Hour Enhanced | Psygore | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/TheirFinestHourEnhanced-2.0b-20261013) |
 | Wing Commander Enhanced | Psygore | [2.0b (17.11.2026)](https://github.com/Vesuri/whdload/releases/tag/WingCommanderEnhanced-2.0b-20261117) |
-| Zany Golf Enhanced | Bored Seal | not yet released |
+| Zany Golf Enhanced | Bored Seal | [2.0b (17.11.2026)](https://github.com/Vesuri/whdload/releases/tag/ZanyGolfEnhanced-2.0b-20261117) |
 
 ## Building
 
