@@ -39,7 +39,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Test Drive II Enhanced | JOTD | released upstream as JOTD's 2.1 (11.10.2026) |
 | TFX Enhanced | JOTD | not yet released; merged upstream, not released there |
 | Their Finest Hour Enhanced | Psygore | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/TheirFinestHourEnhanced-2.0b-20261013) |
-| Wing Commander Enhanced | Psygore | [2.0b (18.11.2026)](https://github.com/Vesuri/whdload/releases/tag/WingCommanderEnhanced-2.0b-20261118) |
+| Wing Commander Enhanced | Psygore | [2.0b (19.11.2026)](https://github.com/Vesuri/whdload/releases/tag/WingCommanderEnhanced-2.0b-20261119) |
 | Zany Golf Enhanced | Bored Seal | [2.0b (17.11.2026)](https://github.com/Vesuri/whdload/releases/tag/ZanyGolfEnhanced-2.0b-20261117) |
 
 ## Building
