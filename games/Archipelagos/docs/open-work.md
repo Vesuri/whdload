@@ -11,8 +11,11 @@ frame loop, the game's clocks and the rendering cost are measured
 2.0b (18.11.2026): StingRay's v1.2 code, which the whdload.de install package lacked, with
 `$VER` and the info text in the slave and the ReadMe entry above StingRay's, game time
 decoupled from the frame rate, and steps 2 to 6 below behind Enhanced framerate (CUSTOM1,
-set in the installed icon). Played by the maintainer; no full
-play-through (the archipelagos are generated, thousands of them). With CUSTOM1 off the
+set in the installed icon). Played by the maintainer (SPS 627, a 68040 with fast memory):
+archipelagos 1 to 5, saving with 5 completed and loading it in a new session; that play
+found the sky's copper lists in fast memory at dusk (fixed). No full play-through (the
+archipelagos are generated, thousands of them). Still worth a look: a dawn after a dusk,
+an archipelago with blood eggs (20 or later), the Obelisk's destruction past archipelago 1. With CUSTOM1 off the
 a1200-030 draws 8.2 fps (SPS 628 7.9), as before step 2, and the a500's moves (both
 versions, CUSTOM1 on and off) are step 5's.
 
