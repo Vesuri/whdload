@@ -12,7 +12,8 @@
 ; fire and calls mouse_init with its parameter table and game H0 base.
 ; The mouse option (CUSTOM5 bits 4-6, mouse_option) scales every count in
 ; mouse_event, so all uses below move alike; off makes the variant install
-; none of the mouse hooks.
+; none of the mouse hooks. CUSTOM5 bit 7 (mouse_dive) inverts the flight
+; pitch.
 ;
 ; Mouse flight: the PC version's pointer and stick. The flight controller's
 ; ramp stores call mouse_steer, which moves the pointer by the mouse motion
@@ -22,7 +23,9 @@
 ; its place as the PC sets its stick: its distance from the gunsight on each
 ; axis, in the PC's steps, gives 0 to 5 steps, and within 4 pixels of the
 ; aperture's edges or past them full deflection; the ship keeps turning while
-; the pointer is off centre. (The PC measures from the middle of a window
+; the pointer is off centre. As on the PC the nose follows the pointer: above
+; the gunsight is the stick back (WC.EXE gives it the pitch of the Down
+; arrow), so mouse forward climbs; with mouse_dive it dives instead. (The PC measures from the middle of a window
 ; that it places at the screen's top left; here it is the aperture, so that
 ; the gunsight is the centre in the cockpit and in the Training Simulator.)
 ; The pointer, the PC version's 9x9 one, shows in the
@@ -279,12 +282,17 @@ mouse_exit:
         move.l  mouse_move(pc),-(sp)
         rts
 
-; The mouse speed option, from the variant's option code before mouse_init:
-; d0 = 0 normal, 1 off, 2-7 0.5x, 0.75x, 1.5x, 2x, 3x, 4x (other bits ignored).
+; The mouse options, from the variant's option code before mouse_init:
+; d0 bits 0-2 = 0 normal, 1 off, 2-7 0.5x, 0.75x, 1.5x, 2x, 3x, 4x; bit 3 =
+; mouse_dive, the flight pitch inverted (other bits ignored).
 ; Returns d0 = mouse_speed and Z set when off, which the variant takes as
 ; "install no mouse patch". Every other register is kept.
 mouse_option:
         move.l  a0,-(sp)
+        lea     mouse_dive(pc),a0
+        clr.w   (a0)
+        btst    #3,d0
+        sne     1(a0)
         andi.w  #7,d0
         move.b  .speeds(pc,d0.w),d0
         ext.w   d0
@@ -402,8 +410,8 @@ mouse_event:
 ; Replaces the flight controller's pitch and yaw ramp stores (8 bytes; a
 ; 6-byte call), with d2 = pitch and d3 = yaw ramp as the native code left them.
 ; Native ramps step by one per call to +-9 and decay by two; the mouse sets
-; them at once. Mouse right is the stick right (yaw +); mouse down is the stick
-; back (pitch -). While the right button rolls, and until the roll ramp
+; them at once. Mouse right is the stick right (yaw +); mouse up is the stick
+; back (pitch -), as on the PC, or with mouse_dive the stick forward. While the right button rolls, and until the roll ramp
 ; settles after it, the roll ramp (d4, which the controller stores next) is
 ; the native ramp with ROLL_SCALE times its steps, decay and cap, from the
 ; controller's roll flags in d5 (left) and d6 (right): ROLL_SCALE times the
@@ -483,7 +491,10 @@ mouse_steer:
         move.w  d0,2(a2)
         ext.l   d0
         divs.w  #STICK_STEP,d0
-        neg.w   d0
+        move.w  mouse_dive(pc),d1       ; (68000: no tst.w d16(pc))
+        beq.s   .pitch                  ; pointer up: the stick back, as the PC
+        neg.w   d0                      ; pointer up: the stick forward
+.pitch:
         move.w  d0,d2                   ; pitch
         move.w  MP_VIEW(a1),d1
         tst.w   (a4,d1.w)
@@ -1468,6 +1479,7 @@ mouse_active:   dc.w 0
 mouse_sum_x:    dc.w 0                  ; counts, wrapping; mouse_sum_y follows
 mouse_sum_y:    dc.w 0
 mouse_speed:    dc.w 4                  ; quarter counts per mouse count (mouse_option)
+mouse_dive:     dc.w 0                  ; nonzero: mouse forward dives (mouse_option)
 mouse_rem:      dc.w 0,0                ; x, y quarters not yet a count
 mouse_fields:   dc.w 0                  ; VBL fields (mouse_vbl)
 stick_x:        dc.w 0                  ; stick units (+-8 steps); stick_y follows

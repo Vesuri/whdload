@@ -191,7 +191,7 @@ def main():
         # The flight: the controller's ramp stores (the slave's mouse_steer).
         # The pointer (sprite 7, the slave's image) moves with the mouse, two
         # counts a pixel, behind the cockpit; mouse right and down: yaw right,
-        # pitch up (stick back), in the PC version's steps from its place.
+        # pitch down (stick forward, as the PC), in the PC version's steps from its place.
         site, ramp, view, aperture, copper = game['flight']
         if ocs:
             sym = json.loads((a.build/'build.json').read_text())['symbols']
@@ -246,10 +246,10 @@ def main():
             drawn, ok = pixels(rows[-1], f'flight-{len(rows)-1}')
             rows[-1].update(drawn=len(drawn), on_screen=ok)
         # The world tick's ramps can lag the pointer by a call. Right: yaw +;
-        # down: pitch - (stick back); full deflection +-9 at the limits.
+        # down: pitch + (stick forward, as the PC); full deflection +-9 at the limits.
         r = rows
-        assert r[0]['view'] == 0 and r[0]['control'] == 0 and r[1]['yaw'] > 0 and r[1]['pitch'] == 0 and r[2]['pitch'] < 0, r
-        assert (r[3]['pitch'], r[3]['yaw']) == (-9, 9) and (r[4]['pitch'], r[4]['yaw']) == (9, -9), r
+        assert r[0]['view'] == 0 and r[0]['control'] == 0 and r[1]['yaw'] > 0 and r[1]['pitch'] == 0 and r[2]['pitch'] > 0, r
+        assert (r[3]['pitch'], r[3]['yaw']) == (9, 9) and (r[4]['pitch'], r[4]['yaw']) == (-9, -9), r
         ptr = Pointer(tuple(r[1]['aperture']))
         for x in r[1:]:
             # Sprite 7 where the model's pointer is; its lines are the PC
@@ -274,7 +274,7 @@ def main():
         assert r[3]['sprite'] == (319-5, 199-4) and r[3]['drawn'] == 0, r[3]
         assert r[4]['sprite'] == (0-5, 0-4) and r[4]['drawn'] == 0, r[4]
         assert r[5]['sprite'] == (220-5, 0-4) and r[5]['drawn'] == 0, r[5]
-        assert r[6]['sprite'] == (220-5, top) and r[6]['drawn'] > 0 and r[6]['pitch'] == 9, r[6]
+        assert r[6]['sprite'] == (220-5, top) and r[6]['drawn'] > 0 and r[6]['pitch'] == -9, r[6]
         if copper:
             # Idle for 10 s: the pointer hides and both lists get the game's
             # BPLCON4 back (the rooms show them, with an even-sprite pointer).

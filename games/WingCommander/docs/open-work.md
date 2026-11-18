@@ -1042,7 +1042,8 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   is in the PC colour 207 through the odd sprites' colour bank, on OCS white
   (colour 31). It appears when the mouse moves and hides
   after 10 seconds without motion (user requests, 2026-11-13).
-  The stick or keys take over and re-centre it. Always on, with no option.
+  The stick or keys take over and re-centre it. The pitch follows the PC by
+  default; "Mouse forward dives" (CUSTOM5 +128) reverses it (UR16).
   Native checks pass on CD32 English and German and on OCS after both installs.
   For live results see
   [mouse flight](internals.md#mouse-flight-both-release-builds-every-mode).
@@ -1056,7 +1057,7 @@ two other OCS revisions in Psygore's lists (CRC `116d`, `262d`) need their files
   - The right button holds the pointer while it throttles and rolls (UR7).
   - Played by the user only for the right-button roll (UR7).
 
-#### User reports after 2.0b (UR1–UR15)
+#### User reports after 2.0b (UR1–UR17)
 
 Two reports received 2026-11-16, overlapping complaints combined: one from the
 separate-slave developer above (H), one from a player who prefers Psygore's
@@ -1143,6 +1144,23 @@ Features for later:
 - **UR14 (H): Secret Missions on the CD32 slave.** Not implemented.
 - **UR15 (H): more languages from text files, with localized fonts.** Not
   implemented.
+
+H's second report (2026-11-18, against 2.0b of 18.11.2026):
+- **UR16 (H): mouse pitch inverted against the PC.** Fixed (2026-11-18). The
+  PC's nose follows the pointer (WC.EXE: the pointer above the middle gives
+  the Down arrow's pitch). The slave had the flight-stick sense. The user
+  chose the PC as the oracle, with the old sense as an option: "Mouse forward
+  dives", CUSTOM5 +128 (internals, "The PC's signs"). Checked natively on both
+  variants (both senses) and live in the simulator on both. Not yet checked
+  by the user.
+- **UR17 (H): roll inverted "with all controllers".** Not reproduced: in
+  WC.EXE and the Amiga code a ramp value rolls the same way, the keys and
+  stick give the same signs, and the right button's roll matches the PC's
+  (internals, "The PC's signs"). Needs H's exact input and the direction
+  seen, compared in play with the PC.
+- UR10's glyphs: H now attributes them to the renderer, not the font data:
+  the `$0D` (%1101) nibble case of the glyph row dispatch (their `GAME+$02FDD6`,
+  handler `GAME+$02FF7E`) draws pixels 0 and 1 but not 3. Not yet examined.
 
 Deferred local work: the pre-existing save/load length guard and native checks
 are preserved in stash `5237ca28782a8e1fd1f615c91232c80b2fd93391`

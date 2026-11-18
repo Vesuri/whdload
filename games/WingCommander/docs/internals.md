@@ -9121,8 +9121,12 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   to the screen. The stick follows from the pointer's place in the PC
   version's steps (below): `STICK_LEVEL` (9) stick units a step, so the ramps,
   stick / 8 toward zero, are 1 to 5 for steps 1 to 5 and 9 (full) for step 8:
-  yaw from x, pitch from −y (mouse right is stick right; mouse towards you is
-  stick back, nose up). Held still off centre, the ramps hold and the ship
+  yaw from x, pitch from y as the PC (mouse right is stick right; mouse
+  forward, the pointer above the gunsight, is stick back, nose up: the nose
+  follows the pointer). CUSTOM5 bit 7 (`mouse_dive`, "Mouse forward dives")
+  takes pitch from −y instead, as a flight stick. Until 2.0b (18.11.2026) the
+  slave had only that, and hexaae reported it inverted against the PC
+  (2026-11-18). Held still off centre, the ramps hold and the ship
   keeps turning. The native ramps step by one per call and decay by two; the
   mouse sets them at once. An earlier version moved the stick by the counts
   (72 to full deflection) and the pointer from it: the pointer then crossed
@@ -9163,6 +9167,31 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   and in the simulator (114, 40), far up and left of its sight. The slave
   uses the aperture, which is that window where it is on screen, so the
   middle is the gunsight in both (the user's choice).
+- **The PC's signs (WC.EXE, file offset = image + `1200`).** The flight
+  input routine (image `49cc`–`4d3c`) writes the same three ramp words as
+  the keys and the joystick: pitch `DS:c3aa`, yaw `c3ac`, roll `c3ae`. The
+  pointer path (`4b95`) stores yaw = x − middle + 1 and pitch = y − middle
+  (y grows down the screen). The keys (`45ac`, by scan code) step the same
+  words to ±9: Up (`48`) pitch +, Down (`50`) pitch −, Left (`4b`) yaw −,
+  Right (`4d`) yaw +, `.` (`34`) roll +, `,` (`33`) roll −. So the pointer
+  above the middle gives the Down arrow's pitch, and below it the Up arrow's.
+  The joystick path (`4c4e`) takes yaw = stick x and pitch = −stick y. The
+  routine has no other sign and no option changes it, and the game uses
+  INT 33h functions 0, 3 and 4 only. With the right button
+  (`4b24`) the pointer's x is the roll (right is `.`'s roll +), half its −y
+  goes to the throttle, and the pitch and yaw words keep their values. On
+  release the pointer goes back to the middle and the three ramps to 0
+  (`4b51`). The rates follow at `4896`: pitch = ship × pitch ramp / 8, yaw
+  and roll the same negated. That is the Amiga's `E:7a4`, term for term
+  (ship +36, +34 and +38, ramps A4 `5882`, `5884` and `5886` in the same
+  order). The Amiga controller (`E:18daa`) steps them from its flags the same
+  way: left yaw −, right yaw +, up pitch +, down pitch −, and with the
+  modifier left roll −, right roll +. So a PC ramp value and the same Amiga
+  value turn the ship the same way. The pointer pitch was the one sign the
+  slave had reversed. The right button's roll (mouse right gives right's roll
+  +) and the yaw already matched. hexaae's report that roll is inverted "with
+  all controllers" does not match this code. The Amiga keys and stick roll
+  as the PC's do, and the right button gives the stick's roll.
 - **Pointer limits.** The PC version's 9×9 pointer (a ring with four ticks,
   captured from DOSBox) starts at the gunsight and moves over the whole
   screen, as the PC's. The aperture's edges are where full deflection starts

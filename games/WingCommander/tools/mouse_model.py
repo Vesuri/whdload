@@ -33,8 +33,8 @@ def level(pixel, centre, first, last, steps):
 class Pointer:
     """The pointer's offset from the gunsight in half pixels."""
 
-    def __init__(self, ap=APERTURE):
-        self.ap, self.x, self.y = ap, 0, 0
+    def __init__(self, ap=APERTURE, dive=False):
+        self.ap, self.x, self.y, self.dive = ap, 0, 0, dive
 
     def move(self, dx, dy):
         cx, cy = self.ap[2], self.ap[3]
@@ -53,9 +53,11 @@ class Pointer:
                 STICK_LEVEL*level(py, cy, y0, y0+h-1, STEPS_Y))
 
     def ramps(self):
-        """(pitch, yaw): mouse right is yaw +, mouse down pitch - (stick back)."""
+        """(pitch, yaw): mouse right is yaw +; as the PC (WC.EXE), mouse up is
+        pitch - (the stick back, nose up), or with dive (CUSTOM5 bit 7) pitch +."""
         sx, sy = self.stick()
-        return -toward_zero(sy, 8), toward_zero(sx, 8)
+        pitch = toward_zero(sy, 8)
+        return -pitch if self.dive else pitch, toward_zero(sx, 8)
 
     def at(self):
         """The pointer's centre pixel."""

@@ -55,12 +55,14 @@
  also moves the selection box when you enter your name, and the right button
  works as Return there, so a name can be entered with the mouse alone. The
  joystick, CD32 pad and keys work as before.
- In flight the mouse steers as in the PC version: move the pointer right of
- the gunsight to turn right and below it to pull the nose up. The further it
- is from the gunsight, the faster the turn, and the ship keeps turning until
- you move it back. The pointer appears when you move the mouse and hides after
- 10 seconds without mouse movement. Using the joystick or keys to steer
- re-centres it.
+ In flight the mouse steers as in the PC version: the nose follows the
+ pointer. Move it right of the gunsight to turn right and above it to pull
+ the nose up. The further it is from the gunsight, the faster the turn, and
+ the ship keeps turning until you move it back. "Mouse forward dives" in the
+ splash window (CUSTOM5 +128) reverses the pitch, as with a flight stick:
+ mouse forward pushes the nose down. The pointer appears when you move the
+ mouse and hides after 10 seconds without mouse movement. Using the joystick
+ or keys to steer re-centres it.
  The other mouse buttons in flight work as on the PC: hold the right button
  and move the mouse forward or back to change speed, or left or right to
  roll, four times as fast as with the keys; the pointer stays where it is
@@ -96,13 +98,14 @@
   12 Venice       13 Hell's Kitchen
  CUSTOM4: 0 = mission 1, 1 = mission 2, 2 = mission 3 (cheat mode required).
 
- CUSTOM5 combines three options; add their values:
+ CUSTOM5 combines four options; add their values:
    World speed:          0 = 1.0x (10 updates/s)   2 = 1.2x   4 = 1.5x
                          6 = 2.0x         8 = CPU-dependent
    Enhanced framerate:  +1 = smooth in-between pictures in flight
    Mouse speed:          0 = 1.0x        16 = off         32 = 0.5x
                         48 = 0.75x       64 = 1.5x        80 = 2.0x
                         96 = 3.0x       112 = 4.0x
+   Mouse forward dives: +128 = mouse forward pushes the nose down
  The installed icon uses CUSTOM5=1: enhanced framerate at 1.0x, mouse at 1.0x.
  For example CUSTOM5=65 is the same with the mouse at 1.5x. Without CUSTOM5
  the world runs at 1.0x without the enhanced framerate.

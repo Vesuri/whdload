@@ -769,26 +769,30 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         assert image() == img() and control() == ptr.sprite(), image()
         # Down 26 pixels, two counts a pixel on both axes: past steps 5 and 18.
         ev(0, 52); tick(); before = chip()
-        assert ptr.at() == (239, 88) and steer() == want() and want()[0] == (-2, 5), 'mouse down: pitch up (stick back)'
+        assert ptr.at() == (239, 88) and steer() == want() and want()[0] == (2, 5), 'mouse down: pitch down (stick forward), as the PC'
         assert chip() == before, 'pointer moved or masked before the VBL'
         assert image() == img() and control() == ptr.sprite() and chip() != before
         assert len(m.sprites) == 1 and len(m.changes) == 1
         # Held still off centre: the ramps hold, the ship keeps turning.
         tick(); assert steer() == (want()[0], [])
+        # CUSTOM5 bit 7 (mouse_dive): the same place pitches the other way.
+        m.write(SLAVE+sy['mouse_dive'], struct.pack('>H', 0x00ff))
+        tick(); assert steer()[0] == Pointer(dive=True).move(160, 52).ramps() == (-2, 5), 'mouse_dive: pitch up'
+        m.write(SLAVE+sy['mouse_dive'], struct.pack('>H', 0))
         # The PC's dead zone: under 10 pixels across and 5 up or down.
         ev(-150, -44); tick(); assert ptr.at() == (164, 66) and steer() == want() and want()[0] == (0, 0)
-        ev(0, 2); tick(); assert steer() == want() and want()[0] == (-1, 0)
+        ev(0, 2); tick(); assert steer() == want() and want()[0] == (1, 0)
         # The screen's corners: full deflection (the PC's edge rule), hidden
         # below the cockpit and above the canopy frame.
-        ev(1000, 1000); tick(); assert steer() == want() == ((-9, 9), [(319-5, 199-4)])
+        ev(1000, 1000); tick(); assert steer() == want() == ((9, 9), [(319-5, 199-4)])
         assert image() == img() == [(0, 0)]*9
-        ev(-2000, -2000); tick(); assert steer() == want() == ((9, -9), [(0-5, 0-4)])
+        ev(-2000, -2000); tick(); assert steer() == want() == ((-9, -9), [(0-5, 0-4)])
         assert image() == img() == [(0, 0)]*9
         # Full deflection within 4 pixels of the aperture's edge, shown there.
-        ev(0, 28); tick(); assert ptr.at() == (0, 14) and steer() == want() and want()[0] == (9, -9)
+        ev(0, 28); tick(); assert ptr.at() == (0, 14) and steer() == want() and want()[0] == (-9, -9)
         assert image() == img() and image() != [(0, 0)]*9
-        ev(8, 2); tick(); assert ptr.at() == (4, 15) and steer() == want() and want()[0] == (5, -9)
-        ev(2, 0); tick(); assert ptr.at() == (5, 15) and steer() == want() and want()[0] == (5, -5)
+        ev(8, 2); tick(); assert ptr.at() == (4, 15) and steer() == want() and want()[0] == (-5, -9)
+        ev(2, 0); tick(); assert ptr.at() == (5, 15) and steer() == want() and want()[0] == (-5, -5)
         # Pixels over the cockpit are left out (the solid ones beside the centre).
         ev(308, 94); tick(); steer()
         assert ptr.at() == (159, 62) and image() == img() and image()[0][0] != POINTER[0]
@@ -814,12 +818,12 @@ def steer_cases(cfg, psy, fixed, blob, sy):
         assert con4() == 0x00cc
         # The modifier routes the stick to throttle and roll: the mouse still steers.
         ev(80, 80); tick()
-        assert steer(flags=(1, 0, 0, 0, 1)) == want() and want()[0] == (-5, 0)
+        assert steer(flags=(1, 0, 0, 0, 1)) == want() and want()[0] == (5, 0)
         out['stick'] = 'pass'
         # Other cockpit views: steering, no pointer; the external view: neither.
         ev(160, 0); tick()
         r, moves = steer(view=1)
-        assert r == ptr.ramps() == (-5, 5) and moves == [] and not shown()
+        assert r == ptr.ramps() == (5, 5) and moves == [] and not shown()
         tick(); assert steer(view=0)[1] == [ptr.sprite()]
         tick(); assert steer((3, 3), view=8) == ((1, 1), []) and not shown()
         ptr.centre()

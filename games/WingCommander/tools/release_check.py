@@ -44,7 +44,7 @@ def main():
     options=[]
     for model,flags in ((2,2),(4,8)):
         for custom in (0,1,2,3,4,5,0xffffffff):
-            for pace in (0,1,2,3,4,5,6,7,8,9,10,0x10,0x11,0x13,0x19,0x23,0x59,0x73,0x7a,0x80,0x83,0xffffffff):
+            for pace in (0,1,2,3,4,5,6,7,8,9,10,0x10,0x11,0x13,0x19,0x23,0x59,0x73,0x7a,0x80,0x83,0x91,0xa3,0xf9,0x8a,0xffffffff):
                 for policy in (0,256):
                     c=CPU(blob,model);c.write(BASE+0x1de4,struct.pack('>I',custom));c.write(BASE+0x1e04,struct.pack('>I',pace))
                     c.write(BASE+0x121e,struct.pack('>I',0x80000));c.write(4,struct.pack('>I',0x2000));c.write(0x2128,struct.pack('>H',flags))
@@ -55,10 +55,10 @@ def main():
                     c.reg(9,0x32a);c.reg(10,0x7f3f);c.reg(11,0x7654)
                     ck(u.uc_emu_start(c.h,BASE+sy['release_setcpu'],STOP,1000000,20000));assert c.reg(18)==STOP and c.reg(11)==0x7654
                     # CUSTOM5 bit 0 framerate, bits 1-3 world speed (0-3 1.0x-2.0x, 4 CPU-dependent = Psygore's normal game),
-                    # bits 4-6 the mouse (0 normal, 1 off, 2-7 0.5x-4x in quarter counts).
-                    rejected=custom>1 or pace&~0x70>9
-                    mouse=(pace>>4)&7
-                    pace&=~0x70
+                    # bits 4-6 the mouse (0 normal, 1 off, 2-7 0.5x-4x in quarter counts), bit 7 mouse forward dives.
+                    rejected=custom>1 or pace&~0xf0>9
+                    mouse=(pace>>4)&7;dive=0xff if pace&0x80 else 0
+                    pace&=~0xf0
                     if pace<=9:pace=(pace+2)%10     # the list: 1.0x-2.0x, then CPU-dependent (internal 0)
                     enhanced=pace>>1!=0
                     if rejected:assert c.read(c.reg(8),4)==struct.pack('>I',9)
@@ -68,6 +68,7 @@ def main():
                         assert int.from_bytes(c.read(BASE+0x1de4,4),'big')==(3 if custom==0 and enhanced else custom)
                         assert int.from_bytes(c.read(BASE+0x1e04,4),'big')==0
                         assert int.from_bytes(c.read(BASE+sy['mouse_speed'],2),'big')==(4,0,2,3,6,8,12,16)[mouse],(pace,mouse)
+                        assert int.from_bytes(c.read(BASE+sy['mouse_dive'],2),'big')==dive,(pace,dive)
                         assert int.from_bytes(c.read(BASE+sy['release_german'],2),'big')==(custom and (2 if enhanced else 1))
                         if enhanced:
                             assert int.from_bytes(c.read(BASE+sy['timing_flight_rate'],4),'big')==(10,12,15,20)[(pace>>1)-1]

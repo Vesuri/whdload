@@ -236,19 +236,22 @@ def steer_scenario(c,slave,sy,moves):
     require(chip()==bytes(40),'pointer image written before the VBL')
     require(image()==img() and control()==ptr.sprite(),'pointer image')
     ev(0,52);tick();before=chip()
-    require(ptr.at()==(239,88) and steer()==want() and want()[0]==(-2,5),'mouse down: pitch up')
+    require(ptr.at()==(239,88) and steer()==want() and want()[0]==(2,5),'mouse down: pitch down, as the PC')
     require(chip()==before,'pointer moved or masked before the VBL')
     require(image()==img() and control()==ptr.sprite() and chip()!=before,'pointer image and position not together')
     tick();require(steer()==(want()[0],[]),'held pointer position')
+    c.write(slave+sy['mouse_dive'],word(0x00ff))
+    tick();require(steer()[0]==Pointer(dive=True).move(160,52).ramps()==(-2,5),'mouse_dive: pitch up')
+    c.write(slave+sy['mouse_dive'],word(0))
     ev(-150,-44);tick();require(ptr.at()==(164,66) and steer()==want() and want()[0]==(0,0),'PC dead zone')
-    ev(1000,1000);tick();require(steer()==want()==((-9,9),[(319-5,199-4)]) and image()==[(0,0)]*9,'full deflection, hidden')
-    ev(-2000,-2000);tick();require(steer()==want()==((9,-9),[(0-5,0-4)]) and image()==[(0,0)]*9,'full deflection up left')
+    ev(1000,1000);tick();require(steer()==want()==((9,9),[(319-5,199-4)]) and image()==[(0,0)]*9,'full deflection, hidden')
+    ev(-2000,-2000);tick();require(steer()==want()==((-9,-9),[(0-5,0-4)]) and image()==[(0,0)]*9,'full deflection up left')
     ev(0,28);tick();require(ptr.at()==(0,14) and steer()==want() and image()==img()!=[(0,0)]*9,'aperture edge: full, shown')
-    ev(10,2);tick();require(steer()==want() and want()[0]==(5,-5),'off the edge: PC steps')
+    ev(10,2);tick();require(steer()==want() and want()[0]==(-5,-5),'off the edge: PC steps')
     ev(308,94);tick();require(steer()[1]==[ptr.sprite()] and ptr.at()==(159,62) and image()==img(),'pointer behind the cockpit')
     tick();require(steer((0,-9),(0,1,0,0,0))==((0,1),[]) and not shown(),'stick steering re-centres');ptr.centre()
     tick();require(steer((0,0))==((0,0),[]),'not re-centred')
-    ev(80,80);tick();require(steer(flags=(1,0,0,0,1))==want() and want()[0]==(-5,2),'modifier: the mouse steers')
+    ev(80,80);tick();require(steer(flags=(1,0,0,0,1))==want() and want()[0]==(5,2),'modifier: the mouse steers')
     tick();require(steer((3,3),view=8)==((1,1),[]),'external view');ptr.centre()
     ev(160,0);tick();steer()
     for _ in range(500):tick();require(steer()==((0,5),[]),'idle steering')
@@ -278,7 +281,7 @@ def check(build, mutation=None):
     require(payload[info:].startswith(b'2.0b (18.11.2026)\n'), 'public release information missing')
     require(b'$VER: WingCommander 2.0b (18.11.2026)\0' in payload, 'public version missing')
     config=int.from_bytes(payload[0x32:0x34],'big')
-    require(payload[config:].split(b'\0',1)[0].endswith(b'C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):1.0x,1.2x,1.5x,2.0x,CPU-dependent:1-3;C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2.0x,3.0x,4.0x:4-6;'),'public config missing')
+    require(payload[config:].split(b'\0',1)[0].endswith(b'C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):1.0x,1.2x,1.5x,2.0x,CPU-dependent:1-3;C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2.0x,3.0x,4.0x:4-6;C5:X:Mouse forward dives:7;'),'public config missing')
     if mutation:
         start,end=sy['ocs_option_gate'],sy['ocs_option_tags']
         segment=payload[start:end]
@@ -306,9 +309,9 @@ def check(build, mutation=None):
     mouse_runs=set()
     for slave,kind,bank in banks:
         for flags in (0,1,2,3,4,8,128):
-            for option in (0,1,3,6,8,9,10,0xffffffff,0x13,0x10,0x11,0x19,0x73,0x2b):
-                # CUSTOM5 bits 4-6 the mouse: 0 normal, 1 off, 2-7 0.5x-4x.
-                mouse=(option>>4)&7;opt=option&~0x70
+            for option in (0,1,3,6,8,9,10,0xffffffff,0x13,0x10,0x11,0x19,0x73,0x2b,0x81,0xa3):
+                # CUSTOM5 bits 4-6 the mouse: 0 normal, 1 off, 2-7 0.5x-4x; bit 7 mouse forward dives.
+                mouse=(option>>4)&7;opt=option&~0xf0;dive=0xff if option&0x80 else 0
                 if opt<=9:opt=(opt+2)%10     # the list: 1.0x-2.0x, then CPU-dependent (internal 0)
                 speed=(4,0,2,3,6,8,12,16)[mouse]
                 if option>>4 and option!=0xffffffff and (flags not in (0,2) or bank not in ('z2-fast','chip')):continue
@@ -360,7 +363,7 @@ def check(build, mutation=None):
                                     if speed==0 and label in MOUSE_LABELS:
                                         require(c.read(CODE+at,6)==before[at:at+6],'mouse off kept a mouse hook')
                                     else:require(c.get(CODE+at,2)==opcode and c.get(CODE+at+2,4)==slave+sy[label],'missing enhanced hook')
-                                require(c.get(slave+sy['mouse_speed'],2)==speed,'mouse option not decoded')
+                                require(c.get(slave+sy['mouse_speed'],2)==speed and c.get(slave+sy['mouse_dive'],2)==dive,'mouse option not decoded')
                                 for at,guard,value in words:
                                     require(c.read(CODE+at,2)==(before[at:at+2] if corrupt=='word' else bytes.fromhex(value)),'word fix state')
                                 rate=struct.unpack('>I',c.read(slave+sy['timing_flight_rate'],4))[0]
@@ -375,7 +378,7 @@ def check(build, mutation=None):
                                     if speed==0 and label in MOUSE_LABELS:continue   # put back: compared below
                                     require(after[at:at+6]==word(opcode)+long(slave+sy[label]),'missing exact hook')
                                     after[at:at+6]=before[at:at+6]
-                                require(c.get(slave+sy['mouse_speed'],2)==speed,'mouse option not decoded')
+                                require(c.get(slave+sy['mouse_speed'],2)==speed and c.get(slave+sy['mouse_dive'],2)==dive,'mouse option not decoded')
                                 for at,guard,value in words:
                                     require(after[at:at+2]==(before[at:at+2] if corrupt=='word' else bytes.fromhex(value)),'word fix state')
                                     after[at:at+2]=before[at:at+2]

@@ -1,8 +1,8 @@
 ; Translate public language/speed options once before language selection.
 ; CUSTOM5 bit 0 enables the enhanced framerate; bits 1-3 select the world
 ; speed: 0 Original (Psygore's normal game), 1-4 a 10/12/15/20 Hz world;
-; bits 4-6 the mouse (mouse_option: 0 normal, 1 off, 2-7 speeds), taken out
-; before the rest is read.
+; bits 4-6 the mouse (mouse_option: 0 normal, 1 off, 2-7 speeds) and bit 7
+; its flight pitch (mouse_dive), taken out before the rest is read.
 ; Internal CUSTOM1=3 is enhanced; 0/1 are Psygore's English/German. German
 ; keeps 1 until Psygore's loader has chosen wing.german (S:142a), so the
 ; converter setup sees 3 only for its call; release_patchseg then maps German
@@ -15,9 +15,9 @@ release_setcpu:
         cmpi.l  #1,d2
         bhi.w   .bad
         move.l  (a1),d2
-        moveq   #$70,d0
+        move.l  #$f0,d0
         and.l   d2,d0
-        eor.l   d0,d2            ; bits 4-6 the mouse
+        eor.l   d0,d2            ; bits 4-7 the mouse
         cmpi.l  #9,d2            ; bit 0 framerate, bits 1-3 world speed 0..4
         bhi.w   .bad
         ; The splash list has the fixed speeds first (0-3: 1.0x-2.0x, 4:
@@ -708,5 +708,6 @@ release_config:
         dc.b 'C4:L:Mission:1,2,3;'
         dc.b 'C5:X:Enhanced framerate:0;'
         dc.b 'C5:M:World speed:1.0x,1.2x,1.5x,2.0x,CPU-dependent:1-3;'
-        dc.b 'C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2.0x,3.0x,4.0x:4-6;',0
+        dc.b 'C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2.0x,3.0x,4.0x:4-6;'
+        dc.b 'C5:X:Mouse forward dives:7;',0
         cnop 0,4

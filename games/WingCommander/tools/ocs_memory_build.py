@@ -571,7 +571,7 @@ ocs_mouse_params:
         text=text.replace('display_create_checked:',exact+words+'\ndisplay_create_checked:',1)
         # Keep option code/data in PC-relative range of the startup seam.
         config=original[32+0xf81:].split(b'\0',1)[0].rstrip(b';')
-        config+=b';C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):1.0x,1.2x,1.5x,2.0x,CPU-dependent:1-3;C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2.0x,3.0x,4.0x:4-6;\0'
+        config+=b';C5:X:Enhanced framerate:0;C5:M:World speed (68020+Fast RAM):1.0x,1.2x,1.5x,2.0x,CPU-dependent:1-3;C5:M:Mouse speed:1.0x,Off,0.5x,0.75x,1.5x,2.0x,3.0x,4.0x:4-6;C5:X:Mouse forward dives:7;\0'
         options=(ROOT/'src/ocs_options.s').read_text()
         options+='\nocs_public_info: dc.b "2.0b (18.11.2026)",10,"Original slave: Psygore",10,"Enhancements: Vesuri",0\nocs_public_version: dc.b "$VER: WingCommander 2.0b (18.11.2026)",0\n even\n'
         options+='\nocs_public_config: dc.b '+','.join(str(x) for x in config)+'\n even\n'
