@@ -97,6 +97,9 @@ def report(out, top=15):
         mhz = h['colorclock_hz'] * h['CYCLE_UNIT'] / h['cycleunit'] / 1e6
         targets = [n[1] - base for n in nodes.values() if base <= n[1] < base + size]
         starts = routines(ins, rel, targets)
+        # The slave's routines that replace the game's (gs2.slave_jumps): PCs from each, up to
+        # 2 KB on, are named after the game's routine.
+        jumps = sorted((t, int(o, 16)) for o, t in layout.get('slave_jumps', {}).items())
         frames = pcs.get(base + PRESENT, (0, 0))[1]
         fps = frames * 50 / h['vsyncs']
         byk, chipk = collections.Counter(), collections.Counter()
@@ -106,7 +109,13 @@ def report(out, top=15):
             k = kind(o, ins, waits)
             byk[k] += units
             chipk[k] += chip
-            r = 'outside' if o is None else starts[bisect.bisect_right(starts, o) - 1]
+            if o is None:
+                r = 'outside'
+                i = bisect.bisect_right([t for t, _ in jumps], pc) - 1
+                if i >= 0 and pc - jumps[i][0] < 0x800:
+                    r = f'slave {jumps[i][1]:#x}'
+            else:
+                r = starts[bisect.bisect_right(starts, o) - 1]
             fself[r] += units
             fchip[r] += chip
         cacr = h['cacr']
@@ -117,7 +126,7 @@ def report(out, top=15):
             lines.append(f'   {k:30s} {v / tot:6.1%}   chip bus {chipk[k] / tot:6.1%}')
         lines.append(f'   routines by self time (code offset, share, chip-bus part):')
         for r, v in fself.most_common(top):
-            name = r if r == 'outside' else f'${r:05x}'
+            name = r if isinstance(r, str) else f'${r:05x}'
             lines.append(f'     {name:>8s} {v / tot:6.1%}  {fchip[r] / tot:6.1%}')
     text = '\n'.join(lines) + '\n'
     (out / 'report.txt').write_text(text)

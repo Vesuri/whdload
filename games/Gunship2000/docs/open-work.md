@@ -4,9 +4,10 @@ Set up 18.11.2026: `src/` is JOTD's v3.1 source with three changes that make vas
 it, equivalent to the shipped slaves apart from the newer KickEmu (`development.md`,
 "Build"). All three variants boot to the duty roster. The AGA flight is profiled
 (`development.md`, "Profiling in flight"); the target is 50 fps in flight on the a1200-030
-(soft). P1-P4 of the plan are done: the VERIFY build pins the mission, the release AGA slave
-keeps the flight's stack in fast RAM and turns the instruction cache on, and `CUSTOM2=1`
-("Enhanced framerate") lifts the frame cap with the simulation kept at its rate.
+(soft). P1-P4 and P5a/P5c of the plan are done (P5b measured, not done): the VERIFY build pins the mission, the release AGA slave
+keeps the flight's stack in fast RAM and turns the instruction cache on, `CUSTOM2=1`
+("Enhanced framerate") lifts the frame cap with the simulation kept at its rate, and the CPU
+fills the polygons (68030 or later) and the one-colour rectangles instead of the blitter.
 
 ## The AGA flight, 18.11.2026
 
@@ -103,40 +104,80 @@ a1200-fast 11.67/11.00 (capped 10.67). The release slave: 10.67/10.67 without `C
 16.33/16.33 with it (the release's own mission). Ending a mission (Alt+E, Y) returns to the
 debriefing with `CUSTOM2=1` and the fast stack.
 
+## P5, filling with the CPU, 18.11.2026
+
+The patches are in `internals.md` ("Slave patches", "Rendering"). VERIFY builds, the pinned
+mission, `CUSTOM2=1`, F5/F6 fps (one frame in 150 fields is 0.33):
+
+| Build | a1200-030 | a1200-fast |
+|---|---:|---:|
+| P4 (all blits) | 17.33/16.67 | 11.67/11.00 |
+| + the spans by the CPU (P5a) | 22.33/21.00 | |
+| + the rectangles by the CPU | 26.33/25.33 | 12.00/10.67 |
+| the spans by the blitter again on the 68020 (the release) | 26.33/24.67 | 12.33/11.67 |
+
+The release slave on its own mission: 25.00/24.33 on the a1200-030, 12.33/11.67 on the
+a1200-fast; without `CUSTOM2` both stay at the cap's 10.67 (the 68030 now spins 56-58% of the
+frame there).
+
+P5c, the pixels: `tools/screens.py` captures every drawn frame for 30 frames in each of the
+cockpit, F5 and F6 views. Against the blitter build every frame is the same: at the cap on
+the a1200-030, and with `CUSTOM2=1 CUSTOM3=7` (7-field frames) on both machines. On the
+a1200-fast one cockpit frame of 30 differs by 4 bytes. That is graphics.library writing a
+sprite's control words into the screen ("Also seen"); it lands before or after the
+frame's clear depending on the drawing speed.
+
+Tried and not kept (no measurable change):
+
+- the span filler with its state in registers, the 4 planes unrolled and the pattern rows
+  cached per field: 26.67/25.00 on the a1200-030, 12.00/10.67 on the a1200-fast (the loop
+  no longer fits the 256-byte instruction cache);
+- long read-modify-writes in the middles of stippled spans: 26.67/25.00;
+- `CACHECHIPDATA` (data cache for fast RAM; chip RAM is never data-cached, all 68030 boards
+  mark it non-cacheable): 27.00/25.67, within a frame or two of `CACHECHIP`.
+
+Where the a1200-030 frame (38 ms) goes now (F5, `aprof_report.py`, which names the
+slave's routines): the span filler 43%, the rectangles 13%, mostly chip RAM writes and the edge
+words' reads; $109ba 10%; the lines $fd3c 10% (blitter waits); $e3de 7%.
+
+**P5b (draw into fast RAM, copy once) is not done.** Its upper bound was measured: spans and
+rectangles written to a fast-RAM dummy, plus a 32000-byte copy to the chip screen every
+frame, gives 32.00/30.33 on the a1200-030. The copy alone is 14.5% of that frame. It would
+also need exact CPU versions of everything else that draws into the view in a frame: the
+lines ($fd3c, a line blit a plane), the horizon band (a line and area-fill blits), the masked
+blits ($12c60, from B+$b8d8), and in the cockpit view the instrument blits (code $b0fc,
+$b138, $b976, $ba16, $ba6a, $c5e8). More than 20 places also switch B+$b8dc or copy between
+the three screens (code $a5e4, $1610c-$17ee6). So: at most about 20% more, at a large risk.
+
 ## Next
 
-P5-P8 of the plan:
+P6-P8 of the plan:
 
-1. **P5 Fill with the CPU.** Replace the per-span blits of $fab6 (and the line, clear and
-   general blits $fd3c, $13832, $dda0 on the same screen):
-   - P5a a CPU span fill straight into the chip screen, with masked edge words and long
-     stores between;
-   - P5b all of the view drawn by the CPU into a 32000-byte fast-RAM buffer, then copied
-     once a frame into the chip screen; overdraw then costs fast RAM only;
-   - P5c keep the blitter's dither patterns (B from D+$1ea0/D+$23a0, alternate lines) exact:
-     frame-by-frame screens identical to the blitter version on the pinned mission. The
-     68020/14 must not get slower (keep the blitter path for it if it does).
-
-   This step decides whether 50 fps is reachable: the rest of the frame is 13-14 ms of the 20.
-2. **P6 Data out of chip RAM.** Sort the work area's blocks (D+$922a, D+$9232 and the heap)
+1. **P6 Data out of chip RAM.** Sort the work area's blocks (D+$922a, D+$9232 and the heap)
    into what the blitter or display uses and what only the CPU does. Move the CPU-only ones to
    ExpMem with a larger `FASTMEMSIZE` (and the ReadMe's memory line). The measure is the
-   chip-bus share of "other gs2.run code" (11-13%).
-3. **P7 Profile again** with the cockpit view (F1, the panel redraws), on NTSC and on a busy
-   scene, and profile the remaining CPU work ($109ba transform, $e3de) if 50 fps is still
-   short.
-4. **P8 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
+   chip-bus share of "other gs2.run code" (now 3-4% on the a1200-030, so probably little).
+2. **P7 Profile again** with the cockpit view (F1, the panel redraws), on NTSC and on a busy
+   scene, and profile the remaining CPU work ($109ba transform, $e3de).
+3. **P8 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
    `$VER: Gunship2000<Variant>.slave 4.0b (18.11.2026)`, the info text credits Vesuri, and
    the ReadMe entry above JOTD's says what changed (the WHDLoad 20.1 KickEmu, the faster AGA
    flight, Enhanced framerate). `make dist` packs it; not yet published. Bump the version and
    the entry as improvements land.
-5. **P4 follow-ups.** The coupling test for the AI and weapons (a mission with moving units,
+4. **P4 follow-ups.** The coupling test for the AI and weapons (a mission with moving units,
    targets fired at); the joystick control mode (code $142c ramps the pitch command per step);
    `CUSTOM2` with time acceleration (`]`).
+5. **P5b**, only if the rest is done (above).
 
-Not yet checked: long flights, and a second flight in one session with `CUSTOM2=1`.
+Not yet checked: long flights, a second flight in one session with `CUSTOM2=1`, and the CPU
+fills in the views other than cockpit, F5 and F6 (the other cameras, the map, night).
 
 ## Also seen
+
+- In flight, graphics.library (Kickstart code in ExpMem) writes a sprite's control words
+  (a beam wait with interrupts off, then a long store) into memory that is now a screen
+  buffer, probably the front end's pointer sprite. It showed as 4 stray bytes in one cockpit
+  frame on line 16 (a1200-fast, with the game's blitter fills).
 
 - The AGA slave's `_cb_dosLoadSeg` clears long 0 on every `LoadSeg`, and `set_copperlist`
   writes a copper end there for the game's `COPJMP2` to 0 (`internals.md`).

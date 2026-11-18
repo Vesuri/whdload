@@ -23,6 +23,10 @@ CLOCKS = {
 }
 
 
+# Code offsets the slave may replace with a jmp to its own routine (the renderer, P5).
+SLAVE_JUMPS = (0xfab6, 0x13832)
+
+
 def hunks(path=GS2):
     """[(type, bytes, memflags)] and relocs {hunk: {offset: target}} of a hunk file."""
     d = path.read_bytes()
@@ -140,6 +144,18 @@ def locate(s):
                memlist=mem)
     h2 = bases[2]
     out['screens'] = [s.long(h2 + o) for o in (0xb8e4, 0xb8e8, 0xb8ec)]
+    out['slave_jumps'] = slave_jumps(s, base0)
+    return out
+
+
+def slave_jumps(s, base0):
+    """{code offset: target} of the slave's `jmp` patches (PL_P) at the renderer's routines, so
+    a profile can name the slave's routines."""
+    out = {}
+    for o in SLAVE_JUMPS:
+        b = s.read(base0 + o, 6)
+        if b[:2] == b'\x4e\xf9':
+            out[f'{o:#x}'] = int.from_bytes(b[2:], 'big')
     return out
 
 

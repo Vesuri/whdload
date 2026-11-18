@@ -94,6 +94,16 @@ remainders, and k, the 6-tick periods of game time the current step completes (`
 | $1212, $1268 | `clr.w B+6` (keys `=` and `-`) | `jsr fps_collective` | the collective steps 1 a call while the key is held: only on steps with k > 0 |
 | 84 sites | `muls.w B+$c67e,Dn; add.l Dn,Dn; swap Dn` | `jsr fps_dtm<n>; nop; swap Dn` | found by `fps_dither_sites`: x × dt is truncated every frame; the product gets a uniform fraction (a golden-ratio sequence) before the swap, so it is right on average, and 0 stays 0 |
 
+All AGA builds (4.0b) also replace two of the renderer's blitter routines ("Rendering"),
+with the same pixels (`tools/screens.py`):
+
+| Offset | Original | Patch | Why |
+|---|---|---|---|
+| $13832 | a D-only blit a plane through $dda0 | `jmp cf_rect` | the rectangle by CPU long writes; leaves the registers and the blitter registers as the blits did |
+| $fab6 (68030 or later, by `_attnflags`) | a blit a scanline span | `jmp cf_fill` | the spans by CPU writes, the edge words read and masked, longs between; the B rows as the blitter's pointer would give them. On the 68020/14 the blits are faster (with the CPU rectangles, CUSTOM2=1: 12.33/11.67 fps against 12.00/10.67), so it keeps them |
+
+Both wait for the blitter first, so the game's own blits (lines, the band) still come before.
+
 The VERIFY build reads `CUSTOM3` as the least fields a frame takes (`fps_wait`), for the
 coupling test (`development.md`).
 
@@ -143,21 +153,35 @@ blink, alternate-frame work) and everything the loop does once a frame.
 
 ### Rendering
 
-The view is three interleaved 320×200 4-plane screens (32000 bytes each, rows of 160 bytes),
-drawn by the blitter one span at a time:
+The view is three interleaved 320×200 4-plane screens (32000 bytes each, rows of 160 bytes).
+The game draws it with the blitter; the 4.0b slave fills with the CPU ("Slave patches"). A
+flight frame in the views measured: the horizon (code $db42: one-colour rectangles above and
+below it by $13832, the band between by a line and area-fill blits through $dda0), then
+polygons by $fab6 with lines by $fd3c between them, then a few masked blits (code $12c60).
 
 | Offset | What |
 |---|---|
-| $fab6 | polygon span filler: per scanline one blit, B (the colour pattern, D+$1ea0/D+$23a0 the edge masks) and C to D, minterm $ca, 4 rows (the planes); waits for the blitter before each |
-| $dda0 | general blit (`btst #14` waits) |
-| $fd3c | lines |
-| $13832 | rectangle clear |
+| $fab6 | polygon span filler: per scanline one blit, B (the colour pattern) and C to D, minterm $ca, 4 rows (the planes); waits for the blitter before each |
+| $dda0 | runs a blit list from B+$b5b8 (`btst #14` waits first) |
+| $fd3c | lines: one line blit a plane, minterm $ca, B the colour bit |
+| $13832 | one-colour rectangle: a D-only blit a plane (BLTCON0 $0100 or $01ff) through $dda0 |
 | $109ba | object transform: a 3×3 word matrix copied in, then CPU maths |
 | $e3de | a list walk ahead of the drawing (to identify) |
 
+$fab6: D0.w indexes the pattern table at B+$108c (its first word the count, in bytes). Below
+the count an entry is a pattern, with A $ffff; from it, the address of a long of two A words
+(stipples: the even lines' word, then the odd lines'), then the pattern. A pattern is two
+rows of 160 bytes, each plane's 40 bytes one word repeated. The edge tables by x (longs):
+D+$1ea0 the first word's mask and byte offset, D+$23a0 the end byte and the last word's
+mask; a span with end <= start is skipped. Even screen lines (from the shown screen B+$b8dc,
+bit 5 of the offset) set B to the pattern; odd ones take the B pointer the last blit left,
+160 bytes on, so after an even line without a span, one row further. With code $fab2 not
+negative it draws one span from $fab2/$fab4.
+
 In the measured flights $fab6 made 650-760 blits a frame, each about 330 CPU cycles of setup.
 The chip bus still had 37-40% free slots: the blitter time is latency (setup, start, wait),
-not bandwidth.
+not bandwidth. With the CPU fills (CUSTOM2=1, the 68030) the chip RAM accesses are the limit:
+in fs-uae a CPU long write to chip costs about 0.6 µs, a read about 1 µs.
 
 ### Memory in flight
 

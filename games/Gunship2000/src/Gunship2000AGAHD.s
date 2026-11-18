@@ -245,29 +245,48 @@ _cb_dosLoadSeg
 	move.l	_resload(pc),a2
 	jsr	resload_Patch(a2)
 
-	; CUSTOM2=1: the frame rate is no longer capped (fps_* below)
 	lea	_ctltags(pc),a0
 	jsr	resload_Control(a2)
-	move.l	(a7)+,d1		; resload_* may change D1
-	move.l	_custom2(pc),d0
-	beq.b	.nofps
-	move.l	d1,-(a7)
+	move.l	(a7),d1			; resload_* may change D1
 	moveq	#2,d0
 	bsr	.gs_hunk
 	lea	gs2_bss(pc),a0
+	move.l	a1,(a0)
+	move.l	(a7),d1
+	moveq	#1,d0
+	bsr	.gs_hunk
+	lea	gs2_data(pc),a0
 	move.l	a1,(a0)
 	move.l	(a7)+,d1
 	moveq	#0,d0
 	bsr	.gs_hunk
 	lea	gs2_code(pc),a0
 	move.l	a1,(a0)
+
+	; The renderer's one-colour rectangles by the CPU, and on a 68030 or later also the
+	; polygon spans (cf_* below; on the 68020 the blitter's spans are faster)
+	lea	pl_gs2_rect(pc),a0
+	move.l	a1,-(a7)
+	jsr	resload_Patch(a2)
+	move.l	(a7),a1
+	move.l	_attnflags(pc),d0	; KickEmu's (WHDLTAG_ATTNFLAGS_GET)
+	btst	#AFB_68030,d0
+	beq.b	.nospans
+	lea	pl_gs2_spans(pc),a0
+	jsr	resload_Patch(a2)
+.nospans
+	move.l	(a7)+,a1
+
+	; CUSTOM2=1: the frame rate is no longer capped (fps_* below)
+	move.l	_custom2(pc),d0
+	beq.b	.nofps
 	lea	pl_gs2_fps(pc),a0
 	move.l	a1,-(a7)
 	jsr	resload_Patch(a2)
 	move.l	(a7)+,a1
 	bsr	fps_dither_sites
-	jsr	resload_FlushCache(a2)
 .nofps
+	jsr	resload_FlushCache(a2)
 	rts
 
 _ctltags	dc.l	WHDLTAG_CUSTOM2_GET
@@ -334,6 +353,16 @@ pl_gs2_fps
 	PL_PS	$1268,fps_collective
 	PL_END
 
+pl_gs2_rect
+	PL_START
+	PL_P	$13832,cf_rect		; one-colour rectangles by the CPU, not a blit a plane
+	PL_END
+
+pl_gs2_spans
+	PL_START
+	PL_P	$fab6,cf_fill		; the polygon spans by the CPU, not one blit each
+	PL_END
+
 ; The flight moved its stack onto the first 2000 bytes of its chip work area (heap pointer
 ; data+$2c3e). Stay on the process stack (ExpMem) and still take the 2000 bytes, so the
 ; heap is laid out as before. A5 = data+$2dfc, where the process stack pointer was saved.
@@ -370,6 +399,7 @@ seed_flight
 ; field that is 2097152/750 on PAL (50 Hz), 2097152/900 on NTSC (60 Hz).
 gs2_bss		dc.l	0
 gs2_code	dc.l	0
+gs2_data	dc.l	0
 fps_k		dc.w	0	; 6-tick periods this simulation step completes
 fps_fields	dc.w	0	; fields since the last frame, counted while not paused
 fps_shift	dc.w	20	; dt = (fields << shift + fps_rem) / fps_den
@@ -676,6 +706,315 @@ fps_wait
 	ENDC
 	move.l	(a7)+,a0
 	rts
+
+; The polygon span filler (code $fab6) by the CPU. The game blits each scanline span:
+; BLTCON0 $07ca (B, C to D: D = A ? B : C), A the constant BLTADAT under the first and last
+; word masks, B the colour pattern, 4 rows of 40 bytes (the planes), and waits for the
+; blitter before each. Here the same pixels by CPU writes:
+; < D0.w the pattern index (bss+$108c: below its count a pattern address, A = $ffff; from it
+;   the address of two A words, then the pattern), D7.w lines - 1, A0/A1 the left and right
+;   x lists, A3 the first line; with code $fab2 not negative, a single span from $fab2/$fab4
+; > as the blitter version's: A0/A1/A3 advanced, D7.w -1, D4 the pattern, D5.w 256, D6 the A
+;   words (with A words; else kept), A2/A6 the edge tables, A4 $dff044, A5 $dff000
+; B: on even lines the pattern's first 160 bytes; on odd ones where the last blit left the
+; blitter's B pointer, 160 bytes on (the pattern's second row, or further when the even
+; line before had no span). Each plane's 40 bytes of a row are one word repeated.
+CF_ADAT		= 0	; A, the even and the odd lines'
+CF_B		= 4	; B, a word per plane: the two rows, then a row further on
+CF_PAT		= 28	; the pattern
+CF_BOFS		= 32	; the B pointer, from the pattern
+CF_PHASE	= 34	; 0 an even line, 2 an odd one
+CF_EDGES	= 36	; data+$1ea0 (left edges; right ones at +$500)
+
+cf_fill
+	move.l	gs2_code(pc),a5
+	tst.w	$fab2(a5)
+	bmi.b	.list
+	moveq	#0,d7
+	lea	$fab2(a5),a0
+	lea	2(a0),a1
+.list	lea	cf_vars(pc),a2
+	move.l	gs2_bss(pc),a6
+	move.l	$108c(a6),a5
+	cmp.w	(a5)+,d0
+	bge.b	.awords
+	move.l	(a5,d0.w),d4
+	move.l	#-1,CF_ADAT(a2)
+	bra.b	.go
+.awords	move.l	(a5,d0.w),a5
+	move.l	(a5)+,d6
+	move.l	a5,d4
+	move.l	d6,CF_ADAT(a2)
+.go	movem.l	d5-d6,-(a7)
+	lea	$dff002,a5
+	tst.b	(a5)
+.bwait	btst	#6,(a5)			; the game's own blits first
+	bne.b	.bwait
+	move.l	d4,a5
+	move.l	d4,CF_PAT(a2)
+	move.w	(a5),CF_B(a2)
+	move.w	40(a5),CF_B+2(a2)
+	move.w	80(a5),CF_B+4(a2)
+	move.w	120(a5),CF_B+6(a2)
+	move.w	160(a5),CF_B+8(a2)
+	move.w	200(a5),CF_B+10(a2)
+	move.w	240(a5),CF_B+12(a2)
+	move.w	280(a5),CF_B+14(a2)
+	move.l	gs2_data(pc),a5
+	lea	$1ea0(a5),a5
+	move.l	a5,CF_EDGES(a2)
+	move.l	a3,d0			; even or odd: as the game, from the shown screen
+	sub.l	$b8dc(a6),d0
+	clr.l	CF_BOFS(a2)
+	btst	#5,d0
+	beq.b	.line
+	move.w	#160,CF_BOFS(a2)
+	move.w	#2,CF_PHASE(a2)
+
+.line	move.l	CF_EDGES(a2),a6
+	move.w	(a0)+,d0
+	move.w	(a1)+,d1
+	add.w	d0,d0
+	add.w	d0,d0
+	move.l	(a6,d0.w),d0		; the first word's mask, the byte offset
+	moveq	#0,d2
+	move.w	d0,d2
+	add.w	d1,d1
+	add.w	d1,d1
+	move.l	($500,a6,d1.w),d3	; the end byte, the last word's mask
+	move.w	d3,d0
+	swap	d3
+	sub.w	d2,d3
+	bls.w	.next
+	not.l	d0			; D0 = ~first:~last, the words kept
+	move.w	CF_PHASE(a2),d1
+	move.w	CF_ADAT(a2,d1.w),d4	; A
+	tst.w	d1
+	bne.b	.odd
+	clr.w	CF_BOFS(a2)		; even lines set the B pointer
+.odd	lea	CF_B(a2),a4
+	move.w	CF_BOFS(a2),d1
+	beq.b	.bgot
+	addq.l	#8,a4
+	cmp.w	#160,d1
+	beq.b	.bgot
+	addq.l	#8,a4			; further on: read it
+	move.l	CF_PAT(a2),a5
+	add.w	d1,a5
+	move.w	(a5),(a4)
+	move.w	40(a5),2(a4)
+	move.w	80(a5),4(a4)
+	move.w	120(a5),6(a4)
+.bgot	add.w	#160,CF_BOFS(a2)
+	lea	(a3,d2.l),a5
+	lsr.w	#1,d3			; words (BLTSIZE's 6 bits)
+	and.w	#63,d3
+	bne.b	.words
+	moveq	#64,d3
+.words	cmp.w	#1,d3
+	beq.w	.one
+	cmp.w	#-1,d4
+	bne.w	.amask
+
+	; A $ffff, 2 words or more: the edges kept where masked, longs between
+	subq.w	#2,d3
+	moveq	#0,d6
+	move.l	a5,d1
+	btst	#1,d1
+	bne.b	.lalign			; the middle starts on a long
+	tst.w	d3
+	beq.b	.lalign
+	bset	#16,d6			; a word first
+	subq.w	#1,d3
+.lalign	lsr.w	#1,d3
+	bcc.b	.even2
+	bset	#17,d6			; a word last
+.even2	move.w	d3,d6
+	moveq	#3,d4
+.plane	move.w	(a4)+,d2
+	move.w	d2,d1
+	swap	d2
+	move.w	d1,d2
+	move.l	a5,a6
+	swap	d0
+	tst.w	d0
+	beq.b	.first
+	move.w	(a6),d1
+	eor.w	d2,d1
+	and.w	d0,d1
+	eor.w	d2,d1
+	move.w	d1,(a6)+
+	bra.b	.mid
+.first	move.w	d2,(a6)+
+.mid	swap	d0
+	btst	#16,d6
+	beq.b	.mlong
+	move.w	d2,(a6)+
+.mlong	move.w	d6,d3
+	bra.b	.mnext
+.mloop	move.l	d2,(a6)+
+.mnext	dbf	d3,.mloop
+	btst	#17,d6
+	beq.b	.last
+	move.w	d2,(a6)+
+.last	tst.w	d0
+	beq.b	.lastw
+	move.w	(a6),d1
+	eor.w	d2,d1
+	and.w	d0,d1
+	eor.w	d2,d1
+	move.w	d1,(a6)
+	bra.b	.pnext
+.lastw	move.w	d2,(a6)
+.pnext	lea	40(a5),a5
+	dbf	d4,.plane
+	bra.b	.next
+
+	; one word: both masks and A
+.one	move.l	d0,d5
+	swap	d5
+	or.w	d0,d5
+	not.w	d4
+	or.w	d4,d5			; the bits kept
+	moveq	#3,d4
+.oplane	move.w	(a4)+,d2
+	move.w	(a5),d1
+	eor.w	d2,d1
+	and.w	d5,d1
+	eor.w	d2,d1
+	move.w	d1,(a5)
+	lea	40(a5),a5
+	dbf	d4,.oplane
+	bra.b	.next
+
+	; A words (stipples), 2 words or more: every word read
+.amask	not.w	d4
+	move.l	d0,d5
+	or.w	d4,d5
+	swap	d5
+	or.w	d4,d5			; ~(first & A), then ~(last & A)
+	subq.w	#2,d3
+	moveq	#3,d6
+.aplane	move.w	(a4)+,d2
+	move.l	a5,a6
+	move.w	(a6),d1
+	eor.w	d2,d1
+	and.w	d5,d1
+	eor.w	d2,d1
+	move.w	d1,(a6)+
+	move.w	d3,d0
+	bra.b	.anext
+.aloop	move.w	(a6),d1
+	eor.w	d2,d1
+	and.w	d4,d1
+	eor.w	d2,d1
+	move.w	d1,(a6)+
+.anext	dbf	d0,.aloop
+	swap	d5
+	move.w	(a6),d1
+	eor.w	d2,d1
+	and.w	d5,d1
+	eor.w	d2,d1
+	move.w	d1,(a6)
+	swap	d5
+	lea	40(a5),a5
+	dbf	d6,.aplane
+
+.next	eor.w	#2,CF_PHASE(a2)
+	lea	160(a3),a3
+	dbf	d7,.line
+	movem.l	(a7)+,d5-d6
+	move.l	CF_PAT(a2),d4
+	move.w	#256,d5
+	move.l	CF_EDGES(a2),a6
+	lea	$500(a6),a2
+	lea	$dff000,a5
+	lea	$44(a5),a4
+	rts
+
+cf_vars		dcb.b	40,0	; CF_* above
+
+; code $13832: a rectangle of the screen in one colour, by the CPU (the game: a D-only blit a
+; plane through code $dda0, BLTCON0 $0100 or $01ff, rows of 160 bytes)
+; < D0.w x extent (D0 / 16 + 1 words), D1.w rows, D4 the top left, D7.b the colour
+; > as the game's: D0.w the words, D1.w BLTSIZE, D2 $ffff, D4 4 planes on, D6.w the last
+;   BLTCON0, D7.b shifted by 4, A6 the end of its blit list (bss+$b5c6), and the blitter
+;   registers it set (BLTCON0, BLTCON1, BLTDMOD, BLTDPT)
+cf_rect
+	movem.l	d3/d5/a0/a5,-(a7)
+	lsr.w	#4,d0
+	addq.w	#1,d0
+	lea	$dff002,a5
+	tst.b	(a5)
+.bwait	btst	#6,(a5)			; the game's own blits first
+	bne.b	.bwait
+	lea	cr_planes(pc),a0	; the planes' longs, 0 or -1
+	moveq	#3,d2
+.pl	lsr.b	#1,d7
+	scs	d6
+	extb.l	d6
+	move.l	d6,(a0)+
+	dbf	d2,.pl
+	move.w	#$100,d6		; the last BLTCON0
+	move.b	cr_planes+15(pc),d6
+	movem.l	d1/d6-d7,-(a7)
+	move.w	d1,d5			; BLTSIZE's height and width
+	and.w	#1023,d5
+	bne.b	.h
+	move.w	#1024,d5
+.h	move.w	d0,d3
+	and.w	#63,d3
+	bne.b	.w
+	moveq	#64,d3
+.w	moveq	#0,d6			; a word first, a word last, longs between
+	btst	#1,d4
+	beq.b	.al
+	bset	#16,d6
+	subq.w	#1,d3
+.al	lsr.w	#1,d3
+	bcc.b	.al2
+	bset	#17,d6
+.al2	move.w	d3,d6
+	move.l	d4,a5
+	move.w	d5,d3
+	subq.w	#1,d3
+.row	lea	cr_planes(pc),a0
+	moveq	#3,d2
+.plane	move.l	(a0)+,d5
+	move.l	a5,a6
+	btst	#16,d6
+	beq.b	.l0
+	move.w	d5,(a6)+
+.l0	move.w	d6,d7
+	bra.b	.l2
+.l1	move.l	d5,(a6)+
+.l2	dbf	d7,.l1
+	btst	#17,d6
+	beq.b	.l3
+	move.w	d5,(a6)+
+.l3	lea	40(a5),a5
+	dbf	d2,.plane
+	dbf	d3,.row
+	lea	$dff000,a6		; the blitter as the last blit left it
+	lea	-40(a5),a5
+	move.l	a5,$54(a6)		; BLTDPT
+	move.w	#160,d2
+	sub.w	d0,d2
+	sub.w	d0,d2
+	move.w	d2,$66(a6)		; BLTDMOD
+	clr.w	$42(a6)			; BLTCON1
+	movem.l	(a7)+,d1/d6-d7
+	move.w	d6,$40(a6)		; BLTCON0
+	lsl.w	#6,d1
+	add.w	d0,d1
+	move.l	#$ffff,d2
+	add.l	#160,d4
+	move.l	gs2_bss(pc),a6
+	lea	$b5c6(a6),a6
+	movem.l	(a7)+,d3/d5/a0/a5
+	rts
+
+cr_planes	dc.l	0,0,0,0
 
 quit
 	pea	TDREASON_OK

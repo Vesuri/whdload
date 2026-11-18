@@ -88,6 +88,7 @@ Traps:
 | `aprof_report.py OUT [TOP]` | per window: frames (presents at code $129c4) and fps, CACR, the chip-bus share, the time by kind (frame cap, blitter waits, stack and calls, other, outside) and the top routines |
 | `gs2.py` | finds `gs2.run`'s hunks in memory (by the installed file), the memory lists, the clocks |
 | `coupling.py OUT [REFERENCE...]` | the coupling test: the same flight inputs at the same game time, the player's state sampled at mission seconds 25-90 and interpolated to the second; with REFERENCEs, the quantities outside their envelope. `coupling.py compare OUT REFERENCE...` compares saved runs |
+| `screens.py OUT [REFERENCE]` | the drawn frames: at every present (code $129c4) the screen just drawn (B+$b8dc), 30 frames (`FRAMES`) in each of the cockpit, F5 and F6 views; with REFERENCE, frame by frame against it. `screens.py compare OUT REFERENCE` compares saved runs |
 | `route.py OUT STEP...` | a scripted input route, for exploring |
 
 ```sh
@@ -111,6 +112,15 @@ The references are the 6-tick cap with the inputs 0-3 fields later: the 1 s turn
 alone spreads by 4 degrees with that (8842-10283 of 65536). `WHD_ARGS="CUSTOM2=1 CUSTOM3=N"`
 makes every frame at least N fields. `DUMPS=1` also saves the data and BSS hunks at each
 sample (`OUT/dumps/`).
+
+The renderer check (P5c): the same frames as the blitter build. At the cap on the a1200-030
+every frame takes 6 ticks, so a capped run is deterministic; on the a1200-fast (slower than
+the cap) fix the frame length instead, `WHD_ARGS="CUSTOM2=1 CUSTOM3=7"`, for both runs:
+
+```sh
+SLAVE=tmp/exp/blit.slave python3 tools/screens.py tmp/prof/s-blit
+SLAVE=tmp/exp/new.slave python3 tools/screens.py tmp/prof/s-new tmp/prof/s-blit
+```
 
 Compare slaves and machines with VERIFY builds (scratch slaves with `-DVERIFY=1`): they fly the
 same mission (`internals.md`, "Slave patches"), whose cockpit shots then agree to 0.01.
@@ -136,6 +146,12 @@ Traps:
   player object B+$d348; entry 1 also changes, not yet identified (not compared).
 - `gs2.locate` takes each hunk's base by the most common value over the code's relocations:
   the CUSTOM2 patches overwrite some, and the PRELOADed file image matches the signature too.
+- `aprof_report.py` names the slave's renderer routines `slave 0xfab6` and `slave 0x13832`:
+  `gs2.locate` reads the `jmp` targets the slave patched in (`layout.json`, `slave_jumps`).
+- The cockpit check (REFERENCE) compares the first lit cockpit picture. Uncapped on the
+  a1200-fast its HUD (the target lock, the screen in the middle) depends on the drawing
+  speed, so leave out the REFERENCE there.
+- The gdb stub takes about 20 software breakpoints at once.
 - The installed aprof writes `AITDPROF 1` for `APROF 1`; `aprof_report.py` reads either.
   Its returns are unpaired, so the report uses flat PC costs.
 - The CPU clock in the profile header is `colorclock × CYCLE_UNIT / cycleunit` (50.4 MHz on
