@@ -6,9 +6,11 @@ its MMU model, which aprof needs) and clicks through the front end to the cockpi
 DUTY ROSTER (the whiteboard), right click on the WOC ERASE-ME record, name "test" + Return,
 Return (unit patch), unit "test" + Return, click the record, MISSION BRIEFING (the door), click
 the photo, BEGIN MISSION (the map), five clicks on the keypad, the Aux Power Unit tab, its switch.
-When the cockpit appears: `monitor aprof start`, F5 (chase view), 3 s, F6 (tactical view), 3 s.
-The window is profiled as two aprof files of 150 fields each (SEGMENT), OUT/f5.prof and OUT/f6.prof (one
-unprofiled field between them for a screenshot). Also writes OUT/route/*.png (a screenshot at
+When the cockpit appears, for each key of VIEWS (default `f5 f6`: the chase and the tactical
+view; `f1` is the cockpit view): `monitor aprof start`, the key, SEGMENT fields (default 150,
+3 s), `monitor aprof stop` to OUT/<key>.prof, and one unprofiled field for a screenshot. With
+FLY=N it first takes off and flies forward for N fields (fly(); FLY=7000 in the pinned mission
+is among the enemy units, the busy scene). Also writes OUT/route/*.png (a screenshot at
 every step), OUT/layout.json (where gs2.run's hunks and the memory lists are) and
 OUT/state.json (game clocks at the window's ends). Summarise with aprof_report.py OUT.
 
@@ -43,6 +45,9 @@ KEYPAD_5 = (491, 236)
 APU_TAB = (645, 280)
 APU_SWITCH = (645, 298)
 SEGMENT = int(os.environ.get('SEGMENT', '150'))   # fields a window: 3 s
+VIEWS = os.environ.get('VIEWS', 'f5 f6').split()  # the keys, one window each, in order
+SHOTS = dict(f1='cockpit-view', f5='chase', f6='tactical')
+FLY = int(os.environ.get('FLY', '0'))   # fields of forward flight before the windows
 
 
 def mean(a, box):
@@ -53,11 +58,11 @@ def mean(a, box):
 def screen(a):
     """Which front-end screen a shot shows, by the mean colour of one region each."""
     r, g, b = mean(a, (90, 80, 150, 260))            # the office window
-    if b > r + 10 and r > 150 and mean(a, (74, 420, 714, 436)).max() < 40:
+    if b > r + 10 and r > 150 and mean(a, (74, 428, 714, 431)).max() < 40:   # NTSC too
         return 'office'
     if mean(a, (120, 50, 600, 170)).min() > 210:      # the white squadron board
         return 'records'
-    if mean(a, (90, 385, 500, 412)).min() > 230:      # the briefing's white orders bar
+    if mean(a, (90, 385, 220, 412)).min() > 230:      # the briefing's white orders bar
         return 'briefing'
     r, g, b = mean(a, (80, 40, 700, 120))             # the tent roof
     if g > r + 10 and g > b + 10 and g > 90:
@@ -169,6 +174,15 @@ def route(f):
     return f.wait_for('cockpit', every=5, test=lit)
 
 
+def fly(s, fields):
+    """The coupling test's take-off (the rotor, collective up 4 s, cyclic forward 3 s), then
+    `fields` of flight; in the pinned mission about 7000 reach the enemy units."""
+    s.tap('9', hold=10, after=10)
+    s.tap(0x0c, hold=200, after=10)      # =, collective up
+    s.tap('up', hold=150, after=10)
+    s.fields(fields)
+
+
 def same_mission(shot, reference, limit=1.0):
     """Mean absolute difference of two cockpit shots, and whether it is under `limit`."""
     ref = sorted((Path(reference) / 'route').glob('*-cockpit.png'))
@@ -193,18 +207,16 @@ def main(out, reference=None):
                 raise SystemExit(f'not the reference mission (difference {d:.2f}); BUILD=verify?')
         layout = gs2.locate(s)
         (s.out / 'layout.json').write_text(json.dumps(layout, indent=1))
+        if FLY:
+            fly(s, FLY)
+            f.shot('flown')
         state = {'start': gs2.clocks(s, layout)}
-        s.aprof_start()
-        s.tap('f5', hold=10, after=SEGMENT - 10)
-        s.aprof_stop(s.out / 'f5.prof')
-        state['f5'] = gs2.clocks(s, layout)
-        f.shot('chase')
-        state['f5_shot'] = gs2.clocks(s, layout)
-        s.aprof_start()
-        s.tap('f6', hold=10, after=SEGMENT - 10)
-        s.aprof_stop(s.out / 'f6.prof')
-        state['f6'] = gs2.clocks(s, layout)
-        f.shot('tactical')
+        for view in VIEWS:
+            s.aprof_start()
+            s.tap(view, hold=10, after=SEGMENT - 10)
+            s.aprof_stop(s.out / f'{view}.prof')
+            state[view] = gs2.clocks(s, layout)
+            f.shot(SHOTS.get(view, view))
         state['fields'] = s.field
         state['env'] = {k: s.env.get(k, os.environ.get(k)) for k in ('SETUP', 'EXTRA_ARGS', 'VARIANT', 'SLAVE', 'BUILD')}
         (s.out / 'state.json').write_text(json.dumps(state, indent=1))

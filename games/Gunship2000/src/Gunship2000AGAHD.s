@@ -263,8 +263,8 @@ _cb_dosLoadSeg
 	lea	gs2_code(pc),a0
 	move.l	a1,(a0)
 
-	; The renderer's one-colour rectangles by the CPU, and on a 68030 or later also the
-	; polygon spans (cf_* below; on the 68020 the blitter's spans are faster)
+	; The renderer's one-colour rectangles and lines by the CPU, and on a 68030 or later also
+	; the polygon spans (cf_*, cl_* below; on the 68020 the blitter's spans are faster)
 	lea	pl_gs2_rect(pc),a0
 	move.l	a1,-(a7)
 	jsr	resload_Patch(a2)
@@ -275,6 +275,9 @@ _cb_dosLoadSeg
 	lea	pl_gs2_spans(pc),a0
 	jsr	resload_Patch(a2)
 .nospans
+	move.l	(a7),a1
+	lea	pl_gs2_lines(pc),a0
+	jsr	resload_Patch(a2)
 	move.l	(a7)+,a1
 
 	; CUSTOM2=1: the frame rate is no longer capped (fps_* below)
@@ -362,6 +365,11 @@ pl_gs2_rect
 pl_gs2_spans
 	PL_START
 	PL_P	$fab6,cf_fill		; the polygon spans by the CPU, not one blit each
+	PL_END
+
+pl_gs2_lines
+	PL_START
+	PL_P	$fd3c,cl_line		; the lines by the CPU, not a line blit a plane
 	PL_END
 
 ; The flight moved its stack onto the first 2000 bytes of its chip work area (heap pointer
@@ -1054,6 +1062,194 @@ cf_rect
 	rts
 
 cr_planes	dc.l	0,0,0,0
+
+; code $fd3c: a line by the CPU (the game: a line blit a plane, BLTCON0 $xbca: where the line's
+; pixel is, the plane's bit of the colour, elsewhere the screen). The same pixels as the
+; blitter's line mode: the game's octant and error terms, the pixel, then (error not
+; negative) a step on the minor axis and error + BLTAMOD (else + BLTBMOD), a step on the major
+; axis, the sign of the new error. Pixels in one word of a row are written together.
+; < D0.w/D1.w the start x, y, D2.w/D3.w the end, D4.b the colour (through the table at code
+;   $fcf8), the screen bss+$b8dc, rows of 160 bytes, 4 planes of 40
+; > as the game's: D0.w BLTCON0, D1 the last plane's B, D2.w -1, D3.w BLTSIZE, D4.w the
+;   colour >> 4, D5.w BLTCON1, D6 the start + 160, A5 $dff000, and the blitter registers it set
+cl_line
+	movem.l	d7/a0-a2,-(a7)
+	move.l	gs2_code(pc),a5
+	move.l	$fcf8(a5),a5
+	ext.w	d4
+	move.b	(a5,d4.w),d4		; D4: the colour
+	move.w	#160,d6			; the game's setup from here
+	mulu.w	d1,d6
+	move.w	d0,d5
+	lsr.w	#4,d5
+	add.w	d5,d5
+	add.w	d5,d6
+	move.l	gs2_bss(pc),a5
+	add.l	$b8dc(a5),d6		; D6: the start's word
+	moveq	#0,d5
+	sub.w	d1,d3
+	roxl.b	#1,d5
+	tst.w	d3
+	bge.b	.ady
+	neg.w	d3
+.ady	sub.w	d0,d2
+	roxl.b	#1,d5
+	tst.w	d2
+	bge.b	.adx
+	neg.w	d2
+.adx	move.w	d3,d1
+	sub.w	d2,d1
+	bge.b	.ymaj
+	exg	d2,d3
+.ymaj	roxl.b	#1,d5			; D5: dy < 0, dx < 0, x major
+	move.w	d5,d7			; D7: the same
+	lea	cl_octants(pc),a5
+	move.b	(a5,d5.w),d5		; D5: BLTCON1
+	addq.w	#1,d3			; D3: the pixels
+	add.w	d2,d2			; D2: BLTBMOD
+	move.w	d2,d1
+	sub.w	d3,d1			; D1: the error (BLTAPTL)
+	bge.b	.pos
+	or.b	#$40,d5			; SIGN
+.pos	move.w	d1,a1
+	sub.w	d3,a1			; A1: BLTAMOD
+	and.w	#15,d0
+	move.w	d0,a2
+	ror.w	#4,d0
+	or.w	#$bca,d0		; D0: BLTCON0
+	lea	$dff002,a5
+	tst.b	(a5)
+.bwait	btst	#6,(a5)			; the game's own blits first
+	bne.b	.bwait
+	lea	-2(a5),a5
+	move.w	d0,$40(a5)		; BLTCON0
+	move.w	d5,$42(a5)		; BLTCON1
+	move.w	#-1,$44(a5)		; BLTAFWM
+	move.w	d1,$52(a5)		; BLTAPTL
+	move.w	#160,$60(a5)		; BLTCMOD
+	move.w	d2,$62(a5)		; BLTBMOD
+	move.w	a1,$64(a5)		; BLTAMOD
+	move.w	#160,$66(a5)		; BLTDMOD
+	move.w	#$8000,$74(a5)		; BLTADAT
+	movem.l	d0/d3/d5-d6,-(a7)
+	move.w	a2,d0
+	move.w	#$8000,d5
+	lsr.w	d0,d5
+	move.w	d5,d0			; D0: the pixel's bit in its word
+	move.l	d6,a0			; A0: its word
+	and.w	#1023,d3		; BLTSIZE's height
+	bne.b	.h
+	move.w	#1024,d3
+.h	subq.w	#1,d3
+	move.w	#160,a2
+	btst	#2,d7
+	beq.b	.down
+	move.w	#-160,a2		; A2: the step in y
+.down	moveq	#0,d6			; D6: the pixels of this word
+	lsr.b	#1,d7
+	bcc.b	.yloop
+	lsr.b	#1,d7
+	bcs.b	.xdec
+; x major, x up
+.xinc	or.w	d0,d6
+	tst.w	d1
+	bmi.b	.xib
+	add.w	a1,d1
+	bsr.w	.plot
+	add.l	a2,a0
+	bra.b	.xis
+.xib	add.w	d2,d1
+.xis	ror.w	#1,d0
+	bcc.b	.xin
+	bsr.w	.plot
+	addq.l	#2,a0
+.xin	dbf	d3,.xinc
+	bra.b	.end
+; x major, x down
+.xdec	or.w	d0,d6
+	tst.w	d1
+	bmi.b	.xdb
+	add.w	a1,d1
+	bsr.w	.plot
+	add.l	a2,a0
+	bra.b	.xds
+.xdb	add.w	d2,d1
+.xds	rol.w	#1,d0
+	bcc.b	.xdn
+	bsr.w	.plot
+	subq.l	#2,a0
+.xdn	dbf	d3,.xdec
+	bra.b	.end
+; y major: a pixel a row
+.yloop	move.w	d0,d6
+	bsr.w	.plot
+	tst.w	d1
+	bmi.b	.yb
+	add.w	a1,d1
+	btst	#0,d7
+	bne.b	.yl
+	ror.w	#1,d0
+	bcc.b	.ys
+	addq.l	#2,a0
+	bra.b	.ys
+.yl	rol.w	#1,d0
+	bcc.b	.ys
+	subq.l	#2,a0
+	bra.b	.ys
+.yb	add.w	d2,d1
+.ys	add.l	a2,a0
+	dbf	d3,.yloop
+.end	bsr.w	.plot
+	movem.l	(a7)+,d0/d3/d5-d6
+	; the registers as the game's last plane blit leaves them
+	move.l	d6,d2
+	add.l	#120,d2
+	move.l	d2,$48(a5)		; BLTCPT
+	move.l	d2,$54(a5)		; BLTDPT
+	moveq	#0,d1
+	btst	#3,d4
+	beq.b	.b
+	moveq	#-1,d1
+.b	move.w	d1,$72(a5)		; BLTBDAT
+	lsr.w	#4,d4
+	lsl.w	#6,d3
+	addq.w	#2,d3
+	add.l	#160,d6
+	moveq	#0,d2
+	subq.w	#1,d2
+	movem.l	(a7)+,d7/a0-a2
+	rts
+; the pixels D6.w of the word at A0 in the colour D4, D6 cleared (D5 scratch)
+.plot	tst.w	d6
+	beq.b	.p4
+	move.w	d6,d5
+	not.w	d5
+	btst	#0,d4
+	beq.b	.c0
+	or.w	d6,(a0)
+	bra.b	.p1
+.c0	and.w	d5,(a0)
+.p1	btst	#1,d4
+	beq.b	.c1
+	or.w	d6,40(a0)
+	bra.b	.p2
+.c1	and.w	d5,40(a0)
+.p2	btst	#2,d4
+	beq.b	.c2
+	or.w	d6,80(a0)
+	bra.b	.p3
+.c2	and.w	d5,80(a0)
+.p3	btst	#3,d4
+	beq.b	.c3
+	or.w	d6,120(a0)
+	moveq	#0,d6
+	rts
+.c3	and.w	d5,120(a0)
+	moveq	#0,d6
+.p4	rts
+
+; BLTCON1 by D5 (dy < 0, dx < 0, x major): the octant and LINE (code $fd34)
+cl_octants	dc.b	$01,$11,$09,$15,$05,$19,$0d,$1d
 
 quit
 	pea	TDREASON_OK

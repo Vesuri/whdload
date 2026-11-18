@@ -66,10 +66,10 @@ features:
  version 4.0b (18.11.2026) done by Vesuri
  - rebuilt with the KickStarter emulation of WHDLoad 20.1
  - AGA version: faster flight on 68020/68030 (stack and 3D models in fast
-   memory, instruction cache on, polygons and sky filled by the CPU instead of
-   the blitter)
+   memory, instruction cache on, polygons, sky and lines drawn by the CPU
+   instead of the blitter)
  - AGA version: Enhanced framerate (CUSTOM2=1): the flight is no longer held to
-   10.7 frames per second (about 25 on a 68030/50), at the game's own speed
+   10.7 frames per second (24 to 31 on a 68030/50), at the game's own speed
  - requires WHDLoad 17+
 
  version 3.1 (28.03.06) done by JOTD

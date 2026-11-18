@@ -4,11 +4,12 @@ Set up 18.11.2026: `src/` is JOTD's v3.1 source with three changes that make vas
 it, equivalent to the shipped slaves apart from the newer KickEmu (`development.md`,
 "Build"). All three variants boot to the duty roster. The AGA flight is profiled
 (`development.md`, "Profiling in flight"); the target is 50 fps in flight on the a1200-030
-(soft). P1-P4, P5a/P5c and P6 of the plan are done (P5b measured, not done): the VERIFY
+(soft). P1-P4, P5a/P5c, P6 and P7 of the plan are done (P5b measured, not done): the VERIFY
 build pins the mission, the release AGA slave keeps the flight's stack and its model data in
 fast RAM and turns the instruction cache on, `CUSTOM2=1` ("Enhanced framerate") lifts the
 frame cap with the simulation kept at its rate, and the CPU fills the polygons (68030 or
-later) and the one-colour rectangles instead of the blitter.
+later) and the one-colour rectangles and draws the lines instead of the blitter. None of it
+is in the ECS and CD32 slaves yet (P8).
 
 ## The AGA flight, 18.11.2026
 
@@ -181,13 +182,52 @@ or the allocation fails, the flight keeps the chip block.
 The other blocks: data+$9232 (copied to a screen at code $a5a2, not in the profile) and the
 heap (the screens, blitter images) stay in chip.
 
+## P7, the cockpit view, NTSC and a busy scene, 18.11.2026
+
+`profile_flight.py` now takes the views as keys (`VIEWS="f1 f5 f6"`, F1 the cockpit view) and
+a forward flight before the windows (`FLY`); `aprof_report.py` takes the fps from the window's
+seconds (PAL or NTSC). VERIFY builds, the pinned mission, `CUSTOM2=1`, 600 fields a view,
+F1/F5/F6 fps:
+
+| Slave | a1200-030 | a1200-fast |
+|---|---:|---:|
+| P6 | 23.13/28.12/25.04 | 12.48/12.90/11.81 |
+| + the lines by the CPU (the release) | 27.12/30.20/25.88 | 13.56/13.06/11.90 |
+| the same, the busy scene (`FLY=6600`, P6 first) | 21.96/27.37/23.63 → 23.88/27.71/24.29 | 10.15/10.57/10.07 → 10.32/10.65/10.40 |
+
+- **The cockpit view was the slowest**: 37% of the a1200-030's time in blitter waits, most in
+  the lines ($fd3c: 33 lines a frame, a line blit a plane, 22% of the time) and the panel's
+  blit lists ($ba80, $b9aa: 15%). The lines are now drawn by the CPU (`internals.md`, "Slave
+  patches"), the same pixels: 90 of 90 frames on the a1200-030 at the cap, 88 of 90 on the
+  a1200-fast with `CUSTOM2=1 CUSTOM3=7` (the two the graphics.library write, "Also seen").
+- **The panel by the CPU was slower** and is not kept: in longs, the mask read once for the 4
+  planes, 26.87 fps against 27.12 (a1200-030), 13.15 against 13.56 (a1200-fast). Its sources,
+  masks and the screen are all chip RAM, and the 68030's chip reads cost as much as the
+  blits; it would need the sources in fast RAM (`tmp/` keeps the try).
+- **NTSC** (`NTSC=1`): the flight runs at the same frame rates and its clock 10 s in 600
+  fields; the front end picks another mission there (on the ground at the base), so the
+  numbers are its own: 22.63/28.12/24.83 fps on the a1200-030 with P6.
+- **The busy scene**, the pinned mission's enemy units (a Mi-8, a SAM site, missiles,
+  explosions) about 140 s in: the game's own code (outside the waits and the slave's
+  routines) grows from 28-29% of the a1200-030's time to 35-37%.
+- **The remaining CPU work**, a1200-030, F5: the span filler 41% and the rectangles 14%
+  (P6); with the lines by the CPU the transform from $109ba to $11300 10.6% (about 224 projected and 390
+  other vertices a frame, no instruction above 0.7%: the divides at $11074 and $11090), $e3de
+  7%. On the a1200-fast the transform is 15-16% and $e3de 8-12%: there the game's own maths
+  is the limit.
+
 ## Next
 
-P7-P8 of the plan:
+P8-P9 of the plan:
 
-1. **P7 Profile again** with the cockpit view (F1, the panel redraws), on NTSC and on a busy
-   scene, and profile the remaining CPU work ($109ba transform, $e3de).
-2. **P8 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
+1. **P8 Port to the ECS and CD32 slaves.** Everything the AGA slave does in flight: the fast
+   stack and model data, the instruction cache, `CUSTOM2=1` (the frame cap and its patches,
+   the dither sites), the CPU fills and lines, and the VERIFY mission pin. The ECS version
+   (kick13, the 68000) and the CD32 one (kick31) have their own `gs2.run` builds: every code
+   offset, the BSS layout and the renderer need finding again, and on a 68000 the CPU fills
+   are probably slower than the blitter (measure, as the 68020 spans). The CD32 slave's patch
+   list is dead code now ("Also seen"). The harness drives the AGA version only.
+2. **P9 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
    `$VER: Gunship2000<Variant>.slave 4.0b (18.11.2026)`, the info text credits Vesuri, and
    the ReadMe entry above JOTD's says what changed (the WHDLoad 20.1 KickEmu, the faster AGA
    flight, Enhanced framerate). `make dist` packs it; not yet published. Bump the version and
@@ -195,10 +235,10 @@ P7-P8 of the plan:
 3. **P4 follow-ups.** The coupling test for the AI and weapons (a mission with moving units,
    targets fired at); the joystick control mode (code $142c ramps the pitch command per step);
    `CUSTOM2` with time acceleration (`]`).
-4. **P5b**, only if the rest is done (above).
+4. **P5b**, only if the rest is done (above); the cockpit panel's sources in fast RAM with it.
 
 Not yet checked: long flights, a second flight in one session with `CUSTOM2=1`, and the CPU
-fills in the views other than cockpit, F5 and F6 (the other cameras, the map, night).
+fills and lines in the views other than cockpit, F5 and F6 (the other cameras, the map, night).
 
 ## Also seen
 

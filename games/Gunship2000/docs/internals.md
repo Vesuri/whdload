@@ -95,15 +95,16 @@ remainders, and k, the 6-tick periods of game time the current step completes (`
 | $1212, $1268 | `clr.w B+6` (keys `=` and `-`) | `jsr fps_collective` | the collective steps 1 a call while the key is held: only on steps with k > 0 |
 | 84 sites | `muls.w B+$c67e,Dn; add.l Dn,Dn; swap Dn` | `jsr fps_dtm<n>; nop; swap Dn` | found by `fps_dither_sites`: x × dt is truncated every frame; the product gets a uniform fraction (a golden-ratio sequence) before the swap, so it is right on average, and 0 stays 0 |
 
-All AGA builds (4.0b) also replace two of the renderer's blitter routines ("Rendering"),
+All AGA builds (4.0b) also replace three of the renderer's blitter routines ("Rendering"),
 with the same pixels (`tools/screens.py`):
 
 | Offset | Original | Patch | Why |
 |---|---|---|---|
 | $13832 | a D-only blit a plane through $dda0 | `jmp cf_rect` | the rectangle by CPU long writes; leaves the registers and the blitter registers as the blits did |
 | $fab6 (68030 or later, by `_attnflags`) | a blit a scanline span | `jmp cf_fill` | the spans by CPU writes, the edge words read and masked, longs between; the B rows as the blitter's pointer would give them. On the 68020/14 the blits are faster (with the CPU rectangles, CUSTOM2=1: 12.33/11.67 fps against 12.00/10.67), so it keeps them |
+| $fd3c | a line blit a plane | `jmp cl_line` | the blitter's line mode by the CPU: the game's octant and error terms, the error's sign taken before each step, the pixels of one word of a row written together; leaves the registers and the blitter registers as the last plane's blit did. Faster on both CPUs |
 
-Both wait for the blitter first, so the game's own blits (lines, the band) still come before.
+All three wait for the blitter first, so the game's own blits (the band, the panel) still come before.
 
 The VERIFY build reads `CUSTOM3` as the least fields a frame takes (`fps_wait`), for the
 coupling test (`development.md`).
@@ -164,7 +165,8 @@ polygons by $fab6 with lines by $fd3c between them, then a few masked blits (cod
 |---|---|
 | $fab6 | polygon span filler: per scanline one blit, B (the colour pattern) and C to D, minterm $ca, 4 rows (the planes); waits for the blitter before each |
 | $dda0 | runs a blit list from B+$b5b8 (`btst #14` waits first) |
-| $fd3c | lines: one line blit a plane, minterm $ca, B the colour bit |
+| $fd3c | lines: one line blit a plane, minterm $ca, B the colour bit; the colour through the table the long at code $fcf8 points to |
+| $b9aa, $ba80 | the cockpit view's panel: blit lists (B+$3ce with sources from B+$3c6 and masks from B+$3ca; B+$2ee with addresses), copies ($09f0) or cookie cuts ($0fca), unshifted, ascending |
 | $13832 | one-colour rectangle: a D-only blit a plane (BLTCON0 $0100 or $01ff) through $dda0 |
 | $109ba | object transform: a 3×3 word matrix copied in, then CPU maths |
 | $e3de | a list walk ahead of the drawing (to identify) |

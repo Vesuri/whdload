@@ -24,7 +24,7 @@ CLOCKS = {
 
 
 # Code offsets the slave may replace with a jmp to its own routine (the renderer, P5).
-SLAVE_JUMPS = (0xfab6, 0x13832)
+SLAVE_JUMPS = (0xfab6, 0x13832, 0xfd3c)
 
 
 def hunks(path=GS2):

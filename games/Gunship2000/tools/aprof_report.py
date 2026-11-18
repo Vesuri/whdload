@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Summarise profile_flight.py's aprof window: aprof_report.py OUT [TOP]
 
-For each segment (OUT/f5.prof, OUT/f6.prof): the frame rate (gs2.run's present, code $129c4,
+For each segment (OUT/*.prof, in the order written: f5, f6, ...): the frame rate (gs2.run's present, code $129c4,
 once per frame), the CACR, the chip-bus share, the time by kind (frame-cap spin, blitter-wait
 loops, stack and call instructions, the rest of gs2.run, outside gs2.run) and the TOP routines of
 gs2.run by self time (a routine is the code from one call target to the next; aprof's call tree
@@ -86,10 +86,8 @@ def report(out, top=15):
     ins, rel = listing(out)
     waits = blitter_waits(ins)
     lines = []
-    for seg in ('f5', 'f6'):
-        p = out / f'{seg}.prof'
-        if not p.exists():
-            continue
+    for p in sorted(out.glob('*.prof'), key=lambda p: p.stat().st_mtime):
+        seg = p.stem
         text = p.read_text()
         # The installed aprof build names its format AITDPROF; the layout is APROF 1's.
         h, pcs, nodes = aprof.parse_profile(re.sub(r'^\w*PROF 1', 'APROF 1', text, count=1))
@@ -101,7 +99,9 @@ def report(out, top=15):
         # 2 KB on, are named after the game's routine.
         jumps = sorted((t, int(o, 16)) for o, t in layout.get('slave_jumps', {}).items())
         frames = pcs.get(base + PRESENT, (0, 0))[1]
-        fps = frames * 50 / h['vsyncs']
+        # units are CYCLE_UNITs of the colour clock: the window's seconds, PAL or NTSC
+        secs = tot / (h['colorclock_hz'] * h['CYCLE_UNIT'])
+        fps = frames / secs
         byk, chipk = collections.Counter(), collections.Counter()
         fself, fchip = collections.Counter(), collections.Counter()
         for pc, (units, _execs, chip, _acc) in pcs.items():
@@ -119,7 +119,7 @@ def report(out, top=15):
             fself[r] += units
             fchip[r] += chip
         cacr = h['cacr']
-        lines.append(f'== {seg}: {h["vsyncs"]} fields, {h["cpu_model"]} at {mhz:.1f} MHz, CACR ${cacr:04x} '
+        lines.append(f'== {seg}: {h["vsyncs"]} fields ({secs:.2f} s), {h["cpu_model"]} at {mhz:.1f} MHz, CACR ${cacr:04x} '
                      f'(IC {"on" if cacr & 1 else "off"}, DC {"on" if cacr & 0x100 else "off"})')
         lines.append(f'   {frames} frames: {fps:.2f} fps; chip-bus accesses {h["chip_units"] / tot:.1%} of the time')
         for k, v in byk.most_common():
