@@ -1,0 +1,23 @@
+{
+  "archives": [
+    {
+      "input": "Archipelagos.lha",
+      "output": "ArchipelagosEnhanced-{version}-{date}.lha",
+      "replace": {
+        "Archipelagos_Install/Archipelagos.slave": "build:Archipelagos",
+        "Archipelagos_Install/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {
+        "dir": "Archipelagos_Install/Source",
+        "variants": [
+          "Archipelagos"
+        ],
+        "keep": [
+          "Archipelagos_ImagerSlave.s"
+        ]
+      }
+    }
+  ]
+}

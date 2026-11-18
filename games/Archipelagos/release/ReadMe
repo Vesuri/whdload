@@ -1,0 +1,93 @@
+
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
+
+ This install applies to "Archipelagos" © 1989 Astral Software.
+
+ Requirements:
+ -------------
+ This install requires WHDLoad and RawDIC to be in the path.
+ To install from a different drive than DF0: select installation mode Expert.
+
+ The installed game requires 0.5 MB ChipMem (+0.3 MB OtherMem for preload).
+ It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
+
+
+ Features:
+ ---------
+ - Full load from HD (real files!)
+ - Protection removed (manual check, protection track check)
+ - 2 versions supported
+ - DMA wait in replayer fixed
+ - CPU dependent delay in text writer fixed
+ - Keyboard routine rewritten
+ - "Fanfare" intro can be quit with left mouse button (US version)
+ - Manual included
+ - NewIcon (created by me)
+ - Source code included as usual
+ - Quit option that works on 68000 machines (default key is 'F10')
+
+ The patch for this classic and quite excellent game has been reworked
+ by yours truly. It now supports both known versions of the game (SPS 627 and
+ SPS 628). I have also completely disabled the manual protection so you won't
+ have to type anything at all and can just start the game! Some minor bugs
+ have been fixed too (CPU dependent delays in the text writer and replayer
+ for example) and I have also included the manual as well.
+ The "Fanfare" intro screen which appears in the US version (SPS 628) only can
+ be quit with left mouse button as I found it quite annoying that there was
+ no way to exit it in the original game.
+
+
+ Have a nice festive season and enjoy the game from HD.
+ Sting, 20-Dec-2015
+
+
+ Greetings to all in Scarab and Scoopex, the WHDLoad team, PMC,
+ Musashi5150, Skan, Slummy, Loaderror, Frequent, Wayne Kerr, Mr.Spiv,
+ Alpha One, CFou!, Paradroid, Audiomonster, Vention, Slammer
+ Axis, Tim, Triace, Britelite, Buzzer and all the other usual suspects. :)
+
+ Special greetings to all Golf MK1 fans worldwide and all classic
+ car owners/drivers. :)
+
+ Extra greetings to the usual suspects on #amigascne, see you all at
+ Revision 2016! :)
+
+
+ History:
+ --------
+
+ version 1.2 (01.01.2018)
+ - imager adapted to save level 1 data too (issue #3786)
+
+ version 1.1 (20.12.2015) done by StingRay:
+ - patch redone, uses real files now
+ - manual protection completely skipped
+ - SPS 627 and 628 versions supported
+ - new install script
+ - source code and manual included
+
+ version 1.0 (15.01.1999) done by John Selck:
+ - initial release
+
+
+
+ Contact:
+ --------
+ If you have problems with this installation please try and get a newer
+ version of this package from the WHDLoad WWW-Page. If that doesn't help try
+ some Tooltypes like NOCACHE, NOAUTOVEC, EXPCHIP, NOMMU, PAL or NTSC. If
+ that also fails, please inform the author via the Bug-Report-Form which
+ can be accessed on the WHDLoad WWW-Page.
+
+ For the full WHDLoad package, other installs and updates refer to:
+	http://www.whdload.de/
+ or	aminet:dev/misc/whdload#?
+ and	aminet:game/patch/
+

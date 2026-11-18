@@ -21,6 +21,10 @@
 *** History			***
 ***********************************
 
+; 31-Aug-2023	- WaitRaster waits for the start of a frame (VPOSR V8 set, then
+;		  clear) instead of line 303, which NTSC never reaches
+;		  (reconstructed from the shipped v1.2 slave, which has no source)
+
 ; 20-Dec-2015	- changed the patch to use real files
 
 ; 19-Dec-2015	- DMA wait in replayer fixed
@@ -90,7 +94,7 @@ HEADER	SLAVE_HEADER		; ws_security + ws_ID
 	IFD	DEBUG
 	dc.b	"DEBUG!!! "
 	ENDC
-	dc.b	"Version 1.1 (20.12.2015)",0
+	dc.b	"Version 1.2 (31.08.2023)",0
 Name	dc.b	"Archipelagos_"
 Num	dc.b	"03FC00",0
 	CNOP	0,2
@@ -123,10 +127,10 @@ Patch	lea	resload(pc),a1
 	move.l	a5,a0
 	jsr	resload_CRC16(a2)
 	lea	PLGAME(pc),a3
-	cmp.w	#$55bf,d0		; SPS 627
+	cmpi.w	#$55bf,d0		; SPS 627 (cmpi: the shipped slave's encoding)
 	beq.b	.ok
 	lea	PLGAME_US(pc),a3
-	cmp.w	#$f600,d0		; SPS 628
+	cmpi.w	#$f600,d0		; SPS 628 (cmpi: the shipped slave's encoding)
 	beq.b	.ok
 
 .wrongver
@@ -142,14 +146,14 @@ Patch	lea	resload(pc),a1
 	add.l	2(a1),a0
 	add.w	#$1C,a1
 	add.w	#$1C,a0
-	add.l	#$1C,d3
+	addi.l	#$1C,d3	; immediate form as the shipped slave has it: vasm encodes op #,Dn as the Dn form
 	move.l	(a0)+,d0
 	add.l	d0,a1
 	add.l	d3,(a1)
 .reloc	moveq	#0,d2
 	move.b	(a0)+,d2
 	beq.b	.done
-	cmp.b	#1,d2
+	cmpi.b	#1,d2	; immediate form as the shipped slave has it: vasm encodes op #,Dn as the Dn form
 	bne.b	.normal
 	add.w	#$FE,a1
 	bra.b	.reloc
@@ -255,11 +259,11 @@ CreateFileName
 	dbf	d4,.cloop
 	rts
 
-.conv2	and.b	#$f,d3
-	cmp.b	#9,d3
+.conv2	andi.b	#$f,d3	; immediate form as the shipped slave has it: vasm encodes op #,Dn as the Dn form
+	cmpi.b	#9,d3
 	ble.b	.ok
 	addq.b	#7,d3
-.ok	add.b	#"0",d3
+.ok	addi.b	#"0",d3
 	move.b	d3,-(a0)
 	rts
 
@@ -330,16 +334,10 @@ AckLev5	move.w	#$1800,$dff09c
 	rte
 
 WaitRaster
-	move.l	d0,-(a7)
-.wait	move.l	$dff004,d0
-	and.l	#$1ff00,d0
-	cmp.l	#303<<8,d0
-	bne.b	.wait
-.wait2	move.l	$dff004,d0
-	and.l	#$1ff00,d0
-	cmp.l	#303<<8,d0
-	beq.b	.wait2
-	move.l	(a7)+,d0
+.wait	btst	#0,$dff005
+	beq.b	.wait
+.wait2	btst	#0,$dff005
+	bne.b	.wait2
 	rts
 
 
