@@ -15,9 +15,10 @@ table at offset `$12FA6` for the current heading, a start and a step (8.8 map po
 for each of the pointer's 51 rows, and the cell is the start plus the step times the
 pointer's X / 256. So every cell the crosshair can reach is known, and a cell is aimed at
 by moving the mouse until the pointer is on it, then checked against the table again.
-A cell out of reach is approached: turn towards it (the pointer pushed past the screen's
-edge turns the view a degree a field), then move to the reachable land cell nearest to it,
-no nearer than 5 cells (the crosshair reaches about 3 to 9 cells ahead). The map wraps.
+A cell out of reach is approached: turn towards it (the pointer at the screen's edge turns
+the view a degree a frame, until it leaves the edge), then move to the reachable land cell
+nearest to it, no nearer than 5 cells (the crosshair reaches about 3 to 9 cells ahead). The
+map wraps.
 """
 import math
 import os
@@ -193,6 +194,7 @@ def turn(deg):
     x, y = ptr()
     point(255 if deg > 0 else 0, y)
     mouse(8 if deg > 0 else -8, 0, int(abs(deg)))
+    point(128, y)                               # off the edge: the turn stops
     fields(20)                                  # a frame with the new heading's table
 
 
