@@ -252,6 +252,8 @@ GS0_a68e equ $a6aa
 GS0_a6a2 equ $a6be
 GS0_a6b0 equ $a6cc
 GS0_a6e4 equ $a700
+GS0_a706 equ $a722
+GS0_a904 equ $a920
 GS0_a998 equ $a9b4
 GS0_a99a equ $a9b6
 GS0_a99c equ $a9b8
@@ -573,6 +575,8 @@ GS0_a68e equ $a68e
 GS0_a6a2 equ $a6a2
 GS0_a6b0 equ $a6b0
 GS0_a6e4 equ $a6e4
+GS0_a706 equ $a706
+GS0_a904 equ $a904
 GS0_a998 equ $a998
 GS0_a99a equ $a99a
 GS0_a99c equ $a99c

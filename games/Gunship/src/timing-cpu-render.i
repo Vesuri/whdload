@@ -64,6 +64,16 @@ cpu_render_install:
  cmp.l GS0_5c86(a3),d0
  bne .bad
  movea.l a3,a0
+ adda.l #GS0_a706,a0
+ cmpi.w #$4eb9,(a0)+
+ bne .bad
+ move.l a3,d0
+ addi.l #GS0_a904,d0
+ cmp.l (a0),d0
+ bne .bad
+ lea cpu_render_box_native(pc),a1
+ move.l d0,(a1)
+ movea.l a3,a0
  adda.l #GS0_aa80,a0
  cmpi.w #$45f9,(a0)
  bne .bad
@@ -142,6 +152,7 @@ cpu_render_install:
  PL_P GS0_8b6c,cpu_render_poly
  PL_P GS0_921c,cpu_render_band
  PL_P GS0_aa80,cpu_render_overlay
+ PL_PS GS0_a706,cpu_render_box
  PL_END
 
 cpu_render_release:
@@ -321,8 +332,28 @@ cpu_render_resume:
  lea cpu_render_active(pc),a0
  move.w cpu_render_suspended-cpu_render_active(a0),(a0)
  beq .done
+ clr.w cpu_render_suspended-cpu_render_active(a0)
  move.w #1,cpu_render_mask_dirty-cpu_render_active(a0)
 .done:
+ movea.l (sp)+,a0
+ rts
+
+; The panel painter's target box (+A904) is four clipped lines in view
+; coordinates, drawn before it narrows the clip to the panel. Natively they
+; would reach chip only to be overwritten by the view copy at +5C84: draw
+; them into the CPU view whenever the renderer owned it before the panel.
+cpu_render_box:
+ move.l a0,-(sp)
+ lea cpu_render_active(pc),a0
+ move.w (a0),-(sp)
+ tst.w cpu_render_suspended-cpu_render_active(a0)
+ beq .call
+ move.w #1,(a0)
+.call:
+ movea.l cpu_render_box_native(pc),a0 ; d0/d1 carry the box origin
+ jsr (a0)
+ lea cpu_render_active(pc),a0
+ move.w (sp)+,(a0)
  movea.l (sp)+,a0
  rts
 
@@ -726,6 +757,7 @@ cpu_render_overlay_native: ds.b 12
 cpu_render_active: dc.w 0
 cpu_render_mask_dirty: dc.w 1
 cpu_render_suspended: dc.w 0
+cpu_render_box_native: dc.l 0
 cpu_render_native_line: ds.b 16
 cpu_render_native_pixel: ds.b 16
 cpu_render_native_begin: ds.b 14
