@@ -933,7 +933,8 @@ _skyold dc.w    $4a40,$6d00,$000a,$3600,$32d8,$51cb,$fffc,$3639
 ; 4 low-resolution planes, and the copies would. The code below runs only on the 68020 and
 ; up but is assembled for the 68000: hunk 1 offsets above $7fff go through an index register.
 
-H1_FASTLOW      = $f4                   ; START's fast pool: the lowest block (its end, not used)
+H1_FASTPOOL     = $e4                   ; START's fast pool: its start
+H1_FASTLOW      = $f4                   ; the lowest block (its end, not used)
 H1_CHIPLOW      = $fc                   ; the chip pool's lowest block
 H1_FRAMEEND     = $d3d8                 ; the objects' frames' end in the fast pool
 H1_HANDLES      = $d598                 ; the block allocator's 16 handles
@@ -953,9 +954,13 @@ _mempatch
 
 ; START gives its fast pool up when AllocMem returns it above $ffffff (hunk 0 +$3de:
 ; cmp.l #$ffffff,d0 / bhi.w +$406), so with only Zorro III or CPU-board memory (most
-; 68040 and 68060 machines) the game ran from chip memory. Its 24-bit pointers (andi.l
-; #$ffffff) are the resource heap's, which is in the chip pool: the bhi.w becomes two nops.
-; POOL24 (a test define): START's check kept.
+; 68040 and 68060 machines) the game ran from chip memory. The bhi.w becomes two nops. The
+; objects' frames in the pool hold images that START reaches through 24-bit pointers (the
+; map: andi.l #$ffffff at hunk 1 +$29ac); _m24patch (src/mask24.s) gives those pointers
+; their top byte back. Where it cannot, the pool's start as the object table's (move.l
+; d0,<hunk 1 +$f0> at +$3ee) becomes jsr _poolobj, which stores 0 there above $ffffff: the
+; object table and the frames then stay in chip, as with v1.2 there, and the pool holds
+; only _fastalloc's blocks. POOL24 (a test define): START's check kept.
 _poolhigh
         move.l  _hunk0(pc),a1
         cmp.l   #$b0bc00ff,$3de(a1)     ; cmp.l #$ffffff,d0
@@ -964,12 +969,61 @@ _poolhigh
         bne     .no
         cmp.w   #$0020,$3e6(a1)
         bne     .no
+        cmp.w   #$23c0,$3ee(a1)         ; move.l d0,<hunk 1 +$f0>
+        bne     .no
         IFND POOL24
         move.l  #$4e714e71,$3e4(a1)
-        move.l  _resload(pc),a2
+        bsr     _m24patch
+        tst.l   d0
+        beq     .flush
+        lea     _objpool(pc),a2
+        move.l  $3f0(a1),(a2)
+        move.w  #$4eb9,$3ee(a1)
+        pea     _poolobj(pc)
+        move.l  (a7)+,$3f0(a1)
+.flush  move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
         ENDC
 .no     rts
+
+; START's store of the pool's start as the object table's (hunk 0 +$3ee): d0 the pool
+_poolobj
+        move.l  a0,-(a7)
+        move.l  _objpool(pc),a0
+        clr.l   (a0)
+        cmp.l   #$ffffff,d0
+        bhi     .high
+        move.l  d0,(a0)
+.high   move.l  (a7)+,a0
+        rts
+
+_objpool        dc.l    0               ; hunk 1 +$f0
+
+; START's andi.l #$ffffff sites: hunk, register, offset
+_m24sites
+        dc.w    1,2
+        dc.l    $29ac
+        dc.w    1,1
+        dc.l    $7352
+        dc.w    1,1
+        dc.l    $74e6
+        dc.w    1,2
+        dc.l    $799e
+        dc.w    1,2
+        dc.l    $79ba
+        dc.w    1,3
+        dc.l    $8e4a
+        dc.w    1,0
+        dc.l    $96b8
+        dc.w    1,0
+        dc.l    $96dc
+        dc.w    1,0
+        dc.l    $d098
+        dc.w    2,2
+        dc.l    $147a
+        dc.w    -1
+
+        INCLUDE mask24.s
 
         INCLUDE obj020.s
 
@@ -1069,7 +1123,8 @@ _skyset move.l  d2,164(a0)
 ; chunky buffer (hunk 1 +$891c), the renderer's tables (+$8938) and the row table (+$8978)
 ; go to _fastalloc instead, which takes the same blocks from the top of the fast pool (hunk 1
 ; +$f4, its end, which START sets and does not use) down to the end of the objects' frames
-; (+$d3d8), or from chip as before when there is no fast pool or no room. _fastfree replaces
+; (+$d3d8) and the pool's start (+$e4; the frames are in chip above 16 MB, _poolobj), or
+; from chip as before when there is no fast pool or no room. _fastfree replaces
 ; START's free (hunk 0 +$2c42, which first passes over a null handle) for both: like it, it
 ; gives a block back only when it is the lowest one of its pool.
 
@@ -1123,6 +1178,8 @@ _fastalloc
         and.w   #-16,d1
         move.l  #H1_FRAMEEND,d2
         cmp.l   (a1,d2.l),d1
+        blo     .chip
+        cmp.l   H1_FASTPOOL(a1),d1      ; the frames are in chip above 16 MB (_poolobj)
         blo     .chip
         move.l  d1,a0
         move.l  H1_FASTLOW(a1),d0
@@ -1452,6 +1509,8 @@ _rowalloc
         move.l  #H1_FRAMEEND,a0
         cmp.l   (a1,a0.l),d0
         move.l  (a7)+,a0
+        blo     .start
+        cmp.l   H1_FASTPOOL(a1),d0
         blo     .start
         move.l  d2,d0
         bsr     _fastalloc

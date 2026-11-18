@@ -1029,9 +1029,13 @@ _c2p    dc.l    0
 ; docs/internals.md). Not with MemConfig=1's 256 KB.
 ; START also gives the pool up when AllocMem returns it above $ffffff (hunk 0 +$222:
 ; cmp.l #$ffffff,d0 / bhi.w +$24a), so with only Zorro III or CPU-board memory (most
-; 68040 and 68060 machines) the game ran from chip memory. Its 24-bit pointers (andi.l
-; #$ffffff) are the resource heap's, which is in the chip pool: the bhi.w becomes two nops.
-; POOL24 (a test define): START's check kept.
+; 68040 and 68060 machines) the game ran from chip memory. The bhi.w becomes two nops. The
+; objects' frames in the pool hold images that START reaches through 24-bit pointers (the
+; map: andi.l #$ffffff at hunk 1 +$42e8); _m24patch (src/mask24.s) gives those pointers
+; their top byte back. Where it cannot, the pool's start as the object table's (move.l
+; d0,<hunk 1 +$fc> at +$232) becomes jsr _poolobj, which stores 0 there above $ffffff: the
+; object table and the frames then stay in chip, as in v1.2, and the pool holds only
+; _fastalloc's blocks. POOL24 (a test define): START's check kept.
 
 _fastpool
         move.l  _expmemsize(pc),d0
@@ -1050,12 +1054,61 @@ _fastpool
         bne     .flush
         cmp.w   #$0020,$22a(a0)
         bne     .flush
+        cmp.w   #$23c0,$232(a0)         ; move.l d0,<hunk 1 +$fc>
+        bne     .flush
         IFND POOL24
         move.l  #$4e714e71,$228(a0)
+        bsr     _m24patch
+        tst.l   d0
+        beq     .flush
+        lea     _objpool(pc),a2
+        move.l  $234(a0),(a2)
+        move.w  #$4eb9,$232(a0)
+        pea     _poolobj(pc)
+        move.l  (a7)+,$234(a0)
         ENDC
 .flush  move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
+
+; START's store of the pool's start as the object table's (hunk 0 +$232): d0 the pool
+_poolobj
+        move.l  a0,-(a7)
+        move.l  _objpool(pc),a0
+        clr.l   (a0)
+        cmp.l   #$ffffff,d0
+        bhi     .high
+        move.l  d0,(a0)
+.high   move.l  (a7)+,a0
+        rts
+
+_objpool        dc.l    0               ; hunk 1 +$fc
+
+; START's andi.l #$ffffff sites: hunk, register, offset
+_m24sites
+        dc.w    1,2
+        dc.l    $42e8
+        dc.w    1,1
+        dc.l    $8d72
+        dc.w    1,1
+        dc.l    $8f06
+        dc.w    1,2
+        dc.l    $93be
+        dc.w    1,2
+        dc.l    $93da
+        dc.w    1,3
+        dc.l    $a7e0
+        dc.w    1,0
+        dc.l    $b04e
+        dc.w    1,0
+        dc.l    $b072
+        dc.w    1,0
+        dc.l    $ea42
+        dc.w    2,2
+        dc.l    $2100
+        dc.w    -1
+
+        INCLUDE mask24.s
 
 **********************************************
 ; The renderer's buffers in fast memory. START's block allocator (hunk 0 +$36ee: d0 size ->
@@ -1063,7 +1116,8 @@ _fastpool
 ; takes from the top of the chip pool; the calls for the 3D view's chunky buffer and the
 ; renderer's tables go to _fastalloc instead, which takes the same blocks from the top of the fast pool
 ; (hunk 1 +$100, its end, which START sets and does not use) down to the end of the objects'
-; frames (hunk 1 +$ed82), or from chip as before when there is no fast pool or no room.
+; frames (hunk 1 +$ed82) and the pool's start (+$f0; the frames are in chip above 16 MB,
+; _poolobj), or from chip as before when there is no fast pool or no room.
 ; _fastfree replaces START's free (hunk 0 +$3748) for both: like it, it gives a block back
 ; only when it is the lowest one of its pool.
 
@@ -1134,6 +1188,8 @@ _fastalloc
         and.w   #-16,d1
         cmp.l   $ed82(a1),d1
         blo     .chip
+        cmp.l   $f0(a1),d1
+        blo     .chip
         move.l  d1,a0
         move.l  $100(a1),d0
         sub.l   d1,d0
@@ -1178,11 +1234,15 @@ _fastfree
 .out    movem.l (a7)+,d0/a0-a1
         rts
 
+_hunk0          dc.l    0
 _hunk1          dc.l    0
 _hunk2          dc.l    0
 
-; _hunks: a1 START's segment list (its first hunk's link); _hunk1 and _hunk2 set, a1 kept
+; _hunks: a1 START's segment list (its first hunk's link); _hunk0-_hunk2 set, a1 kept
 _hunks
+        lea     4(a1),a0
+        lea     _hunk0(pc),a2
+        move.l  a0,(a2)
         move.l  (a1),d0
         lsl.l   #2,d0
         move.l  d0,a2                   ; hunk 1 - 4
@@ -3006,6 +3066,8 @@ _rowalloc
         subq.l  #8,d0
         and.w   #-16,d0
         cmp.l   $ed82(a1),d0
+        blo     .start
+        cmp.l   $f0(a1),d0
         blo     .start
         move.l  d2,d0
         bsr     _fastalloc

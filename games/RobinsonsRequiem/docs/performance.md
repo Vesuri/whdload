@@ -687,6 +687,11 @@ decides only how close a real 68030 to 68060 gets.
     start and end screenshots identical to Zorro II's. On the `a1200-040` preset's MMU core,
     3,000 fields walking: 126 frames in both layouts, the end screenshots identical, no
     faults.
+    That left the objects' frames above 16 MB, and START masks some pointers into them to
+    24 bits: the map faulted (reported from a real A1200/040, reproduced in both games).
+    The objects' table and frames in chip instead (`M24_OFF`): 47 frames. The masked
+    pointers given their top byte back (`src/mask24.s`): 92 frames, the start and end
+    screenshots identical to the check's removal alone, the map opening in both games.
 
 Not planned: running the scripts more often in smaller steps. The engine has no step
 length: each object runs every period and its script moves it by its own constants (the
@@ -1033,6 +1038,8 @@ is, each step below chosen at install, and the game has to keep working correctl
     Zorro II's 770,894, the start and end screenshots identical to Zorro II's. The
     `a3000-50` cannot run it: with `--fast_memory=0 --zorro_iii_memory=32768` WHDLoad stops
     with "Can't allocate ExpMem.".
+    With the masked pointers' top byte given back (AGA step 16, the map): 115 frames, the
+    screenshots identical.
 
 ## Reproducing
 
@@ -1060,8 +1067,8 @@ BUILD=profile SETUP=a1200-060 OPEN=human APROF=1 FSUAE=$FSUAE_APROF \
     EXTRA_ARGS='--uae_mmu_model=0 --uae_cpu_cycle_exact=true --uae_cpu_memory_cycle_exact=true --uae_blitter_cycle_exact=true' \
     python3 tools/rr_prof.py tmp/prof/aga-060-aprof
 # fast memory above 16 MB (step 16): the cycle-exact 040 at 40 MHz with only Zorro III
-# memory; SLAVE=<a slave assembled with -DPOOL24> for START's check; without
-# --zorro_iii_memory for Zorro II
+# memory; SLAVE=<a slave assembled with -DPOOL24> for START's check, -DM24_OFF for the
+# objects' frames in chip; without --zorro_iii_memory for Zorro II
 BUILD=profile SETUP=a1200-040 OPEN=human FIELDS=300 APROF=1 FSUAE=$FSUAE_APROF \
     EXTRA_ARGS='--uae_mmu_model=0 --uae_cpu_cycle_exact=true --uae_cpu_memory_cycle_exact=true --uae_blitter_cycle_exact=true --uae_cpu_frequency=40000000 --fast_memory=0 --zorro_iii_memory=32768' \
     python3 tools/rr_prof.py tmp/prof/aga040-z3

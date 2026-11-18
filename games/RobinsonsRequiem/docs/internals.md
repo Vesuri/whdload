@@ -89,8 +89,14 @@ work either way, and items 21 and 22 are always made. `_hunks` finds START's hun
    [`$24e`], `cmp.l #$ffffff,d0` / `bhi.w +$24a`, `b0bc 00ff ffff 6200 0020`, checked
    first): with fast memory only above 16 MB (Zorro III, most 68040 and 68060 boards) the
    game ran from chip memory. The `bhi.w` at `+$228` [`$254`] becomes two `nop`s
-   (`4e71 4e71`); its 24-bit pointers are the resource heap's ("24-bit pointers" below).
-   The test define `POOL24` keeps the check.
+   (`4e71 4e71`). The objects' frames in the pool hold images that START reaches through
+   24-bit pointers (the map, "24-bit pointers" below): `_m24patch` (`src/mask24.s`) gives
+   them their top byte back. Where it cannot, the pool's start as the object table's,
+   `move.l d0,<hunk 1 +$fc>` at `+$232` [`$25e`] (`23c0`, checked first), becomes `jsr
+   _poolobj`, which stores 0 there when the pool is above `$ffffff`: the object table and
+   the frames are then in chip, as in v1.2, and the pool holds only the slave's blocks
+   (items 3 and 9). The test define `POOL24` keeps the check, `M24_OFF` takes the
+   fallback.
 2. **Caches on**: `CACHECHIPDATA` instead of `CACHE`. Without WHDLoad's MMU, `CACHE` left
    both caches off on the 68030 (CACR `$2000`); `CACHECHIPDATA` turns them on with BaseMem
    write-through. The game's one blitter use (hunk 2 `+$5b6`) copies the shown planes into
@@ -618,8 +624,10 @@ either way.
      all checked first:
      - `_poolhigh`: START gives its pool up when `AllocMem` returns it above `$ffffff`
        (hunk 0 `+$3de` [`$40e`], `cmp.l #$ffffff,d0` / `bhi.w +$406`), as the AGA START
-       does; the `bhi.w` at `+$3e4` [`$414`] becomes two `nop`s. The test define `POOL24`
-       keeps the check. On the 68000 there is no memory above 16 MB.
+       does; the `bhi.w` at `+$3e4` [`$414`] becomes two `nop`s, and as in AGA item 1
+       `_m24patch` patches the ECS mask sites or, where it cannot, `move.l d0,<hunk 1
+       +$f0>` at `+$3ee` [`$41e`] becomes `jsr _poolobj`. The test define `POOL24` keeps
+       the check. On the 68000 there is no memory above 16 MB.
      - `_fastblocks`: the block allocator's calls for the chunky buffer (hunk 1 `+$891c`
        [`$c214`]), the renderer's tables (`+$8938`) and the row table (`+$8978`), each
        `jsr <hunk 0 +$2be8>`, become `jsr _fastalloc`. It takes them from the top of the
@@ -802,7 +810,7 @@ improvements":
 
 | Item | Sites, AGA → ECS | ECS differences |
 |---|---|---|
-| 1 | hunk 0 `+$196` → none, `+$228` → `+$3e4` | START keeps its fast pool (hunk 0 `+$3be`-`+$406` allocates the pool it sized; nothing discards it), unless it is above 16 MB |
+| 1 | hunk 0 `+$196` → none, `+$228` → `+$3e4`, `+$232` → `+$3ee` | START keeps its fast pool (hunk 0 `+$3be`-`+$406` allocates the pool it sized; nothing discards it), unless it is above 16 MB |
 | 3 | hunk 0 `+$36ee` → `+$2be8`, the free `+$3748` → `+$2c42`; hunk 1 `+$a2b2`, `+$a2ce`, `+$a30e` → `+$891c`, `+$8938`, `+$8978` | the free tests for a null handle first: `48e7 8080 4a80` for `48e7 8080 2040` |
 | 4 | hunk 2 `+$2e84` → none | the ECS game's own 4-plane conversion ("ECS improvements" 1) |
 | 5 | hunk 1 `+$e262` → `+$c8b8` | ("ECS improvements" 2's site) |
@@ -840,7 +848,8 @@ START divides memory itself (hunk 0 `+$162`-`+$290`); the hunk 1 variables:
   100,000, and none when `AllocMem` returns it above `$ffffff` (hunk 0 `+$222`). v1.2
   discarded it (`+$f4` := 0 at hunk 0 `+$196`); kept, it holds MAIN's object
   table and the objects' variable frames (hunk 1 `+$8c7c`: `+$ed6c`-`+$ed82`, 87 KB in the
-  jungle), from `+$fc`. `+$100` is set to the pool's end and not used.
+  jungle), from `+$fc` (0 for none: then they are at the chip heap's base, as with the
+  slave's `_poolobj`, AGA item 1). `+$100` is set to the pool's end and not used.
 - **Chip pool** `+$e4`-`+$ec`: `AvailMem(MEMF_CHIP|MEMF_LARGEST)` - 14,000 (the game ends
   under 295,000). The resource heap grows up from `+$104` (`+$ed5c` base, `+$ed60` top,
   hunk 1 `+$9532`: every loaded file, 969 KB in the jungle), and a block allocator grows
@@ -876,13 +885,25 @@ hunk 1 `+$29ac`, `+$7352`, `+$74e6`, `+$799e`, `+$79ba`, `+$8e4a`, `+$96b8`, `+$
   `+$8f0c`); with bit 7 set the pointer is backed up by 22 bytes (`+$8d86`) or 6
   (`+$8f1a`).
 
-In play they point into the resource heap and other chip memory, never into the fast pool,
-so START's 16 MB check on the fast pool (AGA item 1) guards nothing that play reaches.
-`tools/rr_masks.py` on `SETUP=a1200-040` with only Zorro III memory (the slaves' check
-removed, the pool there: 634 KB AGA, 745 KB ECS), `OPEN=human`, 300 fields of keypad 9 and
-900 of keypad 8 (ending against a slope): the same 7 of the 10 sites in each game, 6,567 values (AGA)
-and 12,412 (ECS), high bytes `$00`, `$01` and `$a1`, low 24 bits all under `$120000`, chip
-memory.
+Walking in the 3D view they point into the resource heap and other chip memory:
+`tools/rr_masks.py` on `SETUP=a1200-040` with only Zorro III memory (the pool there, with
+the objects in it: 634 KB AGA, 745 KB ECS), `OPEN=human`, 300 fields of keypad 9 and 900
+of keypad 8 (ending against a slope): the same 7 of the 10 sites in each game, 6,567
+values (AGA) and 12,412 (ECS), high bytes `$00`, `$01` and `$a1`, low 24 bits all under
+`$120000`. The map (its action icon) is drawn as 3D elements whose `+18` pointer is in
+the objects' frames: with the frames in the pool above 16 MB, `+$42e8` masked
+`$02ec26ee` to `$00ec26ee` and the read at `+$42f4` faulted (reported from a real A1200
+with a 68040; reproduced on that setup in both games, ECS at `+$29ac`).
+
+`_m24patch` (`src/mask24.s`, AGA item 1 and ECS `_poolhigh`): when the slave's ExpMem
+(START's only fast memory, the pool and START's hunks in it) is above 16 MB, its low 24
+bits start at `$200000` or above (above every chip address) and it does not cross a
+16 MB boundary, each of the 10 sites (`0280+n 00ff ffff`, all checked first) becomes `jsr
+_m24d<n>`: the same mask, and a result within ExpMem's low 24 bits gets ExpMem's top byte
+back. START then sees the pointers as with ExpMem below 16 MB, where the top byte is 0
+(the compaction too: it has no upper bound, and moves frame pointers there as on Zorro
+II). No site reads the condition codes the `andi.l` set. Otherwise the frames go to chip
+(`_poolobj`).
 
 ## Memory (ECS)
 
