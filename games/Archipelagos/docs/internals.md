@@ -39,6 +39,8 @@ byte ST header (so at runtime `$201C` + offset).
 | `$11FA8` | `$12260` | game time: a move, interpolated over 48 fields |
 | `$CD4E`; `$C5F2`, `$C60E` | `$CD7A`; `$C61E`, `$C63A` | game time: the effects' frames, until each step has had 6 fields |
 | `$12220` | `$124D8` | the swap's end: it also measures each frame |
+| `$CE92`; `$E494`, `$10BBA`, `$11884`, `$118B4` | `$CEBE`; `$E4E8`, `$10C9E`, `$11B3C`, `$11B6C` | the level 3 handler's self-modifying `jsr` (the pointer or the pan routine): it jumps through a slave variable, and the four writes of its target write that variable |
+| (install) | same | the instruction cache on for BaseMem, the data cache off (`resload_SetCPU`: `WCPUF_Base_WT`, `WCPUF_IC`) |
 
 ## Memory
 
@@ -211,12 +213,24 @@ fetches that miss the 68030's 256-byte cache (37%), the program image's variable
 and span list (29%), the stack (12%) and the map (2%): about 31000 accesses a frame at
 one chip slot (282 ns) or more each, at least 8.7 ms.
 
-The only self-modifying code found is the level 3 handler's `jsr` (offset `$CE92`). Its
-target at offset `$CE94` is written at `$E490`, `$10BB4`, `$1187E` and `$118B0`: the
-pointer routine or the pan routine (the target kept at offset `$129CE`). That search
-(`tools/smc.py`) compared the bytes of every instruction a traced run executed with the
-relocated file, at the end of the a1200-030 run above; the other screens are not checked
-yet.
+The only self-modifying code is the level 3 handler's `jsr` (offset `$CE92`). Its target
+at offset `$CE94` was written at `$E490`, `$10BB4`, `$1187E` and `$118B0`: the pointer
+routine or the pan routine (the target kept at offset `$129CE`). With an instruction cache
+the `jsr` could run a stale target. The slave makes the `jsr` jump through a variable of
+its own and points the four writes at that variable (patch table above), then turns the
+instruction cache on.
+
+`tools/smc.py` checks for any other: it keeps the program image at the game's entry
+(relocated and patched) and, at each stop of a route, traces 2 fields and compares every
+executed instruction with it. Its two routes cover the title, the archipelago screen,
+creating archipelago 1, play, the map, pan mode, both stones' collapse, the Obelisk's
+destruction, the end screen and its save, the Obelisk destroying the player, the death
+screen, retrying, and selecting another archipelago. The progress block (the loader's
+table at `$9F7C`, entry 3: disk offset `$5F000`) loads once at boot, before the title, into
+a data buffer. On the a1200-030 with the instruction cache, both versions: no instruction
+differs from the entry's image, apart from the `rts` at `$12398` (628 `$1273C`), after which the
+comparison runs into the swap's pointer table (data). Nothing outside the image runs
+except the slave and WHDLoad.
 
 ## Limitations
 

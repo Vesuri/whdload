@@ -16,13 +16,13 @@ later). `tools/play.py` plays archipelago 1 to its end.
 
 ## 50 fps on the a1200-030
 
-The soft target is 50 fps in play on the a1200-030, which now draws 8.2 fps on archipelago
-1. A frame there takes 124 ms: 90 ms of CPU work, 12 ms waiting for the blitter and 27 ms
-waiting for fields. The causes, largest first:
+The soft target is 50 fps in play on the a1200-030, which drew 8.2 fps on archipelago 1
+before step 2 and 15.8 since. Before step 2 a frame there took 124 ms: 90 ms of CPU work,
+12 ms waiting for the blitter and 27 ms waiting for fields. The causes, largest first:
 
-- **Caches off.** WHDLoad's default marks BaseMem uncacheable, and without the MMU in use
-  (the 68030's default) that turns both caches off. The slave sets no cache flags, so the
-  whole game runs uncached from Chip RAM. WHDLoad's `CACHE` option alone took the
+- **Caches off** (fixed in step 2). WHDLoad's default marks BaseMem uncacheable, and
+  without the MMU in use (the 68030's default) that turns both caches off. The slave set no
+  cache flags, so the whole game ran uncached from Chip RAM. WHDLoad's `CACHE` option alone took the
   emulated 030 from 8.0 to 15.0 fps.
 - **Nothing in fast memory.** No ExpMem. Code, stack, tables, the span list and the map all
   sit in Chip RAM. With the instruction cache on, 80% of the CPU's chip accesses outside the
@@ -51,14 +51,14 @@ nor change behaviour.
    effects (a stone's collapse, the Obelisk's ramps), and an image scan finds nothing
    else at the frame rate. Not checked in play: the blood spread (`$C99E`), which needs
    archipelago 20 or later; it runs in the renderer's steps, which are checked.
-2. **Instruction cache.** First fix the one piece of self-modifying code: point the four
-   writes of the level 3 handler's `jsr` target (`$E490`, `$10BB4`, `$1187E`, `$118B0`) at
-   a slave variable, and make the `jsr` (`$CE92`) jump through it. Then call
-   `resload_SetCACR` with the instruction cache on for BaseMem. Leave its data cache off:
-   on a 68040/060 with the MMU it would make the screens data-cacheable.
-   - Run `tools/smc.py` on runs through the title, the archipelago screen, the map, saving
-     and loading, a level's end and a death.
-   - Expected from the `CACHE` measurement: 15 fps on the 030. The 68000 is unaffected.
+2. **Instruction cache.** Done. The level 3 handler's self-modifying `jsr` jumps through a
+   slave variable that its four writers now write, and the slave turns on the instruction
+   cache for BaseMem with the data cache off (`resload_SetCPU`; a 68040/060 with the MMU
+   would otherwise make the screens data-cacheable). `tools/smc.py` finds no other
+   self-modifying code through every screen, on both versions
+   ([internals.md](internals.md#rendering-cost)). Panning on archipelago 1
+   (`tools/archipelagos.py frames 250 4`), the previous slave against this one: a1200-030
+   8.20 to 15.80 fps, a1200 6.40 to 12.60, a500 5.40 and 5.40.
 3. **One field wait a frame.** Drop the wait before the swap (`$1185C`). The renderer's wait
    (`$11AE6`) keeps the buffers safe, as it already does in the move routine. Guard the swap
    (`$12306`) so it never rewrites the bitplane pointers while the copper is loading them at

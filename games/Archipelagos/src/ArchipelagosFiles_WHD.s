@@ -24,6 +24,8 @@
 ; 18-Nov-2026	- game time no longer follows the frame rate: the renderer's
 ;		  steps, moves and two effects advance with the fields their frames
 ;		  take, at most a step every 6 fields (timing.s; Vesuri)
+;		- the level 3 handler's self-modifying jsr goes through a
+;		  variable, and the instruction cache is on (Vesuri)
 
 ; 31-Aug-2023	- WaitRaster waits for the start of a frame (VPOSR V8 set, then
 ;		  clear) instead of line 303, which NTSC never reaches
@@ -134,10 +136,12 @@ Patch	lea	resload(pc),a1
 	jsr	resload_CRC16(a2)
 	lea	PLGAME(pc),a3
 	lea	GT627(pc),a4
+	move.l	#$ce94,d4		; the level 3 handler's jsr target
 	cmpi.w	#$55bf,d0		; SPS 627 (cmpi: the shipped slave's encoding)
 	beq.b	.ok
 	lea	PLGAME_US(pc),a3
 	lea	GT628(pc),a4
+	move.l	#$cec0,d4
 	cmpi.w	#$f600,d0		; SPS 628 (cmpi: the shipped slave's encoding)
 	beq.b	.ok
 
@@ -172,15 +176,20 @@ Patch	lea	resload(pc),a1
 	bra.b	.reloc
 
 .done
-	
-	
-
+	lea	L3Vec(pc),a0		; the jsr's first target, relocated
+	move.l	$1c(a5,d4.l),(a0)
 
 ; patch
 	add.w	#$1c,a5			; skip ST header
 	move.l	a3,a0
 	move.l	a5,a1
 	jsr	resload_Patch(a2)
+
+; the instruction cache for BaseMem, no data cache (it would make the screens
+; data-cacheable where WHDLoad uses the MMU)
+	move.l	#WCPUF_Base_WT|WCPUF_IC,d0
+	move.l	#WCPUF_Base|WCPUF_IC|WCPUF_DC,d1
+	jsr	resload_SetCPU(a2)
 
 
 ; and start
@@ -204,6 +213,14 @@ KillSys	move.w	#$7fff,$dff09a
 AckVBI	move.w	#1<<4+1<<5+1<<6,$dff09c
 	move.w	#1<<4+1<<5+1<<6,$dff09c
 	rts
+
+; The level 3 handler called the pointer or the pan routine with a jsr whose
+; target the game rewrote, which an instruction cache would miss. The writes
+; now go to L3Vec, and the jsr comes here.
+L3Jump	move.l	L3Vec(pc),-(a7)
+	rts
+
+L3Vec	dc.l	0
 
 AckLev6	move.w	#1<<13,$dff09c
 	move.w	#1<<13,$dff09c
@@ -236,6 +253,12 @@ PLGAME	PL_START
 	PL_PSS	$c5f2,t_pacedraw,6	; the two ramps
 	PL_PSS	$c60e,t_pacedraw,6
 	PL_P	$12220,t_swapend	; the swap measures each frame
+
+	PL_PS	$ce92,L3Jump		; the level 3 handler's jsr, through L3Vec
+	PL_PA	$e494,L3Vec		; and its four writes
+	PL_PA	$10bba,L3Vec
+	PL_PA	$11884,L3Vec
+	PL_PA	$118b4,L3Vec
 	PL_END
 
 
@@ -313,6 +336,12 @@ PLGAME_US
 	PL_PSS	$c61e,t_pacedraw,6	; the two ramps
 	PL_PSS	$c63a,t_pacedraw,6
 	PL_P	$124d8,t_swapend	; the swap measures each frame
+
+	PL_PS	$cebe,L3Jump		; the level 3 handler's jsr, through L3Vec
+	PL_PA	$e4e8,L3Vec		; and its four writes
+	PL_PA	$10c9e,L3Vec
+	PL_PA	$11b3c,L3Vec
+	PL_PA	$11b6c,L3Vec
 	PL_END
 
 ; add LMB check to "Fanfare intro"
