@@ -40,6 +40,8 @@ byte ST header (so at runtime `$201C` + offset).
 | `$CD4E`; `$C5F2`, `$C60E` | `$CD7A`; `$C61E`, `$C63A` | game time: the effects' frames, until each step has had 6 fields |
 | `$12220` | `$124D8` | the swap's end: it also measures each frame |
 | `$CE92`; `$E494`, `$10BBA`, `$11884`, `$118B4` | `$CEBE`; `$E4E8`, `$10C9E`, `$11B3C`, `$11B6C` | the level 3 handler's self-modifying `jsr` (the pointer or the pan routine): it jumps through a slave variable, and the four writes of its target write that variable |
+| `$12334`, `$1238C` | `$126D8`, `$12730` | the swap's copper-list writes: all interrupts off, and never in lines 0-2 or a frame's last three ([The frame](#the-frame)) |
+| `$1185C` | `$11B14` | 68020 or better: the frame's second field wait skipped |
 | (install) | same | the instruction cache on for BaseMem, the data cache off (`resload_SetCPU`: `WCPUF_Base_WT`, `WCPUF_IC`) |
 
 ## Memory
@@ -69,10 +71,24 @@ routine at `$117EA` once a frame:
 
 The swap takes effect at the next vertical blank, when the copper reloads the list, and
 the renderer's own wait (step 2) keeps it from drawing into a buffer still on screen.
-The second wait (step 3) adds nothing to that and caps the loop at 25 fps: with no work a
-frame would still take two fields. The move routine `$11FA8` (eight steps between two
-cells, each a world update, a render and a swap, then a final frame on the cell) has only
-the renderer's wait.
+The second wait (step 3) adds nothing to that and caps the loop at 25 fps: after it the
+renderer's wait takes almost a whole field more, so a frame takes its work rounded up to
+whole fields plus one. The move routine `$11FA8` (eight steps between two cells, each a
+world update, a render and a swap, then a final frame on the cell) has only the renderer's
+wait.
+
+On a 68020 or better the slave skips the second wait (2.0b). A frame then takes its work
+rounded up to whole fields: one field less than before, measured on every setup below. The
+68000 keeps it, so the a500 runs as it did. A swap can now come at any line, as the move
+routine's always could, and the copper reads the list's first ten moves (the pointers) at
+the start of line 0: a write while it reads them would show planes from both buffers for
+a frame. The slave makes the swap turn off all interrupts, not only VERTB, and wait out
+lines 0-2 and a frame's last three (PAL 310-312, NTSC 260-262; it reads the beam position
+twice, so a line change between `VPOSR` and `VHPOSR` is not taken for a line) before it
+writes. That matters: on the a1200-030 the frame's work in a pan is close to two fields,
+and without the end-of-frame lines a swap begun at line 312.9 wrote at line 0.1. Traced
+over 300 fields with the guard, every write was at line 3 or later (line estimated from
+the cycles into the field).
 
 Draw view: planes 3 and 4 of the ground (lines 113-179) by two blits; then, for each of
 the 67 ground rows from the bottom up, the row's two edge rays across the map (`$11BD4`),

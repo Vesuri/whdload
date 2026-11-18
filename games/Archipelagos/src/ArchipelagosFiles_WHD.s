@@ -26,6 +26,9 @@
 ;		  take, at most a step every 6 fields (timing.s; Vesuri)
 ;		- the level 3 handler's self-modifying jsr goes through a
 ;		  variable, and the instruction cache is on (Vesuri)
+;		- the swap's bitplane pointers are written with interrupts off and
+;		  never while the copper loads them; on a 68020 or better the
+;		  frame no longer waits for a field before the swap (Vesuri)
 
 ; 31-Aug-2023	- WaitRaster waits for the start of a frame (VPOSR V8 set, then
 ;		  clear) instead of line 303, which NTSC never reaches
@@ -137,11 +140,13 @@ Patch	lea	resload(pc),a1
 	lea	PLGAME(pc),a3
 	lea	GT627(pc),a4
 	move.l	#$ce94,d4		; the level 3 handler's jsr target
+	lea	PLFAST(pc),a6
 	cmpi.w	#$55bf,d0		; SPS 627 (cmpi: the shipped slave's encoding)
 	beq.b	.ok
 	lea	PLGAME_US(pc),a3
 	lea	GT628(pc),a4
 	move.l	#$cec0,d4
+	lea	PLFAST_US(pc),a6
 	cmpi.w	#$f600,d0		; SPS 628 (cmpi: the shipped slave's encoding)
 	beq.b	.ok
 
@@ -185,6 +190,15 @@ Patch	lea	resload(pc),a1
 	move.l	a5,a1
 	jsr	resload_Patch(a2)
 
+; a 68020 or better: no field wait before the swap
+	move.l	CPUFLAGS(pc),d0
+	btst	#AFB_68020,d0
+	beq.b	.slow
+	move.l	a6,a0
+	move.l	a5,a1
+	jsr	resload_Patch(a2)
+.slow
+
 ; the instruction cache for BaseMem, no data cache (it would make the screens
 ; data-cacheable where WHDLoad uses the MMU)
 	move.l	#WCPUF_Base_WT|WCPUF_IC,d0
@@ -222,11 +236,59 @@ L3Jump	move.l	L3Vec(pc),-(a7)
 
 L3Vec	dc.l	0
 
+; The swap writes the five bitplane pointers into the copper list's first
+; moves, which the copper reads at the start of each frame. A write while it
+; reads them would show one frame with planes from both buffers. The game
+; turned off only VERTB; all interrupts are off now, from before the beam
+; check to after the writes. The writes wait out the copper's lines (0-2)
+; and a frame's last three (310-312 PAL, 260-262 NTSC; 260-262 wait on PAL
+; too). The beam position is read twice so that a line change between
+; VPOSR and VHPOSR is not taken for a line.
+SwapOff	lea	IntEna(pc),a2
+	move.w	$dff01c,(a2)
+	move.w	#$4000,$dff09a
+.beam	move.l	$dff004,d0
+	move.l	$dff004,d1
+	eor.l	d0,d1
+	andi.l	#$1ff00,d1
+	bne.b	.beam
+	lsr.l	#8,d0
+	andi.w	#$1ff,d0
+	cmpi.w	#3,d0
+	bcs.b	.beam
+	cmpi.w	#260,d0
+	bcs.b	.ok
+	cmpi.w	#263,d0
+	bcs.b	.beam
+	cmpi.w	#310,d0
+	bcc.b	.beam
+.ok	move.w	#$0020,$dff09a		; the game's own write
+	rts
+
+SwapOn	move.w	#$8020,$dff09a		; the game's own write
+	move.w	IntEna(pc),d0
+	andi.w	#$4000,d0
+	beq.b	.off
+	move.w	#$c000,$dff09a
+.off	rts
+
+IntEna	dc.w	0
+
 AckLev6	move.w	#1<<13,$dff09c
 	move.w	#1<<13,$dff09c
 	rte
 
 
+; SPS 627, 68020 or better
+PLFAST	PL_START
+	PL_S	$1185c,6		; no field wait before the swap
+	PL_END
+
+; SPS 628, 68020 or better
+PLFAST_US
+	PL_START
+	PL_S	$11b14,6		; no field wait before the swap
+	PL_END
 
 ; SPS 627
 PLGAME	PL_START
@@ -259,6 +321,8 @@ PLGAME	PL_START
 	PL_PA	$10bba,L3Vec
 	PL_PA	$11884,L3Vec
 	PL_PA	$118b4,L3Vec
+	PL_PSS	$12334,SwapOff,2	; the swap's copper list writes
+	PL_PSS	$1238c,SwapOn,2
 	PL_END
 
 
@@ -342,6 +406,8 @@ PLGAME_US
 	PL_PA	$10c9e,L3Vec
 	PL_PA	$11b3c,L3Vec
 	PL_PA	$11b6c,L3Vec
+	PL_PSS	$126d8,SwapOff,2	; the swap's copper list writes
+	PL_PSS	$12730,SwapOn,2
 	PL_END
 
 ; add LMB check to "Fanfare intro"
