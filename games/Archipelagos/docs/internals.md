@@ -87,12 +87,18 @@ then the game runs only the fast one, apart from the replayer.
 |---|---|---|
 | `$0`-`$8D2A` | the replayer, its data and samples, and other data | Paula reads the samples (`$2C12`-`$4929`); the replayer addresses everything pc-relative, so it runs from the chip copy as a whole |
 | `$8F50`-`$8F9C` | sprites | sprite DMA |
-| `$8FFA`-`$9258`, `$9976`-`$99AC` | copper lists | the copper |
+| `$8FFA`-`$99AC` | copper lists: the screen's, and the sky's five (`$906A`, `$9256`, `$9436`, `$95D2`, `$978A`) | the copper |
 | `$B004`-`$B0A4`, `$B2CC`-`$B7EC` (628 `$B010`-`$B0B0`, `$B2DA`-`$B7FA`) | the blitter's shape tables | blitter sources |
 | `$14076`-`$140F8` (628 `$1441A`-`$1449C`) | a buffer | a blitter source |
 
 The blocks come from the trace's DMA records through every screen (`tools/smc.py`'s two
-routes, both versions): every DMA read of the body is in one of them. A pc-relative
+routes, both versions), and from the code's writes of the copper's pointers (`COP1LC`:
+`$8FFA`, `$9976`, the one at `$8FE0`; `COP2LC`: `$906A` and the sky tables). The trace
+missed three of the sky's lists: the level 3 handler takes them only in the 256 fields
+after every 4096th of its field count (offset `$12862`; bits 6-7 pick the list, bit 12
+dusk or dawn), and no route ran that long; before the fix the copper read those three
+from fast memory's addresses and the display broke. Every DMA read of the body is in
+one of the blocks. A pc-relative
 reference across a block's edge would reach the wrong copy; decoding every executed
 instruction, and a linear sweep of the whole body, finds only five, the `lea`s that hand
 the blitter its shape tables and buffer, which the slave patches to the chip copy. The

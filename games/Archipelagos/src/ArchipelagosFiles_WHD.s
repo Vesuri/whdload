@@ -369,13 +369,15 @@ GameBody	dc.l	$2000+$1c	; the body the game runs
 
 ; What stays in chip memory, as body offsets: from offset 0 the replayer,
 ; which addresses its data and samples pc-relative, with the samples and
-; data up to the boot code; the sprites; the copper lists; the blitter's
+; data up to the boot code; the sprites; the copper lists (the sky's five
+; at $906a-$9976, which the level 3 handler takes in turn every 4096 fields,
+; and the screen's); the blitter's
 ; shape tables; a buffer the blitter reads. Every DMA read of the body on
 ; every screen is in one of them. Nothing outside a block refers into it
 ; pc-relative but the five lea of PLFASTMEM, nor the other way round.
-CHIP627	dc.l	$0,$8d2a,$8f50,$8f9c,$8ffa,$9258,$9976,$99ac
+CHIP627	dc.l	$0,$8d2a,$8f50,$8f9c,$8ffa,$99ac
 	dc.l	$b004,$b0a4,$b2cc,$b7ec,$14076,$140f8,-1
-CHIP628	dc.l	$0,$8d2a,$8f50,$8f9c,$8ffa,$9258,$9976,$99ac
+CHIP628	dc.l	$0,$8d2a,$8f50,$8f9c,$8ffa,$99ac
 	dc.l	$b010,$b0b0,$b2da,$b7fa,$1441a,$1449c,-1
 
 ; The blitter's sources, which the game takes pc-relative: the chip copy.
