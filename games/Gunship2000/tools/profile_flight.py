@@ -7,7 +7,7 @@ DUTY ROSTER (the whiteboard), right click on the WOC ERASE-ME record, name "test
 Return (unit patch), unit "test" + Return, click the record, MISSION BRIEFING (the door), click
 the photo, BEGIN MISSION (the map), five clicks on the keypad, the Aux Power Unit tab, its switch.
 When the cockpit appears: `monitor aprof start`, F5 (chase view), 3 s, F6 (tactical view), 3 s.
-The window is profiled as two aprof files of 150 fields each, OUT/f5.prof and OUT/f6.prof (one
+The window is profiled as two aprof files of 150 fields each (SEGMENT), OUT/f5.prof and OUT/f6.prof (one
 unprofiled field between them for a screenshot). Also writes OUT/route/*.png (a screenshot at
 every step), OUT/layout.json (where gs2.run's hunks and the memory lists are) and
 OUT/state.json (game clocks at the window's ends). Summarise with aprof_report.py OUT.
@@ -42,7 +42,7 @@ MAP = (200, 150)
 KEYPAD_5 = (491, 236)
 APU_TAB = (645, 280)
 APU_SWITCH = (645, 298)
-SEGMENT = 150                # fields: 3 s
+SEGMENT = int(os.environ.get('SEGMENT', '150'))   # fields a window: 3 s
 
 
 def mean(a, box):

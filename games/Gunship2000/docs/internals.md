@@ -29,7 +29,7 @@ flight). The CD32 slave loads `lowlevel.library` and `nonvolatile.library` from 
 | | BaseMem (`CHIPMEMSIZE`) | ExpMem (`FASTMEMSIZE`) | Flags | `slv_Version` |
 |---|---|---|---|---|
 | ECS | $100000 | $100000 | `NoError`, `Examine`, `EmulTrap` | 16 |
-| AGA | $100000 | $100000 | `NoError`, `Examine`, `ClearMem`; stack 13000 | 17 (4.0b: `slv_config`, `C2:B:Enhanced framerate`) |
+| AGA | $100000 | $130000 (JOTD's $100000) | `NoError`, `Examine`, `ClearMem`; stack 13000 | 17 (4.0b: `slv_config`, `C2:B:Enhanced framerate`) |
 | CD32 | $1ff000 | 0 | `NoError`, `Examine` | 16 |
 
 The quit key is $5d (numeric `*`); the ReadMe says F10 and gives the older memory figures.
@@ -60,6 +60,7 @@ AGA, `_cb_dosLoadSeg` first clears long 0 (`clr.l 0`) on every `LoadSeg`, then b
 | `gs2.run` (code $19014 at file $30), $12780 | `jsr -270(a6)` (`WaitTOF` before `LoadView`) | two `nop` | |
 | `gs2.run`, $12834 | `lea $dff000,a5` | `jsr set_copperlist` | writes the copper end `$fffffffe` to address 0 (the game's `COPJMP2` to 0), sets `COP1LC` from the game's copper-list variable |
 | `gs2.run`, $13d52 (4.0b) | `movea.l D+$2c3e,sp; lea 2000(sp),sp; move.l sp,D+$2c3e` | `jsr fast_stack` (D+$2c3e += 2000), then a branch to $13d62 | the flight stays on its process stack in ExpMem instead of moving it onto its chip work area ("Memory in flight"); the 2000 bytes are still taken, so the heap is laid out as before |
+| `gs2.run`, $181c2 (4.0b) | `movea.l D+$922a,a0` (the model data, before $18b8c relocates it) | `jsr fast_models` | copies the block (up to D+$9232, at most $21000 bytes) into a fast buffer allocated on the first flight and points D+$922a at it; the transform and object code read it there ("Memory in flight"). Larger or no memory: the chip block |
 | `Gunship 2000` (code $6a4 at file $28), $122 | the `Install Gunship 2000` test | skip to $13e | |
 | `Gunship 2000`, $16c | an `OpenLibrary` and the test after it | skip to $1f4 | |
 
@@ -188,8 +189,15 @@ in fs-uae a CPU long write to chip costs about 0.6 µs, a read about 1 µs.
 The front end hands `gs2.run` its work area (code $18f62: a0 base, d0 size, a1 a table of
 blocks). On the a1200-030 it is in chip RAM: the heap pointer D+$2c3e and end D+$2c42 ran to
 $a2580, about 600 KB, with the three screens in it, and the blocks D+$922a and D+$9232 were
-also in chip (D+$8d6a in fast). Which allocations the blitter or the display needs, and
-which only the CPU touches, is not yet sorted out. ExpMem had 84 KB free.
+also in chip (D+$8d6a in fast). ExpMem had 84 KB free.
+
+D+$922a is the model data: a file of offsets that $18b8c turns into addresses (the
+pointers D+$9222, D+$9226, D+$18e4-$18f0 and code $11928, and the tables in the block),
+read by the transform ($109ba) and the object code ($e3de, $1060e, $112e2, $d5c6, $10754).
+The 4.0b slave moves it into fast memory; the checked views draw the same frames with it
+there, so the blitter does not read it in those. D+$9232 is copied to a screen at code
+$a5a2. The heap ($13084 a block, $130a6 a cleared one; 21 calls) holds the three screens and
+the blitter's images (code $12f34 reads an image's header), and stays in chip.
 
 At $13d48 the flight saves its process stack pointer (D+$2dfc) and moves the stack onto the
 first 2000 bytes of the heap (D+$2c3e moves up by 2000); the exit at $13e6a restores it.

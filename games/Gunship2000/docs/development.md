@@ -84,7 +84,7 @@ Traps:
 | Tool | What |
 |---|---|
 | `gunship2000.py` | `Session`: boots `common/run.sh` as its own instance in warp, deterministic, nothing in port 0; fields, keys, mouse, clicks, screenshots, Barto traces, aprof, memory reads. `MACHINE` = `a1200-030` (default), `a1200-030-mmu` or `a1200-fast`; `SLAVE`, `VARIANT` pass through |
-| `profile_flight.py OUT [REFERENCE]` | the front-end route to the cockpit and the profile: F5 (chase view) and 3 s, F6 (tactical) and 3 s, as `OUT/f5.prof` and `OUT/f6.prof` (150 fields each), with `OUT/route/*.png`, `layout.json` and `state.json`; with REFERENCE (an earlier OUT) it stops unless the cockpit is the reference's |
+| `profile_flight.py OUT [REFERENCE]` | the front-end route to the cockpit and the profile: F5 (chase view) and 3 s, F6 (tactical) and 3 s, as `OUT/f5.prof` and `OUT/f6.prof` (150 fields each, `SEGMENT`), with `OUT/route/*.png`, `layout.json` and `state.json`; with REFERENCE (an earlier OUT) it stops unless the cockpit is the reference's |
 | `aprof_report.py OUT [TOP]` | per window: frames (presents at code $129c4) and fps, CACR, the chip-bus share, the time by kind (frame cap, blitter waits, stack and calls, other, outside) and the top routines |
 | `gs2.py` | finds `gs2.run`'s hunks in memory (by the installed file), the memory lists, the clocks |
 | `coupling.py OUT [REFERENCE...]` | the coupling test: the same flight inputs at the same game time, the player's state sampled at mission seconds 25-90 and interpolated to the second; with REFERENCEs, the quantities outside their envelope. `coupling.py compare OUT REFERENCE...` compares saved runs |
@@ -152,6 +152,9 @@ Traps:
   a1200-fast its HUD (the target lock, the screen in the middle) depends on the drawing
   speed, so leave out the REFERENCE there.
 - The gdb stub takes about 20 software breakpoints at once.
+- One frame in a 150-field window is 0.33 fps: for changes of a few percent use
+  `SEGMENT=600`. A change in the flight's start-up time (a copy, a wait) moves its timing and
+  so the scenes against an older run; compare against a slave with the same delay.
 - The installed aprof writes `AITDPROF 1` for `APROF 1`; `aprof_report.py` reads either.
   Its returns are unpaired, so the report uses flat PC costs.
 - The CPU clock in the profile header is `colorclock × CYCLE_UNIT / cycleunit` (50.4 MHz on

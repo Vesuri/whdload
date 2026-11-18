@@ -4,10 +4,11 @@ Set up 18.11.2026: `src/` is JOTD's v3.1 source with three changes that make vas
 it, equivalent to the shipped slaves apart from the newer KickEmu (`development.md`,
 "Build"). All three variants boot to the duty roster. The AGA flight is profiled
 (`development.md`, "Profiling in flight"); the target is 50 fps in flight on the a1200-030
-(soft). P1-P4 and P5a/P5c of the plan are done (P5b measured, not done): the VERIFY build pins the mission, the release AGA slave
-keeps the flight's stack in fast RAM and turns the instruction cache on, `CUSTOM2=1`
-("Enhanced framerate") lifts the frame cap with the simulation kept at its rate, and the CPU
-fills the polygons (68030 or later) and the one-colour rectangles instead of the blitter.
+(soft). P1-P4, P5a/P5c and P6 of the plan are done (P5b measured, not done): the VERIFY
+build pins the mission, the release AGA slave keeps the flight's stack and its model data in
+fast RAM and turns the instruction cache on, `CUSTOM2=1` ("Enhanced framerate") lifts the
+frame cap with the simulation kept at its rate, and the CPU fills the polygons (68030 or
+later) and the one-colour rectangles instead of the blitter.
 
 ## The AGA flight, 18.11.2026
 
@@ -36,8 +37,8 @@ view, in ms per frame:
   non-cacheable area switches both caches off.
 - **The stack was in chip RAM** (P2 fixes it). gs2.run's code, data and BSS load into ExpMem, but at $13d48
   the flight moves its stack onto its chip work area: stack and call instructions are 9-11% of
-  the 68030's time, nearly all chip bus. The work area (600 KB: screens, buffers) is chip;
-  which parts only the CPU touches is not yet known, and ExpMem has 84 KB free.
+  the 68030's time, nearly all chip bus. The work area (600 KB: screens, buffers) is chip,
+  and ExpMem has 84 KB free (P6 moves the model data).
 - **The 68020/14 is CPU-bound** (52-57 ms of its own code a frame): 50 fps is for the 68030.
 
 P1-P3 measured on the pinned mission (VERIFY builds, every cockpit shot the reference's;
@@ -149,25 +150,52 @@ blits ($12c60, from B+$b8d8), and in the cockpit view the instrument blits (code
 $b138, $b976, $ba16, $ba6a, $c5e8). More than 20 places also switch B+$b8dc or copy between
 the three screens (code $a5e4, $1610c-$17ee6). So: at most about 20% more, at a large risk.
 
+## P6, data out of chip RAM, 18.11.2026
+
+Which chip RAM the flight's own code reads, from aprof's per-instruction chip time without
+the custom registers (`tools/aprof_report.py`'s data, 150 fields of F5): 2.6% of the
+a1200-030's time, 1.0% of it in the transform $109ba and the rest in $e3de, $1060e, $112e2,
+$d5c6 and $10754. Breaking on the hot reads put them all in the block data+$922a: the
+flight's model data (the front end's block, 134960 bytes up to the next, data+$9232), whose offsets
+$18b8c turns into addresses at the flight's start. The slave copies it into fast memory
+just before that (`internals.md`, "Slave patches"). What is left (0.4%) is $12f34, which
+reads a blitter image's header, and stays.
+
+VERIFY builds, the pinned mission, `CUSTOM2=1`, F5/F6, 600 fields a view (`SEGMENT=600`),
+against a slave that makes the same copy but keeps the chip block (the copy takes about two
+fields at the start, which moves the flight's timing):
+
+| | a1200-030 | a1200-fast |
+|---|---:|---:|
+| the copy only | 27.58/24.42 fps | 12.92/11.75 |
+| the model data in fast RAM | 28.08/25.08 (+1.8%/+2.7%) | 13.00/11.92 (+0.6%/+1.4%) |
+
+The chip data time on the a1200-030 went from 2.6% to 0.4%. The frames (`screens.py`) are
+the copy-only slave's: 90 of 90 on the a1200-030, at the cap and with `CUSTOM2=1 CUSTOM3=7`;
+on the a1200-fast 89 of 90, the one the graphics.library write ("Also seen"). Against the
+P5 slave they differ (the rotor's angle, the instruments) because of the moved timing.
+`FASTMEMSIZE` is $130000 (it was $100000; ExpMem had 84 KB free), so ExpMem is 1.69 MB with
+the Kickstart, inside the ReadMe's 2.0 MB OtherMem. If the block is larger than the buffer
+or the allocation fails, the flight keeps the chip block.
+
+The other blocks: data+$9232 (copied to a screen at code $a5a2, not in the profile) and the
+heap (the screens, blitter images) stay in chip.
+
 ## Next
 
-P6-P8 of the plan:
+P7-P8 of the plan:
 
-1. **P6 Data out of chip RAM.** Sort the work area's blocks (D+$922a, D+$9232 and the heap)
-   into what the blitter or display uses and what only the CPU does. Move the CPU-only ones to
-   ExpMem with a larger `FASTMEMSIZE` (and the ReadMe's memory line). The measure is the
-   chip-bus share of "other gs2.run code" (now 3-4% on the a1200-030, so probably little).
-2. **P7 Profile again** with the cockpit view (F1, the panel redraws), on NTSC and on a busy
+1. **P7 Profile again** with the cockpit view (F1, the panel redraws), on NTSC and on a busy
    scene, and profile the remaining CPU work ($109ba transform, $e3de).
-3. **P8 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
+2. **P8 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
    `$VER: Gunship2000<Variant>.slave 4.0b (18.11.2026)`, the info text credits Vesuri, and
    the ReadMe entry above JOTD's says what changed (the WHDLoad 20.1 KickEmu, the faster AGA
    flight, Enhanced framerate). `make dist` packs it; not yet published. Bump the version and
    the entry as improvements land.
-4. **P4 follow-ups.** The coupling test for the AI and weapons (a mission with moving units,
+3. **P4 follow-ups.** The coupling test for the AI and weapons (a mission with moving units,
    targets fired at); the joystick control mode (code $142c ramps the pitch command per step);
    `CUSTOM2` with time acceleration (`]`).
-5. **P5b**, only if the rest is done (above).
+4. **P5b**, only if the rest is done (above).
 
 Not yet checked: long flights, a second flight in one session with `CUSTOM2=1`, and the CPU
 fills in the views other than cockpit, F5 and F6 (the other cameras, the map, night).

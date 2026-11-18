@@ -3,8 +3,8 @@
 MicroProse's Gunship 2000 (1991-1994) under WHDLoad, in its three Amiga releases: the floppy
 ECS version (kick13), the floppy AGA version and the CD32 version (both kick31). `src/` is
 JOTD's v3.1 (28.03.06) source made to assemble with vasm; the AGA flight is profiled, with
-a plan toward 50 fps on the a1200-030; the AGA slave keeps the flight's stack in fast RAM and
-turns the instruction cache on, fills the polygons (68030+) and the one-colour rectangles with
+a plan toward 50 fps on the a1200-030; the AGA slave keeps the flight's stack and model data in
+fast RAM and turns the instruction cache on, fills the polygons (68030+) and the one-colour rectangles with
 the CPU (the same pixels, checked frame by frame), `CUSTOM2=1` lifts the flight's frame cap
 (the simulation kept at its rate, checked by the coupling test), and its VERIFY build pins
 the mission.

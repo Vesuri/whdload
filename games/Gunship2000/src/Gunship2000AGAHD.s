@@ -34,7 +34,7 @@
 ;============================================================================
 
 CHIPMEMSIZE	= $100000
-FASTMEMSIZE	= $100000
+FASTMEMSIZE	= $130000	; JOTD's $100000, and the flight's model data (fast_models)
 NUMDRIVES	= 1
 WPDRIVES	= %1111
 ;DEBUG
@@ -321,6 +321,7 @@ pl_gs2_run
 	PL_PS	$12834,set_copperlist
 	PL_PS	$13d52,fast_stack	; keep the stack in fast memory
 	PL_S	$13d58,$13d62-$13d58
+	PL_PS	$181c2,fast_models	; the model data in fast memory
 	IFD VERIFY
 	PL_PS	$183e8,seed_flight	; move.w VHPOSR,bss+$b8fe: the flight's random seed
 	ENDC
@@ -369,6 +370,44 @@ pl_gs2_spans
 fast_stack
 	add.l	#2000,-($2dfc-$2c3e)(a5)
 	rts
+
+; The flight's model data (the front end's chip block data+$922a, read by the transform and
+; the object code, not the blitter), before $18b8c turns its offsets into addresses: copied
+; up to the next block (data+$9232) into fast memory, allocated on the first flight and kept.
+; A larger block or no memory: the chip block, as before. > A0 = the block, as replaced.
+MODELS_SIZE	= $21000
+
+fast_models
+	movem.l	d0-d2/a1-a2/a6,-(a7)
+	move.l	gs2_data(pc),a2
+	move.l	$9232(a2),d2
+	sub.l	$922a(a2),d2		; to the next block
+	bls.b	.keep
+	cmp.l	#MODELS_SIZE,d2
+	bhi.b	.keep
+	lea	fm_block(pc),a1
+	move.l	(a1),d0
+	bne.b	.have
+	move.l	#MODELS_SIZE,d0
+	move.l	#MEMF_FAST,d1
+	move.l	4.w,a6
+	jsr	(_LVOAllocMem,a6)
+	lea	fm_block(pc),a1
+	move.l	d0,(a1)
+	beq.b	.keep
+.have	move.l	d0,a1
+	move.l	$922a(a2),a0
+	move.l	d0,$922a(a2)
+	addq.l	#3,d2
+	lsr.l	#2,d2
+.copy	move.l	(a0)+,(a1)+
+	subq.l	#1,d2
+	bne.b	.copy
+.keep	move.l	$922a(a2),a0
+	movem.l	(a7)+,d0-d2/a1-a2/a6
+	rts
+
+fm_block	dc.l	0
 
 	IFD VERIFY
 verify_seed
