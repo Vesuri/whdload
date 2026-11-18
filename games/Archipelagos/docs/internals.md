@@ -95,7 +95,19 @@ runs the music. So the clocks are:
 |---|---|
 | fields (the level 3 handler) | the field counter, the sky's colour changes, the `$CF16` countdown, pan turning (the mouse's X counts added to the heading, offset `$12880`, 0-719 half degrees, each field), buttons, music |
 | world tick: every 6 fields, checked once a frame | the world update `$F700`: spawning near the player and other world events. It runs when the countdown is below zero and reloads it with 5 (offset `$129B4`), so it never runs more than once a frame and a late check loses the time it was late |
-| frames | at the start of the renderer (`$11AC6`-`$11AE5`): one step of a spread across connected land (`$C99E`: a queue at offset `$13426`, head and tail at offsets `$129EA`/`$129E8`, one cell a frame; what it shows in play is still to be identified), the terrain animation phase (offset `$12DAC`, every 10 frames), two object animation timers (offsets `$12DB8`, `$12DC8`, 2 a frame). Moves: 9 frames each, whatever they take. Two effects: six frames (`$CD1C`, counting at offset `$12B96`), run when the count at offset `$129DC` drops; two ramps of 32 frames (`$C5D0`, offsets `$CF1C` and `$CF1E`), run from the input dispatch (`$1196C`) |
+| frames | at the start of the renderer (`$11AC6`-`$11AE5`): one step of the blood spread (`$C99E`, below), the terrain animation phase (offset `$12DAC`, every 10 frames), two object animation timers (offsets `$12DB8`, `$12DC8`, 2 a frame). Moves: 9 frames each, whatever they take. Two effects: a stone's collapse, six frames (`$CD1C`, counting at offset `$12B96`), when a stone joined to the Obelisk is clicked (`$CBEC` checks the land path; the count of stones left, offset `$129DC`, drops); the Obelisk's destruction, two ramps of 32 frames (`$C5D0`, offsets `$CF1C` and `$CF1E`), when it is clicked with no stones left (`$1196C`) |
+
+The blood spread is the manual's first kind of blood egg (archipelago 20 on), whose blood
+spreads "until it has covered the whole of an island". A world tick counts each egg's
+ticks (`$F950`, offset `$12B5A`) and at 50 puts its cell (offset `$129D6`) at the head of
+a queue (`$FED6`; the queue at offset `$13426`, head and tail at offsets `$129EA` and
+`$129E8`). Each step takes one cell off the queue, infects it (clears bit 2 of the terrain:
+land 6 to 2, sand 7 to 3) and queues its unvisited land and sand neighbours (bit 3 marks
+them). The second kind, which eats the island away, is the same with a second queue
+(`$CAA4`, which turns cells into sea, type 4; the queue at offset `$13826`, head and tail at
+offsets `$129EE` and `$129EC`; seeded by `$FEF0`). Nothing in the program refers to `$CAA4`
+or `$FEF0` (no absolute, pc-relative or branch reference), so that egg never hatches in
+this version.
 
 The game's own speed therefore depends on the CPU. The world tick lags below 8.33 fps
 and loses the time a late check was late, but never runs faster than every 6 fields.
@@ -127,7 +139,10 @@ fields (the game clears the counter when an archipelago starts).
   the fields into the move / 6. It takes 48 fields plus the frame on the cell, drawn in as
   many frames as fit. At 6 fields a frame its positions are the original's.
 - Each step of the two effects (`$CD4E`, `$C5F2`, `$C60E`) draws frames until it has had 6
-  fields, the swap measuring each frame.
+  fields, the swap measuring each frame and the rest carried to the effect's next step. An
+  effect's first frame (6 fields or more after an effect's last) carries nothing from an
+  earlier effect. Its first step also counts the fields since the last frame shown before
+  it, as every frame's length does.
 
 Checked with `tools/timecheck.py` (300 fields from the first interactive field, a move to
 the cell ahead), the original slave against this one:
@@ -140,7 +155,33 @@ the cell ahead), the original slave against this one:
 | a1200-030, `CACHE` | decoupled | 13.33 | 46 fields, 17 frames | 8.33 |
 
 On the a500 and the US a1200 every field's state (position, buffer, phase, timer, world
-tick) is the original's. The two effects have no route yet: play-test them.
+tick) is the original's.
+
+The effects, with `tools/timecheck.py OUT effects` (archipelago 1 played to its end by
+`tools/play.py`: both stones collapsed, then the Obelisk destroyed):
+
+| Machine (emulated) | | a stone's collapse (6 steps) | the Obelisk's ramps (64 steps) |
+|---|---|---|---|
+| a500 | original, decoupled | 48 fields, 6 frames | 512 fields, 64 frames |
+| a1200, US version (60 Hz) | original, decoupled | 48 fields, 6 frames | 512 fields, 64 frames |
+| a1200-030, `CACHE` | original | 17 and 12 fields, 6 frames | 129 fields, 64 frames |
+| a1200-030, `CACHE` | decoupled | 32 fields, 16 frames | 384 fields, 183 frames |
+| a1200-030, `CACHE`, US version | decoupled | 33 fields, 11 frames | 384 fields, 128 frames |
+
+On the a500 the whole run (2550 fields) is the original's field by field. On the US a1200
+it is the original's frame by frame up to frame 62, where one frame ends a field later
+(fields 62-72, against 62-71). The route's input is timed in fields, so the two runs then
+take different paths, with the same effect lengths.
+
+Nothing else follows the frame rate. The input dispatch after the swap (`$11866`-`$11AC2`)
+acts once on each button or key flag the level 3 handler sets and keeps no counter of its
+own. Program-image dumps after every field (150 fields of
+crosshair moves in cursor mode, then 150 of panning, archipelago 1), counting each word's
+changes, find no word that changes more often than every 6 fields on the cached 030 and
+more often than on the a500, apart from the presentation: the copper list's bitplane
+pointers, the swap's pointer table (offset `$1239A`), the back-buffer pointer and the span
+list. With the original slave the same scan also finds the renderer's three counters
+(offsets `$12DAC`, `$12DB8`, `$12DC8`, at the frame rate).
 
 ## Rendering cost
 

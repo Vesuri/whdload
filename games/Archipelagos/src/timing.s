@@ -30,7 +30,7 @@
 ;   as many frames as fit.  At STEP_FIELDS fields a frame the positions are the original's.
 ;   The frame on the cell is the original's.
 ; - t_pace and t_pacedraw, in place of an effect's frame: frames until the effect's step
-;   has had STEP_FIELDS fields (t_paceacc, carrying the rest).
+;   has had STEP_FIELDS fields (t_paceacc, carrying the rest to the effect's next step).
 ;
 ; State is kept here, not in registers: the game's render and swap keep none.
 
@@ -68,6 +68,7 @@ GT628	dc.l	BODY+$12c06,BODY+$12c0e,BODY+$c9ca,BODY+$13150,BODY+$1315c
 t_table		dc.l	0		; GT627 or GT628
 t_last		dc.l	$80000000	; the field counter at the last swap (the first
 t_lastdraw	dc.l	$80000000	; ... at the last render  interval reads as long)
+t_lastpace	dc.l	$80000000	; ... at an effect's last frame
 t_frame		dc.w	0		; the last frame's fields
 t_swapped	dc.w	0		; set (byte) by a swap, cleared by a render
 t_stepacc	dc.w	0		; fields towards the renderer's next steps
@@ -226,19 +227,26 @@ t_pacedraw
 	bcs.b	t_pacedraw
 	rts
 
-; Carry set while the effect's step has had fewer than STEP_FIELDS fields.
-t_paced	movem.l	d0/a0,-(a7)
+; Carry set while the effect's step has had fewer than STEP_FIELDS fields.  An effect's
+; frames follow each other: a first frame (STEP_FIELDS or more since the last) starts with
+; no fields carried from an earlier effect.
+t_paced	movem.l	d0-d1/a0-a1,-(a7)
+	lea	t_lastpace(pc),a0
+	bsr.w	t_since
 	lea	t_paceacc(pc),a0
-	move.w	t_frame(pc),d0
+	cmp.w	#STEP_FIELDS,d0
+	bcs.b	.carry
+	clr.w	(a0)
+.carry	move.w	t_frame(pc),d0
 	add.w	(a0),d0
 	subq.w	#STEP_FIELDS,d0
 	bcs.b	.short
 	move.w	d0,(a0)			; carry clear
-	movem.l	(a7)+,d0/a0
+	movem.l	(a7)+,d0-d1/a0-a1
 	rts
 
 .short	addq.w	#STEP_FIELDS,d0
 	move.w	d0,(a0)
-	movem.l	(a7)+,d0/a0
+	movem.l	(a7)+,d0-d1/a0-a1
 	ori.b	#1,ccr
 	rts

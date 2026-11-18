@@ -11,8 +11,8 @@ frame loop, the game's clocks and the rendering cost are measured
 2.0b (18.11.2026): StingRay's v1.2 code, which the whdload.de install package lacked, with
 `$VER` and the info text in the slave and the ReadMe entry above StingRay's, and game time
 decoupled from the frame rate. Still to do: play-test both versions on every machine in
-`SETUPS`, including saving and loading a game, destroying stones and finishing an
-archipelago (the two decoupled effects have no route yet).
+`SETUPS`, including saving and loading a game and an archipelago with blood eggs (20 or
+later). `tools/play.py` plays archipelago 1 to its end.
 
 ## 50 fps on the a1200-030
 
@@ -46,17 +46,11 @@ nor change behaviour.
 1. **Decouple game time.** Done (`src/timing.s`; [internals.md](internals.md#decoupled-srctimings-20b)).
    Decided 18.11.2026: every frame-counted step takes at least 6 fields (the game's world
    tick, 8.33 Hz), so today's a1200-030 pace holds on faster machines. The world tick stays
-   as the game has it unless the a500 gets faster too. Checked with `tools/timecheck.py`:
-   on the a500 and the US a1200 every field's state is the original's; on the cached 030 a
-   move takes 46 fields in 17 frames instead of 25 in 9, and the renderer's steps run at
-   8.33 a second instead of 12.83. Left:
-   - play-test the two effects (a stone's, `$CD1C`; the ramps, `$C5D0`) and give them a
-     route;
-   - identify what the spread is in play, and the second queue `$CAA4`, which no direct
-     call reaches;
-   - the audit covered every call of the renderer, its drawing and the swap. Other
-     per-frame counters in the input dispatch (`$118AC`-`$11AC2`) would still follow the
-     frame rate.
+   as the game has it unless the a500 gets faster too. Checked with `tools/timecheck.py`
+   on the a500, the US a1200 and the cached 030: moves, the renderer's steps and both
+   effects (a stone's collapse, the Obelisk's ramps), and an image scan finds nothing
+   else at the frame rate. Not checked in play: the blood spread (`$C99E`), which needs
+   archipelago 20 or later; it runs in the renderer's steps, which are checked.
 2. **Instruction cache.** First fix the one piece of self-modifying code: point the four
    writes of the level 3 handler's `jsr` target (`$E490`, `$10BB4`, `$1187E`, `$118B0`) at
    a slave variable, and make the `jsr` (`$CE92`) jump through it. Then call
