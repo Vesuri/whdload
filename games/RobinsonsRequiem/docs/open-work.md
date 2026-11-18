@@ -23,7 +23,11 @@ between passes there now) and 400 MHz from 480 to 485; its spans (20 ms, the ins
 cache's too) were examined and not changed (their calls batched out of the loop measured
 slower, 137 frames); on the 68040 and 68060 the slave uses Kalms' 040/060 conversion
 (about 0.9 ms a frame less as the emulator times those CPUs, by instruction count; no real
-040 or 060 measured). The AGA plan is done; its checks in play are left (below). The ECS
+040 or 060 measured). Step 16 keeps START's fast pool when it is above 16 MB: with only
+Zorro III or CPU-board fast memory START gave it up and the game ran from chip memory, 5.3
+fps on the cycle-exact 040 at 40 MHz against 15.3 with Zorro II (a real A1200 with a
+040/40 and 32 MB: about 4 fps reported); with the fix 15.3, as Zorro II (the ECS game the
+same, its step 12: 12.0 → 19.2 fps). The AGA plan is done; its checks in play are left (below). The ECS
 plan for the A500 is done: steps 1 and 2 (the conversion and the
 sky, `docs/internals.md`, "ECS improvements") took the walk from 15 to 17 frames, the mean
 frame interval from 649.5 to 578.2 ms; steps 3 and 4 were examined and not done, the
@@ -76,7 +80,7 @@ Next, in order:
    does not start). In the jungle, a 4,900-field walk with `MAPCHECK` found every copy
    equal (240 drawings, 4,419 object images given) and filled step 13's cache to 63,919
    of its 65,536 bytes (37 images) before emptying it once. The 040/060 conversion on a
-   real 040 or 060.
+   real 040 or 060, and the frame rate there with fast memory above 16 MB (step 16).
 2. The ECS plan's checks in play (`docs/performance.md`, "Plan", "ECS on a fast CPU"),
    as in the AGA game: steps 9 and 10's staged creatures, the scripts' drawing with the
    swap, the pointer's picking between world passes, and the image cache in other areas.

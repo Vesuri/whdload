@@ -944,10 +944,31 @@ _mempatch
         move.l  _attnflags(pc),d0
         and.w   #AFF_68020,d0
         beq     .no
+        bsr     _poolhigh
         bsr     _fastblocks
         bsr     _mappatch
         bsr     _skycopy
         bsr     _objpatch
+.no     rts
+
+; START gives its fast pool up when AllocMem returns it above $ffffff (hunk 0 +$3de:
+; cmp.l #$ffffff,d0 / bhi.w +$406), so with only Zorro III or CPU-board memory (most
+; 68040 and 68060 machines) the game ran from chip memory. Its 24-bit pointers (andi.l
+; #$ffffff) are the resource heap's, which is in the chip pool: the bhi.w becomes two nops.
+; POOL24 (a test define): START's check kept.
+_poolhigh
+        move.l  _hunk0(pc),a1
+        cmp.l   #$b0bc00ff,$3de(a1)     ; cmp.l #$ffffff,d0
+        bne     .no
+        cmp.l   #$ffff6200,$3e2(a1)     ; bhi.w +$406
+        bne     .no
+        cmp.w   #$0020,$3e6(a1)
+        bne     .no
+        IFND POOL24
+        move.l  #$4e714e71,$3e4(a1)
+        move.l  _resload(pc),a2
+        jsr     resload_FlushCache(a2)
+        ENDC
 .no     rts
 
         INCLUDE obj020.s

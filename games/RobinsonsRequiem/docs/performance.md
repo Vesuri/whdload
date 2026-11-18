@@ -674,6 +674,19 @@ decides only how close a real 68030 to 68060 gets.
        150 on the 040; on the presets' MMU cores (`a1200-040`, `a1200-060`) 164 both ways,
        the screenshots identical. Kalms gives his routine as running at copy speed on a
        040/40 and a 060.
+16. **Fast memory above 16 MB** (done, `docs/internals.md`, AGA item 1 and "24-bit
+    pointers"). START gives its fast pool up when `AllocMem` returns it above `$ffffff`,
+    so with only Zorro III or CPU-board fast memory (most 68040 and 68060 machines; the
+    presets have 8 MB of Zorro II) what the pool holds went to chip: MAIN's object table,
+    the objects' frames and the 3D view's buffers (AGA item 3; the sky's and the images'
+    copies come from the fast memory list and stayed in fast memory). A report from a real A1200 with a 68040 at 40 MHz and 32 MB of 32-bit fast memory: about
+    4 fps. Measured on the cycle-exact 040 at 40 MHz (aprof, `OPEN=human`, 300 fields,
+    `--fast_memory=0 --zorro_iii_memory=32768`): 32 frames (5.3 fps), 73% of the window in
+    chip accesses, against 92 (15.3 fps) and 14% with the 8 MB of Zorro II. With the
+    check removed: 92 frames, 1,079,578 chip accesses against Zorro II's 1,079,572, the
+    start and end screenshots identical to Zorro II's. On the `a1200-040` preset's MMU core,
+    3,000 fields walking: 126 frames in both layouts, the end screenshots identical, no
+    faults.
 
 Not planned: running the scripts more often in smaller steps. The engine has no step
 length: each object runs every period and its script moves it by its own constants (the
@@ -1011,6 +1024,15 @@ is, each step below chosen at install, and the game has to keep working correctl
       The reload of `-604(a1)` (`+$c1b4`) can be rewritten in place (about 1.4 ms, 0.25% of
       a frame), less than the walk's frame intervals resolve. Step 4 found no change worth
       making.
+12. **Fast memory above 16 MB** (done, `docs/internals.md`, "ECS improvements", item 3,
+    `_poolhigh`), as AGA step 16, on the 68020 and up: the ECS START has the same check.
+    Measured on the cycle-exact 040 at 40 MHz (`SETUP=a1200-040`, aprof, `OPEN=human`,
+    which the ECS game opens as `human.CO`, 300 fields): 72 frames (12.0 fps), 71% of the
+    window in chip accesses, with only Zorro III memory, against 115 (19.2 fps) and 9% with
+    the 8 MB of Zorro II. With the check removed: 115 frames, 770,889 chip accesses against
+    Zorro II's 770,894, the start and end screenshots identical to Zorro II's. The
+    `a3000-50` cannot run it: with `--fast_memory=0 --zorro_iii_memory=32768` WHDLoad stops
+    with "Can't allocate ExpMem.".
 
 ## Reproducing
 
@@ -1037,6 +1059,19 @@ BUILD=profile SETUP=a1200-060 OPEN=human python3 tools/rr_prof.py tmp/prof/aga-0
 BUILD=profile SETUP=a1200-060 OPEN=human APROF=1 FSUAE=$FSUAE_APROF \
     EXTRA_ARGS='--uae_mmu_model=0 --uae_cpu_cycle_exact=true --uae_cpu_memory_cycle_exact=true --uae_blitter_cycle_exact=true' \
     python3 tools/rr_prof.py tmp/prof/aga-060-aprof
+# fast memory above 16 MB (step 16): the cycle-exact 040 at 40 MHz with only Zorro III
+# memory; SLAVE=<a slave assembled with -DPOOL24> for START's check; without
+# --zorro_iii_memory for Zorro II
+BUILD=profile SETUP=a1200-040 OPEN=human FIELDS=300 APROF=1 FSUAE=$FSUAE_APROF \
+    EXTRA_ARGS='--uae_mmu_model=0 --uae_cpu_cycle_exact=true --uae_cpu_memory_cycle_exact=true --uae_blitter_cycle_exact=true --uae_cpu_frequency=40000000 --fast_memory=0 --zorro_iii_memory=32768' \
+    python3 tools/rr_prof.py tmp/prof/aga040-z3
+# the same for the ECS game (ECS step 12)
+VARIANT=RobinsonsRequiem BUILD=profile SETUP=a1200-040 OPEN=human FIELDS=300 APROF=1 FSUAE=$FSUAE_APROF \
+    EXTRA_ARGS='--uae_mmu_model=0 --uae_cpu_cycle_exact=true --uae_cpu_memory_cycle_exact=true --uae_blitter_cycle_exact=true --uae_cpu_frequency=40000000 --fast_memory=0 --zorro_iii_memory=32768' \
+    python3 tools/rr_prof.py tmp/prof/ecs040-z3
+# the values START's 24-bit masks receive (docs/internals.md, "24-bit pointers")
+SETUP=a1200-040 BUILD=profile OPEN=human EXTRA_ARGS='--fast_memory=0 --zorro_iii_memory=32768' \
+    python3 tools/rr_masks.py tmp/prof/masks
 # ECS on the AGA's CPU ("ECS on a fast CPU")
 VARIANT=RobinsonsRequiem SETUP=a3000-50 BUILD=profile APROF=1 FSUAE=$FSUAE_APROF \
     EXTRA_ARGS=--uae_mmu_model=0 python3 tools/rr_prof.py tmp/prof/ecs-a3000

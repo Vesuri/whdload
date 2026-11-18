@@ -1027,6 +1027,11 @@ _c2p    dc.l    0
 ; everything comes from the chip pool. With the 1 MB ExpMem, branch over that store: MAIN's
 ; object table and the objects' variables then live in fast memory (hunk 1 +$8c7c,
 ; docs/internals.md). Not with MemConfig=1's 256 KB.
+; START also gives the pool up when AllocMem returns it above $ffffff (hunk 0 +$222:
+; cmp.l #$ffffff,d0 / bhi.w +$24a), so with only Zorro III or CPU-board memory (most
+; 68040 and 68060 machines) the game ran from chip memory. Its 24-bit pointers (andi.l
+; #$ffffff) are the resource heap's, which is in the chip pool: the bhi.w becomes two nops.
+; POOL24 (a test define): START's check kept.
 
 _fastpool
         move.l  _expmemsize(pc),d0
@@ -1039,7 +1044,16 @@ _fastpool
         cmp.w   #$0000,$19a(a0)
         bne     .no
         move.w  #$6008,$196(a0)         ; bra.s to +$1a0
-        move.l  _resload(pc),a2
+        cmp.l   #$b0bc00ff,$222(a0)     ; cmp.l #$ffffff,d0
+        bne     .flush
+        cmp.l   #$ffff6200,$226(a0)     ; bhi.w +$24a
+        bne     .flush
+        cmp.w   #$0020,$22a(a0)
+        bne     .flush
+        IFND POOL24
+        move.l  #$4e714e71,$228(a0)
+        ENDC
+.flush  move.l  _resload(pc),a2
         jsr     resload_FlushCache(a2)
 .no     rts
 

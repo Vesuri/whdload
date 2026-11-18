@@ -84,7 +84,13 @@ work either way, and items 21 and 22 are always made. `_hunks` finds START's hun
 
 1. **START's fast pool kept** (`_fastpool`): with the 1 MB ExpMem (not with `MemConfig=1`),
    hunk 0 `+$196` [`$1c2`], `move.l #0,<hunk 1 +$f4>` (`23fc 0000 0000`, checked first),
-   becomes `bra.s +$1a0` (`6008`), so the pool START sized is kept ("Memory" below).
+   becomes `bra.s +$1a0` (`6008`), so the pool START sized is kept ("Memory" below). START
+   also gives the pool up when `AllocMem` returns it above `$ffffff` (hunk 0 `+$222`
+   [`$24e`], `cmp.l #$ffffff,d0` / `bhi.w +$24a`, `b0bc 00ff ffff 6200 0020`, checked
+   first): with fast memory only above 16 MB (Zorro III, most 68040 and 68060 boards) the
+   game ran from chip memory. The `bhi.w` at `+$228` [`$254`] becomes two `nop`s
+   (`4e71 4e71`); its 24-bit pointers are the resource heap's ("24-bit pointers" below).
+   The test define `POOL24` keeps the check.
 2. **Caches on**: `CACHECHIPDATA` instead of `CACHE`. Without WHDLoad's MMU, `CACHE` left
    both caches off on the 68030 (CACR `$2000`); `CACHECHIPDATA` turns them on with BaseMem
    write-through. The game's one blitter use (hunk 2 `+$5b6`) copies the shown planes into
@@ -608,7 +614,12 @@ either way.
      the screens (hunk 2), and the CPU writes the screens without reading them back: the
      conversion, and the pointer's background (hunk 2 `+$2aa`).
    - **On the 68020 and up** (`_mempatch`, WHDLoad's `AttnFlags`), the AGA slave's items
-     3, 9 and 10 at the ECS sites ("The AGA's sites in the ECS game"), all checked first:
+     1 (the 16 MB check), 3, 9 and 10 at the ECS sites ("The AGA's sites in the ECS game"),
+     all checked first:
+     - `_poolhigh`: START gives its pool up when `AllocMem` returns it above `$ffffff`
+       (hunk 0 `+$3de` [`$40e`], `cmp.l #$ffffff,d0` / `bhi.w +$406`), as the AGA START
+       does; the `bhi.w` at `+$3e4` [`$414`] becomes two `nop`s. The test define `POOL24`
+       keeps the check. On the 68000 there is no memory above 16 MB.
      - `_fastblocks`: the block allocator's calls for the chunky buffer (hunk 1 `+$891c`
        [`$c214`]), the renderer's tables (`+$8938`) and the row table (`+$8978`), each
        `jsr <hunk 0 +$2be8>`, become `jsr _fastalloc`. It takes them from the top of the
@@ -791,7 +802,7 @@ improvements":
 
 | Item | Sites, AGA → ECS | ECS differences |
 |---|---|---|
-| 1 | hunk 0 `+$196` → none | START keeps its fast pool (hunk 0 `+$3be`-`+$406` allocates the pool it sized; nothing discards it) |
+| 1 | hunk 0 `+$196` → none, `+$228` → `+$3e4` | START keeps its fast pool (hunk 0 `+$3be`-`+$406` allocates the pool it sized; nothing discards it), unless it is above 16 MB |
 | 3 | hunk 0 `+$36ee` → `+$2be8`, the free `+$3748` → `+$2c42`; hunk 1 `+$a2b2`, `+$a2ce`, `+$a30e` → `+$891c`, `+$8938`, `+$8978` | the free tests for a null handle first: `48e7 8080 4a80` for `48e7 8080 2040` |
 | 4 | hunk 2 `+$2e84` → none | the ECS game's own 4-plane conversion ("ECS improvements" 1) |
 | 5 | hunk 1 `+$e262` → `+$c8b8` | ("ECS improvements" 2's site) |
@@ -826,7 +837,8 @@ the frame routine's other entries and variables): those are found with each step
 START divides memory itself (hunk 0 `+$162`-`+$290`); the hunk 1 variables:
 
 - **Fast pool** `+$f0`-`+$f8`: `AvailMem(MEMF_FAST|MEMF_LARGEST)` - 50,000, none under
-  100,000. v1.2 discarded it (`+$f4` := 0 at hunk 0 `+$196`); kept, it holds MAIN's object
+  100,000, and none when `AllocMem` returns it above `$ffffff` (hunk 0 `+$222`). v1.2
+  discarded it (`+$f4` := 0 at hunk 0 `+$196`); kept, it holds MAIN's object
   table and the objects' variable frames (hunk 1 `+$8c7c`: `+$ed6c`-`+$ed82`, 87 KB in the
   jungle), from `+$fc`. `+$100` is set to the pool's end and not used.
 - **Chip pool** `+$e4`-`+$ec`: `AvailMem(MEMF_CHIP|MEMF_LARGEST)` - 14,000 (the game ends
@@ -844,6 +856,33 @@ In the jungle the block allocator holds, from the top: 256 KB and 4 KB for MAIN'
 (hunk 1 `+$3480`; the 3D objects' graphics are in the first), the 3D view's chunky buffer
 ((width + 1) × (height + 1) + 320 bytes, hunk 1 `+$a2b2`), the renderer's tables (34,592
 bytes, `+$a2c8`) and a 2 KB table (`+$a30e`).
+
+### 24-bit pointers
+
+START keeps a flag in the top byte of some pointers and masks it off before using them
+(`andi.l #$ffffff`), the 68000's habit. AGA sites: hunk 1 `+$42e8`, `+$8d72`, `+$8f06`,
+`+$93be`, `+$93da`, `+$a7e0`, `+$b04e`, `+$b072`, `+$ea42` and hunk 2 `+$2100`; ECS:
+hunk 1 `+$29ac`, `+$7352`, `+$74e6`, `+$799e`, `+$79ba`, `+$8e4a`, `+$96b8`, `+$96dc`,
+`+$d098` and hunk 2 `+$147a`. The flags read (AGA offsets):
+
+- The 3D elements (`+$ed86`'s table) keep an image pointer at `+18` and another at `+8`.
+  Hunk 1 `+$3f74` stores the `+18` pointer and `+$3f78` puts `<+$edd2>` in its top byte;
+  `+$42fe` tests that byte and mirrors the image (the hotspot `4(a0)` subtracted, not
+  added). `+$a856` XORs it with the view's flag into `<+$ee34>`, which `+$4dc2`, `+$4e30`,
+  `+$4f16` and `+$a784` write into the top byte at `+8`.
+- The resource heap's compaction (`+$93ba`-`+$93f0`) moves both pointers down by the
+  freed block's size and writes back only their low 24 bits, keeping the flags.
+- Hunk 3 `+$140` holds a pointer whose top byte is copied to `<+$ed3e>` (`+$8d78`,
+  `+$8f0c`); with bit 7 set the pointer is backed up by 22 bytes (`+$8d86`) or 6
+  (`+$8f1a`).
+
+In play they point into the resource heap and other chip memory, never into the fast pool,
+so START's 16 MB check on the fast pool (AGA item 1) guards nothing that play reaches.
+`tools/rr_masks.py` on `SETUP=a1200-040` with only Zorro III memory (the slaves' check
+removed, the pool there: 634 KB AGA, 745 KB ECS), `OPEN=human`, 300 fields of keypad 9 and
+900 of keypad 8 (ending against a slope): the same 7 of the 10 sites in each game, 6,567 values (AGA)
+and 12,412 (ECS), high bytes `$00`, `$01` and `$a1`, low 24 bits all under `$120000`, chip
+memory.
 
 ## Memory (ECS)
 
