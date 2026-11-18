@@ -39,9 +39,13 @@ MOUSE=((0x2651a,'mouse_room',0x4eb9),(0x26480,'mouse_exit',0x4eb9),(0x33f88,'mou
        (0x180ce,'mouse_esc',0x4eb9),(0x1814c,'mouse_esc',0x4eb9))
 # Installed on every path: bit-exact E1 shortcuts, the waypoint marker order and the mouse.
 ALWAYS=EXACT+('waypoint_early','waypoint_scene')+tuple(label for _,label,_ in MOUSE)
-# Game-bug word fixes, public builds, every mode: (offset, guarded bytes, word).
+# Game-bug fixes, public builds, every mode: (offset, guarded bytes, new
+# bytes), each written whole or, if its guard does not match, not at all.
 # TrainSim keys 1-4: the fly-off animation gets the stored choice (a2), not d4.
-WORDS=((0x179e2,'3f04486c3d60','3f12'),)
+# Glyph rows: the $0D (%1101) case of the nibble dispatch O:3065c drew $0C's
+# pixels, losing x3; it now draws x1 and branches to the $09 case (x0, x3).
+WORDS=((0x179e2,'3f04486c3d60','3f12'),
+       (0x30804,'10c410c4548851cdfe50','1144000160da'))
 # Rotated bitmaps (src/rotation.s with ROT_OCS), public builds, enhanced only:
 # the renderer O:2d0de's table starts centred on the hotspot. The sites match
 # CD32's (variants/cd32.py BUFFERED_HOOKS) instruction for instruction.
@@ -483,12 +487,22 @@ exact_hooks_done:
  bsr.w slave+$ee8
  bra.w install_done
 '''
-        # Each word fix checks its own six bytes and is skipped alone on a mismatch.
+        # Each fix checks its own guard bytes and is skipped alone on a mismatch.
         words='\nword_fixes:\n'
         for off,guard,value in WORDS:
-            words+=(f' movea.l d6,a5\n adda.l #${off:x},a5\n cmpi.l #${guard[:8]},(a5)\n'
-                    f' bne.s .skip{off:x}\n cmpi.w #${guard[8:]},4(a5)\n bne.s .skip{off:x}\n'
-                    f' move.w #${value},(a5)\n.skip{off:x}:\n')
+            assert len(guard)%4==0 and len(value)%4==0 and len(value)<=len(guard)
+            words+=f' movea.l d6,a5\n adda.l #${off:x},a5\n'
+            k=0
+            while k<len(guard):
+                n=8 if len(guard)-k>=8 else 4
+                words+=f' cmpi.{"l" if n==8 else "w"} #${guard[k:k+n]},{k//2}(a5)\n bne.s .skip{off:x}\n'
+                k+=n
+            k=0
+            while k<len(value):
+                n=8 if len(value)-k>=8 else 4
+                words+=f' move.{"l" if n==8 else "w"} #${value[k:k+n]},{k//2}(a5)\n'
+                k+=n
+            words+=f'.skip{off:x}:\n'
         # The mouse option: off puts back the bytes of every mouse hook site,
         # which both install paths have written by now (the guards checked
         # them), so the game reads only its stick and keys, as Psygore's.

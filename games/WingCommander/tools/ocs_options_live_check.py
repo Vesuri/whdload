@@ -38,9 +38,9 @@ def check(build, run, corrupt=False):
         expected[off:off+6]=op.to_bytes(2,'big')+(r['slave']+b['symbols'][label]).to_bytes(4,'big')
     # Game-bug word fixes are also installed in every mode.
     for off,_,value in b.get('word_fixes',[]):
-        expected[off:off+2]=bytes.fromhex(value)
+        expected[off:off+len(value)//2]=bytes.fromhex(value)
     windows=[(off,6) for off,_,_ in b['hooks']]
-    windows += [(off,2) for off,_,_ in b.get('word_fixes',[])]
+    windows += [(off,len(value)//2) for off,_,value in b.get('word_fixes',[])]
     windows += [(off,2) for off in (*NOPS,*PREDICTION_NOPS)]
     windows += [(off,width) for off,width,_,_ in MODALS]
     checks=0

@@ -144,6 +144,8 @@
    next reload (thanks hexaae!).
  - Choosing a Training Simulator opponent with keys 1-4 shows the right ship
    (thanks hexaae!).
+ - Text is drawn as the font has it: the game left out one pixel of some
+   letters, such as "0", M, N and W (thanks hexaae!).
  - CD32 edition: one mouse click chooses a Training Simulator opponent; the
    game often lost the click before.
  - CD32 edition: Training Simulator high scores are kept with each saved pilot

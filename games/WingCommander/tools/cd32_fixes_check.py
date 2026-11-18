@@ -23,6 +23,7 @@ import argparse, ctypes as C, hashlib, json, re, struct
 from pathlib import Path
 from c2p_check import u, ck, P, I, Q, Z
 from runtime_buffers import load as load_slave
+import glyph_rows
 from mouse_model import BUTTON_SEQUENCE, BUTTON_KEYS, buttons_expected, APERTURE, POINTER, KEY, Pointer, cockpit, FIRE_SEQUENCE, fire_poll, fire_expected, fire_native_holds
 
 u.uc_emu_stop.argtypes = [P]; u.uc_emu_stop.restype = I
@@ -33,7 +34,7 @@ GAMES = {
                     sha='093505483aed4c9dbd1b97484c3336e92fdb156be9c15a67ed0199bd4dade657',
                     psygore=0x15e6, fix='fix_patch_en', save=0x275de, a4=0x7ffe,
                     app=-1332, prefix=-1328, name=-1296,
-                    sites=dict(store=0x31498, list=0x314b0, branch=0x276b0), trainsim=0x1827e, flyoff=0x17d06,
+                    sites=dict(store=0x31498, list=0x314b0, branch=0x276b0), trainsim=0x1827e, flyoff=0x17d06, glyph=(0x2fdd6, 0x2ff7e),
                     peek=dict(site=0x181e0, read=0x33dfc, record=-504),
                     scores=dict(site=0x268be, restore=0x26874, table=17664, stubs=(0x6, 0x2543c)),
                     mouse=dict(room=0x273fc, exit=0x27362, pad=0x33e78, guard=0x33de6, reset=0x33ddc, entry=0x2737c, move=0x27418,
@@ -47,7 +48,7 @@ GAMES = {
                    sha='2047da69f2c83803675921afd86204747609a5c59dd3e7f67d954d785677dabe',
                    psygore=0x1cf4, fix='fix_patch_de', save=0x277a0, a4=0x7ffe,
                    app=-1288, prefix=-1284, name=-1252,
-                   sites=dict(store=0x3165a, list=0x31672, branch=0x27872), trainsim=0x18338, flyoff=0x17db6,
+                   sites=dict(store=0x3165a, list=0x31672, branch=0x27872), trainsim=0x18338, flyoff=0x17db6, glyph=(0x2ff98, 0x30140),
                    peek=dict(site=0x1829a, read=0x33fbe, record=-460),
                    scores=dict(site=0x26a6a, restore=0x26a20, table=17714, stubs=(0x6, 0x255bc)),
                    mouse=dict(room=0x275be, exit=0x27524, pad=0x3403a, guard=0x33fa8, reset=0x33f9e, entry=0x2753e, move=0x275da,
@@ -1055,7 +1056,8 @@ def main():
         apply(blob, sy[cfg['fix']], fixed, fixlog)
         mc = cfg['mouse']
         sc = cfg['scores']
-        assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']), (3, cfg['peek']['site']), (3, sc['site'])], fixlog
+        gd, gc = cfg['glyph']
+        assert fixlog == [(3, s['store']), (2, s['list']), (7, s['branch']), (7, cfg['trainsim']), (3, cfg['peek']['site']), (3, sc['site']), (8, gc), (7, gc+4)], fixlog
         # The mouse option off installs only fix_patch: no mouse site changes.
         unmoused = bytes(fixed)
         mouse_sites = [mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], mc['poll']]+list(mc['scans'])+list(mc['esc'])
@@ -1086,10 +1088,15 @@ def main():
         t = cfg['trainsim']
         assert original[t:t+4] == bytes.fromhex('3f04486c') and original[t+6:t+8] == bytes.fromhex('4eba')
         assert fixed[t:t+2] == bytes.fromhex('3f12') and fixed[t+2:t+8] == original[t+2:t+8]
+        # Glyph rows: the $0D case (a copy of $0C's) draws x1, then the $09
+        # case 0x20 before it draws x0 and x3. Run natively for every nibble.
+        assert original[gc:gc+6] == bytes.fromhex('10c410c45488') and original[gc-0x20:gc-0x1c] == bytes.fromhex('10845688')
+        assert fixed[gc:gc+6] == bytes.fromhex('1144000160da') and psy[gc:gc+6] == original[gc:gc+6]
+        cases_glyph = glyph_rows.check(original, fixed, gd)
         changed = [i for i in range(len(psy)) if psy[i] != fixed[i]]
-        assert all(any(x <= i < x+6 for x in list(s.values())+[cfg['peek']['site'], mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], mc['poll'], sc['site']]+list(mc['scans'])+list(mc['esc'])) or t <= i < t+2
+        assert all(any(x <= i < x+6 for x in list(s.values())+[cfg['peek']['site'], mc['room'], mc['exit'], mc['pad'], mc['guard'], mc['name'], mc['steer'], mc['poll'], sc['site'], gc]+list(mc['scans'])+list(mc['esc'])) or t <= i < t+2
                    for i in changed)
-        cases = {}
+        cases = {'glyph': cases_glyph}
         # Negative control: Psygore's list writes the file but clears the name.
         files = {'Bed_0': b'\0'*116, 'Bed_5': b'\5'*116}
         r, after, calls = save(cfg, psy, blob, files, 3, 0x58)

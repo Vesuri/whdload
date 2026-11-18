@@ -135,6 +135,10 @@ release_limit:
 ; - Mouse buttons in flight (mouse.s), as the PC's: the right button held
 ;   makes motion throttle and roll, a right double click held is the
 ;   afterburner, and both buttons or the middle one fire the missile.
+; - Glyph rows (game bug). Text draws each 4-pixel row nibble through a jump
+;   table (E:2fdd6, G:2ff98); its $0D (%1101) case was a copy of $0C's, so
+;   pixel 3 was lost ("0", M, N, W, ...). The fonts themselves match the PC.
+;   The case now draws x1 and branches to the $09 case for x0 and x3.
 ; - TrainSim high scores. The game keeps its six-entry table only in memory,
 ;   seeded at boot and for a new game; its player entry (id 8) names the
 ;   current pilot. Saving a pilot also writes the table to Bed_N.hi beside
@@ -409,6 +413,12 @@ fix_patch_en:
         dc.w    3                ; PL_PS pilot restore: its last store
         dc.l    $268be
         dc.w    scores_load_en-fix_patch_en
+        dc.w    8                ; PL_L glyph rows: the $0D case draws x1,
+        dc.l    $2ff7e
+        dc.l    $11440001        ; move.b d4,1(a0)
+        dc.w    7                ; PL_W then the $09 case draws x0 and x3
+        dc.l    $2ff82
+        dc.w    $60da            ; bra.s E:2ff5e
         dc.w    0
 ; The mouse: the mouse_ routines here and in mouse.s, installed after
 ; fix_patch unless the mouse option is off. Then the game reads only its pad,
@@ -467,6 +477,12 @@ fix_patch_de:
         dc.w    3
         dc.l    $26a6a
         dc.w    scores_load_de-fix_patch_de
+        dc.w    8
+        dc.l    $30140
+        dc.l    $11440001
+        dc.w    7
+        dc.l    $30144
+        dc.w    $60da
         dc.w    0
 mouse_patch_de:
         dc.w    3

@@ -9651,6 +9651,39 @@ How it is checked:
 Not yet run live. The OCS revisions `116d` and `262d` are not covered because
 their files are missing.
 
+### Glyph rows (UR10)
+
+The text routine (`E:2fd96`) draws each glyph row a byte at a time. The low
+nibble is four chunky pixels, bit 3 leftmost, dispatched through a 16-entry
+jump table (`E:2fdd6`/`G:2ff98`/`O:3065c`). The table repeats four times, so
+bits 4-5 are ignored. The `$0D` (%1101) case (`E:2ff7e`/`G:30140`/`O:30804`)
+is a byte copy of the `$0C` case: it draws x0 and x1, skips two and never
+draws x3. Every other case is right.
+
+The fonts (`fonts.pkt`, LZNP, unpacked by `E:30cc8`) are not at fault. Each
+glyph's entry at font+4+4×char gives a word offset, a width and an advance;
+the glyph has a row count, a y offset and then the rows. The PC's `FONTS.FNT`
+(Origin LZW, one byte a pixel) has the same three fonts, and the shapes match
+on 91, 89 and 91 of the 94 printable glyphs. The differences (font 0 `6u~`,
+font 1 `@B^_s`, font 2 `@_~`) are redrawn glyphs unrelated to the bug. The
+glyphs with `$0D` rows are font 0 `"&0ABDHPR^bempw`, font 1 `*0` (the
+simulator's slashed zero) and font 2 `MNW` (the small hull display).
+
+**Fix (both release builds, every mode).** The `$0D` case now starts with
+`move.b d4,1(a0)` / `bra.s` to the `$09` case 0x20 bytes before it, which
+draws x0 and x3 and advances a0 by 4: `10c4 10c4 5488` becomes
+`1144 0001 60da`. The three executables share that layout. Where it is installed:
+- **CD32:** a PL_L and a PL_W in each language's fix list (`src/release.s`).
+- **OCS (English `00e8`):** a `WORDS` entry that writes all six bytes only if
+  its ten guarded bytes match.
+
+How it is checked: `tools/glyph_rows.py` runs the game's row loop under
+Unicorn for every nibble. The original executable must lose exactly `$0D`'s
+x3 (drawing `$0C`), and the fixed one must draw all 16 right.
+`tools/cd32_fixes_check.py` runs it for English and German through the
+slave's fix list. `tools/ocs_options_check.py` runs it for the floppy
+executable, with the build's `WORDS`, and checks that the slave writes them.
+
 ### TrainSim enemy selection by mouse (CD32)
 
 Each pass of the CD32 selection loop (`E:181a6`, `G:18260`) reads the port-1

@@ -1138,8 +1138,10 @@ Graphics:
   font 1 `@B^_s`, font 2 `@_~`). The PC's font 1 "0" is a
   slashed zero; the Amiga draws its third row `##..` where the data and the PC
   have `##.#`. Glyphs that use `$0D`: font 0 `"&0ABDHPR^bempw`, font 1 `*0`,
-  font 2 `MNW`. Not fixed yet; the fix is 8 bytes in place: x0, x1, then the
-  `$01` handler for x3.
+  font 2 `MNW`. Fixed in both slaves (2026-11-18): the case draws x1 and
+  branches to the `$09` case for x0 and x3 (internals, "Glyph rows"). Checked
+  natively, and live in the simulator on both variants: the score's zeros,
+  drawn like sixes before, are the PC's slashed zeros. Not yet checked by H.
 - **UR11 (H): wrong palette after skipping** Game Over, ejection or the player
   explosion (for example a red space colour in the funeral); H asks for our
   "skip routines" to be removed. Open. The slaves add no skipping: the native

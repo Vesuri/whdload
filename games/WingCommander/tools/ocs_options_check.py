@@ -300,7 +300,12 @@ def check(build, mutation=None):
     words=[(at,guard,value) for at,guard,value in meta['word_fixes']]
     require(words==[list(w) for w in WORDS] or words==[tuple(w) for w in WORDS],'word fixes missing from build')
     game=(ROOT/'tmp/game/WingCommander/data/Wing.english').read_bytes()
-    for at,guard,value in words:require(game[44+at:50+at]==bytes.fromhex(guard),'word fix guard does not match the pinned game')
+    for at,guard,value in words:require(game[44+at:44+at+len(guard)//2]==bytes.fromhex(guard),'word fix guard does not match the pinned game')
+    # The glyph row fix, natively: the original loses $0D's pixel 3, the fixed code draws every nibble.
+    import glyph_rows
+    original=bytearray(game[44:44+0x358c8]);fixed=bytearray(original)
+    for at,guard,value in words:fixed[at:at+len(value)//2]=bytes.fromhex(value)
+    glyph_rows.check(original,fixed,0x3065c)
     banks=((0x500000,4,'z2-fast'),(0x1000000,4,'high-fast'),
            (0xc00000,4,'slow-labelled-fast'),(0x80000,2,'chip'),
            (0x500000,0,'unmapped'),(0x500000,6,'chip-and-fast'),
@@ -365,7 +370,7 @@ def check(build, mutation=None):
                                     else:require(c.get(CODE+at,2)==opcode and c.get(CODE+at+2,4)==slave+sy[label],'missing enhanced hook')
                                 require(c.get(slave+sy['mouse_speed'],2)==speed and c.get(slave+sy['mouse_dive'],2)==dive,'mouse option not decoded')
                                 for at,guard,value in words:
-                                    require(c.read(CODE+at,2)==(before[at:at+2] if corrupt=='word' else bytes.fromhex(value)),'word fix state')
+                                    n=len(value)//2;require(c.read(CODE+at,n)==(before[at:at+n] if corrupt=='word' and at==words[0][0] else bytes.fromhex(value)),'word fix state')
                                 rate=struct.unpack('>I',c.read(slave+sy['timing_flight_rate'],4))[0]
                                 framerate=struct.unpack('>H',c.read(slave+sy['timing_high_framerate'],2))[0]
                                 require(rate==(10,12,15,20)[(opt>>1)-1] and framerate==opt&1,'world speed/framerate option not decoded')
@@ -380,8 +385,9 @@ def check(build, mutation=None):
                                     after[at:at+6]=before[at:at+6]
                                 require(c.get(slave+sy['mouse_speed'],2)==speed and c.get(slave+sy['mouse_dive'],2)==dive,'mouse option not decoded')
                                 for at,guard,value in words:
-                                    require(after[at:at+2]==(before[at:at+2] if corrupt=='word' else bytes.fromhex(value)),'word fix state')
-                                    after[at:at+2]=before[at:at+2]
+                                    n=len(value)//2
+                                    require(after[at:at+n]==(before[at:at+n] if corrupt=='word' and at==words[0][0] else bytes.fromhex(value)),'word fix state')
+                                    after[at:at+n]=before[at:at+n]
                                 require(bytes(after)==before and c.read(STARTUP,0x1d94)==opening_before,'original mode modified game')
                                 require(events[-1]=='flush' and 'abort' not in events,'original mode enhanced')
                                 for pos in meta['fixups']:
