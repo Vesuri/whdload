@@ -1126,22 +1126,16 @@ Firing and mouse:
   (2026-11-17).
 
 Graphics:
-- **UR10 (H): glyphs differ from the PC:** the simulator's "0", W/M missing
-  pixels in the small hull display. A renderer bug, not font data (examined
-  2026-11-18). The glyph row dispatch (code hunk `2fdd6` CD32 English, `2ff98`
-  German, `3065c` floppy) draws each row byte's low nibble, bit 3 leftmost,
-  through a 16-entry jump table. The `$0D` (%1101) entry (`2ff7e`, `30140`,
-  `30804`) is a copy of the `$0C` code, so pixel 3 is never drawn. The other 15
-  entries are right. `fonts.pkt` (LZNP, three fonts) matches the PC's
-  `FONTS.FNT` (LZW, the same three fonts) on 89 to 91 of the 94 printable
-  glyphs; the rest are small redrawings unrelated to the bug (font 0 `6u~`,
-  font 1 `@B^_s`, font 2 `@_~`). The PC's font 1 "0" is a
-  slashed zero; the Amiga draws its third row `##..` where the data and the PC
-  have `##.#`. Glyphs that use `$0D`: font 0 `"&0ABDHPR^bempw`, font 1 `*0`,
-  font 2 `MNW`. Fixed in both slaves (2026-11-18): the case draws x1 and
-  branches to the `$09` case for x0 and x3 (internals, "Glyph rows"). Checked
+- **UR10 (H): glyphs differ from the PC. Fixed (2026-11-18):** the
+  simulator's "0", W/M missing pixels in the small hull display. A renderer
+  bug, not font data: the glyph row dispatch (code hunk `2fdd6` CD32 English,
+  `2ff98` German, `3065c` floppy) draws each row byte's low nibble, bit 3
+  leftmost, through a 16-entry jump table, and its `$0D` (%1101) entry
+  (`2ff7e`, `30140`, `30804`) was a copy of the `$0C` code, so pixel 3 was
+  never drawn. Both slaves now draw x1 there and branch to the `$09` case for
+  x0 and x3. The fonts match the PC's (internals, "Glyph rows"). Checked
   natively, and live in the simulator on both variants: the score's zeros,
-  drawn like sixes before, are the PC's slashed zeros. Not yet checked by H.
+  drawn like sixes before, are the PC's slashed zeros.
 - **UR11 (H): wrong palette after skipping** Game Over, ejection or the player
   explosion (for example a red space colour in the funeral); H asks for our
   "skip routines" to be removed. Open. The slaves add no skipping: the native
@@ -1172,7 +1166,7 @@ H's second report (2026-11-18, against 2.0b of 18.11.2026):
   (internals, "The PC's signs"). Needs H's exact input and the direction
   seen, compared in play with the PC.
 - UR10's glyphs: H attributes them to the renderer (their `GAME+` offsets are
-  our code-hunk offsets). Confirmed; see UR10.
+  our code-hunk offsets). Confirmed and fixed; see UR10.
 
 Deferred local work: the pre-existing save/load length guard and native checks
 are preserved in stash `5237ca28782a8e1fd1f615c91232c80b2fd93391`
