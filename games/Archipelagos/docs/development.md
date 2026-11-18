@@ -19,15 +19,18 @@ the 0627 data lacks, `Archipelagos_064000`.
 ## The build
 
 `src/ArchipelagosFiles_WHD.s` is the package's `Source/ArchipelagosFiles_WHD.s` (the import
-commit has it unchanged) with these commented edits, and builds byte-identically to the v1.2
-slave in the Retroplay archives (`release/slaves.sha256`):
+commit has it unchanged) with these commented edits. Without the 2.0b version strings (the
+info text and `$VER`) it builds byte-identically to the v1.2 slave in the Retroplay archives:
 
 - the v1.2 changes, reconstructed from a disassembly diff of the v1.1 and v1.2 slaves,
   which differ in nothing else: the version string, and `WaitRaster` (called only by
   `KillSys` on quit) waiting for VPOSR's V8 bit to set and clear instead of for line 303;
 - seven `cmp`/`add`/`and #imm,Dn` written as `cmpi`/`addi`/`andi`: StingRay's assembler
-  emits the immediate forms, vasm the Dn forms. With these the v1.1 source also rebuilds
-  the v1.1 slave byte-identically.
+  emits the immediate forms, vasm the Dn forms.
+
+Release 2.0b adds only "enhanced by Vesuri", its version line and
+`$VER: Archipelagos.slave 2.0b (18.11.2026)` to the info text; the code is v1.2's, moved by
+the longer strings (`release/slaves.sha256` records it).
 
 `-devpac` (no optimisation) matches: the source sizes its branches. `-pic`: no relocations.
 StingRay's `INCDIR SOURCES:INCLUDE/` stays; vasm finds `WHDLoad.i` through `-I`.

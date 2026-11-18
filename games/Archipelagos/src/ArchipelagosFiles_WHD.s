@@ -94,7 +94,9 @@ HEADER	SLAVE_HEADER		; ws_security + ws_ID
 	IFD	DEBUG
 	dc.b	"DEBUG!!! "
 	ENDC
-	dc.b	"Version 1.2 (31.08.2023)",0
+	dc.b	"enhanced by Vesuri",10
+	dc.b	"Version 2.0b (18.11.2026)",0
+	dc.b	"$VER: Archipelagos.slave 2.0b (18.11.2026)",0
 Name	dc.b	"Archipelagos_"
 Num	dc.b	"03FC00",0
 	CNOP	0,2

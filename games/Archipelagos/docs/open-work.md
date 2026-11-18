@@ -1,14 +1,14 @@
 # Open work
 
-Set up from StingRay's v1.2 slave; no improvement work yet. The build equals the shipped v1.2
-slave, and both variants boot to the title and into archipelago 1: SPS 627 on the a500 and
-SPS 628 (NTSC) on the a1200, where F10 also quits cleanly.
+Set up from StingRay's v1.2 slave; no improvement work yet. Both variants boot to the title
+and into archipelago 1, SPS 627 on the a500 and SPS 628 (NTSC) on the a1200, and F10 quits
+cleanly on both.
 
-## Before a first release
+## Release
 
-- A dated `$VER` string and a version (`2.0b`), and the ReadMe's entry for it above
-  StingRay's history ([releasing](../../../docs/releasing.md)).
-- Play-test both versions on every machine in `SETUPS`, including saving and loading a game.
+2.0b (18.11.2026): StingRay's v1.2 code, which the whdload.de install package lacked, with
+`$VER` and the info text in the slave and the ReadMe entry above StingRay's. Still to do:
+play-test both versions on every machine in `SETUPS`, including saving and loading a game.
 
 ## Candidates
 

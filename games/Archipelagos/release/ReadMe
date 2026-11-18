@@ -9,6 +9,8 @@
  PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
  This install applies to "Archipelagos" © 1989 Astral Software.
+ Archipelagos Enhanced 2.0b (18.11.2026)
+ Original install: StingRay. Version 2.0b: Vesuri.
 
  Requirements:
  -------------
@@ -62,6 +64,10 @@
 
  History:
  --------
+
+ version 2.0b (18.11.2026) done by Vesuri:
+ - quitting no longer hangs on NTSC Amigas (StingRay's fix of 31.08.2023,
+   which the previous install package did not include)
 
  version 1.2 (01.01.2018)
  - imager adapted to save level 1 data too (issue #3786)
