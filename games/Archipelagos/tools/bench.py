@@ -55,7 +55,13 @@ def main(args):
     out.mkdir(parents=True, exist_ok=True)
     route.run(['start'])
     b = route.body()
-    red = GameReduction(marks=report.MARKS, tally=report.VBL_SPIN,
+    marks = dict(report.MARKS)
+    j = route.peek(route.addr(0x11efa), 6)
+    if j[:2] == b'\x4e\xf9':           # 68020+: the slave's wait, which runs the blit queue
+        bw = int.from_bytes(j[2:], 'big')
+        marks['bw_in'] = bw
+        marks['bw_out'] = bw + route.peek(bw, 0x80).index(b'\x4a\x40\x4e\x75') + 2
+    red = GameReduction(marks=marks, tally=report.VBL_SPIN,
                         remap=(b, b + 0x15000, b - route.CHIP_BODY) if route.fast() else None)
     chunk = out / 'chunk.bin'
     states = []

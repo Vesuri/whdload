@@ -35,6 +35,8 @@ MARKS = {
 }
 VBL_SPIN = (0x143da, 0x143e0)          # the VBL wait's loop: cmp.l $1487e,d0 / bne
 BLIT_SPIN = (0x13f18, 0x13f1e, 0x13f22)  # the blitter wait's loop
+# On a 68020+ the game's wait jumps to the slave's, which also runs the blit queue: bench.py
+# sets bw_in and bw_out to its entry and its rts, and all of it counts as the spin.
 
 NAMES = {
     0x13806: 'game loop', 0x11712: 'world update', 0x13ae2: 'render',
@@ -127,7 +129,9 @@ def report(r, states=None, meta=None, hz=50):
             blit += p - bin_
             nblit += 1
             bin_ = None
-    blit_spin = sum(r.self[pc] for pc in BLIT_SPIN)
+    m = getattr(r, 'marks', MARKS)
+    spin_pcs = BLIT_SPIN if m['bw_in'] == MARKS['bw_in'] else range(m['bw_in'], m['bw_out'] + 2, 2)
+    blit_spin = sum(r.self[pc] for pc in spin_pcs)
     vbl_spin = sum(r.self[pc] for pc in VBL_SPIN)
     incl = r.inclusive()
     irq = sum(c for st, c in r.stacks.items() if any(isinstance(fr, tuple) for fr in st))

@@ -94,7 +94,9 @@ python3 tools/archipelagos.py quit
   which the slave sets, running fields until it is set (older slaves leave it 0: the chip
   body). `bench.py` reads its state through gdb, since a trace's chip snapshot has no fast
   memory, and its reduction counts fast-body PCs at the chip copy's addresses, so the
-  report's addresses hold either way.
+  report's addresses hold either way. On a 68020+ the game's blitter wait jumps to the
+  slave's (the blit queue); `bench.py` finds it there, and the report counts all of it as
+  the wait.
 - `tools/cpuchip.py FILE` splits the CPU's chip-bus accesses in one trace by target.
 - `tools/timeline.py OUT [FIELDS]` traces FIELDS fields (default 8) from wherever the game
   is and lays each frame out on the beam: the field and line each phase starts at (the

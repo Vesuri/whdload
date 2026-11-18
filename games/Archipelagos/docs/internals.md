@@ -42,6 +42,10 @@ byte ST header (so at runtime `$201C` + offset).
 | `$CE92`; `$E494`, `$10BBA`, `$11884`, `$118B4` | `$CEBE`; `$E4E8`, `$10C9E`, `$11B3C`, `$11B6C` | the level 3 handler's self-modifying `jsr` (the pointer or the pan routine): it jumps through a slave variable, and the four writes of its target write that variable |
 | `$12334`, `$1238C` | `$126D8`, `$12730` | the swap's copper-list writes: all interrupts off, and never in lines 0-2 or a frame's last three ([The frame](#the-frame)) |
 | `$1185C` | `$11B14` | 68020 or better: the frame's second field wait skipped |
+| `$11B72`-`$11BCD`; `$AE32` | `$11E2A`-`$11E85`; `$AE3E` | 68020 or better: draw view's two ground fills and the sky fill's five go into the slave's blit queue at draw view's start ([The frame](#the-frame)) |
+| `$11EFA` | `$121B2` | 68020 or better: the blitter wait also waits for the queue, runs it when the interrupt cannot, and sets BLITHOG while the objects' blits run |
+| `$CE1A`; `$CEA2` | `$CE46`; `$CECE` | 68020 or better: the level 3 handler starts the queue's next blit on BLIT, and its acknowledge leaves BLIT |
+| `$B7F0` | `$B7FE` | 68020 or better: the CPU clears the border, after the objects' last blit |
 | (install) | same | the instruction cache on for BaseMem and ExpMem, the data cache off (`resload_SetCPU`: `WCPUF_Base_WT`, `WCPUF_Exp_CB`, `WCPUF_IC`) |
 | (install) | same | 68020 or better with ExpMem in fast memory: the body relocated to run there, DMA's data kept in chip ([Memory](#memory)) |
 | `$AEFA`, `$B10E`, `$C8D8` | `$AF06`, `$B11C`, `$C904` | body in fast memory: the blitter's shape tables and buffer, which the game takes pc-relative, from the chip copy |
@@ -127,6 +131,37 @@ and without the end-of-frame lines a swap begun at line 312.9 wrote at line 0.1.
 over 300 fields with the guard, every write was at line 3 or later (line estimated from
 the cycles into the field).
 
+On a 68020 or better the blitter's fills run behind the CPU (2.0b). Draw view's two ground
+fills and the sky fill's five (below) are constant fills of planes 3-4 of the ground and of
+the sky, which the CPU's drawing (the ground's planes 0-2) never touches. The slave puts all
+seven into a queue at draw view's start, and the blitter interrupt starts each next one, so
+the blitter fills while the CPU draws the ground, and the sky fill returns at once. The
+game's blitter wait, which every one of its blits calls first, waits for the queue too, so
+every other blit still starts after the fills, as before. It also runs the queue itself when
+the interrupt cannot (a wait at level 3, a BLIT request lost), and the game's level 3
+acknowledge leaves BLIT to the slave. The border clear after the objects (`$B7F0`: bytes
+36-43 of lines 20-179, the right border and the next line's left, which the objects' blits
+overrun) is the CPU's now, two longs a line and plane, and the blitter's registers are left
+as the game's last fill left them. And while the objects' blits run (from the sky fill to the
+border clear) the wait sets BLITHOG: the CPU only polls `DMACONR` then, and without it the
+blitter gives the CPU every fourth cycle of a four-channel blit. On the a1200-030, facing two
+trees and two stones on archipelago 1 (`tools/timeline.py`, lines a frame):
+
+| | 2.0b step 4 | with the queue |
+|---|---|---|
+| draw view | 196 | 210 |
+| sky fill | 76 (waits) | 0 |
+| objects | 65 | 51 |
+| border clear | 35 | 15 |
+| the swap at | line 63 of the next field (2 fields a frame) | line 280 (1 field) |
+
+Draw view takes 14 lines more: the CPU's chip accesses share the bus with the fills, which
+end well inside it (9584 blitter slots in 210 lines), so the objects' first blit does not
+wait for them. The border takes 15 lines against the blitter's 24-40 with the CPU waiting.
+BLITHOG is set only for the objects' blits, which are short. With it a CPU poll stalls until
+the blit ends and an interrupt waits behind the poll, which the game's longer blits on other
+screens would stretch to milliseconds.
+
 Draw view: planes 3 and 4 of the ground (lines 113-179) by two blits; then, for each of
 the 67 ground rows from the bottom up, the row's two edge rays across the map (`$11BD4`),
 the map cells along the row (near rows by division, `$11D2C`; rows beyond the 45th with a
@@ -137,6 +172,15 @@ planes 0-2 through one of eight fill routines (table at offset `$1254A`, code fr
 4 of each 40-byte line), sky lines 20-112, ground 113-179. The sky fill `$AE32` blits five
 planes of lines 20-112 (plane 1 ones, the rest zeros), waiting for the blitter before each.
 All waits for the blitter go through `$11EFA` (BLTBUSY in `DMACONR`).
+
+The objects (`$B0A4`, `$BEFA`, `$C8BA` and the routines they call) are blits of all four
+channels (A a column mask, B the shape, C and D the screen, minterm `$CA`), four bus cycles a
+word, a plane at a time, the CPU waiting before each; scaled shapes repeat a 16-line source
+in blits of 16 lines. Facing the two trees and two stones above, the objects make 45 blits
+and 1860 words a frame. They take 51 lines (3.3 ms) of which 42 the CPU waits; the blitter
+has 58% of the bus slots then, the rest going to the bitplanes (down to line 244) and the
+CPU's set-up between blits. With nothing in view they take nothing, and the rest of the
+frame does not change with them: on a fast machine they decide whether a frame fits a field.
 
 ## Game time
 
@@ -257,6 +301,10 @@ frame:
 | of which the sky fill | 6.7 | 7.0 |
 | waiting for the next field (both waits) | 26.6 | 27.9 |
 | interrupts | 2.2 | 1.1 |
+
+2.0b on the same run (100 fields of the pan; the body in fast memory, one field wait, the
+blit queue): 49.6 fps; of a frame's 20 ms, 14.5 are CPU work (draw view 13.0), 0.8 waiting
+for the blitter and 5.0 waiting for the field.
 
 The world update is 0.03% of the time and the swap 0.1%. 99.7% of the cycles run code in
 Chip RAM. With the instruction cache on, the CPU still makes 11500 chip accesses a field

@@ -4,7 +4,7 @@ Set up from StingRay's v1.2 slave. Both variants boot to the title and into arch
 1, SPS 627 on the a500 and SPS 628 (NTSC) on the a1200, and F10 quits cleanly on both. The
 frame loop, the game's clocks and the rendering cost are measured
 ([internals.md](internals.md#the-frame)). Game time is decoupled from the frame rate
-(step 1 below), and steps 2 to 4 of the 50 fps plan are done.
+(step 1 below), and steps 2 to 5 of the 50 fps plan are done.
 
 ## Release
 
@@ -17,7 +17,8 @@ later). `tools/play.py` plays archipelago 1 to its end.
 ## 50 fps on the a1200-030
 
 The soft target is 50 fps in play on the a1200-030, which drew 8.2 fps on archipelago 1
-before step 2, 15.8 after it, 23.2 after step 3 and 43.6 since step 4. Before step 2 a frame there took
+before step 2, 15.8 after it, 23.2 after step 3, 43.6 after step 4 and 50 since step 5
+(panning archipelago 1; SPS 628 60). Before step 2 a frame there took
 124 ms: 90 ms of CPU work, 12 ms waiting for the blitter and 27 ms waiting for fields. The causes, largest first:
 
 - **Caches off** (fixed in step 2). WHDLoad's default marks BaseMem uncacheable, and
@@ -93,12 +94,27 @@ nor change behaviour.
    `timecheck.py effects` one click takes effect a frame (10 fields) earlier, and the
    play-through differs from there (a build without the ExpMem request is identical; so
    is SPS 628's move check).
-5. **Overlap the blitter with the CPU.** The sky (lines 20-112) and the ground (113-179)
-   do not overlap. Start the sky's plane blits before draw view and start each next one
-   when the blitter is idle, polled once a ground row or from the blitter interrupt. The
-   CPU then draws the ground while the blitter fills the sky. The objects wait only for
-   what is left. Also check which sky planes need clearing at all: only object pixels dirty
-   them. Gate: the blitter-wait line of the bench report.
+5. **Overlap the blitter with the CPU.** Done. On a 68020 or better draw view's two ground
+   fills and the sky fill's five go into a queue at draw view's start and run from the
+   blitter interrupt while the CPU draws the ground; the game's blitter wait waits for the
+   queue first, so every other blit keeps its order. The border clear after the objects is
+   the CPU's, and the wait sets BLITHOG while the objects' blits run
+   ([internals.md](internals.md#the-frame)). Which sky planes need clearing (only objects
+   dirty them) no longer matters: the fills end well inside draw view. Panning
+   (`frames 250 4`), step 4's slave against this one: a1200-030 43.60 to 50.00 fps (every
+   frame one field), a1200 16.60 to 18.40, a1200-fast and a500-020 23.80 to 25.00; SPS 628
+   a1200-030 30.00 to 60.00, a1200 17.76 to 19.92, a1200-fast 19.92 to 29.28; a1200-040 and
+   a1200-060 50.00 before and after; a500 5.40 and 5.40. The bench gate (a1200-030): the
+   blitter waits went from 8.7 to 0.8 ms a frame, CPU work from 12.2 to 14.5 (draw view
+   shares the bus with the fills, and the border clear is the CPU's). `tools/timeline.py`,
+   facing two trees and two stones: the sky fill's 76 lines of waiting gone, the objects 65
+   to 51 lines (BLITHOG), the border 35 to 15, the swap at line 280 instead of the next
+   field's 63. Game time there: a move 43 fields, 8.33 renderer steps and world ticks a
+   second, collapses 31 fields, the ramps 384. The a500 runs the 68000 path, and its moves
+   and effects are identical to step 4's field by field (SPS 628's move too). `tools/smc.py`'s
+   routes, both versions, play through with no difference but the known `rts`, and the
+   screens match step 4's pixel for pixel at twelve headings but for the creatures' animation
+   (a1200-030) and at one (a1200-060).
 6. **The renderer's CPU work**, re-profiled after steps 2-5.
    - Inline the per-word `jsr 12(a1)` fills as long-word writes: the view is long-aligned,
      and AGA's chip bus takes a long in one access.
@@ -108,12 +124,40 @@ nor change behaviour.
    - A 68020+ path in the slave is allowed. Keep the 68000 path as it is.
 7. **Triple buffering**, only if frames still end just after a field. It needs another
    40000 bytes of Chip RAM, so map what BaseMem uses between `$16314` and `$5C780` first.
+   Now that a frame fits a field on the a1200-030, the objects decide the frame rate there
+   (below): a frame of 1.1 fields shows at 25 fps with two buffers and at about 45 with
+   three.
 
-After step 4 (18.11.2026), the measurement for that decision: on the a1200-030 a frame
-is 12.2 ms of CPU work and 8.7 ms waiting for the blitter, 21 ms against a field's 20.
-So 50 fps there looks reachable with step 5's overlap, and step 6 would add margin. The
-a1200-040 and a1200-060 already run at 50. Without fast memory (a stock a1200) the frame
-still takes 3 fields, and steps 5 and 6 are what is left for it.
+After step 5 (18.11.2026), the decision on going further. The a1200-030 pans archipelago 1 at
+50 fps and SPS 628 at 60: the target is met where the plan measures it. On the a1200-030 a
+frame is now about 210 lines of draw view (CPU work), the objects (0-51 lines on archipelago
+1, all but 9 of them waiting for the blitter) and 15 lines of border clear, ending by line
+280 of 313: some 30 lines to spare, and none on NTSC, where a field has 263 lines and the
+same view with two trees and two stones takes 282 (30 fps). Without fast memory (a stock
+a1200) a frame still takes 3 fields, CPU-bound.
+
+The objects, which the frame rate follows on fast machines ([internals.md](internals.md#the-frame)):
+
+- They are blitter-bound. Their 45 blits there are 1860 words of a four-channel blit, four
+  bus cycles a word, and the blitter has 58% of the slots while the CPU waits, the rest
+  going to the bitplanes and the CPU's set-up. BLITHOG in the wait (step 5) took 13-20% off.
+- Queueing them too would save at most the CPU's set-up between blits (9 lines), and the
+  queue's interrupt for every one of many small blits (36 words on average) would eat into
+  that.
+- The CPU drawing them: its chip accesses take about two slots each on the emulated 030
+  (the border clear: 1600 long writes in 15 lines with no bitplane DMA), so a read and a
+  write of a long (32 pixels) take about half the blitter's eight slots. With shifting and
+  masking in software, perhaps 1.3-2 times faster, unmeasured, for a rewrite of every
+  object routine that must match the blitter pixel for pixel. Not worth it before steps 6
+  and 7.
+- Triple buffering (step 7) is what keeps them from halving the frame rate: today a frame
+  that runs over a field by a line takes two.
+- Draw view (step 6) is three quarters of the frame; what it saves is margin for objects.
+- The border clear (15 lines) could go if the display window ended at the view's edges in
+  play. The in-game copper list does not set the window, though, and every screen shows
+  it, so each screen would have to set its own.
+
+So the next steps, if any: step 6, then step 7.
 
 ## Other candidates
 

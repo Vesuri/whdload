@@ -32,6 +32,10 @@
 ;		- on a 68020 or better with fast memory (optional ExpMem) the
 ;		  program and its stack run there; what DMA reads stays in
 ;		  chip memory (Vesuri)
+;		- on a 68020 or better the ground's two plane fills and the sky
+;		  fill run from a blit queue while the CPU draws the ground, the
+;		  CPU clears the border, and the CPU's polls leave the objects'
+;		  blits every cycle (BLITHOG) (Vesuri)
 
 ; 31-Aug-2023	- WaitRaster waits for the start of a frame (VPOSR V8 set, then
 ;		  clear) instead of line 303, which NTSC never reaches
@@ -162,6 +166,14 @@ Patch	lea	resload(pc),a1
 
 .ok	lea	Chip(pc),a1
 	move.l	a0,(a1)
+	lea	BackOff(pc),a1		; SPS 627: the back buffer's pointer, the
+	move.l	#$1286a,(a1)+		; level 3 handler past its first two
+	move.l	#$ce24,(a1)		; instructions
+	cmpi.l	#$ce94,d4
+	beq.b	.v627
+	move.l	#$ce50,(a1)
+	move.l	#$12c0e,-(a1)
+.v627
 	lea	t_table(pc),a0
 	move.l	a4,(a0)
 
@@ -410,15 +422,221 @@ AckLev6	move.w	#1<<13,$dff09c
 	rte
 
 
+; The blit queue (68020 or better). Draw view starts with two plane fills
+; of the ground and the sky fill after it has five, all with the CPU
+; waiting for the blitter: 120 lines a frame on the a1200-030. They go into
+; a queue now, at the start of draw view, and run from the blitter
+; interrupt while the CPU draws the ground (lines 113-179, planes 0-2; the
+; fills are the ground's planes 3-4 and the sky, lines 20-112). The game's
+; blitter wait, which every blit of the game calls first, waits for the
+; queue as well, so every other blit runs after it, as before. An entry:
+; BLTSIZE (0 ends the list), BLTDMOD, BLTADAT, and BLTDPT as an offset into
+; the back buffer; BLTCON0 $01f0 (D = A), BLTCON1 0, both masks $ffff, as
+; the game sets them.
+QTab	dc.w	$10d0,8,$ffff
+	dc.l	3*8000+113*40+4		; the ground, planes 3 and 4
+	dc.w	$10d0,8,0
+	dc.l	4*8000+113*40+4
+	dc.w	$1750,8,$ffff
+	dc.l	20*40+4			; the sky, planes 0-4
+	dc.w	$1750,8,0
+	dc.l	1*8000+20*40+4
+	dc.w	$1750,8,0
+	dc.l	2*8000+20*40+4
+	dc.w	$1750,8,0
+	dc.l	3*8000+20*40+4
+	dc.w	$1750,8,0
+	dc.l	4*8000+20*40+4
+	dc.w	0
+
+QPtr	dc.l	0			; the entry running, 0 when idle
+Hog	dc.b	0			; the objects: BLITHOG in the wait
+	even
+QBase	dc.l	0			; the back buffer
+BackOff	dc.l	0			; the back buffer's pointer (body offset)
+L3Rest	dc.l	0			; the level 3 handler's third instruction
+
+; a0: the back buffer
+Back	movea.l	GameBody(pc),a0
+	adda.l	BackOff(pc),a0
+	movea.l	(a0),a0
+	rts
+
+; draw view's start: the queue's fills, then the registers as the game's
+; two blits left a0 and a1
+QView	bsr	Back
+	lea	QBase(pc),a1
+	move.l	a0,(a1)
+	bsr	BWait			; the blitter idle
+	lea	QTab(pc),a0
+	lea	QPtr(pc),a1
+	move.l	a0,(a1)
+	move.w	#$0040,$dff09c		; an earlier blit's BLIT request
+	move.w	#$0040,$dff09c
+	bsr	QStart
+	move.w	#$8040,$dff09a		; BLIT on
+	movea.l	QBase(pc),a0
+	adda.l	#4*8000+113*40+4,a0
+	lea	$dff000,a1
+	rts
+
+; the sky fill: queued already. The objects follow, and the CPU only polls
+; while their blits run: BLITHOG then (BWait) keeps the CPU's DMACONR reads
+; from taking every fourth cycle of a four-channel blit.
+QSky	move.l	a0,-(a7)
+	lea	Hog(pc),a0
+	st	(a0)
+	move.l	(a7)+,a0
+	bsr	Back
+	adda.l	#4*8000+20*40+4,a0
+	lea	$dff000,a1
+	rts
+
+; a0: the entry to start, the blitter idle
+QStart	movem.l	d0/a1,-(a7)
+	lea	$dff000,a1
+	move.w	#$01f0,$40(a1)
+	clr.w	$42(a1)
+	moveq	#-1,d0
+	move.l	d0,$44(a1)
+	move.w	2(a0),$66(a1)
+	move.w	4(a0),$74(a1)
+	move.l	6(a0),d0
+	add.l	QBase(pc),d0
+	move.l	d0,$54(a1)
+	move.w	(a0),$58(a1)
+	movem.l	(a7)+,d0/a1
+	rts
+
+; the running entry is done: the next, or BLIT off
+QNext	movem.l	d0/a0-a1,-(a7)
+	move.w	#$0040,$dff09c
+	move.w	#$0040,$dff09c
+	lea	QPtr(pc),a1
+	move.l	(a1),d0
+	beq.b	.done
+	movea.l	d0,a0
+	lea	10(a0),a0
+	tst.w	(a0)
+	beq.b	.idle
+	move.l	a0,(a1)
+	bsr	QStart
+	bra.b	.done
+.idle	clr.l	(a1)
+	move.w	#$0040,$dff09a		; BLIT off
+.done	movem.l	(a7)+,d0/a0-a1
+	rts
+
+; The game's blitter wait: the queue empty, then the blitter idle. It
+; runs the queue itself when the interrupt cannot (a wait with the level 3
+; interrupt masked, a BLIT request taken by another handler). Flags and d0
+; as the game's wait leaves them.
+BWait	move.l	a0,-(a7)
+	lea	QPtr(pc),a0
+	tst.l	(a0)
+	beq.b	.blit
+.q	btst	#6,$dff01f		; INTREQR: BLIT, not yet taken
+	beq.b	.more
+	move.w	#$0040,$dff09a		; the interrupt off, then look again
+	btst	#6,$dff01f
+	beq.b	.on
+	bsr	QNext
+.on	tst.l	(a0)
+	beq.b	.blit
+	move.w	#$8040,$dff09a
+.more	tst.l	(a0)
+	bne.b	.q
+.blit	tst.b	$dff002
+	tst.b	Hog-QPtr(a0)
+	movea.l	(a7)+,a0		; flags kept
+	beq.b	.wait
+	btst	#6,$dff002
+	beq.b	.idle
+	move.w	#$8400,$dff096		; BLITHOG while the CPU only polls
+.hog	btst	#6,$dff002
+	bne.b	.hog
+	move.w	#$0400,$dff096
+	bra.b	.idle
+.wait	btst	#6,$dff002
+	bne.b	.wait
+.idle	tst.w	d0
+	rts
+
+; The level 3 handler's start: a queued blit done, the next one. The rest
+; is the game's, which now leaves BLIT alone (AckVB).
+L3Blit	movem.l	d0-a6,-(a7)
+	lea	$dff000,a0
+	move.w	$1c(a0),d0
+	and.w	$1e(a0),d0
+	btst	#6,d0
+	beq.b	.game
+	bsr	QNext
+.game	movea.l	GameBody(pc),a1
+	adda.l	L3Rest(pc),a1
+	jmp	(a1)
+
+AckVB	move.w	#1<<4+1<<5,$dff09c
+	move.w	#1<<4+1<<5,$dff09c
+	rts
+
+; The border clear (68020 or better): five planes of bytes 36-43 of lines
+; 20-179 (the right border and the next line's left), which the objects'
+; blits overrun. The game blitted them after the objects with the CPU
+; waiting; the CPU writes them now, after the objects' last blit, and
+; leaves the blitter's registers, a0 and a1 as the game's last blit did.
+CBorder	movem.l	d0-d2,-(a7)
+	bsr	Back
+	lea	20*40+36(a0),a0
+	bsr	BWait
+	lea	Hog(pc),a1
+	sf	(a1)
+	moveq	#0,d0
+	moveq	#5-1,d2
+.plane	move.w	#160-1,d1
+.line	move.l	d0,(a0)
+	move.l	d0,4(a0)
+	lea	40(a0),a0
+	dbf	d1,.line
+	lea	8000-160*40(a0),a0
+	dbf	d2,.plane
+	lea	$dff000,a1
+	move.w	#$01f0,$40(a1)
+	clr.w	$42(a1)
+	moveq	#-1,d1
+	move.l	d1,$44(a1)
+	move.w	#32,$66(a1)
+	clr.w	$74(a1)
+	lea	-8000(a0),a0		; plane 4's start
+	lea	160*40(a0),a1
+	move.l	a1,$dff054		; where the game's blit ended
+	lea	$dff000,a1
+	movem.l	(a7)+,d0-d2
+	rts
+
+
 ; SPS 627, 68020 or better
 PLFAST	PL_START
 	PL_S	$1185c,6		; no field wait before the swap
+	PL_P	$11efa,BWait		; the blitter wait waits for the queue too
+	PL_PS	$11b72,QView		; the ground's and the sky's fills queued
+	PL_SA	$11b78,$11bce
+	PL_P	$ae32,QSky
+	PL_P	$b7f0,CBorder		; the border cleared by the CPU
+	PL_P	$ce1a,L3Blit		; the level 3 handler runs the queue
+	PL_PS	$cea2,AckVB
 	PL_END
 
 ; SPS 628, 68020 or better
 PLFAST_US
 	PL_START
 	PL_S	$11b14,6		; no field wait before the swap
+	PL_P	$121b2,BWait
+	PL_PS	$11e2a,QView
+	PL_SA	$11e30,$11e86
+	PL_P	$ae3e,QSky
+	PL_P	$b7fe,CBorder
+	PL_P	$ce46,L3Blit
+	PL_PS	$cece,AckVB
 	PL_END
 
 ; SPS 627, the body in fast memory
