@@ -19,4 +19,5 @@ Read `docs/open-work.md` first.
 | `docs/development.md` | what differs from the shared workflow: inputs, the build, driving it, traps |
 | `docs/internals.md` | how it loads, memory, every slave patch, limitations |
 
-The slave source is `src/`. There is no `tools/` harness yet; `make serve` drives a boot.
+The slave source is `src/`; `tools/` boots, routes, counts frames and profiles
+([development.md](docs/development.md#routes-and-profiling)).

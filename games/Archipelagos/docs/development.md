@@ -46,6 +46,38 @@ Both variants build the same slave. `Archipelagos` boots the 0627 drawer,
 From boot, about 12 s in warp reaches "Press any key"; space gives the archipelago screen,
 space again starts archipelago 1. `VERIFY_EXIT=1` and F10 test the quit path.
 
+## Routes and profiling
+
+`tools/` drives a warp, deterministic boot with no window and nothing in port 0 (the mouse
+comes from `monitor mouse`):
+
+```sh
+SETUP=a1200-030 tools/boot.sh                  # quits this instance's server, boots one
+python3 tools/route.py start 'rmb 4' 'f 4'     # archipelago 1 in play, then pan mode
+python3 tools/archipelagos.py frames 250 4     # fps, world ticks, heading over 250 fields
+python3 tools/archipelagos.py quit
+```
+
+- `tools/route.py`: steps and named routes. `start` is the title, the archipelago screen
+  and the first pass of the in-game loop, each reached by a breakpoint on its key loop, not
+  by a field count (the screens take different times on different machines). Each wait
+  has a deadline (`UNTIL_TIMEOUT`, default 180 s), and a missed one quits the server.
+- `frames N [DX]`: counts flips of the back-buffer pointer field by field, moving the mouse
+  DX counts first. It needs no breakpoint or trace, so it works on every setup, the MMU
+  cores included.
+- `tools/bench.py OUT [PAN [DX]]` traces the whole panning run: the right button, then PAN
+  fields (default 250) at DX counts (default 4). It writes `OUT/report.txt`
+  (`tools/report.py`): fps, the waits by call site, blitter waits, interrupts, the call
+  tree and hot instructions. Traces need a CPU that records instructions: on the 030 that
+  is `EXTRA_ARGS=--uae_mmu_model=0`. WHDLoad leaves the 68030's MMU unused by default, so
+  the game runs the same: 8.0 fps against 8.2 with the MMU model. `WHD_ARGS=CACHE` turns on
+  the instruction cache.
+- `tools/reduction.py` is the reduction behind it. On a 68010+ WHDLoad enters the game's
+  interrupt handlers through its own vector table, so an interrupt is counted where a
+  handler in the game's vectors starts, and trace gaps go to the running code.
+- `tools/cpuchip.py FILE` splits the CPU's chip-bus accesses in one trace by target, and
+  `tools/smc.py OUT` checks a bench run's executed code against the relocated file.
+
 ## Traps
 
 - `SLAVE=` is relative to where make started: inside the game directory,
