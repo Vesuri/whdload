@@ -10,7 +10,7 @@ Server: `python3 tools/gunship2000.py serve` boots under the shared gdb-stub ser
 (common/tools/game_server.py); `python3 tools/gunship2000.py <command>` sends it one command.
 
 Environment: MACHINE picks an entry of MACHINES (default a1200-030; a500 is game.conf's ECS
-machine, VARIANT=Gunship2000ECS only); VARIANT (default Gunship2000AGA), SLAVE, BUILD and the
+machine, VARIANT=Gunship2000ECS only; a1200-040-z3 a 68040 with Zorro III fast); VARIANT (default Gunship2000AGA), SLAVE, BUILD and the
 other common/run.sh options pass through;
 GUNSHIP2000_FSUAE picks another native build (default the aprof one, which also has
 `monitor mouse`, `input`, `key` and `fields`).
@@ -40,6 +40,9 @@ MACHINES = {
     'a1200-030': dict(SETUP='a1200-030', EXTRA_ARGS='--uae_mmu_model=0'),
     'a1200-030-mmu': dict(SETUP='a1200-030'),
     'a500': dict(SETUP='custom'),   # game.conf's ECS machine: 68000, 1 MB chip, 2 MB fast
+    # a 68040 with 32 MB of Zorro III fast memory (above 16 MB) for
+    # WHDLoad's MMU option (WHD_ARGS=MMU); functional checks only, no timing
+    'a1200-040-z3': dict(SETUP='a1200-040', EXTRA_ARGS='--zorro3_memory=32768'),
 }
 
 # Amiga raw key codes.

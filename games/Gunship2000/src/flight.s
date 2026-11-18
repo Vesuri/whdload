@@ -7,7 +7,8 @@
 ;   G_* code offsets: G_DT G_CLOCK G_PHASE G_WAIT G_BLINK G_VBL G_COLLECTIVE_UP
 ;	G_COLLECTIVE_DOWN G_SPEED G_SPEED_STEP G_HEADING G_CLIMB G_FILL G_COLOURS G_LINE
 ;	G_STACK G_MODELS G_SEED G_START G_SIZE, and G_RECT where the rectangles are drawn at
-;	once (not the ECS build, which queues them)
+;	once (not the ECS build, which queues them), and G_LOADVIEW where the game clears
+;	LoadView's View with suba.w a1,a1 (AGA, CD32)
 ;   B_* BSS offsets: B_TICKS B_DT B_VBL B_PAUSE B_PHASE B_BLINK B_CLIMB_TARGET B_CLIMB
 ;	B_COLLECTIVE B_PATTERNS B_DRAWN, B_RECTS with G_RECT
 ;   D_* data offsets: D_EDGES D_HEAP D_MODELS D_MODELS_NEXT, and D_SAVESP for a flight on its
@@ -142,6 +143,11 @@ pl_gs2_flight
 	ENDC
 	PL_S	G_STACK+6,$a
 	PL_PS	G_MODELS,fast_models	; the model data in fast memory
+	IFD G_LOADVIEW
+	PL_W	G_LOADVIEW,$93c9	; suba.l a1,a1: LoadView(NULL). The game's suba.w
+					; leaves a1 nonzero from $8000 up, which
+					; gives LoadView a View (with MMU: a fault)
+	ENDC
 	IFD VERIFY
 	PL_PS	G_SEED,seed_flight	; move.w VHPOSR,bss+$b8fe: the flight's random seed
 	ENDC

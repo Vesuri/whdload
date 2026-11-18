@@ -95,6 +95,12 @@ The fast stack and model data, every build:
 | ECS $13ac2 | the same, for the supervisor stack: the ECS flight takes the machine over (a `trap`, SR $2700, its own vectors) | `jsr fast_super_stack` | the supervisor stack in 2000 bytes of fast memory allocated when `gs2.run` loads; no memory: the work area, as before |
 | $181c2 | `movea.l D+$922a,a0` (the model data, before $18b8c relocates it) | `jsr fast_models` | copies the block (up to D+$9232, at most $21000 bytes) into a fast buffer allocated when `gs2.run` first loads (the ECS flight has the OS switched off) and points D+$922a at it; the transform and object code read it there ("Memory in flight"). Larger or no memory: the chip block |
 
+And a fix, in every build that has the call:
+
+| Offset | Original | Patch | Why |
+|---|---|---|---|
+| $12784 (AGA), CD32 $12748 | `suba.w a1,a1` before `LoadView` (graphics -222) at the flight's start | `suba.l a1,a1` (`G_LOADVIEW`) | `suba.w` subtracts only the sign-extended low word, so a1 from $8000 up stays nonzero and `LoadView` gets the game's data as a View. Its copper list pointers are then the data's words: with WHDLoad's `MMU` option, a read past BaseMem is an access fault (a 68040 with 32 MB Zorro III fast, 19.11.2026: a1 $2ea0000, data+$7d68, read at $160007). The ECS build has no such call |
+
 The VERIFY build pins the mission for measurements (`development.md`, "Profiling in flight"):
 
 | File, offset | Original | Patch | Why |

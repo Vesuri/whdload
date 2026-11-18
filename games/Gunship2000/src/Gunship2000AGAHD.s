@@ -76,6 +76,7 @@ G_CLIMB		= $7950
 G_FILL		= $fab6
 G_COLOURS	= $fcf8
 G_LINE		= $fd3c
+G_LOADVIEW	= $12784
 G_RECT		= $13832
 G_STACK		= $13d52
 G_MODELS	= $181c2

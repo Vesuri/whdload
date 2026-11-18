@@ -73,6 +73,7 @@ features:
  - Enhanced framerate (CUSTOM2=1, on in the installed icon): the flight is no
    longer held to 10.7 frames per second (24 to 31 on a 68030/50, AGA), at the
    game's own speed
+ - fixed a crash entering flight with the MMU option (AGA, CD³²)
  - requires WHDLoad 17+
 
  version 3.1 (28.03.06) done by JOTD

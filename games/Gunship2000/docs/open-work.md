@@ -282,8 +282,11 @@ P9 of the plan, and what is left:
    `dist/Gunship2000Enhanced-4.0b-20261118.lha`, waiting for a test on a real A1200. The three
    icons carry `CUSTOM2=1` (`release.json`'s tooltypes; the install copies the chosen icon),
    the ReadMe's memory figures are the slave headers' (ExpMem with the Kickstart) and its quit
-   key the slaves' ($5d, the keypad's `*`), and the entry above JOTD's says what changed. After
-   the test: `make release PUBLISH=1`. Bump the version and the entry as improvements land.
+   key the slaves' ($5d, the keypad's `*`), and the entry above JOTD's says what changed. The
+   first A1200 test (68040/40, MMU, 32 MB Zorro III) crashed entering flight: the game's
+   `suba.w a1,a1` before `LoadView` (`internals.md`), fixed in the AGA and CD32 slaves and
+   repacked; the fixed slaves reach the cockpit on `a1200-040-z3` with `MMU`. After the test:
+   `make release PUBLISH=1`. Bump the version and the entry as improvements land.
 2. **P4 follow-ups.** The coupling test for the AI and weapons (a mission with moving units,
    targets fired at); the joystick control mode (code $142c ramps the pitch command per step);
    `CUSTOM2` with time acceleration (`]`).
