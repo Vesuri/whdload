@@ -36,7 +36,7 @@ ExpMem also holds the Kickstart (KickEmu's `KICKSIZE` before `FASTMEMSIZE`). Wit
 CD32 setup all of the game's memory was chip; the 4.0b CD32 slave's ExpMem gives the OS
 fast memory, and the flight's code, data and BSS (any-memory hunks) load there.
 
-The quit key is $5d (numeric `*`); the ReadMe says F10 and gives the older memory figures.
+The quit key is $5d (numeric `*`), as the ReadMe says.
 
 ## Slave patches
 

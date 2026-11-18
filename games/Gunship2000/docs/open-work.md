@@ -278,11 +278,12 @@ without the lines.
 
 P9 of the plan, and what is left:
 
-1. **P9 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
-   `$VER: Gunship2000<Variant>.slave 4.0b (18.11.2026)`, the info text credits Vesuri, and
-   the ReadMe entry above JOTD's says what changed (the WHDLoad 20.1 KickEmu, the faster AGA
-   flight, Enhanced framerate). `make dist` packs it; not yet published. Bump the version and
-   the entry as improvements land.
+1. **P9 Release 4.0b** (18.11.2026) is packed, not published: `make dist` gives
+   `dist/Gunship2000Enhanced-4.0b-20261118.lha`, waiting for a test on a real A1200. The three
+   icons carry `CUSTOM2=1` (`release.json`'s tooltypes; the install copies the chosen icon),
+   the ReadMe's memory figures are the slave headers' (ExpMem with the Kickstart) and its quit
+   key the slaves' ($5d, the keypad's `*`), and the entry above JOTD's says what changed. After
+   the test: `make release PUBLISH=1`. Bump the version and the entry as improvements land.
 2. **P4 follow-ups.** The coupling test for the AI and weapons (a mission with moving units,
    targets fired at); the joystick control mode (code $142c ramps the pitch command per step);
    `CUSTOM2` with time acceleration (`]`).
@@ -304,4 +305,3 @@ version switches views (its function keys are the pad's buttons).
   writes a copper end there for the game's `COPJMP2` to 0 (`internals.md`).
 - The CD32 slave keeps `DEBUG` set, and its patch list is dead code (`_patch_gs2000`
   returns first).
-- The ReadMe's memory figures and quit key (F10) do not match the slaves ($5d).

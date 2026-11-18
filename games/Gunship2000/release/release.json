@@ -11,9 +11,24 @@
       },
       "add": {},
       "remove": [],
+      "tooltypes": {
+        "Gunship2000HD/Gunship2000.exoticon": [
+          "CUSTOM2=1"
+        ],
+        "Gunship2000HD/Gunship2000.exoticon2": [
+          "CUSTOM2=1"
+        ],
+        "Gunship2000HD/Gunship2000.newicon": [
+          "CUSTOM2=1"
+        ]
+      },
       "source": {
         "dir": "Gunship2000HD/source",
-        "variants": ["Gunship2000ECS", "Gunship2000AGA", "Gunship2000CD32"]
+        "variants": [
+          "Gunship2000ECS",
+          "Gunship2000AGA",
+          "Gunship2000CD32"
+        ]
       }
     }
   ]
