@@ -28,8 +28,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import archipelagos  # noqa: E402
 
-BODY = 0x201c
 US = os.environ.get('VARIANT') == 'ArchipelagosNTSC'
+
+
+def body():
+    import route
+    return route.body()
 
 
 def v(o627, o628):
@@ -71,7 +75,7 @@ def peek(addr, n):
 
 
 def var(off, n=2, signed=True):
-    return int.from_bytes(peek(BODY + off, n), 'big', signed=signed)
+    return int.from_bytes(peek(body() + off, n), 'big', signed=signed)
 
 
 # record(): from then on every field's clocks go to RECORD, one tuple a field (CLOCKS).
@@ -80,8 +84,11 @@ CLOCKS = [('fields', FIELDS, 'unsigned int'), ('back', BACK, 'unsigned int'),
           ('ramp2', RAMP2, 'unsigned short'), ('left', LEFT, 'short'),
           ('x', POS, 'unsigned short'), ('y', POS + 2, 'unsigned short')]
 RECORD = None
-_PRINT = ('printf "@ ' + ' '.join(['%u'] * len(CLOCKS)) + '\\n", '
-          + ', '.join(f'*({t} *){BODY + a:#x}' for _, a, t in CLOCKS))
+
+
+def _print():
+    return ('printf "@ ' + ' '.join(['%u'] * len(CLOCKS)) + '\\n", '
+            + ', '.join(f'*({t} *){body() + a:#x}' for _, a, t in CLOCKS))
 
 
 def record():
@@ -97,7 +104,7 @@ def fields(n):
 
 
 def _fields(n, pre=()):
-    out = batch(*pre, *(['monitor fields 1', _PRINT] * n))
+    out = batch(*pre, *(['monitor fields 1', _print()] * n))
     RECORD.extend(tuple(int(v) for v in l[2:].split()) for l in out.splitlines()
                   if l.startswith('@ '))
 
@@ -125,7 +132,7 @@ def wr(v):
 
 
 def pos():
-    b = peek(BODY + POS, 4)
+    b = peek(body() + POS, 4)
     return b[0] + b[1] / 256, b[2] + b[3] / 256
 
 
@@ -134,7 +141,7 @@ def ptr():
 
 
 def rows():
-    t = peek(BODY + ROWS, 51 * 8)
+    t = peek(body() + ROWS, 51 * 8)
     return [struct.unpack_from('>4h', t, r * 8) for r in range(51)]
 
 

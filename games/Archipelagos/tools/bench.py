@@ -29,19 +29,19 @@ import report  # noqa: E402
 from amigaxdev import barto  # noqa: E402
 from reduction import GameReduction  # noqa: E402
 
-STATE = [  # (name, address, size): sampled from each traced field's chip snapshot
-    ('fields', 0x1487e, 4),   # the game's field counter (the level 3 handler; 0 at play start)
-    ('heading', 0x1489c, 2),  # 0..719, half degrees
-    ('tick', 0x149d2, 2),     # the world tick countdown: the VBL decrements it, a tick is due
+STATE = [  # (name, SPS 627 body offset, size): read after each traced field
+    ('fields', 0x12862, 4),   # the game's field counter (the level 3 handler; 0 at play start)
+    ('heading', 0x12880, 2),  # 0..719, half degrees
+    ('tick', 0x129b6, 2),     # the world tick countdown: the VBL decrements it, a tick is due
                               # below 0 and reloads it from $149d0 (5)
-    ('back', 0x14886, 4),     # the buffer being drawn ($5c780 or $663c0)
+    ('back', 0x1286a, 4),     # the buffer being drawn ($5c780 or $663c0)
 ]
 
 
-def sample(chip):
+def sample():
     out = []
     for _, a, n in STATE:
-        v = int.from_bytes(chip[a:a + n], 'big')
+        v = int.from_bytes(route.peek(route.addr(a), n), 'big')
         out.append(v - (1 << 16) if n == 2 and v & 0x8000 and _ == 'tick' else v)
     return out
 
@@ -54,7 +54,9 @@ def main(args):
     dx = int(args[2]) if len(args) > 2 else 4
     out.mkdir(parents=True, exist_ok=True)
     route.run(['start'])
-    red = GameReduction(marks=report.MARKS, tally=report.VBL_SPIN)
+    b = route.body()
+    red = GameReduction(marks=report.MARKS, tally=report.VBL_SPIN,
+                        remap=(b, b + 0x15000, b - route.CHIP_BODY) if route.fast() else None)
     chunk = out / 'chunk.bin'
     states = []
 
@@ -62,7 +64,7 @@ def main(args):
         nonlocal last
         route.req('profile', str(n_fields), str(chunk))
         t = red.feed(chunk)
-        states.append(sample(t.chip))
+        states.append(sample())
         last = t
         chunk.unlink()
 

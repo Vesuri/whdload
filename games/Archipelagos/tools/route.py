@@ -30,15 +30,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = [sys.executable, str(ROOT / 'tools/archipelagos.py')]
 
-# Program addresses: the program loads to $2000 and its body (offsets in docs/internals.md)
-# starts at $201c, so address = offset + $201c. SPS 627's, or SPS 628's when VARIANT is
-# ArchipelagosNTSC (set it for boot.sh and the tools alike).
+# Program offsets (docs/internals.md): SPS 627's, or SPS 628's when VARIANT is
+# ArchipelagosNTSC (set it for boot.sh and the tools alike). An address is body() + offset:
+# the body is at $201C in chip memory, or in fast memory on a 68020+ with ExpMem; the slave
+# leaves the address of the body that runs in the ST header's reserved long at $2012.
 US = os.environ.get('VARIANT') == 'ArchipelagosNTSC'
-TITLE_LOOP = 0x13768 if US else 0x13520   # offset $1174C / $11504: the title polls a key byte
-ARCH_LOOP = 0x1250e if US else 0x12484    # $104F2 / $10468: the archipelago screen asks for a key
-GAME_LOOP = 0x13abc if US else 0x13806    # $11AA0 / $117EA: the in-game loop; its first pass
-                                          # follows the archipelago's opening tune
+CHIP_BODY = 0x201c
+TITLE_LOOP = 0x1174c if US else 0x11504   # the title polls a key byte
+ARCH_LOOP = 0x104f2 if US else 0x10468    # the archipelago screen asks for a key
+GAME_LOOP = 0x11aa0 if US else 0x117ea    # the in-game loop; its first pass follows the
+                                          # archipelago's opening tune
 VARS = 0x3a4 if US else 0                 # SPS 628's variables are $3A4 above SPS 627's
+_BODY = None
 
 # 'start': boot to archipelago 1 in play, stopped at the in-game loop's first pass.
 ROUTES = {
@@ -58,10 +61,53 @@ def req(*words, timeout=600):
     return p.stdout
 
 
-def until(addr):
-    out = req('until', hex(addr), timeout=int(os.environ.get('UNTIL_TIMEOUT', '180')))
+def peek(addr, n):
+    vals = []
+    for line in req('gdb', f'x/{n}xb {addr:#x}').splitlines():
+        if ':' in line:
+            vals += [int(v, 16) for v in line.split(':', 1)[1].split()]
+    return bytes(vals[:n])
+
+
+def body():
+    """The running body's address, from $2012; runs fields until the slave has set it."""
+    global _BODY
+    if _BODY is None:
+        old = 0
+        for _ in range(200):
+            # The body's first instruction is a jmp to offset $8D2A, which the relocation
+            # points at the body that runs. A slave before 2.0b's fast memory leaves $2012
+            # as the file has it (0): then the body is the chip one.
+            if peek(CHIP_BODY, 2) == b'\x4e\xf9':
+                v = int.from_bytes(peek(CHIP_BODY + 2, 4), 'big') - 0x8d2a
+                mark = int.from_bytes(peek(0x2012, 4), 'big')
+                if mark == v and v:
+                    break
+                if mark == 0 and v == CHIP_BODY:
+                    old += 1
+                    if old > 2:
+                        break
+            req('gdb', 'monitor fields 5')
+        else:
+            sys.exit('no body address after 1000 fields')
+        _BODY = v
+    return _BODY
+
+
+def fast():
+    return body() != CHIP_BODY
+
+
+def addr(off):
+    return body() + off
+
+
+def until(off):
+    """Run to body offset off."""
+    a = addr(off)
+    out = req('until', hex(a), timeout=int(os.environ.get('UNTIL_TIMEOUT', '180')))
     if 'Breakpoint' not in out:
-        sys.exit(f'until {addr:#x}: {out}')
+        sys.exit(f'until {off:#x} ({a:#x}): {out}')
 
 
 def key(raw, fields):

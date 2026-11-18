@@ -36,16 +36,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 import route  # noqa: E402
 
-BASE = 0x14800       # one dump covers every variable: $14800-$14e00 in SPS 627
+BASE = 0x127e4       # one dump covers every variable: offsets $127E4-$12DE4 in SPS 627
 SIZE = 0x600
-VARS = [  # (name, SPS 627 address, size, signed); SPS 628's are route.VARS higher
-    ('fields', 0x1487e, 4, False),
-    ('back', 0x14886, 4, False),
-    ('x', 0x149da, 2, False),
-    ('y', 0x149dc, 2, False),
-    ('phase', 0x14dc8, 2, True),
-    ('timer', 0x14dd4, 2, True),
-    ('tick', 0x149d2, 2, True),
+VARS = [  # (name, SPS 627 body offset, size, signed); SPS 628's are route.VARS higher
+    ('fields', 0x12862, 4, False),
+    ('back', 0x1286a, 4, False),
+    ('x', 0x129be, 2, False),
+    ('y', 0x129c0, 2, False),
+    ('phase', 0x12dac, 2, True),
+    ('timer', 0x12db8, 2, True),
+    ('tick', 0x129b6, 2, True),
 ]
 
 
@@ -92,10 +92,10 @@ def main(args):
         return effects(out)
     out = Path(args[0]).resolve()
     n = int(args[1]) if len(args) > 1 else 300
-    shift = route.VARS
     hz = 60 if route.US else 50   # the NTSC variant boots an NTSC machine (game.conf)
     out.mkdir(parents=True, exist_ok=True)
     route.run(['start'])
+    shift = route.VARS + route.body()
     dump = out / 'dump.bin'
     rows = []
     route.req('gdb', 'monitor input JOY1_FIRE_BUTTON 1')

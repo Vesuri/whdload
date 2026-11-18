@@ -9,10 +9,14 @@ Counts the trace's DMA slot records of the CPU (each a chip-bus access: 0x10nn r
 the program image within 10 bytes after an instruction the trace executed; the two wait
 loops' reads (the field counter at $1487E, offset $12862, and DMACONR) are listed apart.
 Only the screen buffers have to be in chip memory for the CPU's sake; everything else
-here could be in fast memory.
+here could be in fast memory. With the body in fast memory (a 68020+ with ExpMem) the
+program image here is the chip copy: its accesses are split by the slave's chip blocks
+(CHIP627 in src/ArchipelagosFiles_WHD.s); one outside them would be a reference the
+relocation missed.
 """
 import collections
 import os
+import re
 import struct
 import sys
 
@@ -20,6 +24,17 @@ sys.path.insert(0, os.environ.get('AMIGA_PYLIB') or os.path.expanduser('~/.local
 from amigaxdev import barto  # noqa: E402
 
 BODY, END = 0x201c, 0x16314
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def chip_blocks():
+    src = open(os.path.join(ROOT, 'src/ArchipelagosFiles_WHD.s'), encoding='latin-1').read()
+    m = re.search(r'^CHIP627\s+dc\.l\s+(.*?)-1', src, re.S | re.M)
+    v = [int(x, 16) for x in re.findall(r'\$([0-9a-f]+)', m.group(1))]
+    return list(zip(v[::2], v[1::2]))
+
+
+BLOCKS = chip_blocks()
 
 
 def region(a, code):
@@ -36,7 +51,12 @@ def region(a, code):
     if 0xdff000 <= a < 0xe00000:
         return 'other custom registers'
     if BODY <= a < END:
-        return 'program image: code fetch' if a in code else 'program image: data'
+        if a in code:
+            return 'program image: code fetch'
+        o = a - BODY
+        if any(lo <= o < hi for lo, hi in BLOCKS):
+            return 'program image: data, in a chip block'
+        return 'program image: data, outside the chip blocks'
     return 'other chip'
 
 

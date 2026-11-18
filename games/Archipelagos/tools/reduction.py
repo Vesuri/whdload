@@ -24,8 +24,11 @@ from amigaxdev.callprofile import Reduction, _opkind  # noqa: E402
 
 
 class GameReduction(Reduction):
-    def __init__(self, marks=None, tally=()):
+    def __init__(self, marks=None, tally=(), remap=None):
         super().__init__(marks, tally)
+        # (lo, hi, delta): PCs in lo..hi (the body in fast memory) are counted at pc - delta,
+        # the chip copy's address, so the report's addresses hold; its code bytes are the same
+        self.remap = remap
         self.gaps = 0          # cycles of the trace's gap records (billed to the running code)
         self.irqs = collections.Counter()   # handler entry -> entries
 
@@ -34,6 +37,8 @@ class GameReduction(Reduction):
         if t.pc_base:
             raise ValueError('relative-PC traces (.pc-base) are not supported')
         handlers = {struct.unpack_from('>I', t.chip, v)[0] for v in range(0x64, 0x80, 4)} - {0}
+        lo, hi, delta = self.remap or (0, 0, 0)
+        handlers = {h - delta if lo <= h < hi else h for h in handlers}
         d, u, cache = t.data, struct.unpack_from, {}
         stack, sps, pend, pos, tallied = self._stack, self._sps, self._pend, self.pos, self.tallied
         tally = self.tally
@@ -65,6 +70,8 @@ class GameReduction(Reduction):
                     gap += c
                     gapc += c
                     continue
+                if lo <= pc < hi:
+                    pc -= delta
                 while sps and sp > sps[-1]:
                     stack, sps = stack[:-1], sps[:-1]
                 if gapc:

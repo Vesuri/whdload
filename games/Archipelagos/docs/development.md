@@ -89,11 +89,20 @@ python3 tools/archipelagos.py quit
   through the server's `batch` command, many to one request.
 - The US version: `VARIANT=ArchipelagosNTSC` for `boot.sh` and for the tools (they read
   SPS 628's addresses then).
+- The tools take body offsets. On a 68020+ with fast memory the body runs from ExpMem
+  ([internals.md](internals.md#memory)); `route.body()` finds it from the long at `$2012`,
+  which the slave sets, running fields until it is set (older slaves leave it 0: the chip
+  body). `bench.py` reads its state through gdb, since a trace's chip snapshot has no fast
+  memory, and its reduction counts fast-body PCs at the chip copy's addresses, so the
+  report's addresses hold either way.
 - `tools/cpuchip.py FILE` splits the CPU's chip-bus accesses in one trace by target.
 - `tools/smc.py OUT [end|death]` checks for self-modifying code: from a fresh boot on a
-  tracing CPU it keeps the image at the game's entry, plays a route (to the level's end, or
-  to a death and the archipelago selection) and compares the code each stop's 2-field trace
-  executes with it.
+  tracing CPU it keeps the image at the game's entry (with the body in fast memory, the
+  chip copy, which never runs), plays a route (to the level's end, or to a death and the
+  archipelago selection) and compares the code each stop's 2-field trace executes with it.
+- `tools/cpuchip.py` splits the chip copy's data accesses by the slave's chip blocks
+  (`CHIP627`): with the body in fast memory, one outside them is a reference the
+  relocation missed.
 
 ## Traps
 

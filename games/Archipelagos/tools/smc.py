@@ -4,14 +4,17 @@
     python3 tools/smc.py OUT [ROUTE]
 
 Needs a server just booted with tools/boot.sh on a CPU that records an instruction trace
-(SETUP=a1200-030 EXTRA_ARGS=--uae_mmu_model=0, or the a500). Stops at the game's entry
-(offset 0, `$201C`) and keeps the program image there as the reference: relocated and
-patched by the slave, before the game runs. Then follows ROUTE (default 'end'; or 'death'),
-tracing 2 fields at each stop, and compares the bytes of every instruction a trace executed
-(from its PC up to the next executed PC, 10 bytes at most) with the reference. A
-difference is code the game wrote after it started, or data the comparison ran into after
-an rts or a jump. Also lists executed PCs outside the program image by 4 KB page (the
-slave, WHDLoad and the ROM).
+(SETUP=a1200-030 EXTRA_ARGS=--uae_mmu_model=0, or the a500). The reference is the program
+image relocated and patched by the slave, before the game runs: with the body in chip
+memory, the image at the game's entry (offset 0, `$201C`); with the body in fast memory, the
+chip copy, which never runs (the replayer's code apart, so the run stops at its first tick,
+`$2030`, whichever comes first). Then follows ROUTE (default 'end'; or 'death'), tracing 2
+fields at each stop, and compares the bytes of every instruction a trace executed in the
+body (from its PC up to the next executed PC, 10 bytes at most) with the reference: the
+trace's chip snapshot, or a dump of the fast body. A difference is code the game wrote
+after it started, data the comparison ran into after an rts or a jump, or one of the
+slave's fast-memory patches (PLFASTMEM, PLFAST), which only the fast copy has. Also lists
+executed PCs outside the body by 4 KB page (the slave, WHDLoad and the ROM).
 
 Routes (each from a fresh boot):
 - end: the title, the archipelago screen, archipelago 1 created and in play, the map (F2),
@@ -52,34 +55,53 @@ class Check:
         self.lines.append(s)
 
     def reference(self):
-        route.until(BODY)
+        play.batch('break *0x201c', 'break *0x2030', 'continue', 'delete')
         p = self.out / 'ref.bin'
         play.batch(f'dump binary memory {p} {BODY:#x} {END:#x}')
         self.ref = p.read_bytes()
+        self.body = route.body()
+        self.log(f'body at ${self.body:X}' + (' (fast memory)' if route.fast() else ''))
 
     def trace(self, name, n=2):
         p = self.out / 'trace.bin'
         route.req('profile', str(n), str(p))
         t = barto.load(p)
-        pcs, out = set(), collections.Counter()
+        b, size = self.body, END - BODY
+        chip = bytes(t.chip[BODY:END])
+        if b == BODY:
+            mem = chip
+        else:
+            d = self.out / 'body.bin'
+            play.batch(f'dump binary memory {d} {b:#x} {b + size:#x}')
+            mem = d.read_bytes()
+            d.unlink()
+        # body offsets executed: in the running body, and (body in fast memory) in the chip
+        # copy, the replayer's code
+        runs = {b: (set(), mem), BODY: (set(), chip)}
+        out = collections.Counter()
         for f in t.fields:
             for pc, _, _ in t.instructions(f):
                 if pc is None or pc == 0x7fffffff:
                     continue
-                if BODY <= pc < END:
-                    pcs.add(pc)
+                for base, (got, _) in runs.items():
+                    if base <= pc < base + size:
+                        got.add(pc - base)
+                        break
                 else:
                     out[pc & ~0xfff] += 1
         self.outside.update(out)
-        pcs = sorted(pcs)
-        diff = []
-        for i, pc in enumerate(pcs):
-            end = min(pc + 10, pcs[i + 1] if i + 1 < len(pcs) else pc + 10)
-            a, b = self.ref[pc - BODY:end - BODY], t.chip[pc:end]
-            if a != b:
-                diff.append(f'  ${pc - BODY:05X}  entry {a.hex()}  now {b.hex()}')
+        diff, n = [], 0
+        for base, (got, now) in runs.items():
+            got = sorted(got)
+            n += len(got)
+            for i, o in enumerate(got):
+                end = min(o + 10, got[i + 1] if i + 1 < len(got) else o + 10)
+                if self.ref[o:end] != now[o:end]:
+                    where = '' if base == b else ' (chip copy)'
+                    diff.append(f'  ${o:05X}{where}  entry {self.ref[o:end].hex()}  '
+                                f'now {now[o:end].hex()}')
         self.total += len(diff)
-        self.log(f'{name}: {len(pcs)} instructions executed in the image, {len(diff)} differ')
+        self.log(f'{name}: {n} instructions executed in the image, {len(diff)} differ')
         for d in diff:
             self.log(d)
         p.unlink()
