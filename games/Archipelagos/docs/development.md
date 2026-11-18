@@ -89,8 +89,11 @@ python3 tools/archipelagos.py quit
   through the server's `batch` command, many to one request.
 - The US version: `VARIANT=ArchipelagosNTSC` for `boot.sh` and for the tools (they read
   SPS 628's addresses then).
-- `tools/cpuchip.py FILE` splits the CPU's chip-bus accesses in one trace by target, and
-  `tools/smc.py OUT` checks a bench run's executed code against the relocated file.
+- `tools/cpuchip.py FILE` splits the CPU's chip-bus accesses in one trace by target.
+- `tools/smc.py OUT [end|death]` checks for self-modifying code: from a fresh boot on a
+  tracing CPU it keeps the image at the game's entry, plays a route (to the level's end, or
+  to a death and the archipelago selection) and compares the code each stop's 2-field trace
+  executes with it.
 
 ## Traps
 
