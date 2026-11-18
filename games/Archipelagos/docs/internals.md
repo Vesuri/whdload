@@ -20,6 +20,12 @@ offset `76*512*10` = `$5F000`, the file `Archipelagos_05F000`.
 Offsets are into the program body: a file offset of `Archipelagos_03FC00` minus its `$1C`
 byte ST header (so at runtime `$201C` + offset).
 
+The rows marked "68020 or better" or "body in fast memory", the body in ExpMem and the
+instruction cache (`resload_SetCPU`) are the Enhanced framerate option, CUSTOM1 (the
+installed icon sets it; `ws_version` 17 for the config string). Without it the slave runs
+as on a 68000, with WHDLoad's caches; the other rows, game time included, apply always.
+The harness sets CUSTOM1=1 (`game.conf`); `ENHANCED=0` runs without it.
+
 | SPS 627 | SPS 628 | Patch |
 |---|---|---|
 | `$8E68`, `$8E72`, `$8E7C` | same | level 1, 5 and 6 interrupt handlers acknowledge twice and return |

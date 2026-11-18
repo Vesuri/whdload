@@ -9,6 +9,11 @@
       },
       "add": {},
       "remove": [],
+      "tooltypes": {
+        "Archipelagos_Install/Archipelagos.newicon": [
+          "CUSTOM1=1"
+        ]
+      },
       "source": {
         "dir": "Archipelagos_Install/Source",
         "variants": [

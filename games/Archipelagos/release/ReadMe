@@ -14,12 +14,15 @@
 
  Requirements:
  -------------
- This install requires WHDLoad and RawDIC to be in the path.
+ This install requires WHDLoad 17 and RawDIC to be in the path.
  To install from a different drive than DF0: select installation mode Expert.
 
  The installed game requires 0.5 MB ChipMem (+0.3 MB OtherMem for preload).
- On a 68020 or better it uses 88 KB of fast memory if there is any.
+ With Enhanced framerate on a 68020 or better it uses 88 KB of fast memory
+ if there is any.
  It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
+ CUSTOM1=1: Enhanced framerate, set in the installed icon. 0 or unset keeps
+ the original frame rate; the game keeps its fixed pace either way.
 
 
  Features:
@@ -69,10 +72,9 @@
  version 2.0b (18.11.2026) done by Vesuri:
  - faster Amigas no longer speed the game up: moves, terrain animation and
    spreading keep their pace, and moves are smoother
- - up to six times the frame rate on 68020 and 68030 Amigas, almost four
-   times without fast memory
- - the title's PLEASE WAIT is five times shorter on 68030 Amigas with fast
-   memory
+ - Enhanced framerate (CUSTOM1, on in the installed icon): up to six times
+   the frame rate on 68020 and 68030 Amigas, almost four times without fast
+   memory, and a five times shorter PLEASE WAIT on 68030s with fast memory
  - quitting no longer hangs on NTSC Amigas
 
  version 1.2 (01.01.2018)

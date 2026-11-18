@@ -41,6 +41,8 @@
 ;		- on a 68020 or better the ground's rows are built in registers
 ;		  and written a long at a time, and the far rows' spans go from
 ;		  carry to carry instead of a pixel at a time (Vesuri)
+;		- the instruction cache, fast memory and the 68020 patches only
+;		  with CUSTOM1 (Enhanced framerate; ws_version 17) (Vesuri)
 
 ; 31-Aug-2023	- WaitRaster waits for the start of a frame (VPOSR V8 set, then
 ;		  clear) instead of line 303, which NTSC never reaches
@@ -80,7 +82,7 @@ PL_PSA	MACRO
 
 
 HEADER	SLAVE_HEADER		; ws_security + ws_ID
-	dc.w	10		; ws_version
+	dc.w	17		; ws_version
 	dc.w	FLAGS		; flags
 	dc.l	524288		; ws_BaseMemSize
 	dc.l	0		; ws_ExecInstall
@@ -103,7 +105,7 @@ HEADER	SLAVE_HEADER		; ws_security + ws_ID
 	dc.w	.config-HEADER	; ws_config
 
 
-.config	dc.b	0
+.config	dc.b	"C1:B:Enhanced framerate",0
 
 .dir	IFD	DEBUG
 	dc.b	"SOURCES:WHD_Slaves/Archipelagos/"
@@ -126,6 +128,8 @@ Num	dc.b	"03FC00",0
 
 TAGLIST		dc.l	WHDLTAG_ATTNFLAGS_GET
 CPUFLAGS	dc.l	0
+		dc.l	WHDLTAG_CUSTOM1_GET
+Enhanced	dc.l	0		; Enhanced framerate: the 68020 patches and caches
 		dc.l	TAG_END
 
 resload	dc.l	0
@@ -136,6 +140,11 @@ Patch	lea	resload(pc),a1
 
 	lea	TAGLIST(pc),a0
 	jsr	resload_Control(a2)
+	move.l	Enhanced(pc),d0		; Enhanced framerate off: as on a 68000
+	bne.b	.enh
+	lea	CPUFLAGS(pc),a0
+	clr.l	(a0)
+.enh
 
 
 ; install keyboard irq
@@ -285,9 +294,12 @@ Patch	lea	resload(pc),a1
 ; the instruction cache for BaseMem and ExpMem, no data cache (it would make
 ; the screens data-cacheable where WHDLoad uses the MMU). BaseMem stays
 ; cacheable: without the MMU one noncacheable area turns both caches off.
+	move.l	Enhanced(pc),d0		; off: WHDLoad's caches, as before
+	beq.b	.nocpu
 	move.l	#WCPUF_Base_WT|WCPUF_Exp_CB|WCPUF_IC,d0
 	move.l	#WCPUF_Base|WCPUF_Exp|WCPUF_IC|WCPUF_DC,d1
 	jsr	resload_SetCPU(a2)
+.nocpu
 
 ; for the tools: the running body's address in the ST header's reserved long,
 ; which nothing reads after the relocation

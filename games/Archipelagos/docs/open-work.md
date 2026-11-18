@@ -9,10 +9,12 @@ frame loop, the game's clocks and the rendering cost are measured
 ## Release
 
 2.0b (18.11.2026): StingRay's v1.2 code, which the whdload.de install package lacked, with
-`$VER` and the info text in the slave and the ReadMe entry above StingRay's, and game time
-decoupled from the frame rate. Still to do: play-test both versions on every machine in
-`SETUPS`, including saving and loading a game and an archipelago with blood eggs (20 or
-later). `tools/play.py` plays archipelago 1 to its end.
+`$VER` and the info text in the slave and the ReadMe entry above StingRay's, game time
+decoupled from the frame rate, and steps 2 to 6 below behind Enhanced framerate (CUSTOM1,
+set in the installed icon). Played by the maintainer; no full
+play-through (the archipelagos are generated, thousands of them). With CUSTOM1 off the
+a1200-030 draws 8.2 fps (SPS 628 7.9), as before step 2, and the a500's moves (both
+versions, CUSTOM1 on and off) are step 5's.
 
 ## 50 fps on the a1200-030
 
