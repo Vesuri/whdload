@@ -357,7 +357,7 @@ _patch_exe:
 	bra.b	.patch
 .aga
 	lea	_pl_gs2000_aga(pc),a0
-	bra.b	.patch
+;	bra.b	.patch		; vasm: a bra.b to the next instruction is illegal; Barfly dropped it
 
 .patch
 	jsr	resload_Patch(a2)

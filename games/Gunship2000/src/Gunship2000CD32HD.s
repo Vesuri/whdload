@@ -61,7 +61,7 @@ slv_keyexit	= $5D	; num '*'
 
 ;============================================================================
 
-	INCLUDE	kick31.s
+	INCLUDE	whdload/kick31.s	; by its path in the WHDLoad tree, as the ECS and AGA sources do
 	INCLUDE	fakepad.s
 
 ;============================================================================

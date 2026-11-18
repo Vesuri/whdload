@@ -1,0 +1,20 @@
+{
+  "archives": [
+    {
+      "input": "Gunship2000.lha",
+      "output": "Gunship2000Enhanced-{version}-{date}.lha",
+      "replace": {
+        "Gunship2000HD/Gunship2000ECS.slave": "build:Gunship2000ECS",
+        "Gunship2000HD/Gunship2000AGA.slave": "build:Gunship2000AGA",
+        "Gunship2000HD/Gunship2000CD32.slave": "build:Gunship2000CD32",
+        "Gunship2000HD/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {
+        "dir": "Gunship2000HD/source",
+        "variants": ["Gunship2000ECS", "Gunship2000AGA", "Gunship2000CD32"]
+      }
+    }
+  ]
+}
