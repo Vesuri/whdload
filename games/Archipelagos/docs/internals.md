@@ -46,6 +46,8 @@ byte ST header (so at runtime `$201C` + offset).
 | `$11EFA` | `$121B2` | 68020 or better: the blitter wait also waits for the queue, runs it when the interrupt cannot, and sets BLITHOG while the objects' blits run |
 | `$CE1A`; `$CEA2` | `$CE46`; `$CECE` | 68020 or better: the level 3 handler starts the queue's next blit on BLIT, and its acknowledge leaves BLIT |
 | `$B7F0` | `$B7FE` | 68020 or better: the CPU clears the border, after the objects' last blit |
+| `$11E52` | `$1210A` | 68020 or better: the span drawer builds each row's 32 pixels of planes 0-2 in registers and writes them a long at a time ([The frame](#the-frame)) |
+| `$11E0E` | `$120C6` | 68020 or better: the far rows' spans from carry to carry, not a pixel at a time |
 | (install) | same | the instruction cache on for BaseMem and ExpMem, the data cache off (`resload_SetCPU`: `WCPUF_Base_WT`, `WCPUF_Exp_CB`, `WCPUF_IC`) |
 | (install) | same | 68020 or better with ExpMem in fast memory: the body relocated to run there, DMA's data kept in chip ([Memory](#memory)) |
 | `$AEFA`, `$B10E`, `$C8D8` | `$AF06`, `$B11C`, `$C904` | body in fast memory: the blitter's shape tables and buffer, which the game takes pc-relative, from the chip copy |
@@ -192,7 +194,28 @@ per-pixel loop, `$11E0E`-`$11E2C`) into a span list (offset `$13C26`), and the s
 `$11E52`, which looks up each span's terrain in the map, collects object cells, and fills
 planes 0-2 through one of eight fill routines (table at offset `$1254A`, code from
 `$1242A`, a `jsr` for each 16-pixel word). The view is 256 pixels wide (16 words from byte
-4 of each 40-byte line), sky lines 20-112, ground 113-179. The sky fill `$AE32` blits five
+4 of each 40-byte line), sky lines 20-112, ground 113-179.
+
+On a 68020 or better the slave draws the rows (2.0b). A span list entry is a span's end x
+and its map cell, a span runs from the last one's end, and the last one runs to the row's
+end; the game's fill routines write a span's colour (the cell's terrain type, plane k bit k
+of the type) from its start to its last word's end, read-modify-writing its first word in
+chip memory, and later spans write over the rest. So a row is a function of its list: the
+slave builds each 32 pixels of the three planes in registers and writes them once, 24 long
+writes a row (the rows are long-aligned) and no reads, with one paint routine for each
+terrain type. Object cells are noted and cleared in the map as the game does. The far rows'
+loop steps x a pixel at a time, adding a step to each of two 16-bit accumulators, a carry
+ending a span: 256 steps a row for about 23 spans. The slave works out each carry instead:
+the first one (65535 - acc) / step + 1 steps on, then, as the accumulator is below the step
+after a carry, q = 65536 / step steps on, or q + 1 when the accumulator is below the
+remainder, and the lists come out in the game's order. `tools/spancheck.py` runs both
+routines and the game's against each other on 3000 random rows each, both versions, with no
+difference in the screen, the map, the variables or the registers the game reads after;
+the screens at twelve headings match step 5's pixel for pixel but for the creatures'
+animation. Draw view on the a1200-030, facing two trees and two stones: 210 lines to 107.
+The queued fills (above) then outlast it, so the objects' first blit waits for them: the
+objects 51 to 98 lines, and the frame ends near line 226 instead of 280. On the a1200-fast
+(14 MHz 68020) a frame's work went from 1.22 fields to 0.91 (`tools/bench.py`, 100 fields). The sky fill `$AE32` blits five
 planes of lines 20-112 (plane 1 ones, the rest zeros), waiting for the blitter before each.
 All waits for the blitter go through `$11EFA` (BLTBUSY in `DMACONR`).
 
@@ -325,9 +348,10 @@ frame:
 | waiting for the next field (both waits) | 26.6 | 27.9 |
 | interrupts | 2.2 | 1.1 |
 
-2.0b on the same run (100 fields of the pan; the body in fast memory, one field wait, the
-blit queue): 49.6 fps; of a frame's 20 ms, 14.5 are CPU work (draw view 13.0), 0.8 waiting
-for the blitter and 5.0 waiting for the field.
+2.0b on the same run (the body in fast memory, one field wait, the blit queue, the rows
+drawn by the slave): 49.8 fps; of a frame's 20 ms, 8.2 are CPU work (draw view 6.6), 3.3
+waiting for the blitter and 8.6 waiting for the field (with the blit queue alone: 14.5,
+13.0, 0.8 and 5.0).
 
 The world update is 0.03% of the time and the swap 0.1%. 99.7% of the cycles run code in
 Chip RAM. With the instruction cache on, the CPU still makes 11500 chip accesses a field

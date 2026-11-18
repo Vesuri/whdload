@@ -38,6 +38,9 @@
 ;		  blits every cycle (BLITHOG) (Vesuri)
 ;		- with the body in fast memory the title's pre-scaler reads and
 ;		  writes fast copies, then copies each object to chip (Vesuri)
+;		- on a 68020 or better the ground's rows are built in registers
+;		  and written a long at a time, and the far rows' spans go from
+;		  carry to carry instead of a pixel at a time (Vesuri)
 
 ; 31-Aug-2023	- WaitRaster waits for the start of a frame (VPOSR V8 set, then
 ;		  clear) instead of line 303, which NTSC never reaches
@@ -181,6 +184,12 @@ Patch	lea	resload(pc),a1
 	beq.b	.p627
 	lea	PS628(pc),a0
 .p627	lea	PSVer(pc),a1
+	move.l	a0,(a1)
+	lea	SD627(pc),a0		; the span drawer's
+	cmpi.l	#$ce94,d4
+	beq.b	.s627
+	lea	SD628(pc),a0
+.s627	lea	SDVer(pc),a1
 	move.l	a0,(a1)
 	lea	t_table(pc),a0
 	move.l	a4,(a0)
@@ -622,6 +631,234 @@ CBorder	movem.l	d0-d2,-(a7)
 	rts
 
 
+; The span drawer (68020 or better), called for each row of the ground,
+; 67 a frame, bottom to top: the row's span list ($13c26; an entry is a
+; span's end x, 0 ending the list, and its map cell), and the row's start in
+; the back buffer (a6, long-aligned; 256 pixels, planes 0-2). The game
+; called a routine for each word, with the colour (the cell's terrain type,
+; plane k bit k), and read-modify-wrote each span's first word in chip
+; memory. A span runs from the last one's end (0 for the first) to its own,
+; and the last one to the row's end; a span from s writes its colour from s
+; to its last word's end, and later spans write over what follows. So a row
+; depends on its list alone: here each 32 pixels of the three planes are
+; built in registers and written once, 24 long writes a row. A cell with an
+; object is noted as the game does (the list at $12f26, its length at
+; $1288e, where the row at $12890 is no further than the one at $12892) and
+; its map bit cleared. a0, a2 and a6 as the game left them.
+; body offsets: the span list, the row, the object limit, the object list's
+; length, the object list; the cell's x step (a byte) and y step (a word
+; after it), the far rows' list end
+SD627	dc.l	$13c26,$12890,$12892,$1288e,$12f26,$129ba,$11e2c
+SD628	dc.l	$13fca,$12c34,$12c36,$12c32,$132ca,$12d5e,$120e4
+SDVer	dc.l	0
+
+; A span from d3 to d4 (d3 <= d4 <= 256) in a terrain type's colour, planes
+; 0, 1 and 2 (\1, \2, \3): the long being built (d0-d2) from d3 on, then
+; whole longs, then the next long started. What lies beyond d4 in a long, a
+; later span writes. a4: the next long to write.
+SDPAINT	MACRO
+	cmp.w	d4,d3
+	bcc.b	.r\@
+	moveq	#-1,d5
+	move.w	d3,d6
+	andi.w	#31,d6
+	lsr.l	d6,d5			; d5: from d3 to the long's end
+	IFEQ	(\1)*(\2)*(\3)
+	move.l	d5,d6
+	not.l	d6
+	ENDC
+	IFNE	\1
+	or.l	d5,d0
+	ELSE
+	and.l	d6,d0
+	ENDC
+	IFNE	\2
+	or.l	d5,d1
+	ELSE
+	and.l	d6,d1
+	ENDC
+	IFNE	\3
+	or.l	d5,d2
+	ELSE
+	and.l	d6,d2
+	ENDC
+	move.w	d3,d7
+	ori.w	#31,d7
+	addq.w	#1,d7			; d7: the next long's start
+	cmp.w	d7,d4
+	bcs.b	.r\@			; d4 inside this long
+	move.l	d1,8000(a4)
+	move.l	d2,16000(a4)
+	move.l	d0,(a4)+
+	moveq	#-(\1),d0		; whole longs, and the one d4 is in
+	moveq	#-(\2),d1
+	moveq	#-(\3),d2
+.w\@	addi.w	#32,d7
+	cmp.w	d4,d7
+	bhi.b	.r\@
+	move.l	d1,8000(a4)
+	move.l	d2,16000(a4)
+	move.l	d0,(a4)+
+	bra.b	.w\@
+.r\@	rts
+	ENDM
+
+SpanD	clr.w	(a5)+			; the list's end, as the game's
+	movem.l	a0/a2/a6,-(a7)
+	movea.l	SDVer(pc),a1
+	movea.l	GameBody(pc),a5
+	adda.l	(a1),a5
+.skip	tst.w	(a5)			; spans ending at 0
+	bne.b	.go
+	addq.l	#4,a5
+	bra.b	.skip
+.go	movea.l	a6,a4			; a4: the next long to write
+	moveq	#0,d3			; d3: the span's start
+	movea.w	#-1,a1			; a1: its type times 2, none yet
+.ent	move.w	(a5)+,d4		; d4: its end
+	beq.b	.last
+	move.w	(a5)+,d6		; d6: its cell
+	move.b	(a3,d6.w),d7
+	bpl.b	.col
+	movem.l	d0-d1/a2,-(a7)		; an object
+	movea.l	SDVer(pc),a1
+	movea.l	GameBody(pc),a2
+	move.l	4(a1),d1
+	move.w	(a2,d1.l),d0
+	move.l	8(a1),d1
+	cmp.w	(a2,d1.l),d0
+	bgt.b	.noob
+	bclr	#7,(a3,d6.w)
+	move.l	12(a1),d1
+	move.w	(a2,d1.l),d0
+	addq.w	#2,(a2,d1.l)
+	adda.l	16(a1),a2
+	move.w	d6,(a2,d0.w)
+.noob	movem.l	(a7)+,d0-d1/a2
+.col	andi.w	#7,d7
+	add.w	d7,d7
+	movea.w	d7,a1
+	move.w	.pt(pc,d7.w),d7
+	jsr	.pt(pc,d7.w)
+	move.w	d4,d3
+	bra.b	.ent
+.last	move.w	a1,d7
+	bmi.b	.done			; an empty list: nothing, as the game's
+	move.w	#256,d4
+	move.w	.pt(pc,d7.w),d7
+	jsr	.pt(pc,d7.w)
+.done	movem.l	(a7)+,a0/a2/a6
+	rts
+
+.pt	dc.w	.p0-.pt,.p1-.pt,.p2-.pt,.p3-.pt,.p4-.pt,.p5-.pt,.p6-.pt,.p7-.pt
+.p0	SDPAINT	0,0,0
+.p1	SDPAINT	1,0,0
+.p2	SDPAINT	0,1,0
+.p3	SDPAINT	1,1,0
+.p4	SDPAINT	0,0,1
+.p5	SDPAINT	1,0,1
+.p6	SDPAINT	0,1,1
+.p7	SDPAINT	1,1,1
+
+; A far row's spans (68020 or better; the rows beyond the 45th from the
+; bottom, where the cells are small; the nearer rows go by division). The game steps
+; x a pixel at a time to the row's end (x a byte, d2's low byte), adding d0
+; to d6 and d1 to d5: each carry ends a span at x with the cell in d4
+; (d6's first, then d5's), and steps the cell in x (a byte) or y. 256 steps
+; a row, most of them without a carry. Here each accumulator's carries are
+; worked out: the first (65535 - acc) / step + 1 steps on; after a carry
+; the accumulator is below the step, so the next comes q = 65536 / step
+; steps on, or q + 1 if the accumulator is below r = 65536 - q * step, and
+; leaves it r less (plus the step). The spans in the game's order, then the
+; game's list end. An x is kept with d2's high byte, as the list has it.
+FarRow	movem.l	a0-a4/a6,-(a7)
+	movea.l	SDVer(pc),a1
+	move.l	24(a1),-(a7)		; the game's list end
+	movea.l	GameBody(pc),a6
+	move.l	a6,d3
+	add.l	d3,(a7)
+	adda.l	20(a1),a6		; a6: the x step (a byte), the y step
+	moveq	#0,d3
+	move.w	d2,d3
+	movea.l	d3,a1			; a1: d6's next carry, an x
+	movea.l	d3,a2			; a2: d5's
+	move.b	#255,d3
+	movea.l	d3,a0			; a0: the row's last x
+; the first carries
+	moveq	#0,d3
+	not.w	d3
+	sub.w	d6,d3
+	divu.w	d0,d3
+	swap	d3
+	clr.w	d3
+	swap	d3
+	addq.l	#1,d3
+	adda.l	d3,a1
+	mulu.w	d0,d3
+	add.w	d3,d6
+	moveq	#0,d3
+	not.w	d3
+	sub.w	d5,d3
+	divu.w	d1,d3
+	swap	d3
+	clr.w	d3
+	swap	d3
+	addq.l	#1,d3
+	adda.l	d3,a2
+	mulu.w	d1,d3
+	add.w	d3,d5
+; q and r: a3 and d3 for d6, a4 and d7 for d5
+	move.w	d1,d2
+	bsr.b	.qr
+	movea.l	d2,a4
+	move.w	d3,d7
+	move.w	d0,d2
+	bsr.b	.qr
+	movea.l	d2,a3
+.next	cmpa.l	a2,a1
+	bhi.b	.e5
+	cmpa.l	a0,a1
+	bhi.b	.done
+	move.w	a1,(a5)+
+	move.w	d4,(a5)+
+	add.b	(a6),d4
+	adda.l	a3,a1
+	cmp.w	d3,d6
+	bcc.b	.q6
+	addq.l	#1,a1
+	add.w	d0,d6
+.q6	sub.w	d3,d6
+	bra.b	.next
+.e5	cmpa.l	a0,a2
+	bhi.b	.done
+	move.w	a2,(a5)+
+	move.w	d4,(a5)+
+	add.w	2(a6),d4
+	adda.l	a4,a2
+	cmp.w	d7,d5
+	bcc.b	.q5
+	addq.l	#1,a2
+	add.w	d1,d5
+.q5	sub.w	d7,d5
+	bra.b	.next
+.done	move.l	(a7)+,d3
+	movem.l	(a7)+,a0-a4/a6
+	move.l	d3,-(a7)
+	rts
+
+; d2.w: a step; out d2.l = 65536 / step, d3.w = the remainder
+.qr	cmpi.w	#1,d2
+	bne.b	.div
+	move.l	#$10000,d2
+	moveq	#0,d3
+	rts
+.div	move.l	#$10000,d3
+	divu.w	d2,d3
+	moveq	#0,d2
+	move.w	d3,d2
+	swap	d3
+	rts
+
 ; The pre-scaler (the title's PLEASE WAIT, the body in fast memory). Once
 ; at boot the game scales each of 36 objects (48x48, in the ST picture at
 ; $70000) to 15 sizes, a pixel at a time, into the blitter's object buffer
@@ -776,6 +1013,8 @@ PLFAST	PL_START
 	PL_P	$b7f0,CBorder		; the border cleared by the CPU
 	PL_P	$ce1a,L3Blit		; the level 3 handler runs the queue
 	PL_PS	$cea2,AckVB
+	PL_P	$11e52,SpanD		; the span drawer, a long at a time
+	PL_P	$11e0e,FarRow		; the far rows' spans, carry to carry
 	PL_END
 
 ; SPS 628, 68020 or better
@@ -789,6 +1028,8 @@ PLFAST_US
 	PL_P	$b7fe,CBorder
 	PL_P	$ce46,L3Blit
 	PL_PS	$cece,AckVB
+	PL_P	$1210a,SpanD
+	PL_P	$120c6,FarRow
 	PL_END
 
 ; SPS 627, the body in fast memory

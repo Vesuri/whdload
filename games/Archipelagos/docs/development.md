@@ -103,6 +103,11 @@ python3 tools/archipelagos.py quit
   renderer, draw view, the sky fill, the objects, the border clear, the swap, the world
   update), its length in lines, the CPU's blitter waits and time outside the program in
   it, and the blitter's DMA slots. It shows what a frame needs to fit a field.
+- `tools/spancheck.py [N]` checks the slave's span drawer and far-row loop against the
+  game's: both versions' originals (from the program file, at address 0) and the slave's
+  routines (assembled from the source) run in Unicorn's 68020 on N random rows each
+  (default 3000), and the screen, the map, the variables and lists, the list end and the
+  registers the game reads after must match. Needs no emulator.
 - `tools/smc.py OUT [end|death]` checks for self-modifying code: from a fresh boot on a
   tracing CPU it keeps the image at the game's entry (with the body in fast memory, the
   chip copy, which never runs), plays a route (to the level's end, or to a death and the

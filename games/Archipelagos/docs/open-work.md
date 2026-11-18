@@ -4,7 +4,7 @@ Set up from StingRay's v1.2 slave. Both variants boot to the title and into arch
 1, SPS 627 on the a500 and SPS 628 (NTSC) on the a1200, and F10 quits cleanly on both. The
 frame loop, the game's clocks and the rendering cost are measured
 ([internals.md](internals.md#the-frame)). Game time is decoupled from the frame rate
-(step 1 below), and steps 2 to 5 of the 50 fps plan are done.
+(step 1 below), and steps 2 to 6 of the 50 fps plan are done.
 
 ## Release
 
@@ -18,7 +18,7 @@ later). `tools/play.py` plays archipelago 1 to its end.
 
 The soft target is 50 fps in play on the a1200-030, which drew 8.2 fps on archipelago 1
 before step 2, 15.8 after it, 23.2 after step 3, 43.6 after step 4 and 50 since step 5
-(panning archipelago 1; SPS 628 60). Before step 2 a frame there took
+(panning archipelago 1; SPS 628 60), with a frame's work down to 0.41 fields after step 6. Before step 2 a frame there took
 124 ms: 90 ms of CPU work, 12 ms waiting for the blitter and 27 ms waiting for fields. The causes, largest first:
 
 - **Caches off** (fixed in step 2). WHDLoad's default marks BaseMem uncacheable, and
@@ -115,31 +115,46 @@ nor change behaviour.
    routes, both versions, play through with no difference but the known `rts`, and the
    screens match step 4's pixel for pixel at twelve headings but for the creatures' animation
    (a1200-030) and at one (a1200-060).
-6. **The renderer's CPU work**, re-profiled after steps 2-5, and the title's pre-scaler.
-   - Done: with the body in fast memory the pre-scaler (the title's PLEASE WAIT) reads a
-     fast copy of each object's source and scales into fast scratch, then copies the
-     object to chip; the buffer is identical. a1200-030 190 to 35 fields (SPS 628 226 to
-     33), a1200-fast 369 to 320, now CPU-bound
-     ([internals.md](internals.md#the-pre-scaler)).
-   - Inline the per-word `jsr 12(a1)` fills as long-word writes: the view is long-aligned,
-     and AGA's chip bus takes a long in one access.
-   - Keep the far-row loop's two direction constants in registers, not pc-relative chip
-     reads.
-   - Fold the span drawer's lookups.
-   - A 68020+ path in the slave is allowed. Keep the 68000 path as it is.
+6. **The renderer's CPU work**, and the title's pre-scaler. Done, on a 68020 or better
+   ([internals.md](internals.md#the-frame)).
+   - With the body in fast memory the pre-scaler (the title's PLEASE WAIT) reads a fast
+     copy of each object's source and scales into fast scratch, then copies the object to
+     chip; the buffer is identical. a1200-030 190 to 35 fields (SPS 628 226 to 33),
+     a1200-fast 369 to 320, now CPU-bound ([internals.md](internals.md#the-pre-scaler)).
+   - The span drawer builds each row in registers and writes it a long at a time, with a
+     paint routine for each terrain type (the plan's long-word fills and folded lookups).
+   - The far rows' per-pixel loop goes from carry to carry.
+   - Not done: the near rows' division loop keeps its variables in fast memory now, which
+     would save about 0.6 ms a frame on the a1200-fast in registers; the plan's direction
+     constants are cheap reads there since step 4. The map stays in chip: its read is 15
+     cycles of each span on the a1200-fast.
+   `tools/spancheck.py` finds no difference from the game's routines (3000 random rows
+   each, both versions), and the screens at twelve headings match step 5's but for the
+   creatures' animation. Panning (`frames 250 4`), step 5's slave against this one:
+   a1200-030 50.00 and 50.00, a1200 18.40 to 24.60, a1200-fast 25.00 to 42.20, a500-020
+   25.00 to 29.60; SPS 628 a1200-030 60.00 and 60.00, a1200 19.92 to 21.60, a1200-fast
+   29.28 to 30.48; a1200-040 and a1200-060 50.00; a500 5.40 and 5.40. The bench gate
+   (a1200-030): draw view 13.0 to 6.6 ms a frame, CPU work 14.5 to 8.2, blitter waits 0.8 to
+   3.3 (the objects now wait for the queued fills), a frame's work 0.73 to 0.41 fields.
+   Game time there and `tools/smc.py`'s routes as after step 5. The a500's moves (both
+   versions) are identical to step 5's field by field, but its effects play-through is not:
+   from field 112 a frame takes 10 fields where it took 9, and the route differs from there.
+   The slave's size alone does that (the same source padded by 1500 bytes differs from both;
+   each build repeats its own run exactly), as asking for ExpMem did in step 4.
 7. **Triple buffering**, only if frames still end just after a field. It needs another
-   40000 bytes of Chip RAM, so map what BaseMem uses between `$16314` and `$5C780` first.
+   40000 bytes of Chip RAM, so map what BaseMem uses between `$16314` and `$5C780` first:
+   the pre-scaled objects fill `$193B8`-`$5C780` ([internals.md](internals.md#the-pre-scaler)),
+   which leaves `$16314`-`$193B8` (12 KB) and what lies above the screens and the map.
    Now that a frame fits a field on the a1200-030, the objects decide the frame rate there
    (below): a frame of 1.1 fields shows at 25 fps with two buffers and at about 45 with
    three.
 
-After step 5 (18.11.2026), the decision on going further. The a1200-030 pans archipelago 1 at
-50 fps and SPS 628 at 60: the target is met where the plan measures it. On the a1200-030 a
-frame is now about 210 lines of draw view (CPU work), the objects (0-51 lines on archipelago
-1, all but 9 of them waiting for the blitter) and 15 lines of border clear, ending by line
-280 of 313: some 30 lines to spare, and none on NTSC, where a field has 263 lines and the
-same view with two trees and two stones takes 282 (30 fps). Without fast memory (a stock
-a1200) a frame still takes 3 fields, CPU-bound.
+After step 6 (18.11.2026). The a1200-030 pans archipelago 1 at 50 fps and SPS 628 at 60.
+A frame there is about 107 lines of draw view, the objects (0-98 lines, waiting for the
+queued fills and then their own blits) and 19 lines of border clear, ending near line 226
+of 313. On the a1200-fast a frame's work is 0.91 fields on average and 1.01 at the 95th
+percentile, so frames fall either side of a field: 42 fps. Without fast memory (a stock
+a1200) a frame takes 2 fields, CPU-bound.
 
 The objects, which the frame rate follows on fast machines ([internals.md](internals.md#the-frame)):
 
@@ -153,16 +168,14 @@ The objects, which the frame rate follows on fast machines ([internals.md](inter
   (the border clear: 1600 long writes in 15 lines with no bitplane DMA), so a read and a
   write of a long (32 pixels) take about half the blitter's eight slots. With shifting and
   masking in software, perhaps 1.3-2 times faster, unmeasured, for a rewrite of every
-  object routine that must match the blitter pixel for pixel. Not worth it before steps 6
-  and 7.
+  object routine that must match the blitter pixel for pixel. Not worth it before step 7.
 - Triple buffering (step 7) is what keeps them from halving the frame rate: today a frame
-  that runs over a field by a line takes two.
-- Draw view (step 6) is three quarters of the frame; what it saves is margin for objects.
+  that runs over a field by a line takes two. The a1200-fast's frames are there now.
 - The border clear (15 lines) could go if the display window ended at the view's edges in
   play. The in-game copper list does not set the window, though, and every screen shows
   it, so each screen would have to set its own.
 
-So the next steps, if any: step 6, then step 7.
+So the next step, if any: step 7.
 
 ## Other candidates
 
