@@ -66,7 +66,7 @@
 features:
 
  version 4.0b (18.11.2026) done by Vesuri
- - rebuilt with the KickStarter emulation of WHDLoad 20.1
+ - rebuilt with the Kickstart emulation (KickEmu) of WHDLoad 20.1
  - faster flight on 68020/68030 (stack and 3D models in fast memory,
    instruction cache on, polygons, sky and lines drawn by the CPU instead of
    the blitter); the CD32 version now needs 1.2 MB more fast memory
