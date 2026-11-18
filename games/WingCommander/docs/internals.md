@@ -9226,6 +9226,8 @@ controller's pitch and yaw ramp stores (`move.w d2`/`move.w d3`, 8 bytes, a
   pointer shows: `stick_bank` keeps each list's byte as the game set it, and
   `stick_unbank`, from `stick_hide` (the flight's end, a pause, the stick, 10 s
   idle), puts it back where the list is still the game's and still has ours.
+  On the user's A1200 both the flight pointer (off-white) and the bar's room
+  pointer are right with this (2026-11-18).
   The pointer's colour on screen was (243,255,235) in the first mission of
   systems 1, 2, 4, 6, 9 and 12 too (2026-11-17, `--direct-flight --system`;
   all six had the 320×105 aperture). On the user's real Amiga (with an Indivision) the pointer
