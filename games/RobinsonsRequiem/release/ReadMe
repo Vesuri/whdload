@@ -53,13 +53,14 @@
  and    aminet:game/patch/
 
  version 2.0b (18.11.2026) done by Vesuri:
- - Enhanced framerate: faster, smoother 3D view, also with Fast memory above
-   16 MB (Zorro III, most 68040/68060 boards); on in the installed icon
+ - Enhanced framerate: faster, smoother 3D view; on in the installed icon
    (Custom2=1)
  - Smooth landscape (AGA): hills keep their shape as you turn; on in the
    installed icon (Custom3=1)
  - Movement speed option (Custom1): walk at the ECS (1X) or AGA (2X) pace
  - AGA: intro and menus no longer skewed on some 68040 machines
+ - Fast memory above 16 MB (Zorro III, most 68040/68060 boards) now used:
+   much faster there (with Enhanced framerate)
  - uses 1 MB of Fast memory (WHDLoad 20 or newer)
 
  version 1.2 (29.03.13) done by CFou!:
