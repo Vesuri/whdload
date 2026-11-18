@@ -116,7 +116,7 @@ def locate(s):
             i = b.find(sig)
             while i >= 0:
                 cand = a + i - sig_off
-                if cand >= 0 and verify(s, cand, code, relocated):
+                if cand >= 0 and verify(s, cand, code, rel[0]):
                     base0 = cand
                     break
                 i = b.find(sig, i + 1)
@@ -126,10 +126,15 @@ def locate(s):
             break
     if base0 is None:
         raise LookupError('gs2.run code hunk not found')
-    bases = {0: base0}
-    for o, t in sorted(rel[0].items()):
-        if t not in bases:
-            bases[t] = s.long(base0 + o) - int.from_bytes(code[o:o + 4], 'big')
+    # Each hunk's base by the most common value over its relocations (patches overwrite some).
+    image = s.read(base0, len(code))
+    votes = {}
+    for o, t in rel[0].items():
+        v = int.from_bytes(image[o:o + 4], 'big') - int.from_bytes(code[o:o + 4], 'big')
+        votes.setdefault(t, {}).setdefault(v & 0xffffffff, 0)
+        votes[t][v & 0xffffffff] += 1
+    bases = {t: max(c, key=c.get) for t, c in votes.items()}
+    bases[0] = base0
     out = dict(hunks={str(h): dict(base=bases[h], size=len(hs[h][1]), type=hs[h][0], memflags=hs[h][2])
                       for h in sorted(bases)},
                memlist=mem)
@@ -138,11 +143,18 @@ def locate(s):
     return out
 
 
-def verify(s, base, code, relocated, n=0x400, patched=16):
-    """The unrelocated bytes of the first n match the file, but for up to `patched` (slaves
-    patch the code)."""
+def verify(s, base, code, relocs, n=0x400, patched=128):
+    """The code hunk at base: the unrelocated bytes of the first n match the file, but for up to
+    `patched` (slaves patch the code, CUSTOM2 most of all), and its relocations are applied (the
+    file's own image, PRELOADed, matches as well)."""
     b = s.read(base, n)
-    return sum(b[i] != code[i] for i in range(n) if i not in relocated) <= patched
+    relocated = set()
+    for o in relocs:
+        relocated.update(range(o, o + 4))
+    if sum(b[i] != code[i] for i in range(n) if i not in relocated) > patched:
+        return False
+    first = [o for o in sorted(relocs) if o + 4 <= n]
+    return sum(b[o:o + 4] != code[o:o + 4] for o in first) > len(first) // 2
 
 
 def clocks(s, layout):

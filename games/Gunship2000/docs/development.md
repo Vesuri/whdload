@@ -87,6 +87,7 @@ Traps:
 | `profile_flight.py OUT [REFERENCE]` | the front-end route to the cockpit and the profile: F5 (chase view) and 3 s, F6 (tactical) and 3 s, as `OUT/f5.prof` and `OUT/f6.prof` (150 fields each), with `OUT/route/*.png`, `layout.json` and `state.json`; with REFERENCE (an earlier OUT) it stops unless the cockpit is the reference's |
 | `aprof_report.py OUT [TOP]` | per window: frames (presents at code $129c4) and fps, CACR, the chip-bus share, the time by kind (frame cap, blitter waits, stack and calls, other, outside) and the top routines |
 | `gs2.py` | finds `gs2.run`'s hunks in memory (by the installed file), the memory lists, the clocks |
+| `coupling.py OUT [REFERENCE...]` | the coupling test: the same flight inputs at the same game time, the player's state sampled at mission seconds 25-90 and interpolated to the second; with REFERENCEs, the quantities outside their envelope. `coupling.py compare OUT REFERENCE...` compares saved runs |
 | `route.py OUT STEP...` | a scripted input route, for exploring |
 
 ```sh
@@ -96,6 +97,20 @@ BUILD=verify python3 tools/profile_flight.py tmp/prof/ref     # about 25 s of wa
 python3 tools/aprof_report.py tmp/prof/ref
 SLAVE=tmp/exp/x.slave python3 tools/profile_flight.py tmp/prof/x tmp/prof/ref
 ```
+
+The coupling test (P4d), each run about 60 s of wall time:
+
+```sh
+make verify VARIANT=Gunship2000AGA
+for d in 0 1 2 3; do INPUT_DELAY=$d BUILD=verify python3 tools/coupling.py tmp/prof/c-cap-d$d; done
+WHD_ARGS=CUSTOM2=1 BUILD=verify python3 tools/coupling.py tmp/prof/c-fps tmp/prof/c-cap-d0 \
+    tmp/prof/c-cap-d1 tmp/prof/c-cap-d2 tmp/prof/c-cap-d3
+```
+
+The references are the 6-tick cap with the inputs 0-3 fields later: the 1 s turn's heading
+alone spreads by 4 degrees with that (8842-10283 of 65536). `WHD_ARGS="CUSTOM2=1 CUSTOM3=N"`
+makes every frame at least N fields. `DUMPS=1` also saves the data and BSS hunks at each
+sample (`OUT/dumps/`).
 
 Compare slaves and machines with VERIFY builds (scratch slaves with `-DVERIFY=1`): they fly the
 same mission (`internals.md`, "Slave patches"), whose cockpit shots then agree to 0.01.
@@ -117,6 +132,10 @@ Traps:
   GOLF 1 and QUEBEC 1 on three 68030 runs), so only VERIFY runs compare.
 - The front end reads the buttons once per animation frame: clicks hold 10 fields. Typed
   letters hold 4 and wait 10; keys in flight hold 10 (3 was missed).
+- In the coupling test the player's position table entry is B+$127a (BSS, not data), the
+  player object B+$d348; entry 1 also changes, not yet identified (not compared).
+- `gs2.locate` takes each hunk's base by the most common value over the code's relocations:
+  the CUSTOM2 patches overwrite some, and the PRELOADed file image matches the signature too.
 - The installed aprof writes `AITDPROF 1` for `APROF 1`; `aprof_report.py` reads either.
   Its returns are unpaired, so the report uses flat PC costs.
 - The CPU clock in the profile header is `colorclock × CYCLE_UNIT / cycleunit` (50.4 MHz on

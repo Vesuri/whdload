@@ -4,8 +4,9 @@ Set up 18.11.2026: `src/` is JOTD's v3.1 source with three changes that make vas
 it, equivalent to the shipped slaves apart from the newer KickEmu (`development.md`,
 "Build"). All three variants boot to the duty roster. The AGA flight is profiled
 (`development.md`, "Profiling in flight"); the target is 50 fps in flight on the a1200-030
-(soft). P1-P3 of the plan are done: the VERIFY build pins the mission, and the release AGA
-slave keeps the flight's stack in fast RAM and turns the instruction cache on.
+(soft). P1-P4 of the plan are done: the VERIFY build pins the mission, the release AGA slave
+keeps the flight's stack in fast RAM and turns the instruction cache on, and `CUSTOM2=1`
+("Enhanced framerate") lifts the frame cap with the simulation kept at its rate.
 
 ## The AGA flight, 18.11.2026
 
@@ -68,23 +69,45 @@ slows. Lifting the cap exposes what assumes about 10 fps:
 - the 91 `muls.w dt` readers lose precision at small dt;
 - the per-frame 1/65536 s the clock loses (0.08% at 50 fps).
 
+## P4, the frame cap (CUSTOM2=1), 18.11.2026
+
+The patches are in `internals.md` ("Slave patches", "Frame loop"). P4a: dt from the fields
+since the last frame, the remainders carried (dt and the mission clock), PAL or NTSC from the
+field's lines. P4b: the phases once per 6 ticks of game time. P4c: at least one field a
+frame. P4e (a fixed step with interpolation) was not needed.
+
+P4d, the coupling test (`tools/coupling.py`; the pinned mission, the same inputs at the same
+game time, the a1200-030). The references are the 6-tick cap with the inputs 0-3 fields
+later; outside their envelope, over mission seconds 25-90:
+
+| Build (CUSTOM2=1) | speed | B+$d370 (falls steadily: the fuel?) | altitude | position (x, y) |
+|---|---|---|---|---|
+| uncapped only | reached its top 1 s early | 2766-3485 out (the references spread 424) | 16 low | 15572, 0 out (range 233938, 184251) |
+| + the dither | the same | 3113-3832 out | 32 high | 4774, 576 out |
+| + the step gating (the release) | as the references | 0-460 out, back inside by 70 s | 32 high | 1654, 0 out; with the inputs a field later 72, 8356 |
+
+- **The speed was frame-coupled** (code $7c04, 1/8 of the gap a call), and B+$d370 through
+  it; also the climb rate's lag and the keyboard collective. They now run once per 6
+  ticks of game time.
+- **The heading after a 1 s turn** depends on where the input falls among the frames: at the
+  cap 8842-10283 of 65536 with the inputs 0-3 fields apart, uncapped 8979-10456; with
+  `CUSTOM3=3` (3 fields a frame) 10511, `CUSTOM3=5` 9582. The positions follow the heading.
+- **The hover ceiling** at full collective is 1456 with the dither, 1424 at the cap: there the
+  climb rate is 2, and 2 × dt truncates to 0 a frame at the cap (without the dither,
+  uncapped, 1408).
+- The test covers the player only: the other position-table entries did not move in these
+  90 s (entry 1, which does, is not identified). The AI, weapons and wingmen are not checked.
+
+Frame rate, VERIFY, the pinned mission, F5/F6: a1200-030 17.33/16.67 fps (capped 10.67),
+a1200-fast 11.67/11.00 (capped 10.67). The release slave: 10.67/10.67 without `CUSTOM2`,
+16.33/16.33 with it (the release's own mission). Ending a mission (Alt+E, Y) returns to the
+debriefing with `CUSTOM2=1` and the fast stack.
+
 ## Next
 
-P4-P8 of the plan:
+P5-P8 of the plan:
 
-1. **P4 Decouple frames from steps, then lift the cap.**
-   - P4a Time from fields: present on the VBL (`COP1LC` takes effect there anyway), dt =
-     fields × 32768 × 64 / (15 × 50) with the remainder carried (2796.2 a field), and the
-     clock's add from the same accumulator; NTSC from 60 fields.
-   - P4b The per-frame phases from game time (every 6/64 s, as now).
-   - P4c Then the cap: at least one field a frame instead of 6 ticks.
-   - P4d The coupling test (AmigaXDev's `playbooks/fixed-time-simulation.md`): the pinned
-     mission with recorded input at the 6-tick cap and uncapped, state compared at equal game
-     time (position, heading, speed, fuel, weapons, targets). Fix the dt readers that drift
-     (carry remainders).
-   - P4e If too many readers drift, fall back to a fixed 6-tick simulation step with the
-     camera interpolated per frame (`playbooks/simulation-and-presentation.md`).
-2. **P5 Fill with the CPU.** Replace the per-span blits of $fab6 (and the line, clear and
+1. **P5 Fill with the CPU.** Replace the per-span blits of $fab6 (and the line, clear and
    general blits $fd3c, $13832, $dda0 on the same screen):
    - P5a a CPU span fill straight into the chip screen, with masked edge words and long
      stores between;
@@ -95,21 +118,23 @@ P4-P8 of the plan:
      68020/14 must not get slower (keep the blitter path for it if it does).
 
    This step decides whether 50 fps is reachable: the rest of the frame is 13-14 ms of the 20.
-3. **P6 Data out of chip RAM.** Sort the work area's blocks (D+$922a, D+$9232 and the heap)
+2. **P6 Data out of chip RAM.** Sort the work area's blocks (D+$922a, D+$9232 and the heap)
    into what the blitter or display uses and what only the CPU does. Move the CPU-only ones to
    ExpMem with a larger `FASTMEMSIZE` (and the ReadMe's memory line). The measure is the
    chip-bus share of "other gs2.run code" (11-13%).
-4. **P7 Profile again** with the cockpit view (F1, the panel redraws), on NTSC and on a busy
+3. **P7 Profile again** with the cockpit view (F1, the panel redraws), on NTSC and on a busy
    scene, and profile the remaining CPU work ($109ba transform, $e3de) if 50 fps is still
    short.
-5. **P8 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
+4. **P8 Release 4.0b** (18.11.2026) is set: `slave_version` gives each slave's info text and
    `$VER: Gunship2000<Variant>.slave 4.0b (18.11.2026)`, the info text credits Vesuri, and
    the ReadMe entry above JOTD's says what changed (the WHDLoad 20.1 KickEmu, the faster AGA
-   flight). `make dist` packs it; not yet published. Bump the version and the entry as
-   improvements land.
+   flight, Enhanced framerate). `make dist` packs it; not yet published. Bump the version and
+   the entry as improvements land.
+5. **P4 follow-ups.** The coupling test for the AI and weapons (a mission with moving units,
+   targets fired at); the joystick control mode (code $142c ramps the pitch command per step);
+   `CUSTOM2` with time acceleration (`]`).
 
-Not yet checked: leaving a flight back to the front end with P2 (the exit at $13e6a restores
-the saved process stack pointer, the same one as before), and long flights.
+Not yet checked: long flights, and a second flight in one session with `CUSTOM2=1`.
 
 ## Also seen
 

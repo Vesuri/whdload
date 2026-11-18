@@ -29,7 +29,7 @@ flight). The CD32 slave loads `lowlevel.library` and `nonvolatile.library` from 
 | | BaseMem (`CHIPMEMSIZE`) | ExpMem (`FASTMEMSIZE`) | Flags | `slv_Version` |
 |---|---|---|---|---|
 | ECS | $100000 | $100000 | `NoError`, `Examine`, `EmulTrap` | 16 |
-| AGA | $100000 | $100000 | `NoError`, `Examine`, `ClearMem`; stack 13000 | 16 |
+| AGA | $100000 | $100000 | `NoError`, `Examine`, `ClearMem`; stack 13000 | 17 (4.0b: `slv_config`, `C2:B:Enhanced framerate`) |
 | CD32 | $1ff000 | 0 | `NoError`, `Examine` | 16 |
 
 The quit key is $5d (numeric `*`); the ReadMe says F10 and gives the older memory figures.
@@ -75,6 +75,28 @@ The VERIFY build pins the mission for measurements (`development.md`, "Profiling
 | `gs` hunk 22, $2a40 | `moveq #0,d0; move.l d0,d5; move.w d5,-18(a5)` | `jsr reseed_mission`, `nop` | the mission setup reseeds: the office animations call `random()` a timing-dependent number of times, and the setup rolls the time of day here (H78+$f6 = `random(5)` = 0, H78+$f7 = `random(100)` > 40) |
 | `gs2.run`, $183e8 | `move.w VHPOSR,B+$b8fe` | `jsr seed_flight` | the flight's own generator ($12aa0) seeds from the beam position |
 
+With `CUSTOM2=1` the AGA slave also applies `pl_gs2_fps` to `gs2.run` (4.0b, "Enhanced
+framerate"): a frame takes at least one field instead of 6 ticks, and the simulation keeps its
+rate ("Frame loop"). The slave keeps the fields since the last frame (`fps_fields`), the
+remainders, and k, the 6-tick periods of game time the current step completes (`fps_k`):
+
+| Offset | Original | Patch | Why |
+|---|---|---|---|
+| $28 | dt from the ticks B+$c680 | `jsr fps_dt`, branch to $4a | dt = fields × 2097152/750 (PAL) or /900 (NTSC), the remainder carried; more than 11 (PAL) or 14 fields: 32767, the game's 15-tick clamp |
+| $78 | the clock's add, `dt × 15360` | `jsr fps_clock`, branch to $86 | dt × 15 / 32 with the remainder carried; also k for this step |
+| $2a8 | B+$c68b flips, B+$c68c counts, per step | `jsr fps_phase`, branch to $2bc | k times |
+| $2c6 | the cap: until B+$c680 is 6 | `jsr fps_wait`, branch to $2d2 | until a field since the last frame |
+| $2fe | B+$c68a flips (the blink), per frame | `jsr fps_blink` | once per 6 ticks of real time |
+| $608 | `addq.w #1,B+$b8fc` (the VBL client) | `jsr fps_vbl` | also counts the field, unless paused (B+$c738, which stops the ticks too) |
+| $18430 | `move.w #15,B+$c680` (flight setup) | `jsr fps_start`, `nop` | the first frame's dt is 32767 as before; PAL or NTSC from the highest line of a field |
+| $7716 | `bsr $7c04; bsr $7dda` | `jsr fps_speed`, `nop` | the speed moves toward its target by 1/8 (1/16 down) of the gap or 1 a call, without dt: $7c04 runs k times |
+| $7950 | `asr.w #2,d1; add.w d1,B+$2cc` | `jsr fps_climb`, `nop` | the climb rate moves a quarter of the way to B+$2ca a call: k times |
+| $1212, $1268 | `clr.w B+6` (keys `=` and `-`) | `jsr fps_collective` | the collective steps 1 a call while the key is held: only on steps with k > 0 |
+| 84 sites | `muls.w B+$c67e,Dn; add.l Dn,Dn; swap Dn` | `jsr fps_dtm<n>; nop; swap Dn` | found by `fps_dither_sites`: x × dt is truncated every frame; the product gets a uniform fraction (a golden-ratio sequence) before the swap, so it is right on average, and 0 stays 0 |
+
+The VERIFY build reads `CUSTOM3` as the least fields a frame takes (`fps_wait`), for the
+coupling test (`development.md`).
+
 `_patch_exe` tells the AGA `Gunship 2000` by `$2c79` at $512; with `$2c79` at $66c (the ECS
 layout) it applies the ECS install-check patches instead.
 
@@ -104,6 +126,13 @@ load into ExpMem. `tools/gs2.py` finds them in a running game and reads the cloc
 The ticks come from a CIA-B timer server (code $133b2; the latch is 11084 E-clocks, 64.0 Hz
 on PAL, 64.6 on NTSC) that adds 1 to B+$c680 unless B+$c738 is set (pause). The VBL server
 (code $133f4) counts fields in B+$b8fc (code $608).
+
+Per step, without dt (frame-coupled at any other rate than the cap's): the speed's and the
+climb rate's approach to their targets (code $7c04, $7950), the keyboard collective (+1 a
+step, $1212), and the phases. Held keys call their routine from the table at code $7d2 (by key
+code) once a step (code $768). The cyclic is real time: the stick emulation (code $13994, a
+VBL client) ramps the deflection per field, and code $13cc reads it into the rate commands
+B+$c6b2 (roll) and B+$c6b6 (pitch).
 
 So the step is variable and in real time: every frame advances the simulation by the ticks
 since the last, in 64ths of a second, between 6 (the cap: at most 10.67 frames a second) and
