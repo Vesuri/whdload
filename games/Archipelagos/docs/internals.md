@@ -42,19 +42,56 @@ byte ST header (so at runtime `$201C` + offset).
 | `$CE92`; `$E494`, `$10BBA`, `$11884`, `$118B4` | `$CEBE`; `$E4E8`, `$10C9E`, `$11B3C`, `$11B6C` | the level 3 handler's self-modifying `jsr` (the pointer or the pan routine): it jumps through a slave variable, and the four writes of its target write that variable |
 | `$12334`, `$1238C` | `$126D8`, `$12730` | the swap's copper-list writes: all interrupts off, and never in lines 0-2 or a frame's last three ([The frame](#the-frame)) |
 | `$1185C` | `$11B14` | 68020 or better: the frame's second field wait skipped |
-| (install) | same | the instruction cache on for BaseMem, the data cache off (`resload_SetCPU`: `WCPUF_Base_WT`, `WCPUF_IC`) |
+| (install) | same | the instruction cache on for BaseMem and ExpMem, the data cache off (`resload_SetCPU`: `WCPUF_Base_WT`, `WCPUF_Exp_CB`, `WCPUF_IC`) |
+| (install) | same | 68020 or better with ExpMem in fast memory: the body relocated to run there, DMA's data kept in chip ([Memory](#memory)) |
+| `$AEFA`, `$B10E`, `$C8D8` | `$AF06`, `$B11C`, `$C904` | body in fast memory: the blitter's shape tables and buffer, which the game takes pc-relative, from the chip copy |
+| `$8D44` (`.kbdcust`) | same | body in fast memory: the key handler's addresses follow the body |
 
 ## Memory
 
-Everything is in the 512 KB of BaseMem, which is Chip RAM; the slave asks for no ExpMem.
-The program image runs from `$201C` to `$16314` and mixes code, variables, tables and
-data that DMA reads: the copper list (offset `$9976`, its address kept at offset `$8FE0`),
+BaseMem is 512 KB of Chip RAM. The program image runs from `$201C` to `$16314` (SPS 628
+`$166B8`), all text, no BSS, with 894 relocations (SPS 628 927), and mixes code,
+variables, tables and data that DMA reads: the copper list (offset `$9976`, its address kept at offset `$8FE0`),
 the sky's copper lists (tables at offsets `$99FA` and `$9A1A`, which the level 3 handler
 puts in `COP2LC`), and audio samples (Paula reads offset `$3A10` in play). Fixed addresses
 outside the image: the two screen buffers at `$5C780` and `$663C0` (40000 bytes each: five
 320x200 planes, 8000 bytes apart), and the map, 64 KB at `$70000`-`$7FFFF`, which code
 indexes from `$78000` with a signed word (256 cells a row; the low nibble is the terrain
-type, bit 7 marks a cell with an object). The supervisor stack is `$784`-`$800`.
+type, bit 7 marks a cell with an object). The supervisor stack is the slave's, below `$800`
+(the game uses `$724`-`$800`).
+
+### The body in fast memory (2.0b)
+
+The slave asks for an optional ExpMem of `$16000` bytes. On a 68020 or better that gets it
+in fast memory (not chip, below `$200000`, nor slow memory, `$C00000`-`$DFFFFF`), the body
+runs from there with the stack at ExpMem's top; otherwise (a 68000, no fast memory)
+everything stays as it was. The relocation resolves each relocated long to one of two
+copies of the body: the chip copy at `$201C` for a target in one of these blocks, the fast
+copy otherwise. Both copies are relocated and patched alike, so they start out the same;
+then the game runs only the fast one, apart from the replayer.
+
+| Offsets (both versions unless given) | What | Why it stays in chip |
+|---|---|---|
+| `$0`-`$8D2A` | the replayer, its data and samples, and other data | Paula reads the samples (`$2C12`-`$4929`); the replayer addresses everything pc-relative, so it runs from the chip copy as a whole |
+| `$8F50`-`$8F9C` | sprites | sprite DMA |
+| `$8FFA`-`$9258`, `$9976`-`$99AC` | copper lists | the copper |
+| `$B004`-`$B0A4`, `$B2CC`-`$B7EC` (628 `$B010`-`$B0B0`, `$B2DA`-`$B7FA`) | the blitter's shape tables | blitter sources |
+| `$14076`-`$140F8` (628 `$1441A`-`$1449C`) | a buffer | a blitter source |
+
+The blocks come from the trace's DMA records through every screen (`tools/smc.py`'s two
+routes, both versions): every DMA read of the body is in one of them. A pc-relative
+reference across a block's edge would reach the wrong copy; decoding every executed
+instruction, and a linear sweep of the whole body, finds only five, the `lea`s that hand
+the blitter its shape tables and buffer, which the slave patches to the chip copy. The
+slave's own absolute addresses into the body follow it: the timing tables, the key
+handlers and the US intro's check. With the body in fast memory nothing touches the chip
+copy outside the blocks (`tools/cpuchip.py`) and no DMA reaches beyond the game's memory.
+The slave leaves the running body's address at `$2012` (the ST header's reserved long) for
+the tools.
+
+The map stays in chip memory: 38 code sites address it absolutely and about 90 longs in
+data point into `$70000`-`$7FFFF`, some of them other buffers there, against 464 chip
+accesses a field in a pan with the body in fast memory (about 0.13 ms).
 
 ## The frame
 

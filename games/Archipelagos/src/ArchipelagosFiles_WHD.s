@@ -29,6 +29,9 @@
 ;		- the swap's bitplane pointers are written with interrupts off and
 ;		  never while the copper loads them; on a 68020 or better the
 ;		  frame no longer waits for a field before the swap (Vesuri)
+;		- on a 68020 or better with fast memory (optional ExpMem) the
+;		  program and its stack run there; what DMA reads stays in
+;		  chip memory (Vesuri)
 
 ; 31-Aug-2023	- WaitRaster waits for the start of a frame (VPOSR V8 set, then
 ;		  clear) instead of line 303, which NTSC never reaches
@@ -52,6 +55,7 @@
 
 FLAGS		= WHDLF_NoError|WHDLF_ClearMem|WHDLF_EmulTrap
 QUITKEY		= $59		; F10
+EXPSIZE		= $16000	; the program body (up to $146a0) and a stack below the top
 ;DEBUG
 
 ; absolute skip
@@ -76,7 +80,7 @@ HEADER	SLAVE_HEADER		; ws_security + ws_ID
 	dc.w	0		; ws_DontCache
 	dc.b	0		; ws_KeyDebug
 	dc.b	QUITKEY		; ws_KeyExit
-	dc.l	0		; ws_ExpMem
+	dc.l	-EXPSIZE	; ws_ExpMem: optional, the program and its stack
 	dc.w	.name-HEADER	; ws_name
 	dc.w	.copy-HEADER	; ws_copy
 	dc.w	.info-HEADER	; ws_info
@@ -141,21 +145,42 @@ Patch	lea	resload(pc),a1
 	lea	GT627(pc),a4
 	move.l	#$ce94,d4		; the level 3 handler's jsr target
 	lea	PLFAST(pc),a6
+	lea	CHIP627(pc),a0
 	cmpi.w	#$55bf,d0		; SPS 627 (cmpi: the shipped slave's encoding)
 	beq.b	.ok
 	lea	PLGAME_US(pc),a3
 	lea	GT628(pc),a4
 	move.l	#$cec0,d4
 	lea	PLFAST_US(pc),a6
+	lea	CHIP628(pc),a0
 	cmpi.w	#$f600,d0		; SPS 628 (cmpi: the shipped slave's encoding)
 	beq.b	.ok
 
 .wrongver
 	pea	(TDREASON_WRONGVER).w
-	bra.b	EXIT
+	bra.w	EXIT
 
-.ok	lea	t_table(pc),a0
+.ok	lea	Chip(pc),a1
+	move.l	a0,(a1)
+	lea	t_table(pc),a0
 	move.l	a4,(a0)
+
+; a 68020 or better with ExpMem in fast memory: the body goes there
+	moveq	#0,d0
+	move.l	CPUFLAGS(pc),d1
+	btst	#AFB_68020,d1
+	beq.b	.chip
+	move.l	HEADER+ws_ExpMem(pc),d1
+	cmpi.l	#$200000,d1		; none, or chip memory
+	bcs.b	.chip
+	cmpi.l	#$c00000,d1		; slow memory, on the chip bus
+	bcs.b	.exp
+	cmpi.l	#$e00000,d1
+	bcs.b	.chip
+.exp	move.l	d1,d0
+	subi.l	#$2000+$1c,d0
+.chip	lea	FastDelta(pc),a1
+	move.l	d0,(a1)
 
 ; relocate Atari-ST binary
 	move.l	a5,a0
@@ -167,7 +192,7 @@ Patch	lea	resload(pc),a1
 	addi.l	#$1C,d3	; immediate form as the shipped slave has it: vasm encodes op #,Dn as the Dn form
 	move.l	(a0)+,d0
 	add.l	d0,a1
-	add.l	d3,(a1)
+	bsr	Reloc
 .reloc	moveq	#0,d2
 	move.b	(a0)+,d2
 	beq.b	.done
@@ -177,7 +202,7 @@ Patch	lea	resload(pc),a1
 	bra.b	.reloc
 
 .normal	add.l	d2,a1
-	add.l	d3,(a1)
+	bsr	Reloc
 	bra.b	.reloc
 
 .done
@@ -199,11 +224,52 @@ Patch	lea	resload(pc),a1
 	jsr	resload_Patch(a2)
 .slow
 
-; the instruction cache for BaseMem, no data cache (it would make the screens
-; data-cacheable where WHDLoad uses the MMU)
-	move.l	#WCPUF_Base_WT|WCPUF_IC,d0
-	move.l	#WCPUF_Base|WCPUF_IC|WCPUF_DC,d1
+; the fast copy: the relocated and patched body (the chip copy has the fast
+; memory patches too, so the two are the same); the slave's absolute
+; addresses into it follow
+	move.l	FastDelta(pc),d0
+	beq.b	.nocopy
+	lea	PLFASTMEM(pc),a0
+	cmpi.l	#$ce94,d4
+	beq.b	.fm
+	lea	PLFASTMEM_US(pc),a0
+.fm	move.l	a5,a1
+	jsr	resload_Patch(a2)
+	move.l	FastDelta(pc),d0
+	move.l	a5,a0
+	lea	(a5,d0.l),a1
+	move.l	-$1c+2(a5),d1		; the text size
+	lsr.l	#2,d1
+.copy	move.l	(a0)+,(a1)+
+	subq.l	#1,d1
+	bpl.b	.copy
+	add.l	d0,a5
+	move.l	t_table(pc),a0
+	moveq	#13-1,d1		; GT627/GT628 entries
+.gt	add.l	d0,(a0)+
+	dbf	d1,.gt
+	lea	GameBody(pc),a0
+	add.l	d0,(a0)
+	jsr	resload_FlushCache(a2)
+.nocopy
+
+; the instruction cache for BaseMem and ExpMem, no data cache (it would make
+; the screens data-cacheable where WHDLoad uses the MMU). BaseMem stays
+; cacheable: without the MMU one noncacheable area turns both caches off.
+	move.l	#WCPUF_Base_WT|WCPUF_Exp_CB|WCPUF_IC,d0
+	move.l	#WCPUF_Base|WCPUF_Exp|WCPUF_IC|WCPUF_DC,d1
 	jsr	resload_SetCPU(a2)
+
+; for the tools: the running body's address in the ST header's reserved long,
+; which nothing reads after the relocation
+	move.l	GameBody(pc),$2000+$12.w
+
+; the stack at ExpMem's top
+	move.l	FastDelta(pc),d0
+	beq.b	.go
+	move.l	HEADER+ws_ExpMem(pc),a7
+	add.l	#EXPSIZE,a7
+.go
 
 
 ; and start
@@ -235,6 +301,71 @@ L3Jump	move.l	L3Vec(pc),-(a7)
 	rts
 
 L3Vec	dc.l	0
+
+; A relocation: the long at (a1) is an offset into the body. The chip
+; copy's address for one in a CHIP block (Chip, ending with -1), the fast
+; copy's otherwise (FastDelta, 0 without fast memory). d3 is the chip body.
+Reloc	movem.l	d0-d1/a0,-(a7)
+	move.l	(a1),d0
+	move.l	Chip(pc),a0
+.next	move.l	(a0)+,d1
+	bmi.b	.fast
+	cmp.l	d1,d0
+	bcs.b	.skip
+	cmp.l	(a0),d0
+	bcs.b	.chip
+.skip	addq.l	#4,a0
+	bra.b	.next
+.fast	add.l	FastDelta(pc),d0
+.chip	add.l	d3,d0
+	move.l	d0,(a1)
+	movem.l	(a7)+,d0-d1/a0
+	rts
+
+Chip		dc.l	0		; CHIP627 or CHIP628
+FastDelta	dc.l	0		; the fast body minus the chip body
+GameBody	dc.l	$2000+$1c	; the body the game runs
+
+; What stays in chip memory, as body offsets: from offset 0 the replayer,
+; which addresses its data and samples pc-relative, with the samples and
+; data up to the boot code; the sprites; the copper lists; the blitter's
+; shape tables; a buffer the blitter reads. Every DMA read of the body on
+; every screen is in one of them. Nothing outside a block refers into it
+; pc-relative but the five lea of PLFASTMEM, nor the other way round.
+CHIP627	dc.l	$0,$8d2a,$8f50,$8f9c,$8ffa,$9258,$9976,$99ac
+	dc.l	$b004,$b0a4,$b2cc,$b7ec,$14076,$140f8,-1
+CHIP628	dc.l	$0,$8d2a,$8f50,$8f9c,$8ffa,$9258,$9976,$99ac
+	dc.l	$b010,$b0b0,$b2da,$b7fa,$1441a,$1449c,-1
+
+; The blitter's sources, which the game takes pc-relative: the chip copy.
+BlitA627
+	lea	$2000+$1c+$b004,a3
+	lea	$2000+$1c+$b7cc,a2
+	rts
+BlitB627
+	lea	$2000+$1c+$b2cc,a3
+	lea	$2000+$1c+$b7cc,a2
+	rts
+BlitC627
+	lea	$2000+$1c+$14076,a2
+	movea.l	GameBody(pc),a0
+	adda.l	#$1286a,a0
+	movea.l	(a0),a0			; the back buffer
+	rts
+BlitA628
+	lea	$2000+$1c+$b010,a3
+	lea	$2000+$1c+$b7da,a2
+	rts
+BlitB628
+	lea	$2000+$1c+$b2da,a3
+	lea	$2000+$1c+$b7da,a2
+	rts
+BlitC628
+	lea	$2000+$1c+$1441a,a2
+	movea.l	GameBody(pc),a0
+	adda.l	#$12c0e,a0
+	movea.l	(a0),a0			; the back buffer
+	rts
 
 ; The swap writes the five bitplane pointers into the copper list's first
 ; moves, which the copper reads at the start of each frame. A write while it
@@ -290,6 +421,21 @@ PLFAST_US
 	PL_S	$11b14,6		; no field wait before the swap
 	PL_END
 
+; SPS 627, the body in fast memory
+PLFASTMEM	PL_START
+	PL_PSS	$aefa,BlitA627,2
+	PL_PSS	$b10e,BlitB627,2
+	PL_PSS	$c8d8,BlitC627,2
+	PL_END
+
+; SPS 628, the body in fast memory
+PLFASTMEM_US
+	PL_START
+	PL_PSS	$af06,BlitA628,2
+	PL_PSS	$b11c,BlitB628,2
+	PL_PSS	$c904,BlitC628,2
+	PL_END
+
 ; SPS 627
 PLGAME	PL_START
 	PL_P	$8e68,AckLev1
@@ -333,8 +479,10 @@ PLGAME	PL_START
 
 .kbdcust
 	move.b	RawKey(pc),d0
-	move.b	d0,$2000+$1c+$e33c
-	jmp	$2000+$1c+$e37e
+	movea.l	GameBody(pc),a0
+	adda.l	#$e33c,a0
+	move.b	d0,(a0)
+	jmp	$e37e-$e33c(a0)
 	
 
 load	move.l	(a0)+,d0		; offset
@@ -411,7 +559,8 @@ PLGAME_US
 	PL_END
 
 ; add LMB check to "Fanfare intro"
-.intro	move.l	#$2000+$1c+$1264c,d0
+.intro	move.l	GameBody(pc),d0
+	addi.l	#$1264c,d0
 	btst	#6,$bfe001
 	bne.b	.noquit
 	moveq	#0,d2
@@ -424,8 +573,10 @@ PLGAME_US
 
 .kbdcust
 	move.b	RawKey(pc),d0
-	move.b	d0,$2000+$1c+$e390
-	jmp	$2000+$1c+$e3d2
+	movea.l	GameBody(pc),a0
+	adda.l	#$e390,a0
+	move.b	d0,(a0)
+	jmp	$e3d2-$e390(a0)
 
 
 SaveGame

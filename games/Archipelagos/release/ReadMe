@@ -8,7 +8,7 @@
  CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
  PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
- This install applies to "Archipelagos" © 1989 Astral Software.
+ This install applies to "Archipelagos" Â© 1989 Astral Software.
  Archipelagos Enhanced 2.0b (18.11.2026)
  Original install: StingRay. Version 2.0b: Vesuri.
 
@@ -18,6 +18,7 @@
  To install from a different drive than DF0: select installation mode Expert.
 
  The installed game requires 0.5 MB ChipMem (+0.3 MB OtherMem for preload).
+ On a 68020 or better it uses 88 KB of fast memory if there is any.
  It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
 
 
@@ -68,9 +69,9 @@
  version 2.0b (18.11.2026) done by Vesuri:
  - faster Amigas no longer speed the game up: moves, terrain animation and
    spreading keep a fixed pace, and moves are smoother
- - two and a half to three times the frame rate on 68020 and 68030
-   Amigas: the instruction cache is on, and a frame no longer waits an
-   extra field
+ - up to five times the frame rate on 68020 and 68030 Amigas, about two
+   and a half times without fast memory: the instruction cache is on, the
+   program runs in fast memory, and a frame no longer waits an extra field
  - quitting no longer hangs on NTSC Amigas (StingRay's fix of 31.08.2023,
    which the previous install package did not include)
 

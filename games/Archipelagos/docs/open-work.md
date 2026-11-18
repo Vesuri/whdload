@@ -4,7 +4,7 @@ Set up from StingRay's v1.2 slave. Both variants boot to the title and into arch
 1, SPS 627 on the a500 and SPS 628 (NTSC) on the a1200, and F10 quits cleanly on both. The
 frame loop, the game's clocks and the rendering cost are measured
 ([internals.md](internals.md#the-frame)). Game time is decoupled from the frame rate
-(step 1 below), and steps 2 and 3 of the 50 fps plan are done.
+(step 1 below), and steps 2 to 4 of the 50 fps plan are done.
 
 ## Release
 
@@ -17,14 +17,14 @@ later). `tools/play.py` plays archipelago 1 to its end.
 ## 50 fps on the a1200-030
 
 The soft target is 50 fps in play on the a1200-030, which drew 8.2 fps on archipelago 1
-before step 2, 15.8 after it and 23.2 since step 3. Before step 2 a frame there took
+before step 2, 15.8 after it, 23.2 after step 3 and 43.6 since step 4. Before step 2 a frame there took
 124 ms: 90 ms of CPU work, 12 ms waiting for the blitter and 27 ms waiting for fields. The causes, largest first:
 
 - **Caches off** (fixed in step 2). WHDLoad's default marks BaseMem uncacheable, and
   without the MMU in use (the 68030's default) that turns both caches off. The slave set no
   cache flags, so the whole game ran uncached from Chip RAM. WHDLoad's `CACHE` option alone took the
   emulated 030 from 8.0 to 15.0 fps.
-- **Nothing in fast memory.** No ExpMem. Code, stack, tables, the span list and the map all
+- **Nothing in fast memory** (fixed in step 4). No ExpMem. Code, stack, tables, the span list and the map all
   sit in Chip RAM. With the instruction cache on, 80% of the CPU's chip accesses outside the
   wait loops go to things DMA never reads: about 31000 a frame, at least 8.7 ms.
 - **Two field waits a frame** (fixed in step 3). One before drawing, which double
@@ -71,20 +71,28 @@ nor change behaviour.
    world tick, which is not decoupled and is checked once a frame, runs 7.3-7.8 times a
    second there (8.17 at step 2's 3-field frames, 6.33 on the uncached original): frames
    of 2 and 3 fields check it late more often than frames of 3.
-4. **Fast memory for what DMA never reads** (ExpMem; cached).
-   - The stack, which is the slave's `$800`.
-   - The renderer's data: the span list (offset `$13C26`), its tables (`$1254A` and the row
-     tables), the variables its loops read pc-relative, and the 64 KB map. Every
-     `lea $78000` must be patched for the map; count them first.
-   - The renderer's code, last (its pc-relative data references have to become absolute),
-     preferably as part of step 6.
-   - Keep in chip everything DMA reads: the screens, the copper lists, the sky lists, the
-     samples, sprite and blitter source data.
-   - On a 68030 without the MMU the caches are global. Chip RAM is never data-cached on
-     real hardware (the bus inhibits it), but FS-UAE models that only without its MMU
-     model. So measure data-cache effects with `EXTRA_ARGS=--uae_mmu_model=0`, and
-     confirm on hardware.
-   - Gate: re-measure `tools/cpuchip.py` and the frame.
+4. **Fast memory for what DMA never reads.** Done, more widely than planned: on a 68020
+   or better with ExpMem in fast memory the whole body runs there, with the stack; only
+   what DMA reads stays in chip (the replayer with its samples, sprites, copper lists, the
+   blitter's tables and a buffer), each relocation resolved to the copy its target is in
+   ([internals.md](internals.md#the-body-in-fast-memory-20b)). `tools/smc.py` finds no
+   self-modifying code that way either, no DMA reaches beyond the game's memory on any
+   screen, and nothing reads the chip copy outside the blocks. The map stays in chip
+   (0.13 ms a field). The data cache stays off. Panning (`frames 250 4`), step 3's slave
+   against this one: a1200-030 23.20 to 43.60 fps (1.15 fields a frame), a1200-fast and
+   a500-020 (68020 with fast memory) 16.60 and 15.00 to 23.80; a1200 without fast memory
+   16.60 and 16.60; SPS 628 (60 Hz) a1200-030 19.92 to 30.00, a1200 17.76 and 17.76,
+   a1200-fast 19.92; a1200-040 and a1200-060 50.00 before and after; a500 5.40 and 5.40.
+   On the a1200-030 (`tools/bench.py`, no MMU model) the frame's work without waits went
+   from 1.40 to 0.59 fields, CPU work to 12.2 ms and blitter waits to 8.7 ms a frame;
+   `tools/cpuchip.py` counts 5216 CPU chip accesses a field outside the wait loops, from
+   15984, 82% of them the screens. Game time there: a move 44 fields, 8.33 renderer steps
+   a second, collapses 31 fields, the ramps 384. The a500 runs the chip path unchanged,
+   and its moves are identical to the original's field by field, but asking for ExpMem
+   changes WHDLoad's memory layout and with it the timing below a field: in
+   `timecheck.py effects` one click takes effect a frame (10 fields) earlier, and the
+   play-through differs from there (a build without the ExpMem request is identical; so
+   is SPS 628's move check).
 5. **Overlap the blitter with the CPU.** The sky (lines 20-112) and the ground (113-179)
    do not overlap. Start the sky's plane blits before draw view and start each next one
    when the blitter is idle, polled once a ground row or from the blitter interrupt. The
@@ -101,9 +109,11 @@ nor change behaviour.
 7. **Triple buffering**, only if frames still end just after a field. It needs another
    40000 bytes of Chip RAM, so map what BaseMem uses between `$16314` and `$5C780` first.
 
-Whether 50 fps is reachable is not shown yet. One field is 20 ms. With the instruction
-cache, CPU work plus blitter waits are about 40 ms a frame, so steps 4-6 have to halve
-that. Decide after step 4's measurement.
+After step 4 (18.11.2026), the measurement for that decision: on the a1200-030 a frame
+is 12.2 ms of CPU work and 8.7 ms waiting for the blitter, 21 ms against a field's 20.
+So 50 fps there looks reachable with step 5's overlap, and step 6 would add margin. The
+a1200-040 and a1200-060 already run at 50. Without fast memory (a stock a1200) the frame
+still takes 3 fields, and steps 5 and 6 are what is left for it.
 
 ## Other candidates
 
