@@ -96,6 +96,11 @@ python3 tools/archipelagos.py quit
   memory, and its reduction counts fast-body PCs at the chip copy's addresses, so the
   report's addresses hold either way.
 - `tools/cpuchip.py FILE` splits the CPU's chip-bus accesses in one trace by target.
+- `tools/timeline.py OUT [FIELDS]` traces FIELDS fields (default 8) from wherever the game
+  is and lays each frame out on the beam: the field and line each phase starts at (the
+  renderer, draw view, the sky fill, the objects, the border clear, the swap, the world
+  update), its length in lines, the CPU's blitter waits and time outside the program in
+  it, and the blitter's DMA slots. It shows what a frame needs to fit a field.
 - `tools/smc.py OUT [end|death]` checks for self-modifying code: from a fresh boot on a
   tracing CPU it keeps the image at the game's entry (with the body in fast memory, the
   chip copy, which never runs), plays a route (to the level's end, or to a death and the
