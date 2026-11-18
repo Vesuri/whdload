@@ -36,6 +36,8 @@
 ;		  fill run from a blit queue while the CPU draws the ground, the
 ;		  CPU clears the border, and the CPU's polls leave the objects'
 ;		  blits every cycle (BLITHOG) (Vesuri)
+;		- with the body in fast memory the title's pre-scaler reads and
+;		  writes fast copies, then copies each object to chip (Vesuri)
 
 ; 31-Aug-2023	- WaitRaster waits for the start of a frame (VPOSR V8 set, then
 ;		  clear) instead of line 303, which NTSC never reaches
@@ -174,6 +176,12 @@ Patch	lea	resload(pc),a1
 	move.l	#$ce50,(a1)
 	move.l	#$12c0e,-(a1)
 .v627
+	lea	PS627(pc),a0		; the pre-scaler's offsets
+	cmpi.l	#$ce94,d4
+	beq.b	.p627
+	lea	PS628(pc),a0
+.p627	lea	PSVer(pc),a1
+	move.l	a0,(a1)
 	lea	t_table(pc),a0
 	move.l	a4,(a0)
 
@@ -614,6 +622,150 @@ CBorder	movem.l	d0-d2,-(a7)
 	rts
 
 
+; The pre-scaler (the title's PLEASE WAIT, the body in fast memory). Once
+; at boot the game scales each of 36 objects (48x48, in the ST picture at
+; $70000) to 15 sizes, a pixel at a time, into the blitter's object buffer
+; ($193b8-$5c780, chip): per pixel four word reads of the source and a
+; read-modify-write of five destination planes, all in chip memory. The
+; game's own scaler still draws every pixel, but from a fast copy of the
+; object's source rows into a fast scratch buffer, which is then copied to
+; the object's place in chip memory. The scratch is the fast copy's
+; replayer area, which only the chip copy runs (body offsets $1000 and
+; $3000). Everything the routine leaves (the size table's pointers, the
+; stride, the object counter, the objects' offset table) as the game's.
+PSD	= $1000			; the scratch: an object's 15 sizes (stride bytes)
+PSS	= $3000			; the scratch: an object's 48 source rows, 160 apart
+
+; body offsets: the size table (15 entries of 20 bytes), the stride, the
+; object counter, the objects' offset table, the scaler, the source's size,
+; the source offset table
+PS627	dc.l	$d1b2,$cf0a,$12e62,$d122,$c724,$cf0e,$d3f6
+PS628	dc.l	$d1de,$cf36,$13206,$d14e,$c750,$cf3a,$d422
+PSVer	dc.l	0
+
+FScale	movem.l	d0-a6,-(a7)
+	movea.l	PSVer(pc),a3
+	movea.l	GameBody(pc),a4
+	movea.l	(a3),a0			; the size table's chip pointers,
+	adda.l	a4,a0			; as the game sets them
+	movea.l	#$193b8,a1
+	moveq	#15-1,d1
+.ptr	move.l	a1,6(a0)
+	move.w	(a0),d0
+	move.w	4(a0),d2
+	move.w	d2,d3
+	mulu.w	d0,d2
+	adda.l	d2,a1
+	move.l	a1,10(a0)
+	asr.w	#2,d3
+	mulu.w	d0,d3
+	adda.l	d3,a1
+	lea	20(a0),a0
+	dbf	d1,.ptr
+	move.l	a1,d5
+	subi.l	#$193b8,d5		; d5: the stride
+	move.l	4(a3),d0
+	move.l	d5,(a4,d0.l)
+	moveq	#36-1,d7
+.obj	move.l	8(a3),d0
+	moveq	#0,d6
+	move.w	(a4,d0.l),d6		; d6: the object
+; its source rows to the fast scratch
+	move.l	24(a3),d0
+	add.l	a4,d0
+	movea.l	d0,a0
+	move.l	d6,d0
+	lsl.l	#2,d0
+	move.l	(a0,d0.l),d0
+	addi.l	#$70000,d0
+	movea.l	d0,a0
+	lea	PSS(a4),a1
+	move.l	20(a3),d0
+	move.w	(a4,d0.l),d1		; the source's size (48)
+	subq.w	#1,d1
+.row	movem.l	(a0),d0/d2-d4/a5-a6	; 48 pixels, four planes
+	movem.l	d0/d2-d4/a5-a6,(a1)
+	lea	160(a0),a0
+	lea	160(a1),a1
+	dbf	d1,.row
+; the size table's pointers moved by d4 = the scratch minus the object's
+; place, which the scaler adds back (stride times the object)
+	move.l	d5,d4
+	mulu.w	d6,d4
+	neg.l	d4
+	addi.l	#-$193b8+PSD,d4
+	add.l	a4,d4
+	bsr	.move
+; the scratch cleared, the object's 15 sizes scaled into it
+	lea	PSD(a4),a0
+	move.l	d5,d0
+	lsr.l	#1,d0
+	subq.l	#1,d0
+.clr	clr.w	(a0)+
+	subq.l	#1,d0
+	bpl.b	.clr
+	movea.l	(a3),a0
+	adda.l	a4,a0
+	moveq	#15-1,d1
+.size	movem.l	d1/d4-d7/a0/a3-a4,-(a7)
+	movea.l	16(a3),a1
+	jsr	(a4,a1.l)
+	movem.l	(a7)+,d1/d4-d7/a0/a3-a4
+	lea	20(a0),a0
+	dbf	d1,.size
+	neg.l	d4
+	bsr	.move
+; the scratch to the object's place in chip memory
+	lea	PSD(a4),a0
+	move.l	d5,d0
+	mulu.w	d6,d0
+	addi.l	#$193b8,d0
+	movea.l	d0,a1
+	move.l	d5,d0
+	move.l	a1,d1
+	btst	#1,d1			; long writes, long-aligned
+	beq.b	.al
+	move.w	(a0)+,(a1)+
+	subq.l	#2,d0
+.al	move.l	d0,d1
+	lsr.l	#2,d1
+	bra.b	.cpe
+.cp	move.l	(a0)+,(a1)+
+.cpe	subq.l	#1,d1
+	bpl.b	.cp
+	btst	#1,d0
+	beq.b	.next
+	move.w	(a0)+,(a1)+
+.next	move.l	8(a3),d0
+	addq.w	#1,(a4,d0.l)
+	dbf	d7,.obj
+; the objects' offset table
+	move.l	12(a3),d0
+	lea	(a4,d0.l),a0
+	moveq	#0,d0
+	moveq	#36-1,d1
+.off	move.l	d0,(a0)+
+	add.l	d5,d0
+	dbf	d1,.off
+	movem.l	(a7)+,d0-a6
+	rts
+
+; the size table's pointers plus d4
+.move	movea.l	(a3),a0
+	adda.l	a4,a0
+	moveq	#15-1,d1
+.mv	add.l	d4,6(a0)
+	add.l	d4,10(a0)
+	lea	20(a0),a0
+	dbf	d1,.mv
+	rts
+
+; the scaler's source: the fast copy of the object's rows
+FSrc	move.l	GameBody(pc),d6
+	addi.l	#PSS,d6
+	rts
+
+
 ; SPS 627, 68020 or better
 PLFAST	PL_START
 	PL_S	$1185c,6		; no field wait before the swap
@@ -644,6 +796,8 @@ PLFASTMEM	PL_START
 	PL_PSS	$aefa,BlitA627,2
 	PL_PSS	$b10e,BlitB627,2
 	PL_PSS	$c8d8,BlitC627,2
+	PL_P	$c636,FScale		; the pre-scaler, from fast copies
+	PL_PS	$c77a,FSrc
 	PL_END
 
 ; SPS 628, the body in fast memory
@@ -652,6 +806,8 @@ PLFASTMEM_US
 	PL_PSS	$af06,BlitA628,2
 	PL_PSS	$b11c,BlitB628,2
 	PL_PSS	$c904,BlitC628,2
+	PL_P	$c662,FScale
+	PL_PS	$c7a6,FSrc
 	PL_END
 
 ; SPS 627

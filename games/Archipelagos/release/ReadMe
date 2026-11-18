@@ -73,6 +73,8 @@
    times without fast memory: the instruction cache is on, the program runs
    in fast memory, the blitter fills the sky while the CPU draws the ground,
    and a frame no longer waits an extra field
+ - the title's PLEASE WAIT is five times shorter on 68030 Amigas with fast
+   memory
  - quitting no longer hangs on NTSC Amigas (StingRay's fix of 31.08.2023,
    which the previous install package did not include)
 

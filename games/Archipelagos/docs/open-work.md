@@ -115,7 +115,12 @@ nor change behaviour.
    routes, both versions, play through with no difference but the known `rts`, and the
    screens match step 4's pixel for pixel at twelve headings but for the creatures' animation
    (a1200-030) and at one (a1200-060).
-6. **The renderer's CPU work**, re-profiled after steps 2-5.
+6. **The renderer's CPU work**, re-profiled after steps 2-5, and the title's pre-scaler.
+   - Done: with the body in fast memory the pre-scaler (the title's PLEASE WAIT) reads a
+     fast copy of each object's source and scales into fast scratch, then copies the
+     object to chip; the buffer is identical. a1200-030 190 to 35 fields (SPS 628 226 to
+     33), a1200-fast 369 to 320, now CPU-bound
+     ([internals.md](internals.md#the-pre-scaler)).
    - Inline the per-word `jsr 12(a1)` fills as long-word writes: the view is long-aligned,
      and AGA's chip bus takes a long in one access.
    - Keep the far-row loop's two direction constants in registers, not pc-relative chip
@@ -160,19 +165,5 @@ The objects, which the frame rate follows on fast machines ([internals.md](inter
 So the next steps, if any: step 6, then step 7.
 
 ## Other candidates
-
-- The title's PLEASE WAIT (SPS 627 `$C724`, from the loop at `$C682`): once at boot the
-  game pre-scales every object's bitmap to 36 sizes, a pixel at a time. For each pixel it
-  reads the four words of an ST-format source group from chip memory and sets or clears a
-  bit in five destination planes (the mask and four colours) with a read-modify-write,
-  about 14 chip accesses a pixel. The destination is the blitter's object buffer, so it
-  stays in chip. Sampled one field in 20 (25 on the a1200, 100 on the a500) from boot to
-  the title loop: about 240 fields on the a1200-030 (no MMU model), 400 on the a1200 and 2000
-  on the a500. Boot to the title takes 199 fields on the a1200-060 and 289 on the a1200-030,
-  so a much faster CPU only halves it: the chip bus is the limit. A 68020+ replacement that
-  builds each destination word in registers and writes it once (the buffer is cleared
-  first), reading the source from a chunky copy in fast memory, would cut the chip
-  accesses to about one in three pixels. Unmeasured; check it against the original's
-  buffer byte for byte.
 
 - SPS 628 (NTSC): the same analysis on its offsets, once SPS 627's patches work.

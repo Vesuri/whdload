@@ -50,6 +50,7 @@ byte ST header (so at runtime `$201C` + offset).
 | (install) | same | 68020 or better with ExpMem in fast memory: the body relocated to run there, DMA's data kept in chip ([Memory](#memory)) |
 | `$AEFA`, `$B10E`, `$C8D8` | `$AF06`, `$B11C`, `$C904` | body in fast memory: the blitter's shape tables and buffer, which the game takes pc-relative, from the chip copy |
 | `$8D44` (`.kbdcust`) | same | body in fast memory: the key handler's addresses follow the body |
+| `$C636`; `$C77A` | `$C662`; `$C7A6` | body in fast memory: the title's pre-scaler scales each object from a fast copy of its source into fast scratch, then copies it to chip ([The pre-scaler](#the-pre-scaler)) |
 
 ## Memory
 
@@ -92,6 +93,28 @@ handlers and the US intro's check. With the body in fast memory nothing touches 
 copy outside the blocks (`tools/cpuchip.py`) and no DMA reaches beyond the game's memory.
 The slave leaves the running body's address at `$2012` (the ST header's reserved long) for
 the tools.
+
+### The pre-scaler
+
+The title's PLEASE WAIT is the pre-scaler (`$C636`, SPS 628 `$C662`), called once at boot
+(`$11490`). It scales each of the 36 objects, 48x48 pixels in the ST picture at `$70000`
+(four interleaved planes, 160 bytes a row; the offset table at `$D3F6`), to 15 sizes (the
+table at `$D1B2`, 20-byte entries: at 0 the size, at 4 the bytes a row of the four colour
+planes, at 6 and 10 the colour and mask pointers, at 16 the bytes a plane-row), into the
+blitter's object buffer, `$193B8`-`$5C780` in chip memory (the stride, `$1DE2` bytes an
+object, at `$CF0A`; the objects' offsets at `$D122`; the object counter at `$12E62`). The
+scaler (`$C724`) does it a pixel at a time: four word reads of the source and a
+read-modify-write of five destination planes, the mask and four colours, all chip
+accesses. With the body in fast memory the slave runs the same loops with the game's
+scaler but points its source at a fast copy of the object's 48 rows and its destination
+at fast scratch, then copies the object's stride bytes to chip with long writes. The
+scratch is the fast copy's replayer area (body offsets `$1000` and `$3000`), which only
+the chip copy runs. The buffer and every variable the routine leaves are identical to the
+original's on the a1200-030 (both versions), a1200-fast and a1200-060
+(`gdb dump` at the call's return). The call, by breakpoints: a1200-030 190 to 35 fields
+(SPS 628 226 to 33), a1200-fast 369 to 320 (a 14 MHz 68EC020: now CPU-bound), a1200-060
+102 to 103 (its core is not cycle-exact). Without fast memory it is unchanged: a1200
+about 400 fields, a500 about 2000 (sampled).
 
 The map stays in chip memory: 38 code sites address it absolutely and about 90 longs in
 data point into `$70000`-`$7FFFF`, some of them other buffers there, against 464 chip
