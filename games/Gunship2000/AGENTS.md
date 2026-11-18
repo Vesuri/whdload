@@ -3,7 +3,8 @@
 MicroProse's Gunship 2000 (1991-1994) under WHDLoad, in its three Amiga releases: the floppy
 ECS version (kick13), the floppy AGA version and the CD32 version (both kick31). `src/` is
 JOTD's v3.1 (28.03.06) source made to assemble with vasm; the AGA flight is profiled, with
-a plan toward 50 fps on the a1200-030, and no slave changes yet.
+a plan toward 50 fps on the a1200-030; the AGA slave keeps the flight's stack in fast RAM and
+turns the instruction cache on, and its VERIFY build pins the mission.
 The original slave is by JOTD (game.conf `AUTHOR`, `UPSTREAM`): his `G/Gunship2000/usr` in
 whdload_slaves at 6046174e, the same source as in the whdload.de install package. Its
 ECS slave starts from Wepl's Wild West World slave and KickStarter 34.005, its

@@ -49,7 +49,9 @@ IOCACHE		= 10000
 CBDOSLOADSEG
 BOOTDOS
 STACKSIZE = 13000
-CACHE
+; The instruction cache for all memory. JOTD's CACHE marks BaseMem non-cacheable, and
+; without WHDLoad's MMU (its default on a 68030) that switches both caches off.
+CACHECHIP
 
 ;============================================================================
 
@@ -185,11 +187,51 @@ _cb_dosLoadSeg
 
 	patch	$D0,crack
 
+	IFD VERIFY
+	move.l	d1,-(a7)
+	ENDC
 	lea	pl_gs(pc),a0
 	move.l	_resload(pc),a2
 	jsr	resload_Patch(a2)
 
+	IFD VERIFY
+	; The same mission on every machine and slave. random() (hunk 97) seeds from time() on
+	; its first call: a constant instead. The office animations then call it a
+	; timing-dependent number of times, so the mission setup in hunk 22 (time of day, ...)
+	; also reseeds.
+	move.l	(a7),d1
+	moveq	#0,d0
+	bsr	.gs_hunk
+	move.l	$35c6(a1),d0		; rand's move.w seed,d0: the seed's address
+	lea	verify_seed(pc),a0
+	move.l	d0,(a0)
+	moveq	#97,d0
+	bsr	.gs_hunk
+	lea	pl_gs_97(pc),a0
+	jsr	resload_Patch(a2)
+	move.l	(a7)+,d1		; resload_Patch may change D1
+	moveq	#22,d0
+	bsr	.gs_hunk
+	lea	pl_gs_22(pc),a0
+	jsr	resload_Patch(a2)
+	ENDC
+
 	rts
+
+	IFD VERIFY
+; < D0: hunk number, D1: seglist   > A1: the hunk's start
+.gs_hunk
+	move.l	d1,a1
+	bra.b	.gs_hunk_next
+.gs_hunk_loop
+	move.l	(a1),a1
+.gs_hunk_next
+	add.l	a1,a1
+	add.l	a1,a1
+	dbf	d0,.gs_hunk_loop
+	addq.l	#4,a1
+	rts
+	ENDC
 
 ; file "gs2.run"
 
@@ -209,12 +251,62 @@ pl_gs
 	PL_L	$4970,$4EB800D0	; crack
 	PL_END
 
+	IFD VERIFY
+pl_gs_97
+	PL_START
+	PL_L	$aa,$70014E71		; move.l -4(a5),d0 (the time) -> moveq #1,d0
+	PL_END
+
+pl_gs_22
+	PL_START
+	PL_PS	$2a40,reseed_mission	; moveq #0,d0; move.l d0,d5; move.w d5,-18(a5)
+	PL_NOP	$2a46,2
+	PL_END
+	ENDC
+
 pl_gs2_run
 	PL_START
 	PL_L	$12780,$4E714E71	; remove WaitTOF before LoadView
 	PL_PS	$12834,set_copperlist
+	PL_PS	$13d52,fast_stack	; keep the stack in fast memory
+	PL_S	$13d58,$13d62-$13d58
+	IFD VERIFY
+	PL_PS	$183e8,seed_flight	; move.w VHPOSR,bss+$b8fe: the flight's random seed
+	ENDC
 ;;	PL_P	$13E6A,quit
 	PL_END
+
+; The flight moved its stack onto the first 2000 bytes of its chip work area (heap pointer
+; data+$2c3e). Stay on the process stack (ExpMem) and still take the 2000 bytes, so the
+; heap is laid out as before. A5 = data+$2dfc, where the process stack pointer was saved.
+fast_stack
+	add.l	#2000,-($2dfc-$2c3e)(a5)
+	rts
+
+	IFD VERIFY
+verify_seed
+	dc.l	0
+
+reseed_mission
+	move.l	a0,-(a7)
+	move.l	verify_seed(pc),a0
+	move.w	#1,(a0)
+	move.l	(a7)+,a0
+	moveq	#0,d0
+	move.l	d0,d5
+	move.w	d5,-18(a5)
+	rts
+
+; A constant flight seed; the seed's address is the instruction's operand after the jsr.
+seed_flight
+	move.l	a0,-(a7)
+	move.l	4(a7),a0
+	move.l	(a0),a0
+	move.w	#1,(a0)
+	move.l	(a7)+,a0
+	addq.l	#4,(a7)
+	rts
+	ENDC
 
 quit
 	pea	TDREASON_OK

@@ -84,17 +84,21 @@ Traps:
 | Tool | What |
 |---|---|
 | `gunship2000.py` | `Session`: boots `common/run.sh` as its own instance in warp, deterministic, nothing in port 0; fields, keys, mouse, clicks, screenshots, Barto traces, aprof, memory reads. `MACHINE` = `a1200-030` (default), `a1200-030-mmu` or `a1200-fast`; `SLAVE`, `VARIANT` pass through |
-| `profile_flight.py OUT` | the front-end route to the cockpit and the profile: F5 (chase view) and 3 s, F6 (tactical) and 3 s, as `OUT/f5.prof` and `OUT/f6.prof` (150 fields each), with `OUT/route/*.png`, `layout.json` and `state.json` |
+| `profile_flight.py OUT [REFERENCE]` | the front-end route to the cockpit and the profile: F5 (chase view) and 3 s, F6 (tactical) and 3 s, as `OUT/f5.prof` and `OUT/f6.prof` (150 fields each), with `OUT/route/*.png`, `layout.json` and `state.json`; with REFERENCE (an earlier OUT) it stops unless the cockpit is the reference's |
 | `aprof_report.py OUT [TOP]` | per window: frames (presents at code $129c4) and fps, CACR, the chip-bus share, the time by kind (frame cap, blitter waits, stack and calls, other, outside) and the top routines |
 | `gs2.py` | finds `gs2.run`'s hunks in memory (by the installed file), the memory lists, the clocks |
 | `route.py OUT STEP...` | a scripted input route, for exploring |
 
 ```sh
 cd games/Gunship2000
-python3 tools/profile_flight.py tmp/prof/a1200-030        # about 25 s of wall time
-python3 tools/aprof_report.py tmp/prof/a1200-030
-SLAVE=tmp/exp/x.slave python3 tools/profile_flight.py tmp/prof/x
+make verify VARIANT=Gunship2000AGA
+BUILD=verify python3 tools/profile_flight.py tmp/prof/ref     # about 25 s of wall time
+python3 tools/aprof_report.py tmp/prof/ref
+SLAVE=tmp/exp/x.slave python3 tools/profile_flight.py tmp/prof/x tmp/prof/ref
 ```
+
+Compare slaves and machines with VERIFY builds (scratch slaves with `-DVERIFY=1`): they fly the
+same mission (`internals.md`, "Slave patches"), whose cockpit shots then agree to 0.01.
 
 The route is the duty roster (the whiteboard), a right click on the first record (WOC
 ERASE-ME), name `test`, Return, Return, unit `test`, Return, the record, the door, the photo,
@@ -108,9 +112,9 @@ Traps:
   `--uae_mmu_model=0`. It makes no difference to the game: WHDLoad uses a 68030's MMU only with
   `MMU/S` (`$WHDLOAD/Docs/en/mmu.html`), and the `a1200-030-mmu` machine gave the same
   15.33 fps with the cap at 1 tick (on another mission).
-- **The mission depends on timing.** The front end's choice of mission, helicopter and time
-  of day changes with the CPU and the cache setup (TANGO 1, GOLF 1 and QUEBEC 1 on three
-  68030 runs), so only runs that fly the same mission compare. Check `route/*-cockpit.png`.
+- **The mission depends on timing.** Outside VERIFY builds, the front end's choice of
+  mission, helicopter and time of day changes with the CPU and the cache setup (TANGO 1,
+  GOLF 1 and QUEBEC 1 on three 68030 runs), so only VERIFY runs compare.
 - The front end reads the buttons once per animation frame: clicks hold 10 fields. Typed
   letters hold 4 and wait 10; keys in flight hold 10 (3 was missed).
 - The installed aprof writes `AITDPROF 1` for `APROF 1`; `aprof_report.py` reads either.

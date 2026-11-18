@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""In-flight profile of the AGA version: profile_flight.py OUT
+"""In-flight profile of the AGA version: profile_flight.py OUT [REFERENCE]
 
 Boots the AGA slave (gunship2000.Session: warp, deterministic, MACHINE default a1200-030 without
 its MMU model, which aprof needs) and clicks through the front end to the cockpit:
@@ -13,11 +13,17 @@ every step), OUT/layout.json (where gs2.run's hunks and the memory lists are) an
 OUT/state.json (game clocks at the window's ends). Summarise with aprof_report.py OUT.
 
 Each step waits for its screen by colour (screen()), so the route holds on slower machines.
+
+Runs compare only on the same mission, and the front end picks it by timing: use the VERIFY
+build (BUILD=verify), which pins the random seeds. With REFERENCE (an earlier OUT), the run
+stops unless its cockpit shot matches the reference's (another mission, helicopter or time of
+day).
 """
 import json
 import os
 import sys
 import time
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
@@ -163,13 +169,28 @@ def route(f):
     return f.wait_for('cockpit', every=5, test=lit)
 
 
-def main(out):
+def same_mission(shot, reference, limit=1.0):
+    """Mean absolute difference of two cockpit shots, and whether it is under `limit`."""
+    ref = sorted((Path(reference) / 'route').glob('*-cockpit.png'))
+    if not ref:
+        raise FileNotFoundError(f'{reference}: no route/*-cockpit.png')
+    a, b = (np.asarray(Image.open(p).convert('RGB')).astype(int) for p in (shot, ref[-1]))
+    d = float(np.abs(a - b).mean())
+    return d, d < limit
+
+
+def main(out, reference=None):
     s = Session(out)
     try:
         f = Flight(s)
         t0 = time.time()
-        route(f)
+        cockpit = route(f)
         print(f'cockpit at field {s.field} ({time.time() - t0:.0f} s)', flush=True)
+        if reference:
+            d, same = same_mission(cockpit, reference)
+            print(f'cockpit against {reference}: mean difference {d:.2f}', flush=True)
+            if not same:
+                raise SystemExit(f'not the reference mission (difference {d:.2f}); BUILD=verify?')
         layout = gs2.locate(s)
         (s.out / 'layout.json').write_text(json.dumps(layout, indent=1))
         state = {'start': gs2.clocks(s, layout)}
@@ -185,7 +206,7 @@ def main(out):
         state['f6'] = gs2.clocks(s, layout)
         f.shot('tactical')
         state['fields'] = s.field
-        state['env'] = {k: s.env.get(k) for k in ('SETUP', 'EXTRA_ARGS', 'VARIANT', 'SLAVE')}
+        state['env'] = {k: s.env.get(k, os.environ.get(k)) for k in ('SETUP', 'EXTRA_ARGS', 'VARIANT', 'SLAVE', 'BUILD')}
         (s.out / 'state.json').write_text(json.dumps(state, indent=1))
         print(json.dumps(state), flush=True)
     finally:
@@ -193,6 +214,6 @@ def main(out):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3):
         sys.exit(__doc__)
-    main(sys.argv[1])
+    main(*sys.argv[1:])

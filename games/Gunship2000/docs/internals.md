@@ -59,8 +59,21 @@ AGA, `_cb_dosLoadSeg` first clears long 0 (`clr.l 0`) on every `LoadSeg`, then b
 | `gs` (code $5ee0 at file $228), $4970 | `move.l -4(a5),d0` (the code entered) | `jsr $d0.w`, a `jmp crack` there | once five digits are in, replaces the entry with the right code (protection removed) |
 | `gs2.run` (code $19014 at file $30), $12780 | `jsr -270(a6)` (`WaitTOF` before `LoadView`) | two `nop` | |
 | `gs2.run`, $12834 | `lea $dff000,a5` | `jsr set_copperlist` | writes the copper end `$fffffffe` to address 0 (the game's `COPJMP2` to 0), sets `COP1LC` from the game's copper-list variable |
+| `gs2.run`, $13d52 (4.0b) | `movea.l D+$2c3e,sp; lea 2000(sp),sp; move.l sp,D+$2c3e` | `jsr fast_stack` (D+$2c3e += 2000), then a branch to $13d62 | the flight stays on its process stack in ExpMem instead of moving it onto its chip work area ("Memory in flight"); the 2000 bytes are still taken, so the heap is laid out as before |
 | `Gunship 2000` (code $6a4 at file $28), $122 | the `Install Gunship 2000` test | skip to $13e | |
 | `Gunship 2000`, $16c | an `OpenLibrary` and the test after it | skip to $1f4 | |
+
+The AGA slave (4.0b) sets KickEmu's `CACHECHIP` where JOTD's set `CACHE`: the instruction
+cache for all memory, BaseMem write-through. `CACHE` marks BaseMem non-cacheable, and without
+WHDLoad's MMU (the default on a 68030) one non-cacheable area switches both caches off.
+
+The VERIFY build pins the mission for measurements (`development.md`, "Profiling in flight"):
+
+| File, offset | Original | Patch | Why |
+|---|---|---|---|
+| `gs` hunk 97, $aa | `move.l -4(a5),d0` (the `time()` result) | `moveq #1,d0; nop` | `random()` ($5c; the generator is hunk 0 $35c4, seed × 3677 + 3) seeds from the clock on its first call |
+| `gs` hunk 22, $2a40 | `moveq #0,d0; move.l d0,d5; move.w d5,-18(a5)` | `jsr reseed_mission`, `nop` | the mission setup reseeds: the office animations call `random()` a timing-dependent number of times, and the setup rolls the time of day here (H78+$f6 = `random(5)` = 0, H78+$f7 = `random(100)` > 40) |
+| `gs2.run`, $183e8 | `move.w VHPOSR,B+$b8fe` | `jsr seed_flight` | the flight's own generator ($12aa0) seeds from the beam position |
 
 `_patch_exe` tells the AGA `Gunship 2000` by `$2c79` at $512; with `$2c79` at $66c (the ECS
 layout) it applies the ECS install-check patches instead.
@@ -126,5 +139,7 @@ also in chip (D+$8d6a in fast). Which allocations the blitter or the display nee
 which only the CPU touches, is not yet sorted out. ExpMem had 84 KB free.
 
 At $13d48 the flight saves its process stack pointer (D+$2dfc) and moves the stack onto the
-first 2000 bytes of the heap (D+$2c3e moves up by 2000). The process stack (13000 bytes,
-`slv_` stack size) is in ExpMem; the flight's stack is chip.
+first 2000 bytes of the heap (D+$2c3e moves up by 2000); the exit at $13e6a restores it.
+The process stack (13000 bytes, `STACKSIZE`) is in ExpMem, about 220 bytes of it used at
+that point. The 4.0b slave keeps the flight there (`Slave patches`); on the chip stack,
+stack and call instructions took 9-11% of the 68030's time.
