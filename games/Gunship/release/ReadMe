@@ -1,5 +1,5 @@
 
- Gunship Enhanced 2.0b (18.11.2026)
+ Gunship Enhanced 2.0b (19.11.2026)
 
  THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
  IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
@@ -75,12 +75,14 @@
 
  History:
  --------
- version 2.0b (18.11.2026) done by Vesuri:
+ version 2.0b (19.11.2026) done by Vesuri:
  - Enhanced framerate for the PAL 0658 and NTSC 1489 releases on 68020 and
    later: smoother 3D view and more responsive controls, enabled in the
    installed icon (CUSTOM1=1)
  - blitter waits fixed for fast CPUs, in all modes and releases
  - crash on sound effects with fast memory above 16 MB fixed (PAL and NTSC)
+ - fading MicroProse logo no longer flashes grey; in enhanced mode, ground
+   close to the camera no longer fills the sky
  - updated installer with PAL/NTSC selection
 
  version 1.2 (15.02.2020) done by JOTD:
