@@ -106,11 +106,12 @@
  - TFX.??? (599152 bytes): 68020+FPU (from DamienD@EAB collection, wonder where you got that
    this is a version with unmerged hunks and SYMBOLS!!! I love when that happens!)
  - TFX.floppy (555644): original CD, never tried this version
- - TFX.020 (571008 bytes) linked in HOL: 68020+FPU, almost destroyed by Hunk Wizard
-   chip/fast hunks merged but I could convert those dynamically to chip so it runs!)
+ - TFX.020 (571008 bytes) linked in HOL: 68020+FPU, intact, but Hunk Wizard merged
+   its chip and fast hunks; the slave converts those dynamically to chip so it runs
    This last HOL version is a newer 1997 build of the game with probable bug fixes
 
- Below are unusable/corrupt versions (no thanks to Hunk Wizard tool):
+ Below are unusable/corrupt versions (their files were damaged on disk before
+ they were archived, not by Hunk Wizard):
  - TFX.030 (HOL https://is.gd/A6yk2T)
  - TFX.strip (68040, HOL https://is.gd/XfxhAL)
  - TFX.040 (original from CU amiga CD)
