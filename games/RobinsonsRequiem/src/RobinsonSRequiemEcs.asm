@@ -275,6 +275,8 @@ _bootdos        lea     (_saveregs,pc),a0
             add.l   a1,a1
             add.l   a1,a1
             bsr _hunks
+            move.l  #$f08,d0           ; START's audio interrupts (src/audint.s)
+            bsr _audpatch
    IFD PROFILE
             pea     slv_base(pc)        ; for tools/rr_prof.py and rr_report.py
             move.l  (a7)+,PROFILE_SLAVE.w
@@ -1024,6 +1026,7 @@ _m24sites
         dc.w    -1
 
         INCLUDE mask24.s
+        INCLUDE audint.s
 
         INCLUDE obj020.s
 

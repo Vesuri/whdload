@@ -76,11 +76,12 @@ The low-memory jumps at `$100` and `$106` sit in the CPU vector table (user vect
 ## AGA improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan. All but the two options
-(items 19 and 20), the planes' alignment (item 21) and FMODE (item 22) are the splash window's "Enhanced framerate", `CUSTOM2` (`_enhget`), on in
+(items 19 and 20), the planes' alignment (item 21), FMODE (item 22) and the audio
+interrupts (item 23) are the splash window's "Enhanced framerate", `CUSTOM2` (`_enhget`), on in
 the installed icon. Without it `_bootdos` installs none of them and puts v1.2's caches back
 (`_cpu12`: `resload_SetCPU` with v1.2's `CACHE` value over the KickEmu's `CACHECHIPDATA`), so
 the game runs as v1.2 did, with START's fast pool given up as before (item 1). The two options
-work either way, and items 21 and 22 are always made. `_hunks` finds START's hunks 1 and 2 for all of them.
+work either way, and items 21 to 23 are always made. `_hunks` finds START's hunks 1 and 2 for all of them.
 
 1. **START's fast pool kept** (`_fastpool`): with the 1 MB ExpMem (not with `MemConfig=1`),
    hunk 0 `+$196` [`$1c2`], `move.l #0,<hunk 1 +$f4>` (`23fc 0000 0000`, checked first),
@@ -582,15 +583,20 @@ work either way, and items 21 and 22 are always made. `_hunks` finds START's hun
     copinit overwrote it at the next frame. The test define `FMODE_RACE` holds `+$710`
     until line 305 (`_fmrace`, through `+$2a2`): the copy then ends on line 13 of the next
     frame, and FS-UAE shows the skew with `FMODE_NOFIX` and the right screens without it.
+23. **Sound effects from a clean interrupt request** (`_audpatch`, `_audclr` in
+    `src/audint.s`; on every CPU and without Enhanced framerate, a fix of the game's own
+    code): hunk 0 `+$1652` [`$167e`], `move.w d0,INTENA` before the channel's DMA goes on
+    ("Sound effects" below; `33c0 00df f09a`, checked first with the instructions on either
+    side), becomes `jsr _audclr`, which also clears the channel's INTREQ bit.
 
 ## ECS improvements
 
 The changes after v1.2, in the order of `docs/performance.md`'s plan. All but the option (item
-11) are the splash window's "Enhanced framerate", `CUSTOM2` (`_enhget`), on in the installed
+11) and the audio interrupts (item 12) are the splash window's "Enhanced framerate", `CUSTOM2` (`_enhget`), on in the installed
 icon. Without it `_bootdos` installs none of them and turns the caches off again as v1.2 had
 them (`_cpu12`: `resload_SetCPU` with 0 over the KickEmu's `CACHECHIPDATA`). START's own fast
 pool (item 3) is the game's and stays, as v1.2 had it with fast memory. The option works
-either way.
+either way, and item 12 is always made.
 
 1. **The chunky-to-planar conversion** (`_c2ppatch`, `src/c2p000.s`): hunk 2 `+$1a5e`
    [`$1606e`], the start of START's row loop, `move.w d6,a4 / move.w a4,d6` (`3846 3c0c`,
@@ -795,6 +801,10 @@ either way.
       A500 (68000, the game's `custom` setup) 2X walks 58.5 units every 50 fields against
       Original's 29.1, and runs 117.2.
 
+12. **Sound effects from a clean interrupt request** (`_audpatch`, `_audclr` in
+    `src/audint.s`; on every CPU and without Enhanced framerate): the AGA's item 23 at
+    hunk 0 `+$f08` [`$f38`].
+
 ## The AGA's sites in the ECS game
 
 Both STARTs are one program at other offsets (`docs/performance.md`, ECS plan step 6): the
@@ -925,6 +935,38 @@ the chunky buffer (32 KB) and the renderer's tables (34,608 bytes). It also hold
 of its 8 KB room used) and the map's copy. The map is 256 rows of 128 cells, 64 KB. The
 sky's copy ("ECS improvements" item 4) is outside the pool, in a 32 KB room the slave
 takes from the fast memory list at install, before START sizes its pool.
+
+## Sound effects
+
+Both STARTs play their samples the same way (AGA offsets; ECS: hunk 0 `+$ece`-`+$f4a`,
+hunk 3 `+$31c`-`+$63a`). A script op (hunk 1 `+$5792` in the ECS game) picks the channel
+whose priority (byte `+1` of its 16-byte entry, -128 free) is lowest. Hunk 2 `+$473e` then
+starts the sample: hunk 2 `+$4842` turns the channel's DMA off, writes its location,
+length, period and volume, stores repeats + 1 as its interrupt count, sets its state to
+`$80`, 3 and disables its audio interrupt. START's VBL routine (hunk 0 `+$15ca`, at `$6c`)
+counts the 3 down for each channel (`+$1624`): at 0 it disables the interrupt again, turns
+the DMA on (`+$1662`) and enables the interrupt (`+$168a`). The level 4 routine (hunk 2
+`+$496e`) takes INTREQR and INTENAR's audio bits, counts the channel down (`+$49ec`) and at 0
+turns its DMA and interrupt off; it acknowledges all four bits at its end. Paula requests
+one interrupt as a channel's DMA starts and one at each reload, so the count is one for the
+start and one per pass.
+
+START never clears a channel's request bit before enabling it, and Paula sets it at every
+reload while the interrupt is disabled: AUD0 and AUD1 were pending all the time in the
+jungle (INTREQR `$03c0`, INTENAR `$403c`, their DMA on), and AUD2 before most starts. With a
+request pending, enabling the interrupt counts the start at once, Paula's real start ends
+the count, and the channel stops a word or two in: a click instead of the sample. Traced in
+FS-UAE with v1.2's slave on the `a1200-fast`: every sound after the first stopped in the
+field it started, INTREQR showing the channel's bit set before `+$168a`. Item 23 (ECS item
+12) clears the bit before the DMA goes on. Checked: each sample then runs its length at its
+period, $104c bytes at period 358 for 21 fields, $163c at 447 for 35, $12c2 at 716 for 48
+(AGA on the `a1200-fast`; ECS on the A500 and the `a1200-030` the same). The test define
+`AUDINT_OFF` leaves START as it is.
+
+The direct start (op byte `+$d4d9` negative in the ECS game) does not set the channel's
+priority, so sounds started that way in quick succession (a punch's swoosh, hit and grunt)
+take the same channel (traced: one channel for all three) and each cuts the one before
+(from the code). That is left as the game has it.
 
 ## The script interpreter (AGA)
 

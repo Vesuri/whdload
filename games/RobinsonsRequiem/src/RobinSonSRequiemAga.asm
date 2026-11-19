@@ -437,6 +437,8 @@ _cont
             add.l   a1,a1
             add.l   a1,a1
             bsr _hunks
+            move.l  #$1652,d0           ; START's audio interrupts (src/audint.s)
+            bsr _audpatch
             bsr _enhget
             beq .orig
             bsr _fastpool
@@ -1109,6 +1111,7 @@ _m24sites
         dc.w    -1
 
         INCLUDE mask24.s
+        INCLUDE audint.s
 
 **********************************************
 ; The renderer's buffers in fast memory. START's block allocator (hunk 0 +$36ee: d0 size ->

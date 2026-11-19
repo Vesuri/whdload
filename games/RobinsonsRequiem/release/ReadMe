@@ -61,6 +61,8 @@
  - AGA: intro and menus no longer skewed on some 68040 machines
  - Fast memory above 16 MB (Zorro III, most 68040/68060 boards) now used:
    much faster there (with Enhanced framerate)
+ - Sound effects no longer cut to a click after the first one (a bug in
+   the original game)
  - uses 1 MB of Fast memory (WHDLoad 20 or newer)
 
  version 1.2 (29.03.13) done by CFou!:
