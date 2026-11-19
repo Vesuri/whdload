@@ -1,6 +1,6 @@
 # TFX
 
-TFX 2.2 for Digital Image Design's TFX (the AGA install, WHDLoad kick31 slave): the newest
+TFX 2.3b for Digital Image Design's TFX (the AGA install, WHDLoad kick31 slave): the newest
 FPU executable (`tfx.020`) chosen automatically on FPU-equipped 68020/030/040/060, faster
 rendering and fast-RAM data in it, native 68040 FPU maths in place of FPSP traps, faster
 rendering in plain `TFX`, and the sort and duplicate-missile fixes. The goal is the fastest
@@ -8,7 +8,7 @@ rendering in plain `TFX`, and the sort and duplicate-missile fixes. The goal is 
 without regressing 020/030/060; the plan is `docs/PERFORMANCE_PLAN.md`. The original slave
 is by JOTD (game.conf `AUTHOR`, `UPSTREAM`): his `T/TFX/usr` in whdload_slaves at ce5a2a25,
 with the 2.0 and 2.1 rendering work its ReadMe credits. Upstream merged this work
-(0cf43ac9, merge 1635ba0e) but has not released it.
+(0cf43ac9, merge 1635ba0e) but has not released it; it is released here as 2.3b.
 
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.

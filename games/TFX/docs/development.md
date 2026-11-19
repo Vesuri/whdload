@@ -48,7 +48,7 @@ build, `OUTPUT_SLAVE=path` copies the slave there. The slave is
 `tmp/build/release/TFX.Slave`, the FPSPs `tmp/build/release/fpsp040.Slave` and
 `fpsp060.Slave`.
 
-The 2.2 slave's `$VER` string carries its fixed date, `2.2 (22.10.2026)`; nothing is
+The slave's `$VER` string carries its fixed date, `2.3b (19.11.2026)`; nothing is
 generated into the source tree (`DATETIME` stays undefined).
 
 ## Run

@@ -89,7 +89,7 @@ IGNORE_JOY_DIRECTIONS
 
 
 DECL_VERSION:MACRO
-	dc.b	"2.2 (22.10.2026)"
+	dc.b	"2.3b (19.11.2026)"
 	ENDM
 	dc.b	"$","VER: slave "
 	DECL_VERSION

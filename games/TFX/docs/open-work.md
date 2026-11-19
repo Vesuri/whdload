@@ -8,11 +8,10 @@ last commit of this history before the move) and JOTD merged it (pull request #3
 date in `DECL_VERSION` instead of the fixed `2.2 (22.10.2026)`) and in 640b9e0c set the
 slave's version to 2.3 and removed a contributor from the slave's credit line (`slv_info`)
 at his request. This repository applies that credit change too (the commit after the
-move); the version and date stay 2.2 (22.10.2026). Upstream's ReadMe still ends at the
-2.2 entry, and whdload.de still offers 2.1 (09.08.2023): upstream has not released it.
-
-Open: release 2.2 here (`make dist` gives TFXEnhanced-2.2-20261022.lha) or wait for
-upstream's release.
+move); e0a36226's build-dated version is not taken (`development.md`). Upstream's ReadMe
+still ends at the 2.2 entry, and whdload.de still offers 2.1 (09.08.2023): upstream has not
+released it, so it is released here as 2.3b (19.11.2026), after upstream's 2.3 and
+JOTD's earlier 2.2 (22.07.2025), as TFXEnhanced-2.3b-20261119.lha.
 
 ## Goal (from the user)
 
