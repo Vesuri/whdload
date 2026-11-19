@@ -128,6 +128,15 @@ Frame stats derived from calls/field × 10 (one frame ≈ 10 fields on the 68000
         (`$0BFA` = A|C when the colour bit is set, `$0B0A` = ¬A·C otherwise).
      5. Spins until the last blit finishes.
    - A degenerate bbox is drawn as a line.
+   - **Clip overflow.** `ClipLine` and `PolyEdge` take an edge's dx and dy with `sub.w`. A near-clipped
+     edge of a large ground face (a field or a road under a low, banked camera) can project its ends more
+     than 32767 pixels apart; `Project` only clamps each end to ±32277. The span then wraps, `divs` puts
+     the border intersection on the wrong side, and the face fills the whole view, sky included, for as
+     long as the camera keeps that geometry. The original game has the same bug; enhanced mode, with a
+     new camera every field, just shows it more often. In a 120,000-view random sweep of a Western
+     Europe snapshot, 16 views failed this way. Enhanced flight (`timing-clip-split.i`) splits such an
+     edge at its midpoint, recursively, and hands each half to the native code. Edges that fit are
+     unchanged (`tools/test_clip_split.py`).
 
 6. **Colour**: every primitive writes all 4 planes (3D view) or 5 planes (bands/rects). A 0 bit is drawn
    with a clear minterm, so every primitive costs one blit per plane whatever its colour.

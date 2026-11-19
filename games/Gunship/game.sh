@@ -17,7 +17,7 @@ game_prepare() {
 # make unpack has installed the drawers, the original executables (GAME_DATA_CHECKS). The
 # other tools/test_*.py read captures left in tmp/ and are run by hand (docs/development.md).
 GAME_CHECKS="test_verify_policy.py test_verify_frame.py test_verify_runtime_rng_c.py
-  test_cockpit_e.py test_draw_overhead_d.py test_damage_colour.py test_damage_rotation.py
+  test_cockpit_e.py test_draw_overhead_d.py test_damage_colour.py test_damage_rotation.py test_clip_split.py
   test_demo_owner.py check_cpu_gate_f.py test_timing_fifo_owner_c.py test_timing_live_input_c.py"
 GAME_DATA_CHECKS="test_blitter.py test_left_drift.py test_sound_pointer.py"
 
