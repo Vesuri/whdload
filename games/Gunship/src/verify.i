@@ -171,9 +171,57 @@ verify_tick:
 	move.b #37,57(a5)
 	move.l #1,68(a0)
 .ready:
+	movem.l d0-d7/a0-a6,-(sp)
+	bsr verify_scene_ahead
+	movem.l (sp)+,d0-d7/a0-a6
 	movem.l (sp)+,d0/a0
 verify_tick_ready:
 	rts
+
+; CUSTOM3=2 scene, for either loop: once airborne after tick 100, move the
+; existing helicopter (slot 5, type and AI kept) $300 ahead of the player's
+; current heading, in one of eight directions. The player is not touched, so
+; the enhanced runtime's own player state stays authoritative. Called from
+; foreground code between worlds; may change all registers.
+verify_scene_ahead:
+	lea verify_marker(pc),a0
+	movea.l a0,a1
+	adda.l #_verify_scene-verify_marker,a1
+	cmpi.l #2,(a1)
+	bne .done
+	tst.l 68(a0)
+	bne .done
+	movea.l 32(a0),a5
+	lea $3b88(a5),a5
+	cmpi.w #100,12(a5)
+	blo .done
+	cmpi.w #16,28(a5)
+	blt .done
+	move.w 42(a5),d0
+	addi.w #$1000,d0
+	rol.w #3,d0
+	andi.w #7,d0
+	add.w d0,d0
+	add.w d0,d0
+	lea .ahead(pc),a1
+	move.w (a5),d1
+	add.w (a1,d0.w),d1
+	move.w 2(a5),d2
+	add.w 2(a1,d0.w),d2
+	move.w d1,d3
+	lsr.w #8,d3
+	move.b d3,$5b(a5)
+	move.b d1,$d5(a5)
+	move.w d2,d3
+	lsr.w #8,d3
+	move.b d3,$db(a5)
+	move.b d2,$155(a5)
+	move.l #2,68(a0)
+.done:
+	rts
+.ahead:	; heading octants from north, clockwise (dx, dy)
+	dc.w 0,$300, $220,$220, $300,0, $220,-$220
+	dc.w 0,-$300, -$220,-$220, -$300,0, -$220,$220
 
 ; Completed swap timestamp, after MakeScreen/RethinkDisplay and buffer toggle.
 ; Fixed-size log: stop writing at capacity and count overflow, never overwrite memory.

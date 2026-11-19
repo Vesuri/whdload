@@ -61,6 +61,14 @@ timing_runtime_loop:
  cmp.w RT_HISTORY+TH_WRITE(a6),d0
  bne .batch
 .present:
+ IFD VERIFY
+ movem.l d0-d7/a0-a6,-(sp)
+.scene_call:
+ lea .scene_call(pc),a0
+ adda.l #verify_scene_ahead-.scene_call,a0
+ jsr (a0)
+ movem.l (sp)+,d0-d7/a0-a6
+ ENDC
  movea.l a6,a0
  bsr timing_runtime_draw
  tst.l d0
