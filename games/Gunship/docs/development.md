@@ -69,6 +69,16 @@ relative to `games/Gunship`, and the tools expect it as the working directory.
 Boot on a500-fast: black while the game LZW-unpacks its data (~1000 fields), Microprose logo
 ~1000, title ~1500–5000, then a self-playing demo flight from ~5500 fields after reset.
 
+Logo clear: titlmule counts 9924(a4) down from 201 (NTSC 9956(a4)), fades the logo's colour 30
+from white to the background red over 179..150, and at 149 clears its rows (50..148). The
+original RectFill clears the displayed planes one after another, so a field could show the
+faded logo half cleared in colour 24 (grey). It happened with JOTD's slave too. `logo-clear.i`
+replaces that call in all modes (PAL +3038, NTSC +35A4) with a CPU clear that does one row of
+every plane at a time, away from the beam. Checked by
+screenshotting every field across counter 153..141 on PAL and NTSC, a1200-fast/68040 and a500-1.5m:
+no grey field. A temporary counter build showed the CPU path ran on both (68000: 14 beam-wait
+polls) and never fell back to RectFill; `tools/test_logo_clear.py` covers the rest.
+
 Keep downloads, extracted data, builds and analysis beneath the ignored `tmp/`.
 The installer's source drawer (`tmp/game/GunshipHD/source/`) is a reference input; edit only `src/`.
 Every run mounts a disposable copy, preserving the pristine drawers.

@@ -308,6 +308,9 @@ pl_titlmule_658
 	; disk copy protection is not here
 
 	PL_B	$EA,$60		; BRA
+
+	; logo cleared without a half-cleared field (logo-clear.i)
+	PL_PSS	$3038,logo_clear,2
 	PL_END
 
 pl_gamemule_658
@@ -339,6 +342,9 @@ pl_titlmule_1489
 	PL_L	$2ee8,$303c0400 ; ""
 	PL_NOP	$2f28,2	; NOP
 	PL_L	$2f3e,$3c3c0200 ; MOVE    #$0200,D6
+
+	; logo cleared without a half-cleared field (logo-clear.i)
+	PL_PSS	$35a4,logo_clear,2
 	PL_END
 
 pl_gamemule_1489
@@ -528,6 +534,7 @@ _verify_scene	dc.l	0
 ;============================================================================
 
 	include "blitter.i"
+	include "logo-clear.i"
 	IFD VERIFY
 ; Nearby LoadSeg entry, with position-independent long reach to the verifier.
 verify_dispatch_near:
