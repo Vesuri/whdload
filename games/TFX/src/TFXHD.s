@@ -16,7 +16,7 @@
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
 	INCLUDE	lvo/dos.i
-        INCLUDE devices/timer.i
+    INCLUDE devices/timer.i
 
         IFND AFB_68060
 AFB_68060=7

@@ -9,6 +9,10 @@ sources build `fpsp040` and `fpsp060`). Paths below are relative to the game dir
 Source baseline: upstream `ce5a2a25e7f8443da5502d9755b6b1ae01080862` of
 https://github.com/jotd666/whdload_slaves (`T/TFX/usr`), developed on the fork branch `tfx`;
 commit hashes in these docs are that branch's (the commit messages here are the same).
+Upstream after the merge (1635ba0e) is followed to 640b9e0c: its credit line and include
+indentation are here. Its e0a36226 is not: that commit's version macro takes the date from
+the build (`DATETIME` or Barfly's `WDate`), which this build does not define, and the release
+name needs the date in `$VER`; its Makefile is replaced by `common/`.
 
 ## Inputs
 
