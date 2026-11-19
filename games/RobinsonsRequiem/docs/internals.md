@@ -68,7 +68,13 @@ After `LoadSeg`:
   `move.b (a3)+,d0 / ext.w d0 / swap d0` (`101b 4880 4840`, the first longword checked),
   becomes `jsr _prepcrack`. When the byte at `-5(a3)` is 7 it compares the seven bytes from
   `-4(a3)` with two script signatures and, on a match, changes the byte their offset word
-  points to from `$14` to `$0a`; then it does the three replaced instructions.
+  points to from `$14` to `$0a`; then it does the three replaced instructions. The two
+  signatures are in `robinson` (slot 17) and `monstre` (slot 16), in their loops that compare
+  the typed word with the manual's letter by letter; the changed branch skips the one that
+  sets the mismatch. The safety check (`baratin`, slot 18) still asks, and any word passes:
+  at the jungle's top-left gate (`porte`), a wrong word was taken without consequence, with
+  `robinson`'s byte changed (gdb, 2026-11-19). While the question is up the area's creatures
+  are idle (state `$ff`).
 
 The low-memory jumps at `$100` and `$106` sit in the CPU vector table (user vectors 64 and
 65).
