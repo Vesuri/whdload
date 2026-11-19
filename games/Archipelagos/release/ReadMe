@@ -9,7 +9,7 @@
  PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
  This install applies to "Archipelagos" © 1989 Astral Software.
- Archipelagos Enhanced 2.0b (18.11.2026)
+ Archipelagos Enhanced 2.0b (19.11.2026)
  Original install: StingRay. Version 2.0b: Vesuri.
 
  Requirements:
@@ -69,12 +69,13 @@
  History:
  --------
 
- version 2.0b (18.11.2026) done by Vesuri:
+ version 2.0b (19.11.2026) done by Vesuri:
  - faster Amigas no longer speed the game up: moves, terrain animation and
    spreading keep their pace, and moves are smoother
  - Enhanced framerate (CUSTOM1, on in the installed icon): up to six times
    the frame rate on 68020 and 68030 Amigas, almost four times without fast
    memory, and a five times shorter PLEASE WAIT on 68030s with fast memory
+ - distant objects no longer flicker in and out with Enhanced framerate
  - quitting no longer hangs on NTSC Amigas
 
  version 1.2 (01.01.2018)

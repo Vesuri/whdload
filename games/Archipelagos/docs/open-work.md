@@ -8,9 +8,9 @@ frame loop, the game's clocks and the rendering cost are measured
 
 ## Release
 
-2.0b (18.11.2026): StingRay's v1.2 code, which the whdload.de install package lacked, with
+2.0b (19.11.2026): StingRay's v1.2 code, which the whdload.de install package lacked, with
 `$VER` and the info text in the slave and the ReadMe entry above StingRay's, game time
-decoupled from the frame rate, and steps 2 to 6 below behind Enhanced framerate (CUSTOM1,
+decoupled from the frame rate, and steps 2 to 6 and 6b below behind Enhanced framerate (CUSTOM1,
 set in the installed icon). Played by the maintainer (SPS 627, a 68040 with fast memory):
 archipelagos 1 to 5, saving with 5 completed and loading it in a new session; that play
 found the sky's copper lists in fast memory at dusk (fixed). No full play-through (the

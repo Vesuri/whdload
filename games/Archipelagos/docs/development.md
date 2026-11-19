@@ -29,7 +29,7 @@ info text and `$VER`) it builds byte-identically to the v1.2 slave in the Retrop
   emits the immediate forms, vasm the Dn forms.
 
 Release 2.0b adds only "enhanced by Vesuri", its version line and
-`$VER: Archipelagos.slave 2.0b (18.11.2026)` to the info text; the code is v1.2's, moved by
+`$VER: Archipelagos.slave 2.0b (19.11.2026)` to the info text; the code is v1.2's, moved by
 the longer strings (`release/slaves.sha256` records it).
 
 `-devpac` (no optimisation) matches: the source sizes its branches. `-pic`: no relocations.
