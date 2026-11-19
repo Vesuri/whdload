@@ -245,6 +245,12 @@ timing_runtime_draw:
  bsr timing_runtime_present_state
  tst.l d0
  bne .done
+ ; Guided-missile hardware sprites: the field owner only records their
+ ; MoveSprite/ChangeSprite requests. Apply the latest ones per drawn frame.
+ move.l a0,-(sp)
+ adda.l #RT_GUIDANCE_PRESENT,a0
+ bsr guidance_present
+ movea.l (sp)+,a0
  movea.l RT_DRAW_ENTRY(a0),a1
  movea.l RT_HUNKS+24(a0),a4
  jsr (a1)
