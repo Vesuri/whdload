@@ -107,7 +107,10 @@ python3 tools/archipelagos.py quit
   game's: both versions' originals (from the program file, at address 0) and the slave's
   routines (assembled from the source) run in Unicorn's 68020 on N random rows each
   (default 3000), and the screen, the map, the variables and lists, the list end and the
-  registers the game reads after must match. Needs no emulator.
+  registers the game reads after must match. Then N / 10 random gaps between two rows
+  (`GapFill`, from a position, a heading and two depths): every object whose cell's centre
+  lies between the rows (a cell in from the rays) and on neither row must be noted, once,
+  and nothing else. Needs no emulator.
 - `tools/smc.py OUT [end|death]` checks for self-modifying code: from a fresh boot on a
   tracing CPU it keeps the image at the game's entry (with the body in fast memory, the
   chip copy, which never runs), plays a route (to the level's end, or to a death and the

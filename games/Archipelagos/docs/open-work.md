@@ -146,6 +146,16 @@ nor change behaviour.
    from field 112 a frame takes 10 fields where it took 9, and the route differs from there.
    The slave's size alone does that (the same source padded by 1500 bytes differs from both;
    each build repeats its own run exactly), as asking for ExpMem did in step 4.
+6b. **The far objects between the rows.** Done (19.11.2026, after 2.0b; [internals.md](internals.md#the-frame)).
+   The maintainer's video showed far trees flickering frame to frame: no row crosses the
+   cells between the far rows, so the game's list (step 5's, unchanged) drops them. Walking
+   on archipelago 1 (six moves, 300 frames, a1200-030), 2.0b's list drops three far objects
+   for a frame or a few, seven times; with the gaps searched, none. `tools/spancheck.py`
+   checks the search on 300 random gaps a version. Panning (`frames 250 4`), 2.0b against
+   this: a1200-030 50.00 and 50.00, a1200 24.60 to 23.80, a1200-fast 41.60 to 38.60; SPS
+   628 a1200-030 60.00 and 60.00, a1200-fast 30.48 to 30.00. The search costs about 0.65 ms
+   a frame on the a1200-fast (traced), but its frames end just inside a field (work 0.92
+   fields a frame, now 0.95), so some now take two.
 7. **Triple buffering**, only if frames still end just after a field. It needs another
    40000 bytes of Chip RAM, so map what BaseMem uses between `$16314` and `$5C780` first:
    the pre-scaled objects fill `$193B8`-`$5C780` ([internals.md](internals.md#the-pre-scaler)),

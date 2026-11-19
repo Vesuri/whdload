@@ -21,6 +21,10 @@
 *** History			***
 ***********************************
 
+; 19-Nov-2026	- on a 68020 or better the far objects no longer flicker: the
+;		  cells between the far rows, which no row crosses, are searched
+;		  for objects too, up to the game's object limit (Vesuri)
+
 ; 18-Nov-2026	- game time no longer follows the frame rate: the renderer's
 ;		  steps, moves and two effects advance with the fields their frames
 ;		  take, at most a step every 6 fields (timing.s; Vesuri)
@@ -661,9 +665,9 @@ CBorder	movem.l	d0-d2,-(a7)
 ; its map bit cleared. a0, a2 and a6 as the game left them.
 ; body offsets: the span list, the row, the object limit, the object list's
 ; length, the object list; the cell's x step (a byte) and y step (a word
-; after it), the far rows' list end
-SD627	dc.l	$13c26,$12890,$12892,$1288e,$12f26,$129ba,$11e2c
-SD628	dc.l	$13fca,$12c34,$12c36,$12c32,$132ca,$12d5e,$120e4
+; after it), the far rows' list end; the row records (GapFill)
+SD627	dc.l	$13c26,$12890,$12892,$1288e,$12f26,$129ba,$11e2c,$12fa6
+SD628	dc.l	$13fca,$12c34,$12c36,$12c32,$132ca,$12d5e,$120e4,$1334a
 SDVer	dc.l	0
 
 ; A span from d3 to d4 (d3 <= d4 <= 256) in a terrain type's colour, planes
@@ -873,6 +877,220 @@ FarRow	movem.l	a0-a4/a6,-(a7)
 	swap	d3
 	rts
 
+; The objects between the rows (68020 or better). The game notes an object
+; only in a cell a row's spans cross, and the far rows, a screen line each,
+; lie more than a cell apart: at 8 frames a second the objects there came
+; and went with the view now and then, at 50 they flicker. Before each row
+; up to the object limit, lines parallel to the row and the last one, at
+; most a cell apart, cross the gap between them, and each object cell they
+; meet is noted as the row would (the list's order is near to far: these go
+; before the row's own, the last line the farthest). The row records (8
+; bytes a row, 2 a row index): the right end's x and y and the vector to
+; the left end, 8.8 (a cell is a byte of each, y's the cell's high byte).
+; At most GFMAX bytes of the list (64 cells long) are filled this way.
+GFMAX	= 96
+
+; The rows lie farther apart the farther they are, so a row within a cell
+; of the last means every nearer one is too: GFFirst is the nearest row
+; that may have a gap, raised past each row found without one, and
+; lowered by two rows a frame (at row 0) in case the spacing changes.
+GFRowA	dc.l	0			; the row's address
+GFFirst	dc.w	0
+
+SpanG	move.l	GFRowA(pc),d0
+	beq.b	.init
+.go	movea.l	d0,a1
+	move.w	(a1),d7			; d7: the row
+	beq.b	.frame
+	cmp.w	GFFirst(pc),d7
+	bcs.w	SpanD			; nearer: no gap
+	bsr.b	GapFill
+	bra.w	SpanD
+.frame	lea	GFFirst(pc),a1
+	subq.w	#4,(a1)
+	bcc.w	SpanD
+	clr.w	(a1)
+	bra.w	SpanD
+.init	movea.l	SDVer(pc),a1
+	move.l	4(a1),d0
+	add.l	GameBody(pc),d0
+	lea	GFRowA(pc),a1
+	move.l	d0,(a1)
+	bra.b	.go
+
+; d7: the row (2 or more); a3: the map's middle, as the span drawer has
+; it. a0, a2, a5 and a6 kept; the span drawer, which follows, takes no
+; others.
+GapFill	movea.l	SDVer(pc),a1
+	movea.l	GameBody(pc),a4
+	move.l	8(a1),d0
+	cmp.w	(a4,d0.l),d7
+	bgt.w	.out			; beyond the limit, as the game's
+	move.l	28(a1),d0
+	adda.l	d0,a4
+	move.w	d7,d0
+	ext.l	d0
+	lsl.l	#2,d0
+	adda.l	d0,a4
+	subq.l	#8,a4			; a4: the last row's record, this one's 8 on
+; the gap: the right end moves along its ray, 32 degrees off the view, so
+; the rows lie |move| cos 32 apart; lines at most a cell apart need k gaps,
+; the least k with |move|^2 / 8 <= k^2 * 11125 (65536 / 8 / cos^2 32 is
+; 11391). |x| + |y| <= 256 is within a cell.
+	move.w	8(a4),d0
+	sub.w	(a4),d0			; the right end's move
+	move.w	10(a4),d1
+	sub.w	2(a4),d1
+	move.w	d0,d2
+	bpl.b	.ax
+	neg.w	d2
+.ax	move.w	d1,d3
+	bpl.b	.ay
+	neg.w	d3
+.ay	add.w	d3,d2
+	cmpi.w	#256,d2
+	bls.b	.none
+	muls.w	d0,d0
+	muls.w	d1,d1
+	add.l	d1,d0
+	lsr.l	#3,d0
+	cmpi.l	#11125,d0
+	bhi.b	.gap
+.none	addq.w	#2,d7			; within a cell: the rows meet every cell
+	lea	GFFirst(pc),a1
+	cmp.w	(a1),d7
+	bls.b	.nr
+	move.w	d7,(a1)
+.nr	rts
+.gap	moveq	#2,d1
+.kl	move.w	d1,d2
+	mulu.w	d2,d2
+	mulu.w	#11125,d2
+	cmp.l	d2,d0
+	bls.b	.kd
+	addq.w	#1,d1
+	cmpi.w	#16,d1
+	bcs.b	.kl
+.kd	movem.l	a0/a2/a5/a6,-(a7)
+	movea.l	GameBody(pc),a2
+	move.l	12(a1),d0
+	lea	(a2,d0.l),a6		; a6: the list's length
+	move.l	16(a1),d0
+	lea	(a2,d0.l),a5		; a5: the list
+	move.w	d1,d0
+.k	movea.w	d0,a1			; a1: the gaps
+	movea.w	#1,a0			; a0: the line, near to far
+; each of x, y, dx, dy: the last row's plus (this row's minus the last's)
+; times the line over the gaps, or half of it for one line
+GFLERP	MACRO
+	move.w	8+\1(a4),\2
+	sub.w	\1(a4),\2
+	IFEQ	\3
+	muls.w	d6,\2
+	divs.w	d5,\2
+	ELSE
+	asr.w	#1,\2
+	ENDC
+	add.w	\1(a4),\2
+	ENDM
+.line	move.w	a0,d6
+	move.w	a1,d5
+	cmpi.w	#2,d5
+	beq.b	.half
+	GFLERP	0,d0,0
+	GFLERP	2,d1,0
+	GFLERP	4,d2,0
+	GFLERP	6,d3,0
+	bra.b	.walk
+.half	GFLERP	0,d0,1
+	GFLERP	2,d1,1
+	GFLERP	4,d2,1
+	GFLERP	6,d3,1
+.walk	bsr.w	GFLine
+	addq.w	#1,a0
+	cmpa.w	a1,a0
+	bcs.w	.line
+	movem.l	(a7)+,a0/a2/a5/a6
+.out	rts
+
+; A line from x, y (d0, d1) by dx, dy (d2, d3): every cell it crosses, in
+; order, its object noted. Each step is to the next cell in x or in y,
+; whichever boundary the line meets first: e = bx * ay - by * ax (b the way
+; to the next boundary, a the line's length, each axis) is below 0 when it
+; is x's. d0-d7 and a2 used.
+GFLine	move.w	d1,d4
+	move.w	d0,d5
+	lsr.w	#8,d5
+	move.b	d5,d4
+	move.w	d4,-(a7)		; the first cell
+	move.w	#$100,d7		; d7: the y step
+	moveq	#0,d5
+	move.b	d1,d5
+	tst.w	d3
+	bmi.b	.yn
+	neg.w	d5
+	addi.w	#256,d5			; d5: by
+	move.w	d3,d1
+	sub.w	d5,d1
+	addi.w	#256,d1
+	bra.b	.yd
+.yn	neg.w	d3			; d3: ay
+	neg.w	d7
+	move.w	d3,d1
+	sub.w	d5,d1
+	addi.w	#255,d1
+.yd	lsr.w	#8,d1			; d1: the steps in y
+	moveq	#1,d6			; d6: the x step
+	moveq	#0,d4
+	move.b	d0,d4
+	tst.w	d2
+	bmi.b	.xn
+	neg.w	d4
+	addi.w	#256,d4			; d4: bx
+	move.w	d2,d0
+	sub.w	d4,d0
+	addi.w	#256,d0
+	bra.b	.xd
+.xn	neg.w	d2			; d2: ax
+	moveq	#-1,d6
+	move.w	d2,d0
+	sub.w	d4,d0
+	addi.w	#255,d0
+.xd	lsr.w	#8,d0			; d0: the steps in x
+	mulu.w	d3,d4
+	mulu.w	d2,d5
+	sub.l	d5,d4			; d4: e
+	andi.l	#$ffff,d3
+	lsl.l	#8,d3			; an x step adds 256 ay
+	andi.l	#$ffff,d2
+	lsl.l	#8,d2			; a y step takes 256 ax
+	move.w	(a7)+,d5		; d5: the cell
+.cell	tst.b	(a3,d5.w)
+	bpl.b	.next
+	movea.w	(a6),a2
+	cmpa.w	#GFMAX,a2
+	bcc.b	.next
+	bclr	#7,(a3,d5.w)
+	move.w	d5,(a5,a2.w)
+	addq.w	#2,(a6)
+.next	tst.w	d0
+	beq.b	.y
+	tst.w	d1
+	beq.b	.x
+	tst.l	d4
+	bpl.b	.y
+.x	add.b	d6,d5
+	add.l	d3,d4
+	subq.w	#1,d0
+	bra.b	.cell
+.y	tst.w	d1
+	beq.b	.end
+	add.w	d7,d5
+	sub.l	d2,d4
+	subq.w	#1,d1
+	bra.b	.cell
+.end	rts
+
 ; The pre-scaler (the title's PLEASE WAIT, the body in fast memory). Once
 ; at boot the game scales each of 36 objects (48x48, in the ST picture at
 ; $70000) to 15 sizes, a pixel at a time, into the blitter's object buffer
@@ -1027,7 +1245,7 @@ PLFAST	PL_START
 	PL_P	$b7f0,CBorder		; the border cleared by the CPU
 	PL_P	$ce1a,L3Blit		; the level 3 handler runs the queue
 	PL_PS	$cea2,AckVB
-	PL_P	$11e52,SpanD		; the span drawer, a long at a time
+	PL_P	$11e52,SpanG		; the objects between the rows, the span drawer
 	PL_P	$11e0e,FarRow		; the far rows' spans, carry to carry
 	PL_END
 
@@ -1042,7 +1260,7 @@ PLFAST_US
 	PL_P	$b7fe,CBorder
 	PL_P	$ce46,L3Blit
 	PL_PS	$cece,AckVB
-	PL_P	$1210a,SpanD
+	PL_P	$1210a,SpanG
 	PL_P	$120c6,FarRow
 	PL_END
 
