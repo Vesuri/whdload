@@ -129,8 +129,10 @@ nor change behaviour.
    - The span drawer builds each row in registers and writes it a long at a time, with a
      paint routine for each terrain type (the plan's long-word fills and folded lookups).
    - The far rows' per-pixel loop goes from carry to carry.
-   - Not done: the near rows' division loop keeps its variables in fast memory now, which
-     would save about 0.6 ms a frame on the a1200-fast in registers; the plan's direction
+   - Not done: the near rows' division loop keeps its variables in fast memory. In
+     registers (tried 19.11.2026, matching the game's loop on 3000 random rows a version)
+     it saved nothing: CPU work 19.35 to 19.37 ms a frame on the a1200-fast, 38.6 and 38.4
+     fps; the profile's cycles on those accesses are the divisions'. The plan's direction
      constants are cheap reads there since step 4. The map stays in chip: its read is 15
      cycles of each span on the a1200-fast.
    `tools/spancheck.py` finds no difference from the game's routines (3000 random rows
