@@ -159,21 +159,31 @@ list `$3ca1e` shows `$100e`; else `$100e`, the list `$3ca42` showing `$1012`).
 
 - The main loop's swap (`jsr $1d58c` at `$28a38`): when the frame was drawn in the buffer,
   waits until the chip back screen has left the display (a VBL since the previous swap, the
-  same point at which the original's clear could start), copies the buffer's 32000 bytes
-  there, then swaps as the game does. When the frame was drawn in chip memory (the first
+  same point at which the original's clear could start), copies the buffer there, then
+  swaps as the game does. The copy goes by rows (40 bytes, a line of a plane) and leaves out
+  those that are zero in the buffer and already zero in that chip screen: a flag per row
+  and chip screen, in ExpMem after the buffer, says which may be nonzero there; they are
+  all set whenever the game draws in the chip screens itself. In the demo 89 to 521 of the
+  800 rows are zero (the sky, the black below the landscape, empty planes). When the frame was drawn in chip memory (the first
   after the main loop's entry, or after the mode was left), swaps first and copies the new
   back screen into the buffer. Either way `$1006`/`$100a` then point at the buffer.
 - The main loop's clear request (`jsr $1d4fe` at `$28a3e`) marks a clear due. It happens,
-  by the CPU in fast memory (the view's four planes), at the next wait for the clear: the
+  by the CPU in fast memory (the view's four planes, only the rows that the last copy
+  found nonzero: nothing draws into the view between the swap and the clear), at the next
+  wait for the clear: the
   renderer's (`$29c7e`) or another of the game's (`$1d53e`, `$2a5e8`, `$2a722`, `$2c022`).
   The original's blitter clear starts at the next VBL, and the renderer waits for its end;
   the radar's bitmap (`$292cc`), the depth-tested particles and everything else drawn
   after the wait are drawn after either.
-- Everything else that swaps (`$1d58c`), swaps only the pointers (`$1d5da`: the score is
-  drawn into both screens that way), requests a clear (`$1d4fe`, `$1d548`) first leaves the
-  mode: the due clear, the buffer copied to the chip back screen (once hidden), the
-  pointers back to it. The attract screen, the title, the wave and highscore screens and the
-  score's update therefore run on the chip screens as in the original.
+- The score draws into both screens through a pair of pointer swaps (`$1d5da`, from
+  `$2a2f0` and `$2a302`). In the mode the first points the game at the shown chip screen,
+  the second back at the buffer, and `$3ca08` changes as in the original; the buffer then
+  carries the score to the other screen. In the demo this happens 93 times in 25 s, each
+  of which left the mode before (two whole copies and a frame drawn in chip memory).
+- Everything else that swaps (`$1d58c`), swaps only the pointers (`$1d5da`, out of the
+  score's pair), requests a clear (`$1d4fe`, `$1d548`) first leaves the mode: the due
+  clear, the buffer copied to the chip back screen (once hidden), the pointers back to it. The attract screen, the title, the wave and highscore screens
+  therefore run on the chip screens as in the original.
 
 Measured (tools/pace.py, the demo window): 37.8 to 46.7 fps on the a1200-030, 32.2 to
 36.0 on the a1200-fast; Enhanced framerate at 25 Hz on the a1200-030 now draws 24.8 frames
@@ -181,6 +191,27 @@ a second of its 25.0 ticks. aprof on the a1200-030: of all time, 46.7% waits for
 back screen to leave the display (the frame is ready before the next VBL: the display's
 limit), 25.2% is the copy to chip memory (about 5 ms a frame), 2.6% the CPU clear, 25.5%
 the game.
+
+The copy by rows, the score in the mode and the clear by rows, each added to the one
+before (tools/pace.py, the demo window, `CACHE`; 47.6 fps is the window's ceiling, the
+first second being the fade-in):
+
+| Machine | Whole copies | Copy by rows | Score in the mode | Clear by rows |
+|---|---:|---:|---:|---:|
+| a500+-020 (68020, 14 MHz, 16-bit chip bus) | 31.7 | 32.9 | 35.4 | 35.7 |
+| a1200-fast (68020, 14 MHz) | 36.0 | 36.0 | 37.2 | 37.4 |
+| a3000 (68030, 25 MHz) | 46.6 | 46.6 | 47.6 | 47.6 |
+| a3000-50, a1200-030, a1200-040, a1200-060 | 47.6 | | | 47.6 |
+
+aprof, the copy's share of all time: on the a1200-030 25.2% (whole copies) to 14.6% by
+rows plus 3.8% of whole copies on leaving and entering the mode, to 17.2% with the score
+in the mode (the wait for the display 46.6% to 52.1%); on the a1200-fast 25.2% to 23.7%:
+its chip writes halve, but there a 14 MHz 68020 spends nearly as long finding the zero
+rows (the CPU clear is 6.9%, the game itself about 63%).
+
+`DCACHE` (instruction and data cache) against `CACHE`, whole copies: no frame rate changes
+(a1200-030, a1200-040, a1200-060, a3000-50 47.6 both; a3000 46.6 and 46.7); aprof on the
+a1200-030 puts the wait for the display at 47.8% against 46.6%.
 
 Checked: at demo tick 200 the game state is the original's (pointers, the unused clear
 request and the patches apart); screenshots at the same ticks (600, 900, 1166, 1175)

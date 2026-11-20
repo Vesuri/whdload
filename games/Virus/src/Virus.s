@@ -29,10 +29,12 @@ CHIP_END	= $4a546
 ; (four planes of 8000 bytes) with room for the renderer's writes past its end.
 FB_OFF		= (MOVE_END-MOVE_START+$1fff)&-$1000	;from ExpMem, 4 KB after the block
 FB_SIZE		= $10000
+ROWS_OFF	= FB_OFF+FB_SIZE			;the chip screens' row flags, 2 * ROWS
 EXP_SIZE	= FB_OFF+FB_SIZE+$1000			;WHDLoad: whole 4 KB
 SCREEN		= 4*8000				;the four planes
 VIEW		= $280					;the 3D view: 16 lines down
 VIEW_SIZE	= 184*40				;its 184 lines a plane
+ROWS		= SCREEN/40				;a screen's rows: 200 lines of 4 planes
 
 ;======================================================================
 
@@ -163,6 +165,10 @@ _relocate	move.l	_expmem(pc),d0
 		move.l	_expmem(pc),d1
 		add.l	#FB_OFF,d1
 		lea	_fbuf(pc),a0
+		move.l	d1,(a0)
+		bsr.w	_stale			;the row flags
+		add.l	#ROWS_OFF-FB_OFF,d1
+		lea	_lastrows(pc),a0
 		move.l	d1,(a0)
 		lea	_srel(pc),a0		;the slave's own references
 		lea	base(pc),a1
@@ -481,7 +487,7 @@ _pl_fast	PL_START
 		PL_PS	$64238-CODE_START,_fswap	;the main loop: jsr $58d8c (show the frame)
 		PL_PS	$6423e-CODE_START,_fclear	;jsr $58cfe (clear the other buffer)
 		PL_PSS	$58d8c-CODE_START,_leave_swap,2	;the swap: eori.b #$ff,$3ca08
-		PL_PSS	$58dda-CODE_START,_leave_swap,2	;the pointers' swap alone: the same
+		PL_PSS	$58dda-CODE_START,_pswap,2	;the pointers' swap alone (the score)
 		PL_PS	$58cfe-CODE_START,_leave_wait	;the clear request: tst.w $606ac
 		PL_PS	$58d48-CODE_START,_leave_wait	;the attract screen's clear: the same
 		PL_PS	$58d3e-CODE_START,_fwait	;waits for the clear: tst.w $606ac
@@ -493,6 +499,8 @@ _pl_fast	PL_START
 
 ; The main loop's swap. Keeps every register.
 _fswap		movem.l	d0-d1/a0-a2,-(sp)
+		lea	_away(pc),a0
+		sf	(a0)
 		move.l	_fbuf(pc),d0
 		move.l	_gv(pc),a2
 		cmp.l	$1006-$1000(a2),d0
@@ -501,11 +509,12 @@ _fswap		movem.l	d0-d1/a0-a2,-(sp)
 		move.l	$1006-$1000(a2),a0	;and the buffer starts as the new back one
 		move.l	d0,a1
 		bsr.w	_scopy
+		bsr.w	_stale			;the chip screens were drawn by the game
 		bra.b	.set
 .copy		bsr.w	_backchip
 		bsr.w	_hidden
 		move.l	d0,a0
-		bsr.w	_scopy
+		bsr.w	_dcopy
 		bsr.w	_swapbody
 .set		move.l	d0,$1006-$1000(a2)
 		add.l	#VIEW,d0
@@ -523,14 +532,48 @@ _fclear		move.l	a0,-(sp)
 		rts
 
 ; The game's swaps and clear requests, entered: out of the mode first, then the original.
-_leave_swap	bsr.b	_leave
+_leave_swap	bsr.w	_leave
 		move.l	a0,-(sp)
 		move.l	_p3ca08(pc),a0
 		eori.b	#$ff,(a0)		;the replaced instruction: its flags returned
 		movea.l	(sp)+,a0
 		rts
 
-_leave_wait	bsr.b	_leave
+; The pointers' swap alone ($58dda). The score draws into both screens through a pair of
+; them (Disk.1 $2a2f0, $2a302). In the mode the first points the game at the shown chip
+; screen, the second back at the buffer, so the buffer gets the score and the mode is not
+; left; $3ca08 changes as in the original. Otherwise the original's.
+_pswap		movem.l	d0/a0/a2,-(sp)
+		move.l	_gv(pc),a2
+		move.l	_p3ca08(pc),a0
+		move.b	_away(pc),d0
+		bne.b	.back
+		move.l	_fbuf(pc),d0
+		cmp.l	$1006-$1000(a2),d0
+		bne.b	.orig
+		eori.b	#$ff,(a0)		;as the game: the shown screen is now the back
+		bne.b	.b			;one in its terms
+		move.l	$1012-$1000(a2),d0
+		bra.b	.away
+.b		move.l	$100e-$1000(a2),d0
+.away		lea	_away(pc),a0
+		st	(a0)
+		bsr.w	_stale			;the game draws in a chip screen
+		bra.b	.set
+.back		eori.b	#$ff,(a0)
+		lea	_away(pc),a0
+		sf	(a0)
+		move.l	_fbuf(pc),d0
+.set		move.l	d0,$1006-$1000(a2)
+		add.l	#VIEW,d0
+		move.l	d0,$100a-$1000(a2)
+		movem.l	(sp)+,d0/a0/a2
+		addq.l	#4,sp			;not the game's code: back to its caller
+		rts
+.orig		movem.l	(sp)+,d0/a0/a2
+		bra.b	_leave_swap
+
+_leave_wait	bsr.w	_leave
 		bra.b	_tstclear
 
 ; A wait for the clear: the pending clear of the buffer first.
@@ -543,6 +586,8 @@ _tstclear	move.l	a0,-(sp)
 
 ; Out of the mode: the buffer (cleared if due) to the chip back buffer, the pointers there.
 _leave		movem.l	d0-d1/a0-a2,-(sp)
+		lea	_away(pc),a0
+		sf	(a0)
 		move.l	_fbuf(pc),d0
 		move.l	_gv(pc),a2
 		cmp.l	$1006-$1000(a2),d0
@@ -552,6 +597,7 @@ _leave		movem.l	d0-d1/a0-a2,-(sp)
 		bsr.w	_hidden
 		move.l	d0,a0
 		bsr.w	_scopy
+		bsr.w	_stale			;the game draws in chip from here
 		move.l	a1,$1006-$1000(a2)
 		lea	VIEW(a1),a1
 		move.l	a1,$100a-$1000(a2)
@@ -601,31 +647,98 @@ _scopy		movem.l	d0-d7/a0-a1/a3-a6,-(sp)
 		movem.l	(sp)+,d0-d7/a0-a1/a3-a6
 		rts
 
-; The pending clear of the buffer's 3D view, four planes.
+; Copies the buffer a0 to the chip back screen a1 (a1 kept), row by row (40 bytes, a
+; line of a plane), leaving out the rows that are zero in the buffer and already zero
+; there: the sky, the black below the landscape, empty planes. A flag per row and chip
+; screen (ROWS_OFF, the second screen's after the first's) says whether the row there may
+; be nonzero; _stale sets them all when the game itself has drawn in the chip screens.
+_dcopy		movem.l	d0-d7/a0-a6,-(sp)
+		move.l	_fbuf(pc),a2
+		add.l	#ROWS_OFF-FB_OFF,a2
+		move.l	a1,d0
+		and.w	#$8000,d0		;$78000: the second screen
+		beq.b	.first
+		lea	ROWS(a2),a2
+.first		lea	_lastrows(pc),a6
+		move.l	a2,(a6)
+		lea	SCREEN(a0),a6
+.row		move.l	(a0),d0
+		bne.b	.copy
+		move.l	4(a0),d0
+		bne.b	.copy
+		move.l	8(a0),d0
+		bne.b	.copy
+		move.l	12(a0),d0
+		bne.b	.copy
+		move.l	16(a0),d0
+		bne.b	.copy
+		move.l	20(a0),d0
+		bne.b	.copy
+		move.l	24(a0),d0
+		bne.b	.copy
+		move.l	28(a0),d0
+		bne.b	.copy
+		move.l	32(a0),d0
+		bne.b	.copy
+		move.l	36(a0),d0
+		bne.b	.copy
+		tst.b	(a2)+			;zero here: and there?
+		beq.b	.skip
+		sf	-1(a2)			;not yet: zeros once more
+		bra.b	.write
+.copy		st	(a2)+
+.write		movem.l	(a0)+,d1-d7/a3-a5
+		movem.l	d1-d7/a3-a5,(a1)
+		lea	40(a1),a1
+		cmpa.l	a6,a0
+		bne.b	.row
+		bra.b	.done
+.skip		lea	40(a0),a0
+		lea	40(a1),a1
+		cmpa.l	a6,a0
+		bne.b	.row
+.done		movem.l	(sp)+,d0-d7/a0-a6
+		rts
+
+; Every row of both chip screens may be nonzero. Keeps every register.
+_stale		movem.l	d0/a0,-(sp)
+		move.l	_fbuf(pc),a0
+		add.l	#ROWS_OFF-FB_OFF,a0
+		move.w	#2*ROWS/4-1,d0
+.set		move.l	#-1,(a0)+
+		dbf	d0,.set
+		movem.l	(sp)+,d0/a0
+		rts
+
+; The pending clear of the buffer's 3D view, four planes: the rows that may be nonzero.
+; The flags of the screen copied last (_lastrows) are, from the copy on, the buffer's own
+; (nonzero rows set); nothing draws into the view between the swap and the clear, and the
+; score's drawing in chip memory sets them all.
 _fpending	movem.l	d0-d7/a0-a1/a3-a6,-(sp)
 		lea	_pending(pc),a0
 		tst.b	(a0)
 		beq.b	.done
 		sf	(a0)
 		move.l	_fbuf(pc),a0
-		lea	VIEW+VIEW_SIZE(a0),a0	;the end of the first plane's view
+		lea	VIEW(a0),a0		;the first plane's view
+		move.l	_lastrows(pc),a1
+		lea	VIEW/40(a1),a1		;its first row's flag
 		moveq	#0,d1
 		moveq	#0,d2
 		moveq	#0,d3
 		moveq	#0,d4
 		moveq	#0,d5
-		moveq	#0,d6
-		moveq	#0,d7
-		move.l	d1,a1
-		move.l	d1,a3
-		moveq	#4-1,d0
-.plane		move.l	a0,-(sp)
-		move.w	#VIEW_SIZE/32-1,d1	;7360 = 230 * 32
-.clr		movem.l	d2-d7/a1/a3,-(a0)
-		dbf	d1,.clr
-		movea.l	(sp)+,a0
-		lea	8000(a0),a0
-		dbf	d0,.plane
+		moveq	#4-1,d7
+.plane		move.w	#VIEW_SIZE/40-1,d0
+.row		tst.b	(a1)+
+		beq.b	.next
+		movem.l	d1-d5,(a0)
+		movem.l	d1-d5,20(a0)
+.next		lea	40(a0),a0
+		dbf	d0,.row
+		lea	VIEW/40(a1),a1		;the next plane's
+		lea	VIEW(a0),a0
+		dbf	d7,.plane
 .done		movem.l	(sp)+,d0-d7/a0-a1/a3-a6
 		rts
 
@@ -647,7 +760,9 @@ _gv		dc.l	$1000			;the game's variables, $3ca08 and $606ac,
 _p3ca08		dc.l	$3ca08			;where they are (relocated with _srel)
 _p606ac		dc.l	$606ac
 _swapped	dc.l	0			;_fields at the main loop's last swap
+_lastrows	dc.l	0			;the row flags of the screen copied last
 _pending	dc.b	0			;the buffer's clear is due
+_away		dc.b	0			;between the score's two pointer swaps
 		even
 
 _tags		dc.l	WHDLTAG_CUSTOM1_GET

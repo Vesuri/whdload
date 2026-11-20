@@ -46,14 +46,15 @@ analysis behind them, against the repository's direction for 68020+ with fast me
 only, everything not DMA in fast memory, every cache on), is in
 [internals](internals.md#what-must-be-in-chip-memory) and its measurements:
 
-1. **Caches.** WHDLoad's `DCACHE` added little before the drawing moved (37.8 to 38.2
-   fps on the a1200-030); measure it again now. No DMA touches CPU-only data, and the
-   slave flushes after the one self-modifying routine; the slave could then enable it
-   itself (`resload_SetCACR`).
-2. **The copy.** At 46.7 fps on the a1200-030 the frame waits for the display (46.7% of
-   the time); the copy to chip memory is 25.2% (about 5 ms a frame). It matters where a
-   frame is just over a field: copying only the 3D view and the panel lines that changed
-   would cut it, a 68040/060's `move16` too.
+- **Caches.** `DCACHE` changes no frame rate in the demo (47.6 on the a1200-030, -040,
+  -060 and a3000-50 with either; the a3000 46.6 to 46.7) and leaves about 1% more time
+  waiting on the a1200-030 ([internals](internals.md#drawing-in-fast-memory)); not worth
+  the slave enabling it.
+- **The copy.** It goes by rows now, skipping zero rows, the score draws without leaving the
+  mode and the clear only clears nonzero rows: the a500+-020 31.7 to 35.7 fps, the
+  a1200-fast 36.0 to 37.4, the a3000 46.6 to 47.6; the others were at the window's ceiling
+  already. What is left on the 68020s is mostly the game itself; on a 68040/060 `move16`
+  is untried, but those wait for the display.
 - Enhanced framerate's speeds stop at 25 Hz; the a1200-030 could now draw a 50 Hz tick
   (a tick every field), but that is a faster game, not a smoother one. Smoother needs
   drawing between ticks (interpolation).
