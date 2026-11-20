@@ -254,13 +254,23 @@ The renderer writes no game state (tools/callwrites.py, Unicorn from a demo chip
 with the drawing left out of every other pass, 8 passes end in the same game state as 8
 whole passes, except for the radar list, which the enemies append to every pass and only
 the renderer resets. Its own scratch (`$1073-$1190`, `$1300-$16dc`, the polygon filler's edge
-state at `$2c586`) is read by nothing else. The renderer also starts two sounds (the
-low-fuel warning, `$2937a`), so a pass that does not draw does not start them. That holds for
-the demo; in play the renderer changes game state in two more places: visible burning tiles
-(map bit 4) spawn smoke every 8 ticks (`$2981c`, through `$25c7e` and the RNG), and the
-attractor's lightning bolt (`$28182`) takes 9 RNG draws a drawn frame (`$282dc`). A pass
-that leaves the drawing out therefore changes the RNG's sequence while either is on
-screen.
+state at `$2c586`) is read by nothing else. The renderer also starts sounds: the low-fuel
+warnings (25, 29 and 34, `$2937a`-`$294ce`, with a latch, `$3ca17`, so that 29 sounds once)
+and sound 0 every 64 ticks while a type-11 tile is in view (`$297ca`). A pass that does not
+draw does not start them. That holds for the demo. In play the renderer changes game state
+in three more places:
+
+- Visible burning tiles (map bit 4) spawn smoke every 8 ticks (`$2981c`, through `$25c7e`
+  and the RNG).
+- The attractor's lightning bolt (`$28182`) takes 9 RNG draws a drawn frame (`$282dc`).
+- The object drawer tests every vertex it projects against the terrain height (`$2bd12`).
+  For the ship's model (`$fe38`) it sets `$3ca0f` (`$2be3e`). The player routine crashes the
+  ship on it at the next tick (`$2b15e`, the crash at `$2b432`); the player's own height
+  test covers only its centre.
+
+A pass that leaves the drawing out therefore changes the RNG's sequence while smoke or the
+lightning is on screen. It also does not test the ship against the terrain, so a crash into
+a slope comes on the next drawn pass if the ship is still in it, or not at all.
 
 **Enhanced framerate** (CUSTOM1=1) runs one pass per tick at a fixed rate: a tick every
 2, 3 or 4 fields (CUSTOM2 0, 1, 2: 25, 16.7, 12.5 Hz), counted by a hook in the VBL.
@@ -333,19 +343,130 @@ it heads for the nearest object, it fires and thrusts by distance and terrain), 
 another game. Only 25 and 12.5 Hz are shifts of 50 Hz; 16.7 Hz is not. No comparison with the
 original's state applies (tools/gametime.py), so only play could judge it.
 
-**Drawing between ticks** gives the frames without any of that. Every mover integrates its
-stored velocity before it decides anything: the particles' dispatcher adds it before the
-handler (which adds only gravity to v), the object handlers integrate first, and so does the
-player. So the next tick reaches `pos + v`, and `pos + v/2` is its midpoint, except where it
-bounces, reverses (`$2721c`, `$27eb8` at their counts), lands or ends. A frame drawn on the
-field between ticks from those predicted positions (the camera, the ship, every object and
-particle, the spin matrices at half angles, the attitude halfway) leaves the simulation as it
-is: the game state stays byte-identical, the demo stays in sync and the comparisons still
-apply. The work is on the drawing side. The depth lists are filled during the simulation
-(the particles `$25252`, the objects `$26d08`, the ship `$2b23c`, the renderer's tiles), so
-the frame between needs a pass of its own that emits them again at the predicted positions
-without the handlers, and that changes nothing: the RNG kept across the draw (the
-lightning), no smoke spawned, no sound started. A wrong prediction shows for one field.
+Drawing between ticks gives the frames without any of that: see the next section.
+
+## Frames between ticks
+
+The design for drawing frames between ticks, read from the code. Nothing of it is built;
+[open work](open-work.md#frames-between-ticks) has the steps. A frame drawn a fraction α of
+the way to the next tick shows every mover at `pos + α·v`, and the game state stays as it
+is. The demo then stays in sync, and the state comparisons (tools/gametime.py,
+tools/callwrites.py) still apply.
+
+This predicts forward rather than interpolating back. Interpolating between the last two
+ticks would show everything a tick late (40 ms at 25 Hz), and it would need each thing paired
+with itself across ticks, which the lists' compaction makes hard (a removal moves the last
+record into the freed slot). The prediction is exact in free motion because of the game's
+update order (below).
+
+**What the renderer draws.** The depth lists are 10 buckets of 3276 bytes at `$16ac-$96a3`,
+256 units of depth each:
+
+- `$29594` holds each bucket's write pointer and end, and `$295e4` its start. `$29574`
+  resets the lists after the renderer.
+- An entry is a plotter's address followed by its data.
+- The renderer (`$29cc2`) draws the buckets far to near, between the landscape's rows. It
+  calls each plotter with a5 at its data and only reads the entries.
+- The simulation fills the lists before the renderer runs. The renderer adds the tiles'
+  objects as it walks the grid.
+
+| Writer (`Disk.1`, tail and store) | Entry | Its position |
+|---|---|---|
+| Particles, a dot (`$25252`, `$252a4`) | 8 bytes: plotter, x, y | projected, against the camera of the tick before: the particles run before the player moves it |
+| Particles, a dot and its ground dot (`$252c2`, `$25312` and `$25348`) | two of 8 bytes | the same; the ground dot at the terrain height under it |
+| Particles, shards (`$25366`, `$253bc`) | 32 bytes: plotter `$2bbaa`, model, matrix (9 words), position | 3D, camera-relative |
+| Objects (`$26d08`, `$26dac`) | 32 bytes, as the shards | 3D, against this tick's camera (`$1096`, `$26cc6`) |
+| The attractor's lightning (`$27cdc`) | 16 bytes: plotter `$28182`, two points | 3D, camera-relative |
+| The ship (`$2b250`) | 32 bytes, its matrix in `$1084` from the attitude | 3D, camera-relative |
+| The renderer's tile objects (`$297d4`, stores `$29672`-`$29840`) | 32, 14 and 4 bytes | from the grid, at the renderer's camera |
+
+The entries hold copies of the matrices, not pointers:
+
+- the spin matrices `$109c`, `$10ae` and `$10c0` (`$2bafc`, from the counter `$c9f4`);
+- the identity `$10d2` (`$288de`);
+- `$1084`, the scratch in which each object and the ship compute their own.
+
+**Prediction.** Every mover adds its stored velocity before anything else changes it:
+
+- The particles' dispatcher adds it before the handler. The handler adds gravity, bounces
+  and writes the record back before its tail (`$25528`, `$2555c`).
+- The object handlers integrate first.
+- The ship integrates first too (`$2b136`).
+
+So at an entry's tail its record holds what the next tick adds, and the next pose is
+`pos + v`, wrapping as words as in the game. The camera is the ship's position, its height
+256 below it or fixed at 512 low down (`$2b1e0`). The camera between ticks is that rule
+applied to the ship's predicted position.
+
+The prediction is wrong for one frame where the next tick changes v in other ways:
+
+- particles bounce on the ground;
+- objects reverse (`$2721c`, `$27eb8`);
+- the ship lands;
+- things end or collide (a shot is drawn half a tick on into what it hits);
+- a decision changes v.
+
+Things spawned during a tick appear at the next tick, as now.
+
+Rotations:
+
+- The spin matrices go to the counter plus α. Angles are in 1/65536 of a turn and the rotation
+  (`$24caa`) looks the sine table up in steps of 32, so a half tick is exact and thirds
+  round to 32.
+- The ship's attitude moves half the way to its target each tick (`$2af56`). Between ticks
+  it is `att + α·(next - att)`, with the target the tick used.
+- The other objects keep the tick's matrix.
+
+The renderer reads the camera at full precision (the grid's offset in units, `$29974`), so a
+frame between ticks moves the landscape by its fraction too.
+
+**Recording and emitting again.** A hook at each of the simulation's 7 stores copies the
+entry and its source's position and velocity into a table in fast memory. That is at most
+the 375 particles twice and the objects, a few KB in practice and never more than the lists'
+32760 bytes. With them go the bucket pointers and the radar list's end, as they are before
+the renderer.
+
+A frame between ticks then resets the lists and emits every recorded entry again at α, with
+its writer's own cull, bucket and capacity rules:
+
+- dots are projected again (`asl.l #8` and `divs`, as at `$25278`);
+- the ground dot comes from the terrain height (`$29eb2`, which writes nothing) at the new
+  place;
+- 3D entries are moved.
+
+Then it calls the renderer, which adds the tiles at the staged camera. Emitting at α = 0
+must reproduce the native lists byte for byte; that is the first check.
+
+**What a frame between ticks must leave as it was.** The renderer changes game state (see
+[Game time](#game-time)), and the frame between ticks must undo or prevent all of it:
+
+| What | Where (`Disk.1`) | In the frame between |
+|---|---|---|
+| The camera `$107e-$1082`, the counter `$c9f4` (the renderer's gates, the type-12 tile's spin `$2963c`) | | staged, then restored |
+| The spin matrices | `$2bafc` | at the counter plus α, then restored |
+| The RNG `$101a`/`$101e` (the lightning's 9 draws) | `$282dc` | saved, then restored |
+| Smoke from burning tiles (a particle and the RNG) | `$2981c` | not spawned (a hook on the call) |
+| The fuel warnings 25, 29 and 34, their latch `$3ca17`; sound 0 | `$2937a`-`$294ce`, `$297ca` | not started (one hook on the sound start `$1ca58`); the latch restored |
+| The ship's terrain contact `$3ca0f` | `$2be3e` | restored |
+| The radar list's end `$1022`, `$1026` | `$29358`, `$29362` | set to the tick's end, then restored |
+
+Everything else the renderer and its plotters write is their own scratch: the ranges in
+[Game time](#game-time), `$1072`, `$c704`, `$3ca06`, `$3ca0e`, `$3ca16` and `$1c088`. That list
+comes from the call graph, read statically; the checks in open work confirm it at run time.
+
+**Where it goes.** At the start of the main loop's pass (`_pass`), before it waits for the
+next tick, while the last pass drew and the next tick's frame is not due:
+
+1. Stage the camera, the counter, the spin matrices and the ship's matrix.
+2. Emit the lists again at α.
+3. Run the renderer.
+4. Swap and request the clear, as a drawn pass does: the copy waits for the display as now,
+   so this is at most one frame a field.
+5. Restore everything staged.
+
+The frame shown k fields after the tick's frame takes α = k/P (P fields a tick, CUSTOM2).
+The counter has already advanced there (`addi.w #1,$c9f4` at `$28a04`), so the frame stages
+it back by one.
 
 ## Measurements
 
