@@ -24,8 +24,7 @@
 
 
 	You need 0.6 MB ChipMem and 0.6 MB OtherMem.
-	With 76 KB more (FastMem if there is some) the game's code and stack
-	run from it.
+	With 416 KB FastMem more, the game runs from it.
 	You can quit the game by pressing F10 (key can be changed with
 	Tooltype "QuitKey=").
 
@@ -40,8 +39,8 @@
 	  instead of following the frame rate; CUSTOM2 picks the game speed
 	- the attract screen lasts as long on slower Amigas as on faster ones
 	- instruction cache flushed after the game rewrites its renderer
-	- the game's code and stack run from fast memory when there is some: faster on
-	  68020 and up (the demo: 23 to 36 frames a second on a 50 MHz 68030)
+	- the game runs from fast memory when there is enough: faster on 68020 and
+	  up (the demo: 23 to 38 frames a second on a 50 MHz 68030)
 
 	This game needs 544 KB ChipMem instead of 512 KB because of
 	some memory leaks in the render routines which make Virus

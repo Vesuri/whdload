@@ -77,8 +77,8 @@ python3 tools/gametime.py compare tmp/prof/f200_030.bin tmp/prof/f200_a500.bin
 
 ## The relocation table
 
-`src/reloc.i` is generated: the longs in the code area that hold a code-area address
-([internals](internals.md#code-in-fast-memory)). After any change to the walk's knowledge
+`src/reloc.i` is generated: the longs in the image that hold an address in the moved block
+([internals](internals.md#cpu-only-data-in-fast-memory)). After any change to the walk's knowledge
 in `tools/relocmap.py` (seeds, pointer tables, ranges of lookalikes):
 
 ```sh
@@ -104,9 +104,11 @@ thrust, LMB (`JOY1_FIRE_BUTTON`) fire, moving the mouse pitches and turns (up: n
 on its `ILLEGAL` fill if a reference was missed; WHDLoad's core dump is then in the run's
 `dh1`).
 
-The tools that need the code's address find it with `tools/codebase.py` (the game's level
-3 vector at `$6c`). `tools/callwrites.py capture` and `tools/bench.py` with `report.py` run
-the game's code at `$57000`: use them with `SLAVE=original`.
+The tools that need the game's address find it with `tools/codebase.py` (the game's level
+3 vector at `$6c`; `codebase.at` maps any address). `tools/chipaccess.py` reports CPU
+accesses to the moved block's stale chip copy (there should be none). `tools/callwrites.py
+capture` and `tools/bench.py` with `report.py` run the game at its original addresses: use
+them with `SLAVE=original`.
 
 ## Traps
 

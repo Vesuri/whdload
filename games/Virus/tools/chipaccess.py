@@ -28,7 +28,11 @@ import codebase  # noqa: E402
 TYPES = {0: 'free', 1: 'refresh', 2: 'CPU', 3: 'copper', 4: 'audio', 5: 'blitter', 6: 'bitplane'}
 
 
-def region(a):
+def region(a, d=0):
+    if d and codebase.moves(a):
+        return 'STALE: the chip copy of a moved address'
+    if d and codebase.MOVED[0] + d <= a < codebase.MOVED[1] + d:
+        return 'fast memory (moved)'
     if a >= 0xdff000:
         return 'custom registers'
     if 0xbf0000 <= a < 0xc00000:
@@ -50,7 +54,8 @@ def main(args):
     srv = game_server('virus')
     trace = ROOT / 'tmp/prof/chipaccess.bin'
     trace.parent.mkdir(parents=True, exist_ok=True)
-    srv.request(f'until {0x641fe + codebase.delta(srv):#x}')
+    dl = codebase.delta(srv)
+    srv.request(f'until {0x641fe + dl:#x}')
     srv.request(f'fields {skip}')
     srv.request(f'profile {n} {trace}')
     t = barto.load(str(trace))
@@ -75,7 +80,7 @@ def main(args):
                 i = next(md.disasm(bytes(t.chip[pc:pc + 10]), pc), None)
                 words.update(range(pc, pc + (i.size if i else 2), 2))
     reg, kind, word, clear = collections.Counter(), collections.Counter(), collections.Counter(), collections.Counter()
-    cpu = 0
+    cpu, stale = 0, collections.Counter()
     for f in t.fields:
         b, s = bytes(f.dma), f.dma_size
         ty = [b[i + 29] for i in range(0, len(b), s)]
@@ -88,7 +93,9 @@ def main(args):
             cpu += 1
             a = u('<I', b, i + 12)[0]
             w = b[i + 1] & 1
-            reg[(region(a), 'write' if w else 'read')] += 1
+            reg[(region(a, dl), 'write' if w else 'read')] += 1
+            if dl and codebase.moves(a):
+                stale[a & ~0xff] += 1
             word[a] += 1
             if not w and a < 0x80000:
                 kind['instruction fetch' if (a & ~1) in words or (a & ~1) + 2 in words else 'data'] += 1
@@ -99,6 +106,8 @@ def main(args):
     print('  chip reads: ' + ', '.join(f'{k} {100 * c / tk:.1f}%' for k, c in kind.most_common()))
     a, c = word.most_common(1)[0]
     print(f'  most read word: ${a:05x}, {100 * c / cpu:.1f}% of the CPU slots')
+    if stale:
+        print('  stale accesses by 256 bytes: ' + ', '.join(f'${a:05x} {c}' for a, c in sorted(stale.items())))
     tc = sum(clear.values()) or 1
     print('  slots while the blitter clears: ' + ', '.join(f'{TYPES.get(k, k)} {100 * c / tc:.1f}%' for k, c in clear.most_common()))
 

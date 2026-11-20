@@ -171,28 +171,34 @@ def compare(dump, a, b):
     ra = Path(a).read_bytes() + Path(a + '.img').read_bytes()
     rb = Path(b).read_bytes() + Path(b + '.img').read_bytes()
     diff = [0x1000 + i for i in range(len(ra)) if ra[i] != rb[i] and not mask[0x1000 + i]]
-    # B with its code in fast memory (tools/codebase.py): its code pointers differ from A's by
-    # one distance. Bytes of an even long that is a code-area address in A and that plus the
-    # distance in B are the same state.
+    # B moved to fast memory (tools/codebase.py): its pointers into the moved block differ
+    # from A's by one distance. Bytes of an even long that is a moved address in A and that
+    # plus the distance in B are the same state.
     def long(r, x):
         return int.from_bytes(r[x - 0x1000:x - 0x1000 + 4], 'big')
     moved, cands = set(), {}
     for x in diff:
         for y in (x & ~1, (x & ~1) - 2):
             va, vb = long(ra, y), long(rb, y)
-            if 0x57000 <= va < 0x68800 and vb != va:
+            if moves(va) and vb != va:
                 cands[vb - va] = cands.get(vb - va, 0) + 1
     if cands:
         d = max(cands, key=cands.get)
         for x in diff:
             for y in (x & ~1, (x & ~1) - 2):
                 va, vb = long(ra, y), long(rb, y)
-                if 0x57000 <= va < 0x68800 and vb - va == d:
+                if moves(va) and vb - va == d:
                     moved.add(x)
         longs = {x & ~1 if long(rb, x & ~1) - long(ra, x & ~1) == d else (x & ~1) - 2 for x in moved}
-        print(f'code pointers moved by ${d:x}: {len(longs)} longs')
+        print(f'pointers moved by ${d:x}: {len(longs)} longs')
         diff = [x for x in diff if x not in moved]
     print(f'game state: {len(diff)} bytes differ: ' + ' '.join(f'${x:05x}' for x in diff[:60]))
+
+
+def moves(v):
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import codebase
+    return codebase.moves(v)
 
 
 def split(dump, n):

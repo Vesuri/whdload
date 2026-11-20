@@ -17,6 +17,7 @@ order (every field is traced unless the step says otherwise):
     dive N DY          trace N fields with both buttons held (RMB thrust, LMB fire), the
                        mouse moved by DY every 5 fields (negative: up, the quickest way to
                        lose a life)
+    thrust N DY        the same with RMB alone: no shots, which cost a point each
 
 NOTRACE=1 runs the same steps untraced (driving a build, not collecting). The set keeps,
 for each PC, the step that first reached it; `python3 tools/coverage.py`
@@ -125,14 +126,14 @@ def main(args):
                 trace(min(5, n), tag)
                 n -= 5
             i += 2
-        elif cmd == 'dive':
+        elif cmd in ('dive', 'thrust'):
             n, dy = int(args[i + 1]), int(args[i + 2])
-            srv.request('gdb monitor input JOY1_FIRE_BUTTON 1')
+            srv.request(f'gdb monitor input JOY1_FIRE_BUTTON {int(cmd == "dive")}')
             srv.request('gdb monitor input JOY1_2ND_BUTTON 1')
             while n > 0:
                 if dy:
                     srv.request(f'gdb monitor mouse 0 {dy}')
-                trace(min(5, n), 'dive')
+                trace(min(5, n), cmd)
                 n -= 5
             srv.request('gdb monitor input JOY1_FIRE_BUTTON 0')
             srv.request('gdb monitor input JOY1_2ND_BUTTON 0')

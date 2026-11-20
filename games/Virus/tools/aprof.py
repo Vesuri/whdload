@@ -74,7 +74,7 @@ def run(path, fields):
     srv.request('gdb monitor aprof start')
     srv.request(f'fields {fields}')
     srv.request(f'gdb monitor aprof stop {Path(path).resolve()}')
-    print('frame counter', srv.request('peek c9f4 2').split()[0])
+    print('frame counter', srv.request(f'peek {codebase.at(0xc9f4, d):x} 2').split()[0])
     report(path)
 
 

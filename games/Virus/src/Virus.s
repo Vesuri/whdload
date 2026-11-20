@@ -16,14 +16,16 @@ DISK_SIZE	= 184320
 GAME_START	= $63ec8
 HI_TABLE	= $66e2e
 HI_SIZE		= 280
-; The code with its own variables and tables, copied to ExpMem when there is some
-; (docs/internals.md, "Code in fast memory"); everything below stays in chip memory.
+; Everything the CPU alone uses, copied to ExpMem when that is fast memory
+; (docs/internals.md, "CPU-only data in fast memory"): the work memory from $1000, the
+; image's data, the stack and the code ($57000 on). The DMA data in it stays in chip
+; memory: the copper lists and the samples, $3ca1e-$4a545.
 CODE_START	= $57000
-CODE_SIZE	= $11800
-; The stack: 4 KB of zeros at $4a546-$4b545, set by lea $4b546,sp at $63f88 and $6420c.
-; With ExpMem it is the 4 KB after the code there, the leas' operands rewritten.
-STACK_SIZE	= $1000
-EXP_SIZE	= $13000
+MOVE_START	= $1000
+MOVE_END	= $68800
+CHIP_START	= $3ca1e
+CHIP_END	= $4a546
+EXP_SIZE	= (MOVE_END-MOVE_START+$fff)&-$1000	;WHDLoad: whole 4 KB
 
 ;======================================================================
 
@@ -114,39 +116,48 @@ _start		lea	_resload(pc),a1
 		jmp	(a0)
 
 ;----------------------------------------------------------------------
-; With ExpMem: copies the code area there and adds the distance (_delta) to every long in
-; it that holds a code-area address (src/reloc.i, from tools/relocmap.py), and moves the
-; stack after it. The chip copy is then filled with ILLEGAL, so that a reference the table
-; missed stops at once.
+; With fast ExpMem: copies $1000-$687ff there and adds the distance (_delta) to every long
+; in the image that holds an address in it (src/reloc.i, from tools/relocmap.py) and to the
+; slave's own (_srel). The chip copy, but for the chip data, is then filled with ILLEGAL, so
+; that a code reference the table missed stops at once.
 
 _relocate	move.l	_expmem(pc),d0
 		beq.b	.none
-		sub.l	#CODE_START,d0
+		cmp.l	#$200000,d0		;chip memory: nothing to gain
+		bcs.b	.none
+		sub.l	#MOVE_START,d0
 		lea	_delta(pc),a0
 		move.l	d0,(a0)
-		lea	CODE_START,a0
+		lea	(MOVE_START).w,a0
 		move.l	_expmem(pc),a1
-		move.w	#CODE_SIZE/4-1,d1
+		move.l	#(MOVE_END-MOVE_START)/4,d1
 .copy		move.l	(a0)+,(a1)+
-		dbf	d1,.copy
-		move.l	_expmem(pc),a1
+		subq.l	#1,d1
+		bne.b	.copy
+		lea	DISK_BASE,a1		;the image there: the first entry's base
+		add.l	d0,a1
 		lea	_reloc(pc),a0
 		move.w	#RELOC_COUNT-1,d1
 .reloc		moveq	#0,d2
-		move.w	(a0)+,d2
-		add.l	d2,d2
-		add.l	d0,(a1,d2.l)
+		move.w	(a0)+,d2		;the distance from the previous one / 2
+		add.l	d2,a1
+		add.l	d2,a1
+		add.l	d0,(a1)
 		dbf	d1,.reloc
-		move.l	_expmem(pc),d0		;the stack: the 4 KB after the code
-		add.l	#CODE_SIZE+STACK_SIZE,d0
-		move.l	#$63f8a-CODE_START,d1	;lea $4b546,sp: at the start
-		move.l	d0,(a1,d1.l)
-		move.l	#$6420e-CODE_START,d1	;and at the main loop's top
-		move.l	d0,(a1,d1.l)
-		lea	CODE_START,a0
-		move.w	#CODE_SIZE/2-1,d1
-.fill		move.w	#$4afc,(a0)+
-		dbf	d1,.fill
+		lea	_srel(pc),a0		;the slave's own references
+		lea	base(pc),a1
+.srel		move.w	(a0)+,d2
+		beq.b	.fill
+		add.l	d0,(a1,d2.w)
+		bra.b	.srel
+.fill		lea	(MOVE_START).w,a0	;the chip copy, but for the chip data
+		move.l	#(CHIP_START-MOVE_START)/2,d1
+		bsr.b	.ill
+		lea	CHIP_END,a0
+		move.l	#(MOVE_END-CHIP_END)/2,d1
+.ill		move.w	#$4afc,(a0)+
+		subq.l	#1,d1
+		bne.b	.ill
 .none		rts
 
 ;----------------------------------------------------------------------
@@ -220,7 +231,8 @@ _pl_game	PL_START
 		PL_PS	$67118-CODE_START,_savehi
 		PL_END
 
-_flush		move.w	$c9fe,$c9fc		;the type now set up
+_flush		move.w	($c9fe).l,($c9fc).l	;the type now set up
+_sr_flush	equ	*
 		move.l	a0,-(sp)
 		move.l	_resload(pc),a0
 		jsr	resload_FlushCache(a0)	;keeps every register
@@ -293,7 +305,8 @@ _pl_enhanced	PL_START
 ; In the level 3 handler's VBL part, all registers saved.
 _vbl		lea	_fields(pc),a0
 		addq.l	#1,(a0)
-		move.b	$3ca1b,d0
+		move.b	($3ca1b).l,d0
+_sr_vbl		equ	*
 		rts
 
 ; The main loop's entry, after the title, a wave or a pause screen: time starts now.
@@ -308,7 +321,8 @@ _rebase		move.l	a0,-(sp)
 		rts
 
 ; One main loop pass: the original's calls, from $6421a to $6424b.
-_pass		tst.b	$3ca07			;paused: no game time passes
+_pass		tst.b	($3ca07).l		;paused: no game time passes
+_sr_pass	equ	*
 		bne.b	_rebase
 		move.l	d1,-(sp)
 		move.l	_period(pc),d1
@@ -322,7 +336,8 @@ _pass		tst.b	$3ca07			;paused: no game time passes
 		beq.b	.nodraw
 		GCALL	$65174			;the renderer: landscape, objects, radar
 		bra.b	.drawn
-.nodraw		move.l	#$9ea6,$1022		;the radar list, as the renderer leaves it
+.nodraw		move.l	#$9ea6,($1022).l	;the radar list, as the renderer leaves it
+_sr_nodraw	equ	*
 .drawn		GCALL	$64d74			;the depth lists emptied
 		GCALL	$61f32			;the wave's end
 		bsr.w	_draw
@@ -344,10 +359,12 @@ _attract	move.l	d1,-(sp)
 		move.l	(sp)+,d1
 		bsr.w	_draw
 		beq.b	.skip
-		lea	$1084,a1
+		lea	($1084).l,a1
+_sr_attract1	equ	*
 		GCALL	$604aa			;the rotation
 		movem.w	8(sp),d2
-		lea	$4b638,a6
+		lea	($4b638).l,a6
+_sr_attract2	equ	*
 		moveq	#0,d0
 		moveq	#0,d1
 		GCALL	$6776c			;the ship
@@ -395,11 +412,16 @@ _fields		dc.l	0			;VBLs since the start (tools/pace.py reads
 _frames		dc.l	0			;these two and _period from _pass's address)
 _due		dc.l	0			;the field the next tick is due
 _period		dc.l	3			;fields a tick
-_delta		dc.l	0			;the code's distance from CODE_START
+_delta		dc.l	0			;the distance moved (0: not moved)
 _skips		dc.b	0			;passes in a row without drawing
 _drawn		dc.b	0			;this pass draws
 
 ;======================================================================
+
+; The slave's references to moved addresses (absolute longs ending at each label).
+_srel		dc.w	_sr_flush-8-base,_sr_flush-4-base,_sr_vbl-4-base,_sr_pass-4-base
+		dc.w	_sr_nodraw-8-base,_sr_nodraw-4-base,_sr_attract1-4-base
+		dc.w	_sr_attract2-4-base,0
 
 _resload	dc.l	0
 _hiname		dc.b	"Virus.hi",0

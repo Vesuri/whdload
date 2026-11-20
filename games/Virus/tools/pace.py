@@ -48,7 +48,7 @@ def main(args):
     else:
         period, frames = None, None
         print('original: one tick a drawn frame')
-    t0 = peek(0xc9f4, 2)
+    t0 = peek(codebase.at(0xc9f4, d), 2)
     f0 = frames() if frames else 0
     done = 0
     rows = []
@@ -56,7 +56,7 @@ def main(args):
         n = min(step, total - done)
         srv.request(f'fields {n}')
         done += n
-        t, f = peek(0xc9f4, 2) - t0, (frames() - f0) if frames else None
+        t, f = peek(codebase.at(0xc9f4, d), 2) - t0, (frames() - f0) if frames else None
         rows.append((done, t, f if f is not None else t))
     prev = (0, 0, 0)
     for d, t, f in rows:

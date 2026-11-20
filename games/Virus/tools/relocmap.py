@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Recursive disassembly of the Virus image: every instruction reached from the entry and
-the code pointers, and every operand that names a game address.
+"""Recursive disassembly of the Virus image, and the relocation table for moving $1000-$687ff
+(work memory, the image's data, the code) to fast memory: every long that holds an address
+in it, but for the chip data (CHIP).
 
-    python3 tools/relocmap.py [summary|refs|indirect|uncovered|dis ADDR [N]]
+    python3 tools/relocmap.py [summary|refs|check|inc|imm|indirect|uncovered|dis ADDR [N]]
 
 Reads Disk.1 (tmp/game/Virus/Disk.1) at its load address $3b800. Seeds: the entry, the
-extra entries in SEEDS (code reached only through pointers the walk cannot follow), and
-every absolute-long or immediate operand that points at an instruction start (iterated
-until nothing new). The demo profile (tmp/prof/demo030/profile.pkl.gz) gives executed PCs
-to check the walk against (`uncovered`: executed but not reached).
+extra entries in SEEDS and TRACED (code reached only through pointers the walk cannot
+follow), the code tables, and every absolute-long or immediate operand that points at an
+instruction start (iterated until nothing new). The relocations: absolute-long operands
+and long immediates with a moved value (but for IMM_NUMBERS), the pointer tables, the
+object models' face pointers (MODELS) and the waves' routine pointers. `check` fails on a
+moved-range long in data that none of these, nor NOT_POINTERS, accounts for; `inc` writes
+src/reloc.i. Executed PCs (tools/coverage.py, else the demo profile) check the walk.
 """
 import gzip
 import pickle
@@ -26,7 +30,26 @@ END = BASE + SIZE
 ENTRY = 0x63ec8
 WORK = (0x1000, BASE)
 
-CODE = (0x57000, 0x68800)    # code, with its own variables and tables: moves to fast memory
+CODE = (0x57000, 0x68800)    # code, with its own variables and tables
+# What moves to fast memory: work memory, the image's data and the code, as one block, but
+# for the DMA data in it, which stays in chip memory (a pointer to it is not relocated).
+MOVED = (0x1000, 0x68800)
+CHIP = ((0x3ca1e, 0x4a546, 'the copper lists ($3ca1e, $3ca42), the samples (the table at '
+         '$58458: $3ca66-$461df, $4a032-$4a545) and the 15 KB of unreferenced sample-like '
+         'data between them'),)
+# Long immediates with a moved value that are numbers, not addresses (every other one is
+# an address: `check` fails on an immediate in neither set).
+IMM_NUMBERS = {
+    0xff00: 'andi.l masks', 0xffff: 'andi.l masks', 0x10000: 'the second map\'s distance, '
+    'fixed-point 1.0, a digit flag (ori.l)', 0x1f40: 'a plane\'s size (8000)',
+    0x1388: 'a score step (5000)', 0x2710: '10000', 0x186a0: '100000', 0x3039: '12345',
+    0x1cc0: 'a display offset bound (cmpa.l #$1cc0 after suba.l $100a)',
+}
+IMM_ADDRS = {
+    0x1084: 'the rotation matrix', 0x109c: 'the second matrix', 0x9ea6: 'the radar list',
+    0xa2a6: 'the particle list', 0xbd04: 'the object list', 0x1ca06: 'the first map',
+    0x2ca06: 'the second map', 0x4b638: 'the player\'s ship model',
+}
 
 # Code entries no traced run executed, found by reading the gaps (tools/coverage.py).
 SEEDS = {
@@ -83,17 +106,36 @@ DATA_TABLES = (
     (0x60120, 0x60180, 4),   # the span writers, entered at an offset from these
     (0x60636, 0x60652, 4),   # into the key table $60962
     (0x61de4, 0x61e24, 4),   # the waves' record lists
-    (0x65550, 0x6556c, 4),   # the dot masks at $57848 / $57868 (and $4d970, below)
+    (0x65550, 0x65578, 4),   # the dot masks at $57848 / $57868 / $4d970
+    (0x64d94, 0x64e34, 4),   # the depth buckets in work memory ($16ac + k * $ccc), twice
+    (0x65074, 0x6516c, 4),   # the landscape objects' models: movea.l $65074(pc,d3.w),a6
 )
+# The object models: 43 in a row. Each: a flags byte, a byte, the vertex count - 1, the
+# face count - 1 (words), the faces' offset (8 + 6 * vertices), the vertices (three words),
+# then the faces of 22 bytes: the normal (three words), three pointers to the vertices'
+# projections in the scratch at $1104 (8 bytes each), the colour (a long).
+MODELS = (0x4b548, 0x4d970)
+VERTS = 0x1104
 VARS = (
     0x58cb2,                 # the dispatcher's state, read with movea.l (pc)
 )
 # Uncovered bytes whose C-range longs are data that only look like addresses.
 NOT_POINTERS = (
-    (0x3b800, 0x57000, 'image data below the code: word records, bitmaps, font, samples'),
-    (0x57000, 0x5788a, 'bitmaps, palettes, dot masks at the code area\'s start'),
+    (0x4d970, 0x4dbd0, 'dot and span masks (words)'),
+    (0x4dbd0, 0x4f908, 'trigonometry tables (words), the font at $4f4d0 (10 bytes a character)'),
+    (0x4f908, 0x57608, 'the 32000 bytes copied to the buffer at ($1006): zeros, bitmaps'),
+    (0x57608, 0x5788a, 'palettes, dot masks'),
     (0x57d4e, 0x5813e, 'the 18-byte records: words'),
-    (0x61ba6, 0x61ba8, 'a wave record: the long $00000006 and $000004b0 straddled'),
+    (0x584a0, 0x584b8, 'the audio channels\' state (words)'),
+    (0x60540, 0x60600, 'the key tables (characters)'),
+    (0x606a6, 0x606ac, 'the clear\'s BLTDPT (a display address) and BLTSIZE'),
+    (0x65578, 0x65588, 'a word table (lea $65578(pc),a2 at $651c0)'),
+    (0x658a4, 0x658c8, 'text records (position words, characters)'),
+    (0x65a54, 0x65a70, 'characters'),
+    (0x65bc0, 0x65bcc, 'the score\'s digits (characters)'),
+    (0x66dd0, 0x66dd4, 'a text record (position words)'),
+    (0x66e2e, 0x66f46, 'the highscore table'),
+    (0x682c8, 0x68800, 'the end of the original executable\'s HUNK_RELOC32 block (offsets)'),
 )
 
 AM = M.M68K_AM_ABSOLUTE_DATA_LONG, M.M68K_AM_ABSOLUTE_DATA_SHORT
@@ -218,15 +260,49 @@ def long_at(data, x):
     return struct.unpack('>I', data[x - BASE:x - BASE + 4])[0]
 
 
-def wave_slots(data):
-    """The routine pointers in the waves' enemy lists: records of five longs (count, three
-    values, routine), each list ended by a zero long."""
-    out = set()
+def wave_records(data):
+    """The waves' enemy lists: records of five longs (count, three values, routine), each
+    list ended by a zero long. Returns the records' addresses and the lists' span."""
+    recs, lo, hi = set(), END, BASE
     for a in {long_at(data, x) for x in range(*WAVES, 4)}:
+        lo = min(lo, a)
         while long_at(data, a):
-            out.add(a + 16)
+            recs.add(a)
             a += 20
-    return sorted(out)
+        hi = max(hi, a + 4)
+    return sorted(recs), (lo, hi)
+
+
+def wave_slots(data):
+    return [a + 16 for a in wave_records(data)[0]]
+
+
+def models(data):
+    """The object models in MODELS, in order: (start, end, face pointer slots). Fails unless
+    they fill the range exactly and every face points at one of its model's vertices."""
+    out, a = [], MODELS[0]
+    word = lambda x: struct.unpack('>H', data[x - BASE:x - BASE + 2])[0]
+    while a < MODELS[1]:
+        nv, nf, off = word(a + 2) + 1, word(a + 4) + 1, word(a + 6)
+        if off != 8 + 6 * nv:
+            raise ValueError(f'{a:x}: not a model')
+        slots, f = [], a + off
+        for _ in range(nf):
+            for j in range(3):
+                v = long_at(data, f + 6 + 4 * j)
+                if not (VERTS <= v < VERTS + 8 * nv and (v - VERTS) % 8 == 0):
+                    raise ValueError(f'{f:x}: face of the model at {a:x} points at {v:x}')
+                slots.append(f + 6 + 4 * j)
+            f += 22
+        out.append((a, f, slots))
+        a = f
+    if a != MODELS[1]:
+        raise ValueError(f'the models end at {a:x}, not {MODELS[1]:x}')
+    return out
+
+
+def model_slots(data):
+    return [x for _, _, slots in models(data) for x in slots]
 
 
 def code_slots(data):
@@ -271,30 +347,64 @@ def in_code(v):
     return CODE[0] <= v < CODE[1]
 
 
+def chip(v):
+    return any(lo <= v < hi for lo, hi, _ in CHIP)
+
+
+def moves(v):
+    """A value that names a moved address (or the end of the block)."""
+    return MOVED[0] <= v <= MOVED[1] and not chip(v)
+
+
+def is_addr(n, v, kind):
+    """An operand of instruction N with value V that names a moved address."""
+    if kind == 'abs':
+        return moves(v)
+    if kind == 'imm':
+        return moves(v) and v not in IMM_NUMBERS
+    return False
+
+
+def slots(data):
+    """Every pointer slot in the image's data, with its kind."""
+    out = {x: 'code table' for x in code_slots(data)}
+    out.update({x: 'data table' for x in data_slots(data)})
+    out.update({x: 'variable' for x in VARS})
+    out.update({x: 'model face' for x in model_slots(data)})
+    return out
+
+
 def relocations(data, insns):
-    """The image addresses of every long that holds a code-area address: (addr, why)."""
+    """The image addresses of every long that holds a moved address: (addr, why)."""
     out = {}
     for a, n in insns.items():
         for p, v, kind, _ in n.abs:
-            if kind in ('abs', 'imm') and in_code(v):
+            if is_addr(n, v, kind):
                 out[a + p] = f'{kind} {n.text}'
-    for x in code_slots(data) + data_slots(data):
-        if in_code(long_at(data, x)):
-            out[x] = 'table' if x not in VARS else 'variable'
+    for x, why in slots(data).items():
+        if moves(long_at(data, x)):
+            out[x] = why
     return out
 
 
 def check(data, insns):
-    """Problems: code-range longs in unreached bytes nobody accounted for, PC-relative
-    operands leaving the code area, instructions outside it."""
+    """Problems: moved-range longs in unreached bytes nobody accounted for, unclassified
+    immediates, short absolute operands to moved addresses, PC-relative operands that leave
+    the moved block, instructions outside the code area."""
     cover = starts(insns)
-    known = set(code_slots(data) + data_slots(data))
+    known = set(slots(data))
+    recs, waves = wave_records(data)
+    parsed = [MODELS, waves] + [(lo, hi) for lo, hi, _ in NOT_POINTERS + CHIP]
     bad = []
+    for r in recs:
+        for k in range(4):
+            if moves(long_at(data, r + 4 * k)):
+                bad.append(f'{r:x}: a wave record\'s value {long_at(data, r + 4 * k):x}')
     for x in range(BASE, END - 3, 2):
-        if x in cover or x in known or any(lo <= x < hi for lo, hi, _ in NOT_POINTERS):
-            continue
-        v = struct.unpack('>I', data[x - BASE:x - BASE + 4])[0]
-        if in_code(v):
+        if x in cover or x + 2 in cover or x in known or any(lo <= x < hi for lo, hi in parsed):
+            continue  # a long that runs into an instruction is no data
+        v = long_at(data, x)
+        if moves(v):
             bad.append(f'{x:x} ({x - BASE:x}): unexplained {v:x}')
     owner = {}
     for a, n in sorted(insns.items()):
@@ -313,8 +423,14 @@ def check(data, insns):
         if not in_code(a):
             bad.append(f'{a:x}: instruction outside the code area: {n.text}')
         for p, t, idx, _ in n.pcrel:
-            if not in_code(t):
-                bad.append(f'{a:x}: PC-relative operand leaves the code area: {n.text}')
+            if not moves(t):
+                bad.append(f'{a:x}: PC-relative operand leaves the moved block: {n.text}')
+        for p, v, kind, _ in n.abs:
+            if kind == 'absw' and moves(v):
+                bad.append(f'{a:x}: short absolute operand to a moved address: {n.text}')
+            if kind == 'imm' and moves(v) and v not in IMM_NUMBERS and v not in IMM_ADDRS \
+                    and not in_code(v):
+                bad.append(f'{a:x}: unclassified immediate: {n.text}')
     return bad
 
 
@@ -362,18 +478,21 @@ def main(args):
         if bad:
             sys.exit('check fails:\n' + '\n'.join(bad))
         locs = sorted(relocations(data, insns))
-        assert all(not x & 1 and in_code(x) for x in locs)
-        out = [f'; Generated by tools/relocmap.py inc: the {len(locs)} longs in the code area',
-               f'; (${CODE[0]:x}-${CODE[1] - 1:x}) that hold a code-area address, as (address - ${CODE[0]:x}) / 2.',
+        gaps = [x - y for x, y in zip(locs, [BASE] + locs)]
+        assert all(not x & 1 and BASE <= x < MOVED[1] for x in locs)
+        assert all(0 < g < 0x20000 for g in gaps)
+        out = [f'; Generated by tools/relocmap.py inc: the {len(locs)} longs in the image that hold an',
+               f'; address in the moved block (${MOVED[0]:x}-${MOVED[1] - 1:x}, but for the chip data in it), each',
+               f'; as its distance from the previous one (from ${BASE:x}) / 2.',
                f'RELOC_COUNT\t= {len(locs)}', '_reloc']
-        for k in range(0, len(locs), 12):
-            out.append('\tdc.w\t' + ','.join(f'${(x - CODE[0]) // 2:04x}' for x in locs[k:k + 12]))
+        for k in range(0, len(gaps), 12):
+            out.append('\tdc.w\t' + ','.join(f'${g // 2:04x}' for g in gaps[k:k + 12]))
         (ROOT / 'src/reloc.i').write_text('\n'.join(out) + '\n')
         print(f'src/reloc.i: {len(locs)} relocations')
     elif cmd == 'imm':
         for a in sorted(insns):
             for p, v, kind, _ in insns[a].abs:
-                if kind == 'imm' and in_code(v):
+                if kind == 'imm' and moves(v):
                     print(f'{a:x} ({a - BASE:x}) {insns[a].text}')
     elif cmd == 'indirect':
         for a in sorted(insns):
