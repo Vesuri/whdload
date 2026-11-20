@@ -4,7 +4,7 @@ David Braben's Virus (1988, Firebird) under WHDLoad: John Selck's V1.0 direct sl
 (15.01.99), which loads the whole disk image into chip memory, hooks the keyboard interrupt
 for the quit key and saves the highscores. The original slave is by John Selck (game.conf
 `AUTHOR`, `UPSTREAM`); its install package ships no source, so `src/Virus.s` is a
-reconstruction that rebuilds the shipped slave byte for byte
+reconstruction of the shipped slave, now version 2.0b
 ([development.md](docs/development.md)).
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.

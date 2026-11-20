@@ -17,10 +17,11 @@ The runs boot the Retroplay drawer `Virus/`.
 
 `src/Virus.s` is a reconstruction: the package has no source, and neither JOTD's nor
 StingRay's repository holds the slave. It was disassembled from the shipped `Virus.slave`
-and rebuilds it byte for byte (`release/slaves.sha256`). `-no-opt` keeps the shipped
-encodings (`move.l #1,d0` rather than `moveq`, `lea ($1000).w`). The labels and comments are
-ours; the header, code and data are the shipped slave's, including an unreferenced routine
-(`_clamp`, [internals](internals.md#slave-patches)).
+rebuilt it byte for byte (commit 4f0c8df4). `-no-opt` keeps the shipped encodings
+(`move.l #1,d0` rather than `moveq`, `lea ($1000).w`). The labels and comments are ours; the
+header, code and data are the shipped slave's, including an unreferenced routine (`_clamp`,
+[internals](internals.md#slave-patches)), except where 2.0b changes them (the `$VER` string
+first). `release/slaves.sha256` records the current release build.
 
 ## Driving it
 

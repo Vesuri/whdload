@@ -2,14 +2,13 @@
 
 Set up from John Selck's V1.0 slave; no improvement work yet. The demo benchmark has a
 baseline on the a1200-030 ([internals](internals.md#measurements)): 23.4 fps, with 31% of
-the time spent waiting for the blitter clear of the back buffer. The reconstruction rebuilds the
-shipped slave byte for byte. It boots to the game's attract mode on the a500+ and the a1200,
+the time spent waiting for the blitter clear of the back buffer. The slave is 2.0b (`$VER`,
+20.11.2026) on the reconstructed V1.0 code. It boots to the game's attract mode on the a500+ and the a1200,
 and F10 quits with `OK`.
 
 ## Before a first release
 
-- A dated `$VER` string and a version (`2.0b`), and the ReadMe's entry for it above the
-  original text ([releasing](../../../docs/releasing.md)).
+- The ReadMe's entry for 2.0b above the original text ([releasing](../../../docs/releasing.md)).
 - Play-test on every machine in `SETUPS`, including saving a highscore.
 
 ## Candidates

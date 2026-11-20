@@ -3,8 +3,8 @@
 ;  :Contents.	Slave for "Virus" (c) 1988 D.J. Braben / Firebird
 ;  :Author.	John Selck (slave V1.0, 15.01.99)
 ;  :Note.	The install package ships no source. This is a reconstruction
-;		from the shipped Virus.slave (420 bytes) that vasm rebuilds byte
-;		for byte with -no-opt; labels and comments are ours.
+;		from the shipped Virus.slave (420 bytes; vasm rebuilt it byte for
+;		byte with -no-opt); labels and comments are ours. 2.0b from here.
 ;---------------------------------------------------------------------------*
 
 	INCLUDE	whdload.i
@@ -32,7 +32,7 @@ base		moveq	#-1,d0
 _keydebug	dc.b	$58			;ws_keydebug = F9
 _keyexit	dc.b	$59			;ws_keyexit = F10
 
-		dc.b	"$VER:Virus slave V1.0 by John Selck 15.01.99 ",0
+		dc.b	"$VER: Virus.slave 2.0b (20.11.2026)",0
 
 ;======================================================================
 
