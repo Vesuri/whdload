@@ -2,11 +2,12 @@
 
 ## How it loads
 
-A WHDLoad v4 direct slave (`ws_Flags` Disk and NoError, no Kickstart). It clears
-`$1000-$3b7ff`, loads the whole disk image `Disk.1` (184320 bytes) to `$3b800`, so a
-`Disk.1` offset is its address minus `$3b800`, loads the highscores, applies two patches,
-turns the instruction cache on (`resload_SetCACR`) and jumps to the game's entry,
-`Disk.1` offset `$286c8` (`$63ec8`).
+A direct slave (`ws_Flags` Disk and NoError, no Kickstart), a v17 header since 2.0b for
+`ws_config` (`C1` Enhanced framerate, `C2` its game speed). It clears `$1000-$3b7ff`, loads
+the whole disk image `Disk.1` (184320 bytes) to `$3b800`, so a `Disk.1` offset is its
+address minus `$3b800`, loads the highscores, applies two patches (and with CUSTOM1 the
+Enhanced framerate patch list), turns the instruction cache on (`resload_SetCACR`) and
+jumps to the game's entry, `Disk.1` offset `$286c8` (`$63ec8`).
 
 ## Memory
 
@@ -60,20 +61,83 @@ data: the span writers' pointer table at `$24920`, the sound table, particle rec
 at run time from immediates). The title, the attract screen, play and the wave screens run
 code the demo does not, so a relocation needs a whole-image disassembly.
 
-No self-modifying code was seen: in a 10-field demo sample no CPU write touched an
-executed instruction word. The slave's two patches are written before its
-`resload_SetCACR`.
+Self-modifying code: the landscape setup (`$28bd8`, at the game's start and from `$26706`
+and `$26728` by the wave number) rewrites five renderer instructions (`$29f7a-$29f85`,
+`$2a050-$2a053`: shift counts and constants) when the landscape type (`$c9fe`) changes,
+then builds the new map. Nothing flushes the instruction cache after it, and the original
+slave runs with it on; on a 68020/030 the map building in between likely evicts the 256
+bytes, on a 68040/060 not necessarily. In a 10-field demo sample no other CPU write touched
+an executed instruction word. The slave's patches are written before its `resload_SetCACR`
+(`resload_Patch` flushes too).
 
 ## Game time
 
-The simulation steps once per main loop pass, that is once per rendered frame. The VBL
-keeps no field counter (it reads the mouse and buttons, loads palettes, counts down
-`$3ca1b` for the fades and runs the sound), and nothing in the loop waits for a field
-except the clear. Checked (tools/gametime.py): at demo frame 200 the whole work memory
+The original steps its simulation once per main loop pass, that is once per rendered
+frame. The VBL keeps no field counter (it reads the mouse and buttons, loads palettes,
+counts down `$3ca1b` for the fades and runs the sound), and nothing in the loop waits for a
+field except the clear. Checked (tools/gametime.py): at demo frame 200 the whole work memory
 `$1000-$3b7ff` is byte-identical on the a500+ (68000) and the a1200-030, and the image area
 differs only in dead stack bytes, the VBL's sound countdowns and the two slave patch
 addresses. The 68000 reached frame 190 after 650 fields, the 68030 after 325: the demo plays
 twice as fast on the 68030. Sound effect lengths are in fields, so they keep real time.
+
+The main loop's calls (`Disk.1` offsets, from `$28a1a`):
+
+| Call | Does | Kind |
+|---|---|---|
+| `$2bafc` | object rotation matrices from the frame counter `$c9f4` | animation, per tick |
+| `$2521c` | particles: move, project, into the depth lists (`$29594`) | simulation, emits drawing |
+| `$2af18` | the player and the camera (`$107e`) | simulation |
+| `$26c9a` | the other objects; each appends itself to the radar list (`$1022`, from `$9ea6`) | simulation, emits drawing |
+| `$29974` | the renderer: landscape, depth lists, objects, radar (draws the list, resets `$1022`) | drawing |
+| `$29574` | empties the depth lists | drawing lists |
+| `$26732` | the wave's end (pops the loop's return and jumps to `$28972`) | simulation |
+| `$1d58c`, `$1d4fe` | the swap, the clear request | drawing |
+| `$2a278` | the score, extra lives | simulation |
+| `$28b56` | the ship's trail positions | simulation |
+
+The renderer writes no game state (tools/callwrites.py, Unicorn from a demo chip dump):
+with the drawing left out of every other pass, 8 passes end in the same game state as 8
+whole passes, except for the radar list, which the enemies append to every pass and only
+the renderer resets. Its own scratch (`$1073-$1190`, `$1300-$16dc`, the polygon filler's edge
+state at `$2c586`) is read by nothing else. The renderer also starts two sounds (the
+low-fuel warning, `$2937a`), so a pass that does not draw does not start them.
+
+**Enhanced framerate** (CUSTOM1=1) runs one pass per tick at a fixed rate: a tick every
+2, 3 or 4 fields (CUSTOM2 0, 1, 2: 25, 16.7, 12.5 Hz), counted by a hook in the VBL.
+A pass waits while it is early. When the next tick is already due too, it leaves out the
+renderer, the swap and the clear request (and resets the radar list as the renderer would)
+and only simulates; at most 3 passes in a row, then it draws anyway. Behind by more than 16
+fields, the time past that is dropped. The loop's entry (`$289fe`, after the title, a wave
+screen, the game's start) and every paused pass restart the clock, so pauses and screens
+between waves add no backlog. The attract screen's approaching ship (`$2a4e4`: 768 frames,
+then the departure, each at most a field because of the clear) gets the same at a tick a
+field. The frame counter `$c9f4` still counts passes, now ticks.
+
+Input is the original's: the mouse position (accumulated by the VBL), the buttons and the
+key table are read when a pass reads them, so catch-up ticks see the latest state. Fades,
+sounds and the "press SPACE" waits are VBL-timed and keep real time. From the game's entry to
+the attract screen (`$2a4e4`) the title shows for 159 fields on the a1200-030 and 567 on the
+a500+: start-up work, not frame-tied, unchanged.
+
+Measured (tools/pace.py, the first 1250 fields of the demo; ticks against the nominal
+rate, drawn frames a second):
+
+| Machine | Original | 25 Hz | 16.7 Hz | 12.5 Hz |
+|---|---|---|---|---|
+| a500+ (68000) | 12.0 fps | 90.7%, 10.5 fps | 96.7%, 11.6 fps | 100.2%, 11.0 fps |
+| a1200 (68020, no fast) | 22.2 fps | 100.0%, 21.0 fps | | |
+| a1200-030, CACHE | 23.4 fps | 100.0%, 21.9 fps | 100.3%, 16.3 fps | |
+
+The A500 cannot hold 25 Hz in the demo's heavy scenes, where a drawn frame takes more than
+the three skipped ticks give it, and comes close at 16.7 Hz. The attract screen took 813
+fields on both the a500+ and the a1200-030 (the original: 49 more on the a500+).
+
+Same game state at the same tick (tools/callwrites.py `compare`, captures at tick 200
+against the original on the a1200-030): no byte of game state differs for the original on
+the a500+, Enhanced off, Enhanced at 25 and 16.7 Hz on the a1200-030 and at 25 Hz on the
+a500+ (which skipped drawing and dropped time on the way). Tick 191 came after exactly
+380 fields at 25 Hz and 570 at 16.7 Hz on the a1200-030.
 
 ## Measurements
 
@@ -128,6 +192,16 @@ Offsets are into `Disk.1`.
 | `$250c0` (level 2 interrupt, after reading CIA-A SDR into d0) | `bset #6,$bfee01` | `nop; jsr _keyboard`: does the same `bset`, then quits on F10 (`ws_keyexit`) or the reset-warning code `$78` through `resload_Abort` |
 | `$2b916` (highscore entry) | `move.w #3000,d7; cmp.w #127,d0` | `nop; jsr _savehi`: on key 13 (return) saves the table, then does the replaced instructions |
 
+With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), from a patch list:
+
+| `Disk.1` offset | Original | Patch |
+|---|---|---|
+| `$24ffe` (level 3, VBL part) | `move.b $3ca1b,d0` | `jsr`: counts the field, then the same |
+| `$289fe` (the main loop's entry) | `jsr` to `$1d538` (clear and wait) | `jsr`: the same, then restarts the clock |
+| `$28a12` (the main loop, after its top) | `tst.b $3ca07; bne.s` and the calls to `$28a4b` | `jsr _pass; bra.s $28a4c`: paused, restarts the clock; else waits for the tick, then the calls, the drawing only when not behind |
+| `$2a530` (the attract screen) | `jsr` to `$26a36` (fade-in) | `jsr`: the same, then restarts the clock |
+| `$2a584` (the attract screen's frame) | the ship's rotation, drawing, swap and clear, to `$2a5b1` | `jsr _attract; bra.s $2a5b2`: the same at a tick a field, left out when behind |
+
 The highscore table is 280 bytes at `$2b62e` (`$66e2e`). `Virus.hi` holds it nibble-swapped
 and inverted (`_crypt`, its own inverse); it is loaded at start when its size is 280.
 
@@ -141,4 +215,6 @@ depend on CPU speed.
 ## Limitations
 
 - Needs more than 512 KB of chip memory (above).
-- No blitter-wait, cache or game-speed fixes: the slave enables the instruction cache only.
+- No blitter-wait or cache fixes: the slave enables the instruction cache only.
+- Enhanced framerate fixes the game's pace, not its frame rate: the drawing is as slow as
+  before, and catching up costs a little of it.

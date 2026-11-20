@@ -48,6 +48,23 @@ The trace needs a core that records one: the 68000, the 68020, or the 68030 with
 model (WHDLoad leaves the MMU alone without its `MMU` option, so the game runs the same).
 The 25 s window takes a few minutes and about 7 MB of trace a field, deleted chunk by chunk.
 
+Enhanced framerate is `WHD_ARGS="CUSTOM1=1 CUSTOM2=N"` (N 0-2: 25, 16.7, 12.5 Hz), with
+`CACHE` on the a1200-030. Its checks ([internals](internals.md#game-time)), each from a fresh
+`tools/boot.sh`:
+
+```sh
+python3 tools/pace.py                            # ticks and drawn frames against elapsed fields
+python3 tools/gametime.py capture tmp/prof/f200_enh.bin   # the state at tick 200, then
+python3 tools/callwrites.py compare tmp/re/f200.chip tmp/prof/f200_030.bin tmp/prof/f200_enh.bin
+```
+
+`compare` takes the game state's differences against the original's capture, less what the
+drawing writes; `tmp/re/f200.chip` is a chip dump from the original at demo frame 200
+(`python3 tools/callwrites.py capture tmp/re/f200.chip`). `tools/callwrites.py` also lists
+what each main-loop call writes (`writes`), checks that leaving the drawing out keeps the
+game state (`split`) and finds who reads and writes an address range (`who`), all in
+Unicorn from that dump.
+
 Other analyses, each from a fresh `tools/boot.sh`:
 
 ```sh

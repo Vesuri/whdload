@@ -13,9 +13,11 @@
 
 
 	That install applies to "Virus" © 1988 D.J.Braben.
+	Virus Enhanced 2.0b (20.11.2026)
+	Original install: John Selck. Version 2.0b: Vesuri.
 
 
-	That install requires WHDLoad and RawDIC to be in the path.
+	That install requires WHDLoad 17 and RawDIC to be in the path.
 	Both can be found in the WHDLoad package.
 	To install from a different drive than DF0: select Expert as
 	installation mode.
@@ -27,6 +29,14 @@
 
 
 	Highscores are saved to HD.
+
+	CUSTOM1=1: Enhanced framerate. CUSTOM2 sets its game speed: 0 25 Hz
+	(the default), 1 16.7 Hz, 2 12.5 Hz. Unset, the game runs as before.
+
+	version 2.0b (20.11.2026) done by Vesuri:
+	- Enhanced framerate (CUSTOM1): the game keeps one pace on every Amiga
+	  instead of following the frame rate; CUSTOM2 picks the game speed
+	- the attract screen lasts as long on slower Amigas as on faster ones
 
 	This game needs 544 KB ChipMem instead of 512 KB because of
 	some memory leaks in the render routines which make Virus
