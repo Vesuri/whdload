@@ -1,0 +1,14 @@
+{
+  "archives": [
+    {
+      "input": "Virus.lha",
+      "output": "VirusEnhanced-{version}-{date}.lha",
+      "replace": {
+        "Virus-install/Virus.slave": "build:Virus",
+        "Virus-install/README": "release/ReadMe"
+      },
+      "add": {},
+      "remove": []
+    }
+  ]
+}
