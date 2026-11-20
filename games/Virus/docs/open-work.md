@@ -35,15 +35,27 @@ analysis behind them, against the repository's direction for 68020+ with fast me
 only, everything not DMA in fast memory, every cache on), is in
 [internals](internals.md#what-must-be-in-chip-memory) and its measurements:
 
-1. **CPU-only data in fast memory.** The code area is moved
-   ([internals](internals.md#code-in-fast-memory)); its data is now 83.6% of the time
-   outside the clear wait, and the CPU's chip slots are work memory 46%, the image's data
-   below `$57000` 45% (the stack most) and the display 9% (before the stack moved too).
-   Next: the work memory `$1000-$3b7ff` and the image's CPU-only data, by the same method: `tools/relocmap.py` already lists their absolute
-   operands (648 to work memory). Harder than the code area: of the 60 long immediates with
-   a work-memory value most are numbers (`#$ffff`, `#$10000`, `#$1f40`, 10000), so each
-   needs reading; records in the image hold longs like `$0000110c`; the copper list
-   pointer `$3ca1e` is used with a displacement into work memory.
+1. **CPU-only data in fast memory.** The code area and the stack are moved
+   ([internals](internals.md#code-in-fast-memory)). The CPU's chip slots are now
+   (tools/chipaccess.py, 10 fields from demo field 300, a1200-030) the display buffers 51%
+   (the drawing's reads and writes), work memory 38% and the image's data below `$57000`
+   10%. By address: the globals `$1000-$10ff` 10.5%, the renderer's scratch `$1100-$15ff`
+   about 6%, the particles around `$a2a6-$abff` about 7%, the depth buckets 7.4%, a table at
+   `$4d900` 4.5%; the landscape maps 1.1%. The same method works by address range, with
+   what makes it harder than the code area:
+   - Data holds work-memory pointers: the object models (`$4b548` on, read by
+     `movea.l (a5)+,a6`) point into the vertex scratch at `$1104-$117c` (over 900 longs).
+     Either parse the model format or leave `$1100-$11ff` in chip memory; the renderer's
+     scratch `$1073-$1190` crosses `$1100`, so a split there needs every base-relative
+     access checked (a trace's register snapshots give each access's address and PC).
+   - Of the 60 long immediates with a work-memory value about ten are addresses
+     (`#$1084`, `#$109c`, `#$9ea6`, `#$a2a6`, `#$bd04`, `#$1ca06`, `#$2ca06`, likely
+     `cmpa.l #$1cc0,a2`); the rest are numbers (`#$ffff`, `#$10000`, `#$1f40`, 10000).
+   - A missed data pointer does not stop the game the way the code's `ILLEGAL` fill
+     does: it reads or writes the stale chip copy. Compare the state at tick 200
+     (`tools/callwrites.py compare` must then read the moved ranges from ExpMem) and play.
+   - The slave's own references (`$1022`, `$1084`, `$c9fc`/`$c9fe`) and the tools'
+     (`$c9f4`) move with it.
 2. **CPU only.** The blitter does one job, the screen clear, and it is what the CPU waits
    for (31%): 11.9 ms from the VBL after each swap, at the blitter's full D-only rate
    (`BLTPRI` is on; the CPU's polling does not slow it). A CPU clear could only start at the
