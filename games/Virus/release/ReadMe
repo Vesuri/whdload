@@ -37,6 +37,7 @@
 	- Enhanced framerate (CUSTOM1): the game keeps one pace on every Amiga
 	  instead of following the frame rate; CUSTOM2 picks the game speed
 	- the attract screen lasts as long on slower Amigas as on faster ones
+	- instruction cache flushed after the game rewrites its renderer
 
 	This game needs 544 KB ChipMem instead of 512 KB because of
 	some memory leaks in the render routines which make Virus

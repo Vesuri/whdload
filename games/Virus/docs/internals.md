@@ -5,8 +5,8 @@
 A direct slave (`ws_Flags` Disk and NoError, no Kickstart), a v17 header since 2.0b for
 `ws_config` (`C1` Enhanced framerate, `C2` its game speed). It clears `$1000-$3b7ff`, loads
 the whole disk image `Disk.1` (184320 bytes) to `$3b800`, so a `Disk.1` offset is its
-address minus `$3b800`, loads the highscores, applies two patches (and with CUSTOM1 the
-Enhanced framerate patch list), turns the instruction cache on (`resload_SetCACR`) and
+address minus `$3b800`, loads the highscores, applies two patches and a patch list (the cache flush below; with
+CUSTOM1 also the Enhanced framerate patch list), turns the instruction cache on (`resload_SetCACR`) and
 jumps to the game's entry, `Disk.1` offset `$286c8` (`$63ec8`).
 
 ## Memory
@@ -64,9 +64,10 @@ code the demo does not, so a relocation needs a whole-image disassembly.
 Self-modifying code: the landscape setup (`$28bd8`, at the game's start and from `$26706`
 and `$26728` by the wave number) rewrites five renderer instructions (`$29f7a-$29f85`,
 `$2a050-$2a053`: shift counts and constants) when the landscape type (`$c9fe`) changes,
-then builds the new map. Nothing flushes the instruction cache after it, and the original
-slave runs with it on; on a 68020/030 the map building in between likely evicts the 256
-bytes, on a 68040/060 not necessarily. In a 10-field demo sample no other CPU write touched
+then builds the new map. It runs at the game's start too (`$c9fc` starts at `$ffff`).
+Nothing flushed the instruction cache after it, and the original slave runs with it on; on
+a 68020/030 the map building in between likely evicted the 256 bytes, on a 68040/060 not
+necessarily. Since 2.0b the slave flushes at the setup's end (`$28cb6`, below). In a 10-field demo sample no other CPU write touched
 an executed instruction word. The slave's patches are written before its `resload_SetCACR`
 (`resload_Patch` flushes too).
 
@@ -191,6 +192,7 @@ Offsets are into `Disk.1`.
 |---|---|---|
 | `$250c0` (level 2 interrupt, after reading CIA-A SDR into d0) | `bset #6,$bfee01` | `nop; jsr _keyboard`: does the same `bset`, then quits on F10 (`ws_keyexit`) or the reset-warning code `$78` through `resload_Abort` |
 | `$2b916` (highscore entry) | `move.w #3000,d7; cmp.w #127,d0` | `nop; jsr _savehi`: on key 13 (return) saves the table, then does the replaced instructions |
+| `$28cb6` (the landscape setup's end, after the code writes and the map) | `move.w $c9fe,$c9fc` | from a patch list, `jsr _flush` and four bytes of `nop`: the same, then `resload_FlushCache` |
 
 With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), from a patch list:
 
@@ -215,6 +217,7 @@ depend on CPU speed.
 ## Limitations
 
 - Needs more than 512 KB of chip memory (above).
-- No blitter-wait or cache fixes: the slave enables the instruction cache only.
+- No blitter-wait fixes. The slave enables the instruction cache only and flushes it after
+  the one self-modifying routine.
 - Enhanced framerate fixes the game's pace, not its frame rate: the drawing is as slow as
   before, and catching up costs a little of it.

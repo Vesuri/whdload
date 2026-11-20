@@ -49,12 +49,8 @@ only, everything not DMA in fast memory, every cache on), is in
 3. **Caches.** Real boards never data-cache chip memory, so with everything in chip WHDLoad's
    `DCACHE` can do nothing (FS-UAE without the MMU model agrees). The data cache only pays
    once item 1 moves data to fast memory. Nothing else blocks it then: no DMA touches
-   CPU-only data, and the one self-modifying routine is below. The instruction cache is already on (the
-   slave's `resload_SetCACR` and `CACHE`).
-- Flush the instruction cache after the landscape setup rewrites the renderer
-  (`$28bd8`, [internals](internals.md#what-must-be-in-chip-memory)): at `$28cb6`, after
-  the last code write and the map build, before the renderer runs. A latent bug of the
-  original slave with the cache on, most likely on a 68040/060; not seen yet.
+   CPU-only data, and the slave flushes the cache after the one self-modifying routine
+   (since 2.0b). The instruction cache is already on (`resload_SetCACR` and `CACHE`).
 - The game speed still waits for whole fields; drawing between ticks (interpolation) or
   a tick shorter than the drawing would need the renderer faster first (items 1 and 2).
 - Run on a 512 KB chip A500: find the render writes past `$80000` (a write watchpoint

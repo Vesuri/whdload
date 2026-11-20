@@ -84,6 +84,11 @@ _start		lea	_resload(pc),a1
 		lea	_savehi(pc),a0
 		move.l	a0,$6711a
 
+		lea	_pl_game(pc),a0
+		sub.l	a1,a1
+		move.l	_resload(pc),a2
+		jsr	resload_Patch(a2)
+
 		move.l	_enhanced(pc),d0
 		beq.b	.orig
 		move.l	_speed(pc),d0		;game speed 0-2: a tick every 2-4 fields
@@ -158,6 +163,22 @@ _clamp		cmp.l	#$78b40,a3
 .ok		lsr.w	#4,d6
 		add.w	d6,d6
 		add.w	d6,a3
+		rts
+
+;----------------------------------------------------------------------
+; The landscape setup ($643d8) rewrites five renderer instructions ($6577a-$65785,
+; $65850-$65853) when the landscape type changes, then builds the map; nothing flushed
+; the instruction cache after it.
+
+_pl_game	PL_START
+		PL_PSS	$644b6,_flush,4		;move.w $c9fe,$c9fc: the setup's end
+		PL_END
+
+_flush		move.w	$c9fe,$c9fc		;the type now set up
+		move.l	a0,-(sp)
+		move.l	_resload(pc),a0
+		jsr	resload_FlushCache(a0)	;keeps every register
+		move.l	(sp)+,a0
 		rts
 
 ;----------------------------------------------------------------------
