@@ -320,6 +320,10 @@ _pl_enhanced	PL_START
 		PL_PS	$65d30-CODE_START,_attract_enter	;jsr $62236: the fade-in, then the ship
 		PL_PS	$65d84-CODE_START,_attract		;lea $1084,a1: the ship's frame, to $65db1
 		PL_W	$65d8a-CODE_START,$6026		;bra.s $65db2: the keys
+		PL_PS	$66c72-CODE_START,_death		;tst.b $609a2: the death sequence's pass
+		PL_PS	$66c7c-CODE_START,_drequest	;jsr $58cfe: its clear request
+		PL_PS	$66c94-CODE_START,_drender	;jsr $65174: its renderer
+		PL_PS	$66ce4-CODE_START,_dshow		;jsr $58d8c: its swap
 		PL_END
 
 ; In the level 3 handler's VBL part, all registers saved.
@@ -370,6 +374,45 @@ _sr_nodraw	equ	*
 		bsr.w	_request		;clear the other buffer
 .noswap		GCALL	$65a78			;the score, extra lives
 		GJMP	$64356			;the ship's trail
+
+; The death sequence ($66c72-$66d05): 51 passes of its own (particles, objects, renderer,
+; swap), counted in passes. Each is a tick too; behind, a pass leaves out the clear
+; request, the renderer and the swap. The last pass (the count $c9f6 at 50) always draws.
+_death		move.l	d1,-(sp)
+		move.l	_period(pc),d1
+		bsr.w	_pace
+		move.l	a0,-(sp)
+		cmp.w	#50,($c9f6).l		;the pass count
+_sr_dcount	equ	*
+		bcs.b	.paced
+		lea	_skips(pc),a0
+		clr.b	(a0)
+		st	1(a0)			;_drawn
+.paced		movea.l	(sp)+,a0
+		move.l	(sp)+,d1
+		tst.b	($609a2).l		;the replaced instruction: its flags returned
+_sr_death	equ	*
+		rts
+
+_drequest	bsr.w	_draw
+		bne.w	_request
+		rts
+
+_drender	bsr.w	_draw
+		beq.b	.no
+		GJMP	$65174			;the renderer
+.no		move.l	#$9ea6,($1022).l	;the radar list, as the renderer leaves it
+_sr_dnodraw	equ	*
+		rts
+
+_dshow		bsr.w	_draw
+		beq.b	.no
+		move.l	a0,-(sp)
+		lea	_frames(pc),a0
+		addq.l	#1,(a0)
+		movea.l	(sp)+,a0
+		bra.w	_show
+.no		rts
 
 ; The attract screen's frame, d0-d3 pushed by the caller: d0/d1 the angles, 4(sp) the
 ; distance. Draws the ship, shows it and clears the other buffer, unless behind.
@@ -625,7 +668,8 @@ _drawn		dc.b	0			;this pass draws
 ; The slave's references to moved addresses (absolute longs ending at each label).
 _srel		dc.w	_sr_flush-8-base,_sr_flush-4-base,_sr_vbl-4-base,_sr_pass-4-base
 		dc.w	_sr_nodraw-8-base,_sr_nodraw-4-base,_sr_attract1-4-base
-		dc.w	_sr_attract2-4-base,_gv-base,_p3ca08-base,_p606ac-base,0
+		dc.w	_sr_attract2-4-base,_sr_death-4-base,_sr_dcount-4-base,_sr_dnodraw-8-base
+		dc.w	_sr_dnodraw-4-base,_gv-base,_p3ca08-base,_p606ac-base,0
 
 _resload	dc.l	0
 _hiname		dc.b	"Virus.hi",0

@@ -229,7 +229,10 @@ fields, the time past that is dropped. The loop's entry (`$289fe`, after the tit
 screen, the game's start) and every paused pass restart the clock, so pauses and screens
 between waves add no backlog. The attract screen's approaching ship (`$2a4e4`: 768 frames,
 then the departure, each at most a field because of the clear) gets the same at a tick a
-field. The frame counter `$c9f4` still counts passes, now ticks.
+field. The death sequence (`$2b472`, after a crash: 51 passes of its own with the
+particles, the objects, the renderer and the swap, then the next life or game over) gets
+the same at a tick a pass, its last pass always drawn. The frame counter `$c9f4` still
+counts passes, now ticks.
 
 Input is the original's: the mouse position (accumulated by the VBL), the buttons and the
 key table are read when a pass reads them, so catch-up ticks see the latest state. Fades,
@@ -339,6 +342,8 @@ With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), a second patch lis
 | `$28a12` (the main loop, after its top) | `tst.b $3ca07; bne.s` and the calls to `$28a4b` | `jsr _pass; bra.s $28a4c`: paused, restarts the clock; else waits for the tick, then the calls, the drawing only when not behind |
 | `$2a530` (the attract screen) | `jsr` to `$26a36` (fade-in) | `jsr`: the same, then restarts the clock |
 | `$2a584` (the attract screen's frame) | the ship's rotation, drawing, swap and clear, to `$2a5b1` | `jsr _attract; bra.s $2a5b2`: the same at a tick a field, left out when behind |
+| `$2b472` (the death sequence's pass) | `tst.b $609a2` | `jsr _death`: waits for the tick, then the same |
+| `$2b47c`, `$2b494`, `$2b4e4` (its clear request, renderer, swap) | `jsr` to `$1d4fe`, `$29974`, `$1d58c` | `jsr`: the same, left out when behind (the radar list reset instead of the renderer); in fast memory the main loop's buffer swap and clear |
 
 The highscore table is 280 bytes at `$2b62e` (`$66e2e`). `Virus.hi` holds it nibble-swapped
 and inverted (`_crypt`, its own inverse); it is loaded at start when its size is 280.
