@@ -7,6 +7,8 @@ CODE = (0x57000, 0x68800)
 MOVED = (0x1000, 0x68800)
 CHIP = (0x3ca1e, 0x4a546)    # the copper lists and the samples stay
 LEVEL3 = 0x60740
+DEMO = 0x641fe      # the demo's main loop entry (Disk.1 $289fe)
+FADED = 0x6434c     # its first pass's end, after the fade-in (Disk.1 $28b4c): the benchmark window's start
 
 
 def peek(srv, addr, n, tries=3):
@@ -45,3 +47,12 @@ def moves(addr):
 def at(addr, d):
     """A game address where it is."""
     return addr + d if moves(addr) else addr
+
+
+def to_window(srv, d):
+    """Runs to the demo's start, then past the fade-in that ends its first main loop pass
+    (`jsr $62236` at $64346 under `tst.b $3ca1a`), and on to the next field: the benchmark
+    window starts there."""
+    srv.request(f'until {DEMO + d:#x}')
+    srv.request(f'until {FADED + d:#x}')
+    srv.request('fields 1')

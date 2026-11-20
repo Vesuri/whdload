@@ -193,15 +193,20 @@ limit), 25.2% is the copy to chip memory (about 5 ms a frame), 2.6% the CPU clea
 the game.
 
 The copy by rows, the score in the mode and the clear by rows, each added to the one
-before (tools/pace.py, the demo window, `CACHE`; 47.6 fps is the window's ceiling, the
-first second being the fade-in):
+before (tools/pace.py, `CACHE`). The first four columns are from the window as it was then,
+from the demo's start, whose 1250 fields held the fade-in and, at 50 fps, the demo's end:
+47.6 fps there was the ceiling, a steady 50. The last is the window now, from the fade-in's
+end until the demo's (it is 1189 ticks long), at most 1250 fields:
 
-| Machine | Whole copies | Copy by rows | Score in the mode | Clear by rows |
-|---|---:|---:|---:|---:|
-| a500+-020 (68020, 14 MHz, 16-bit chip bus) | 31.7 | 32.9 | 35.4 | 35.7 |
-| a1200-fast (68020, 14 MHz) | 36.0 | 36.0 | 37.2 | 37.4 |
-| a3000 (68030, 25 MHz) | 46.6 | 46.6 | 47.6 | 47.6 |
-| a3000-50, a1200-030, a1200-040, a1200-060 | 47.6 | | | 47.6 |
+| Machine | Whole copies | Copy by rows | Score in the mode | Clear by rows | Clear by rows, window now |
+|---|---:|---:|---:|---:|---:|
+| a500+-020 (68020, 14 MHz, 16-bit chip bus) | 31.7 | 32.9 | 35.4 | 35.7 | 35.8 |
+| a1200-fast (68020, 14 MHz) | 36.0 | 36.0 | 37.2 | 37.4 | 37.8 |
+| a3000 (68030, 25 MHz) | 46.6 | 46.6 | 47.6 | 47.6 | 50.0 |
+| a3000-50, a1200-030, a1200-040, a1200-060 | 47.6 | | | 47.6 | 50.0 |
+
+Enhanced framerate at 25 Hz on the a1200-030, the window now: 25.0 drawn a second of 25.0
+ticks (100.0%).
 
 aprof, the copy's share of all time: on the a1200-030 25.2% (whole copies) to 14.6% by
 rows plus 3.8% of whole copies on leaving and entering the mode, to 17.2% with the score
@@ -210,7 +215,7 @@ its chip writes halve, but there a 14 MHz 68020 spends nearly as long finding th
 rows (the CPU clear is 6.9%, the game itself about 63%).
 
 `DCACHE` (instruction and data cache) against `CACHE`, whole copies: no frame rate changes
-(a1200-030, a1200-040, a1200-060, a3000-50 47.6 both; a3000 46.6 and 46.7); aprof on the
+(the window then: a1200-030, a1200-040, a1200-060, a3000-50 47.6, its ceiling, both; a3000 46.6 and 46.7); aprof on the
 a1200-030 puts the wait for the display at 47.8% against 46.6%.
 
 Checked: at demo tick 200 the game state is the original's (pointers, the unused clear

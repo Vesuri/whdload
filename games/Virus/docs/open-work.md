@@ -46,15 +46,16 @@ analysis behind them, against the repository's direction for 68020+ with fast me
 only, everything not DMA in fast memory, every cache on), is in
 [internals](internals.md#what-must-be-in-chip-memory) and its measurements:
 
-- **Caches.** `DCACHE` changes no frame rate in the demo (47.6 on the a1200-030, -040,
-  -060 and a3000-50 with either; the a3000 46.6 to 46.7) and leaves about 1% more time
-  waiting on the a1200-030 ([internals](internals.md#drawing-in-fast-memory)); not worth
+- **Caches.** `DCACHE` changes no frame rate in the demo (the a1200-030, -040, -060 and
+  a3000-50 at the old window's ceiling with either; the a3000 46.6 to 46.7) and leaves
+  about 1% more time waiting on the a1200-030 ([internals](internals.md#drawing-in-fast-memory)); not worth
   the slave enabling it.
 - **The copy.** It goes by rows now, skipping zero rows, the score draws without leaving the
   mode and the clear only clears nonzero rows: the a500+-020 31.7 to 35.7 fps, the
-  a1200-fast 36.0 to 37.4, the a3000 46.6 to 47.6; the others were at the window's ceiling
-  already. What is left on the 68020s is mostly the game itself; on a 68040/060 `move16`
-  is untried, but those wait for the display.
+  a1200-fast 36.0 to 37.4, the a3000 46.6 to 47.6, the old window's ceiling. In the window
+  now (after the fade-in, ending with the demo) the a3000, a3000-50, a1200-030, -040 and
+  -060 draw 50.0, a frame every field, and the a500+-020 35.8, the a1200-fast 37.8. What is
+  left on the 68020s is mostly the game itself.
 - Enhanced framerate's speeds stop at 25 Hz; the a1200-030 could now draw a 50 Hz tick
   (a tick every field), but that is a faster game, not a smoother one. Smoother needs
   drawing between ticks (interpolation).

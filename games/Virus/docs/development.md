@@ -53,7 +53,7 @@ Enhanced framerate is `WHD_ARGS="CUSTOM1=1 CUSTOM2=N"` (N 0-2: 25, 16.7, 12.5 Hz
 `tools/boot.sh`:
 
 ```sh
-python3 tools/pace.py                            # ticks and drawn frames against elapsed fields
+python3 tools/pace.py                            # ticks and drawn frames a second, after the fade-in to the demo's end
 python3 tools/gametime.py capture tmp/prof/f200_enh.bin   # the state at tick 200, then
 python3 tools/callwrites.py compare tmp/re/f200.chip tmp/prof/f200_030.bin tmp/prof/f200_enh.bin
 ```

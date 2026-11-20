@@ -5,8 +5,8 @@
         FSUAE=$FSUAE_APROF SETUP=a1200-030 EXTRA_ARGS=--uae_mmu_model=0 WHD_ARGS=CACHE tools/boot.sh
     python3 tools/aprof.py report OUT.aprof
 
-`run` goes to the demo's start, profiles FIELDS fields (default 1250, as tools/bench.py)
-and reads the frame counter. `report` groups every PC's units and chip units (cycles spent
+`run` goes to the demo's start and past its fade-in (tools/codebase.py `to_window`),
+profiles FIELDS fields (default 1250, as tools/pace.py) and reads the frame counter. `report` groups every PC's units and chip units (cycles spent
 on chip-bus accesses, waits included) and prints the CACR the profile recorded. With the
 code in ExpMem (tools/codebase.py) `run` writes its distance to OUT.aprof.delta and the
 groups use the game's addresses.
@@ -70,7 +70,7 @@ def run(path, fields):
     srv = game_server('virus')
     d = codebase.delta(srv)
     Path(f'{path}.delta').write_text(hex(d))
-    srv.request(f'until {0x641fe + d:#x}')
+    codebase.to_window(srv, d)
     srv.request('gdb monitor aprof start')
     srv.request(f'fields {fields}')
     srv.request(f'gdb monitor aprof stop {Path(path).resolve()}')
