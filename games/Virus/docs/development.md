@@ -47,6 +47,16 @@ The trace needs a core that records one: the 68000, the 68020, or the 68030 with
 model (WHDLoad leaves the MMU alone without its `MMU` option, so the game runs the same).
 The 25 s window takes a few minutes and about 7 MB of trace a field, deleted chunk by chunk.
 
+Other analyses, each from a fresh `tools/boot.sh`:
+
+```sh
+python3 tools/chipaccess.py                      # what the CPU's chip slots go to (trace DMA records)
+FSUAE=$FSUAE_APROF SETUP=a1200-030 EXTRA_ARGS=--uae_mmu_model=0 WHD_ARGS=CACHE tools/boot.sh
+python3 tools/aprof.py run tmp/prof/demo030.aprof  # exact cycles and chip-access time per group
+python3 tools/gametime.py capture tmp/prof/f200_030.bin   # then the same on SETUP=a500+
+python3 tools/gametime.py compare tmp/prof/f200_030.bin tmp/prof/f200_a500.bin
+```
+
 ## Traps
 
 - `ws_BaseMemSize` is 544 KB, all chip memory, so WHDLoad cannot run it on a 512 KB chip

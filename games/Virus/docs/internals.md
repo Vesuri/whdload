@@ -39,6 +39,42 @@ Everything runs in supervisor mode on one stack, which the main loop resets to `
 - `$1d614` is a VBL-timed wait (the countdown `$3ca1b`, which the VBL decrements): the fades
   use it, two fields a palette step (the demo's fade-in, `$26a36`, 7 steps).
 
+## What must be in chip memory
+
+The only DMA the game uses: the two display buffers (`$70000-$7ffff`), the two copper
+lists (`Disk.1` `$121e-$1265`: bitplane pointers only, no sprites), the audio samples
+(`$1266-$a9df` and `$e832-$ed45`, from the table at `$1cc58`), and the blitter, for the
+screen clear only (one `BLTCON0` write, `BLTSIZE` in the level 3 handler). DMACON is
+`$87c0` from the start (`$287b4`) and only the audio bits change after it, so `BLTPRI` is
+always on. Everything else is CPU-only: the code (`$57000-$687ff`, `Disk.1` `$1b800-$2cfff`),
+the work memory at `$1000-$3b7ff` (variables, the two 64 KB landscape maps at `$1ca06` and
+`$2ca06` reached through the pointers `$1032`/`$1036`, the slope table `$14b06`, the
+particles), the rest of the image's data and the stack (`$4b546` down).
+
+Moving the CPU-only parts means relocating a raw memory image: the program has no
+relocation table. In the 6288 instructions the 25 s demo executes there are 518 absolute
+long operands to game addresses (306 to work memory, 140 to code, 72 to image data), no
+absolute short ones, and 103 PC-relative ones (some reach data inside the code, as the
+pointer variable `$1d4b2` read by `movea.l (pc),a2; jmp (a2)`). Code pointers also sit in
+data: the span writers' pointer table at `$24920`, the sound table, particle records (built
+at run time from immediates). The title, the attract screen, play and the wave screens run
+code the demo does not, so a relocation needs a whole-image disassembly.
+
+No self-modifying code was seen: in a 10-field demo sample no CPU write touched an
+executed instruction word. The slave's two patches are written before its
+`resload_SetCACR`.
+
+## Game time
+
+The simulation steps once per main loop pass, that is once per rendered frame. The VBL
+keeps no field counter (it reads the mouse and buttons, loads palettes, counts down
+`$3ca1b` for the fades and runs the sound), and nothing in the loop waits for a field
+except the clear. Checked (tools/gametime.py): at demo frame 200 the whole work memory
+`$1000-$3b7ff` is byte-identical on the a500+ (68000) and the a1200-030, and the image area
+differs only in dead stack bytes, the VBL's sound countdowns and the two slave patch
+addresses. The 68000 reached frame 190 after 650 fields, the 68030 after 325: the demo plays
+twice as fast on the 68030. Sound effect lengths are in fields, so they keep real time.
+
 ## Measurements
 
 The demo benchmark (tools/bench.py, [development](development.md#benchmark)): the first
@@ -68,6 +104,20 @@ slave enables the instruction cache too), the original slave. 99.07% of all cycl
 Chip bus slots over the window: CPU 43.1%, bitplanes 22.5%, free 22.4%, blitter 9.7%,
 refresh 1.8%, audio 0.4%. Game code and data are all in chip memory (99.7% of the
 executed cycles are at chip addresses).
+
+aprof over the same window (tools/aprof.py; same frame count, 586, and the same 31.0% in the
+clear wait): CACR `$2011` (instruction cache and burst on, data cache off), and **97.7% of
+the CPU's time is chip-bus access**, waits included; 96.9% without the busy-wait. Per group:
+renderer own code 93.2%, objects 93.9%, particles 93.4%, edge stepping 99.5%, span writers
+99.0%, the rest 99.4%. The 50 MHz 68030 runs at the speed of the chip bus.
+
+What the CPU's chip slots are (tools/chipaccess.py, 10 fields from demo field 300): reads
+in the code area 71.4%, of which the clear-flag polling (`$606ac`, which lies there) is
+31.7% of all CPU slots; of all chip reads 43.0% are instruction fetches and 57.0% data.
+Work memory 13.2%, image data 11.8%, display buffers 3.3% (2.2% writes, 1.2% reads). While
+the blitter clears, the slots alternate blitter and CPU (35% each, bitplanes 27%, free 1%):
+the D-only clear runs at its full rate of a word every other cycle, and the polls take only
+the cycles it leaves, so they do not slow it.
 
 ## Slave patches
 
