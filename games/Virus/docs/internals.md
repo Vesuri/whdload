@@ -15,9 +15,9 @@ offset `$286c8` (`$63ec8`).
 
 `ws_BaseMemSize` is `$88000` (544 KB). The ReadMe's reason: the render routines write past
 the 512 KB border. The game itself uses fixed chip addresses up to at least `$78000`
-(`$70000` and `$78000` stored at its entry). `ws_ExpMem` asks for an optional 72 KB
-(`$12000`) for the code area; WHDLoad gives fast memory when there is some, else chip
-memory above the 544 KB.
+(`$70000` and `$78000` stored at its entry). `ws_ExpMem` asks for an optional 76 KB
+(`$13000`) for the code area and the stack; WHDLoad gives fast memory when there is some,
+else chip memory above the 544 KB.
 
 ## The frame
 
@@ -79,6 +79,11 @@ an executed instruction word. The slave's patches are written before its `resloa
 (`resload_Patch` flushes too).
 
 ## Code in fast memory
+
+The stack moves too: the original's is the 4 KB of zeros at `$4a546-$4b545` (`Disk.1`
+`$ed46-$fd45`, between the samples and the data), which nothing addresses absolutely, set
+only by `lea $4b546,sp` at `$28788` (start) and `$28a0c` (the main loop's top). With ExpMem
+it is the 4 KB after the code there, and the slave rewrites those two operands.
 
 The code area `$57000-$687ff` (`Disk.1` `$1b800-$2cfff`, 72 KB) moves to ExpMem as a
 whole, with the variables and tables mixed into it (the clear flag `$606ac`, the key table
@@ -249,7 +254,7 @@ With the code in ExpMem (2.0b), the same window (tools/pace.py; frames a second)
 | a500+ (68000, no fast memory: ExpMem in chip) | 12.0 | 12.0 |
 | a1200 (68020, no fast memory: ExpMem in chip) | 22.2 | 22.2 |
 | a1200-fast (68020, fast memory) | 22.2 | 25.4 |
-| a1200-030, CACHE | 23.4 | 32.8 |
+| a1200-030, CACHE | 23.4 | 32.8; 36.0 with the stack moved too |
 | a1200-030, CACHE, Enhanced framerate 25 Hz | 21.9 drawn | 24.7 drawn (100.2% of the ticks) |
 
 FS-UAE's a1200-060 gives 47.6 with either, so it does not model what this changes. aprof on
@@ -295,7 +300,7 @@ depend on CPU speed.
 - Needs more than 512 KB of chip memory (above).
 - No blitter-wait fixes. The slave enables the instruction cache only and flushes it after
   the one self-modifying routine.
-- Only the code area moves to fast memory; the work memory, the image's data and the stack
-  stay in chip memory.
+- Only the code area and the stack move to fast memory; the work memory and the image's
+  data stay in chip memory.
 - Enhanced framerate fixes the game's pace, not its frame rate: the drawing is as slow as
   before, and catching up costs a little of it.

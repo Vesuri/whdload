@@ -5,7 +5,7 @@ gives the game fixed-rate game time, a tick every 2, 3 or 4 fields (CUSTOM2), wi
 left out while behind; off, the game runs as the original
 ([internals](internals.md#game-time)). The code area runs from ExpMem when there is some
 ([internals](internals.md#code-in-fast-memory)): the demo went from 23.4 to 32.8 fps on the
-a1200-030 and from 22.2 to 25.4 on the a1200-fast, and the busy-wait for the blitter clear
+a1200-030 (36.0 with the stack moved too) and from 22.2 to 25.4 on the a1200-fast, and the busy-wait for the blitter clear
 of the back buffer is now 43.9% of the time ([internals](internals.md#measurements)). It
 boots to the game's attract mode on the a500+ and the a1200, and F10 quits with `OK`.
 
@@ -38,9 +38,8 @@ only, everything not DMA in fast memory, every cache on), is in
 1. **CPU-only data in fast memory.** The code area is moved
    ([internals](internals.md#code-in-fast-memory)); its data is now 83.6% of the time
    outside the clear wait, and the CPU's chip slots are work memory 46%, the image's data
-   below `$57000` 45% (the stack most) and the display 9%. Next: the stack (`$4b546`, set
-   by `lea $4b546,sp` in the main loop), then the work memory `$1000-$3b7ff` and the image's
-   CPU-only data, by the same method: `tools/relocmap.py` already lists their absolute
+   below `$57000` 45% (the stack most) and the display 9% (before the stack moved too).
+   Next: the work memory `$1000-$3b7ff` and the image's CPU-only data, by the same method: `tools/relocmap.py` already lists their absolute
    operands (648 to work memory). Harder than the code area: of the 60 long immediates with
    a work-memory value most are numbers (`#$ffff`, `#$10000`, `#$1f40`, 10000), so each
    needs reading; records in the image hold longs like `$0000110c`; the copper list

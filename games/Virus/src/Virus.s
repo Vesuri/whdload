@@ -20,7 +20,10 @@ HI_SIZE		= 280
 ; (docs/internals.md, "Code in fast memory"); everything below stays in chip memory.
 CODE_START	= $57000
 CODE_SIZE	= $11800
-EXP_SIZE	= $12000
+; The stack: 4 KB of zeros at $4a546-$4b545, set by lea $4b546,sp at $63f88 and $6420c.
+; With ExpMem it is the 4 KB after the code there, the leas' operands rewritten.
+STACK_SIZE	= $1000
+EXP_SIZE	= $13000
 
 ;======================================================================
 
@@ -112,8 +115,9 @@ _start		lea	_resload(pc),a1
 
 ;----------------------------------------------------------------------
 ; With ExpMem: copies the code area there and adds the distance (_delta) to every long in
-; it that holds a code-area address (src/reloc.i, from tools/relocmap.py). The chip copy
-; is then filled with ILLEGAL, so that a reference the table missed stops at once.
+; it that holds a code-area address (src/reloc.i, from tools/relocmap.py), and moves the
+; stack after it. The chip copy is then filled with ILLEGAL, so that a reference the table
+; missed stops at once.
 
 _relocate	move.l	_expmem(pc),d0
 		beq.b	.none
@@ -133,6 +137,12 @@ _relocate	move.l	_expmem(pc),d0
 		add.l	d2,d2
 		add.l	d0,(a1,d2.l)
 		dbf	d1,.reloc
+		move.l	_expmem(pc),d0		;the stack: the 4 KB after the code
+		add.l	#CODE_SIZE+STACK_SIZE,d0
+		move.l	#$63f8a-CODE_START,d1	;lea $4b546,sp: at the start
+		move.l	d0,(a1,d1.l)
+		move.l	#$6420e-CODE_START,d1	;and at the main loop's top
+		move.l	d0,(a1,d1.l)
 		lea	CODE_START,a0
 		move.w	#CODE_SIZE/2-1,d1
 .fill		move.w	#$4afc,(a0)+
