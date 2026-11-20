@@ -33,17 +33,14 @@ at 12.0 fps on the a500+ and 22 to 23 fps on the a1200 and the a1200-030. The A5
   sound 29) still has about 50 fields to go when the death sequence ends at 25 Hz, and the
   next life's sounds cut it after about 15. Making the next life wait for it would
   change the game, not its pace: decide by play.
-- With Enhanced framerate a pass that leaves the drawing out also leaves out what the
-  renderer writes to the game state ([internals](internals.md#game-time)). Two parts
-  matter:
-  - The ship's terrain test. The object drawer marks the ship's contact with a slope, and
-    the next tick crashes the ship. A pass that does not draw skips the test, so the crash
-    comes late or not at all. That changes the game on machines that fall behind (the A500
-    in heavy scenes). Fix: on a pass that does not draw, test the ship's vertices against
-    the terrain height as the drawer does (`$2bd12`).
-  - The RNG and the smoke. Skipped draws leave out the lightning's RNG draws and the smoke,
-    so the game state then differs from the original's at the same tick, though it plays
-    alike. Accept, or make those draws when not drawing.
+- With Enhanced framerate a pass that leaves the drawing out also leaves out the
+  renderer's RNG draws (the attractor's lightning) and smoke
+  ([internals](internals.md#game-time)): the game state then differs from the original's
+  at the same tick, though it plays alike. Accept, or make those draws when not drawing.
+  (The ship's terrain test, which the renderer also runs, such a pass now runs itself.)
+- Play-test a crash into a slope (a wing, not the ship's centre) on the a500+ at 25 Hz,
+  where passes leave the drawing out: the check build only made contacts by lowering the
+  ship's entry.
 - Without Enhanced framerate the game is the original, tied to the frame rate; with fast
   memory light scenes now run it at up to 50 fps, twice the pace it had before.
 - The chip copy of the moved block stays filled with `ILLEGAL` for now (a code reference

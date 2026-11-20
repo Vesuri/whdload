@@ -269,14 +269,18 @@ in three more places:
   test covers only its centre.
 
 A pass that leaves the drawing out therefore changes the RNG's sequence while smoke or the
-lightning is on screen. It also does not test the ship against the terrain, so a crash into
-a slope comes on the next drawn pass if the ship is still in it, or not at all.
+lightning is on screen. It would also leave out the ship's terrain test, so that a crash into
+a slope came on the next drawn pass if the ship was still in it, or not at all: Enhanced
+framerate runs that test itself on such a pass (below).
 
 **Enhanced framerate** (CUSTOM1=1) runs one pass per tick at a fixed rate: a tick every
 2, 3 or 4 fields (CUSTOM2 0, 1, 2: 25, 16.7, 12.5 Hz), counted by a hook in the VBL.
 A pass waits while it is early. When the next tick is already due too, it leaves out the
-renderer, the swap and the clear request (and resets the radar list as the renderer would)
-and only simulates; at most 3 passes in a row, then it draws anyway. Behind by more than 16
+renderer, the swap and the clear request and only simulates; at most 3 passes in a row,
+then it draws anyway. Such a pass resets the radar list as the renderer would, and runs the
+drawer's terrain test on the ship's depth-list entry (`_shiptest`, the same vertices, matrix
+and arithmetic as `$2bc1e`-`$2be3e`; a hook on the ship's store, `$2b250`, notes the entry),
+so a contact still crashes the ship at the next tick. Behind by more than 16
 fields, the time past that is dropped. The loop's entry (`$289fe`, after the title, a wave
 screen, the game's start) and every paused pass restart the clock, so pauses and screens
 between waves add no backlog. The attract screen's approaching ship (`$2a4e4`: 768 frames,
@@ -305,10 +309,18 @@ The A500 cannot hold 25 Hz in the demo's heavy scenes, where a drawn frame takes
 the three skipped ticks give it, and comes close at 16.7 Hz. The attract screen took 813
 fields on both the a500+ and the a1200-030 (the original: 49 more on the a500+).
 
+The ship's terrain test on the passes that do not draw costs the a500+ at 25 Hz, in the
+window now (tools/pace.py): 567 ticks and 262 drawn frames (10.48 fps) without it, 566 and
+251 (10.04 fps) with it. Checked against the drawer: a check build ran both on every drawn
+pass of the demo and of the scripted play (wander) on the a1200-030, lowering the ship's
+entry by 0 to 2976 on every 32nd pass to make contacts; in 998 passes, 17 with a contact,
+the two never differed.
+
 Same game state at the same tick (tools/callwrites.py `compare`, captures at tick 200
 against the original on the a1200-030): no byte of game state differs for the original on
 the a500+, Enhanced off, Enhanced at 25 and 16.7 Hz on the a1200-030 and at 25 Hz on the
-a500+ (which skipped drawing and dropped time on the way). Tick 191 came after exactly
+a500+ (which skipped drawing and dropped time on the way), and with the ship's terrain test
+on the a1200-030 and at 25 Hz on the a500+. Tick 191 came after exactly
 380 fields at 25 Hz and 570 at 16.7 Hz on the a1200-030.
 
 ## A 50 Hz tick
@@ -551,6 +563,7 @@ With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), a second patch lis
 | `$28a12` (the main loop, after its top) | `tst.b $3ca07; bne.s` and the calls to `$28a4b` | `jsr _pass; bra.s $28a4c`: paused, restarts the clock; else waits for the tick, then the calls, the drawing only when not behind |
 | `$2a530` (the attract screen) | `jsr` to `$26a36` (fade-in) | `jsr`: the same, then restarts the clock |
 | `$2a584` (the attract screen's frame) | the ship's rotation, drawing, swap and clear, to `$2a5b1` | `jsr _attract; bra.s $2a5b2`: the same at a tick a field, left out when behind |
+| `$2b250` (the ship's depth-list entry) | `lea $2bbaa(pc),a2; movem.l a2/a6,(a1)` | `jsr _shipemit; nop`: the same, and notes the entry for `_shiptest` |
 | `$2b472` (the death sequence's pass) | `tst.b $609a2` | `jsr _death`: waits for the tick, then the same |
 | `$2b47c`, `$2b494`, `$2b4e4` (its clear request, renderer, swap) | `jsr` to `$1d4fe`, `$29974`, `$1d58c` | `jsr`: the same, left out when behind (the radar list reset instead of the renderer); in fast memory the main loop's buffer swap and clear |
 

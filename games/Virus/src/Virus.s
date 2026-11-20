@@ -330,6 +330,7 @@ _pl_enhanced	PL_START
 		PL_PS	$66c7c-CODE_START,_drequest	;jsr $58cfe: its clear request
 		PL_PS	$66c94-CODE_START,_drender	;jsr $65174: its renderer
 		PL_PS	$66ce4-CODE_START,_dshow		;jsr $58d8c: its swap
+		PL_PSS	$66a50-CODE_START,_shipemit,2	;lea $673aa(pc),a2; movem.l a2/a6,(a1)
 		PL_END
 
 ; In the level 3 handler's VBL part, all registers saved.
@@ -358,6 +359,10 @@ _sr_pass	equ	*
 		move.l	_period(pc),d1
 		bsr.w	_pace
 		move.l	(sp)+,d1
+		move.l	a0,-(sp)
+		lea	_shipent(pc),a0
+		clr.l	(a0)			;not in the lists yet
+		movea.l	(sp)+,a0
 		GCALL	$672fc			;object rotations from the frame counter
 		GCALL	$60a1c			;particles: move, into the depth lists
 		GCALL	$66718			;the player, the camera
@@ -368,6 +373,7 @@ _sr_pass	equ	*
 		bra.b	.drawn
 .nodraw		move.l	#$9ea6,($1022).l	;the radar list, as the renderer leaves it
 _sr_nodraw	equ	*
+		bsr.w	_shiptest		;the drawer's test of the ship against the terrain
 .drawn		GCALL	$64d74			;the depth lists emptied
 		GCALL	$61f32			;the wave's end
 		bsr.w	_draw
@@ -440,6 +446,83 @@ _sr_attract2	equ	*
 		GCALL	$58d8c			;show it
 		GCALL	$58d48			;clear the other buffer
 .skip		rts
+
+; The ship's depth-list entry ($66a50, the main loop's pass): the drawer tests the ship's
+; vertices against the terrain height and marks a contact in $3ca0f, on which the player
+; routine crashes the ship at the next tick (docs/internals.md, "Game time"). A pass that
+; does not draw runs the same test from the same entry, so that no contact is missed.
+_shipemit	move.l	#$673aa,a2		;the replaced instructions: the object drawer
+		add.l	_delta(pc),a2
+		movem.l	a2/a6,(a1)
+		move.l	a0,-(sp)
+		lea	_shipent(pc),a0
+		move.l	a1,(a0)
+		movea.l	(sp)+,a0
+		rts
+
+; One row of the drawer's rotation ($67454): \1 = row (a1)+ . (d0,d1,d2), d6 used.
+SROW		MACRO
+		move.w	(a1)+,\1
+		muls.w	d0,\1
+		swap	\1
+		add.w	\1,\1
+		move.w	(a1)+,d6
+		muls.w	d1,d6
+		swap	d6
+		add.w	d6,d6
+		add.w	d6,\1
+		move.w	(a1)+,d6
+		muls.w	d2,d6
+		swap	d6
+		add.w	d6,d6
+		add.w	d6,\1
+		ENDM
+
+; The drawer's test ($6741e-$6763e) for the ship's entry: entry +4 the model, +8 the
+; matrix, +26 the position; the model's flags (bit 0 drawn this way, bit 1 tested), its
+; vertex count - 1 at +2 and the vertices from +8. Keeps every register.
+_shiptest	movem.l	d0-d7/a0-a6,-(sp)
+		lea	_shipent(pc),a0
+		move.l	(a0),d0
+		beq.w	.done
+		clr.l	(a0)
+		movea.l	d0,a0
+		movea.l	4(a0),a4
+		btst	#0,(a4)
+		beq.w	.done
+		btst	#1,(a4)
+		beq.w	.done
+		move.w	2(a4),d7
+		lea	8(a4),a6
+.vertex		movem.w	(a6)+,d0-d2
+		lea	8(a0),a1
+		SROW	d3
+		SROW	d4
+		SROW	d5
+		add.w	26(a0),d3		;x, y, z against the camera
+		add.w	28(a0),d4
+		add.w	30(a0),d5
+		move.l	_gv(pc),a3
+		move.w	d3,d6
+		add.w	$107e-$1000(a3),d6
+		move.w	d7,-(sp)
+		move.w	d5,d7
+		add.w	$1082-$1000(a3),d7
+		sub.w	#3584,d7
+		movem.l	d4/a0/a4/a6,-(sp)
+		GCALL	$656b2			;the terrain height there: d1
+		movem.l	(sp)+,d4/a0/a4/a6
+		move.w	(sp)+,d7
+		move.l	_gv(pc),a3
+		sub.w	$1080-$1000(a3),d1
+		cmp.w	d1,d4
+		ble.b	.next
+		move.l	_p3ca0f(pc),a1		;below it: the contact
+		st	(a1)
+		bra.b	.done
+.next		dbf	d7,.vertex
+.done		movem.l	(sp)+,d0-d7/a0-a6
+		rts
 
 ; Z set when this pass does not draw. Keeps every register.
 _draw		move.l	a0,-(sp)
@@ -759,6 +842,8 @@ _fbuf		dc.l	0			;the drawing buffer (0: not moved)
 _gv		dc.l	$1000			;the game's variables, $3ca08 and $606ac,
 _p3ca08		dc.l	$3ca08			;where they are (relocated with _srel)
 _p606ac		dc.l	$606ac
+_p3ca0f		dc.l	$3ca0f
+_shipent	dc.l	0			;the ship's entry this pass (0: none)
 _swapped	dc.l	0			;_fields at the main loop's last swap
 _lastrows	dc.l	0			;the row flags of the screen copied last
 _pending	dc.b	0			;the buffer's clear is due
@@ -784,7 +869,8 @@ _drawn		dc.b	0			;this pass draws
 _srel		dc.w	_sr_flush-8-base,_sr_flush-4-base,_sr_vbl-4-base,_sr_pass-4-base
 		dc.w	_sr_nodraw-8-base,_sr_nodraw-4-base,_sr_attract1-4-base
 		dc.w	_sr_attract2-4-base,_sr_death-4-base,_sr_dcount-4-base,_sr_dnodraw-8-base
-		dc.w	_sr_dnodraw-4-base,_gv-base,_p3ca08-base,_p606ac-base,0
+		dc.w	_sr_dnodraw-4-base,_gv-base,_p3ca08-base,_p606ac-base
+		dc.w	_p3ca0f-base,0
 
 _resload	dc.l	0
 _hiname		dc.b	"Virus.hi",0
