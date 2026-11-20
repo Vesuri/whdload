@@ -17,4 +17,5 @@ Read `docs/open-work.md` first.
 | `docs/development.md` | what differs from the shared workflow: inputs, the build, driving it |
 | `docs/internals.md` | how it loads, memory, every slave patch, limitations |
 
-The slave source is `src/`. There is no `tools/` yet: `make serve` drives it.
+The slave source is `src/`; `tools/` boots, benchmarks the demo mode and reports
+([development.md](docs/development.md#benchmark)), and never ships.
