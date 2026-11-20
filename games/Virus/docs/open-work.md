@@ -28,6 +28,13 @@ at 12.0 fps on the a500+ and 22 to 23 fps on the a1200 and the a1200-030. The A5
   every time (`tools/coverage.py ... wander 2500 wander 2000` from the demo, then
   crashes with `thrust`, no shots); the game-over screen took SPACE only on a
   second press, and RETURN in the entry was not reached yet.
+- The death sequence is paced by ticks now; its game-over text (the last life's death)
+  is not seen yet. A second sound of the crash (on another channel than the explosion,
+  sound 29) still has about 50 fields to go when the death sequence ends at 25 Hz, and the
+  next life's sounds cut it after about 15. Making the next life wait for it would
+  change the game, not its pace: decide by play.
+- Without Enhanced framerate the game is the original, tied to the frame rate; with fast
+  memory light scenes now run it at up to 50 fps, twice the pace it had before.
 - The chip copy of the moved block stays filled with `ILLEGAL` for now (a code reference
   `src/reloc.i` missed then stops at once rather than misbehaving later): revisit before
   the release.
