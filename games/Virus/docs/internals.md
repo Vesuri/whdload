@@ -29,9 +29,10 @@ Everything runs in supervisor mode on one stack, which the main loop resets to `
   blitter; level 2 (`$250a8`) reads the keyboard.
 - The main loop (`$28a04`, entered at `$289fe` once per game or demo start) increments the
   frame counter `$c9f4` (cleared at the start), runs the simulation, the particles
-  (`$2521c`: count `$c9ec`, list `$a2a6`, each projected with `divs` and plotted by the
-  depth-tested dot plotter `$29eb2`), then the landscape renderer (`$29974`), the swap and
-  the clear request.
+  (`$2521c`: count `$c9ec`, list `$a2a6`, each moved, projected with `divs` and put into
+  the depth lists with its plotter, such as `$1c08a` or `$1c0ce`; `$29eb2` is the terrain
+  height, a sum of sines, for the ground), then the landscape renderer (`$29974`), the swap
+  and the clear request.
 - The renderer projects the landscape grid, then waits (`$29c7e`: `tst.w $606ac`) for the
   back buffer's clear, then draws the tiles and the objects (`$2bbaa`, `$2bc00`). All
   polygons are CPU-filled: `$2c58e` steps the edges and jumps, per scanline, into unrolled
@@ -247,14 +248,19 @@ The main loop's calls (`Disk.1` offsets, from `$28a1a`):
 | `$26732` | the wave's end (pops the loop's return and jumps to `$28972`) | simulation |
 | `$1d58c`, `$1d4fe` | the swap, the clear request | drawing |
 | `$2a278` | the score, extra lives | simulation |
-| `$28b56` | the ship's trail positions | simulation |
+| `$28b56` | a four-entry position queue (`$10e4`): the seeds push where they land (`$25e5c`), this moves it on each tick its head's map cell is empty or marked (bit 4), the flying fighters steer at its head | simulation |
 
 The renderer writes no game state (tools/callwrites.py, Unicorn from a demo chip dump):
 with the drawing left out of every other pass, 8 passes end in the same game state as 8
 whole passes, except for the radar list, which the enemies append to every pass and only
 the renderer resets. Its own scratch (`$1073-$1190`, `$1300-$16dc`, the polygon filler's edge
 state at `$2c586`) is read by nothing else. The renderer also starts two sounds (the
-low-fuel warning, `$2937a`), so a pass that does not draw does not start them.
+low-fuel warning, `$2937a`), so a pass that does not draw does not start them. That holds for
+the demo; in play the renderer changes game state in two more places: visible burning tiles
+(map bit 4) spawn smoke every 8 ticks (`$2981c`, through `$25c7e` and the RNG), and the
+attractor's lightning bolt (`$28182`) takes 9 RNG draws a drawn frame (`$282dc`). A pass
+that leaves the drawing out therefore changes the RNG's sequence while either is on
+screen.
 
 **Enhanced framerate** (CUSTOM1=1) runs one pass per tick at a fixed rate: a tick every
 2, 3 or 4 fields (CUSTOM2 0, 1, 2: 25, 16.7, 12.5 Hz), counted by a hook in the VBL.
@@ -294,6 +300,52 @@ against the original on the a1200-030): no byte of game state differs for the or
 the a500+, Enhanced off, Enhanced at 25 and 16.7 Hz on the a1200-030 and at 25 Hz on the
 a500+ (which skipped drawing and dropped time on the way). Tick 191 came after exactly
 380 fields at 25 Hz and 570 at 16.7 Hz on the a1200-030.
+
+## A 50 Hz tick
+
+What a tick every field would take with the game's pace kept (each pass half of a 25 Hz
+tick), read from the code; nothing of it is built. The CPU is not the limit: the simulation
+calls, with the particles' projection, are about 9% of all time on the a1200-fast and 4% on
+the a1200-030 in the demo window (aprof). The limit is that the game is written per tick, in
+integers:
+
+| What | Where (`Disk.1`) | At half a tick |
+|---|---|---|
+| Positions, `pos += v` | the particles' dispatcher `$25248`, the player `$2b136`, about 16 sites in the object handlers | `v>>1` and `v-(v>>1)` on alternate passes sum to v exactly, v kept in 25 Hz units |
+| Gravity `$c9ea` (3 to 6 by wave, `$26624`) | 9 particle and 6 object handlers, the player `$2b140` | `g>>1` and `g-(g>>1)` alternately |
+| Drag, `v -= v>>k` (the player 6, `$2afc2`; fighters 5, chasers 6, seeders and the missile 4) | | one more shift keeps the retention (within 0.1%) but not the dead band: a positive speed under 2^k never slows and `asr` takes a negative one down a unit a tick; at k+1 the player drifts at up to 127 a tick instead of 63 and negative speeds decay twice as fast. Needs a fraction kept per velocity |
+| Homing, `v += (target-pos)>>k` (`$285dc`, `$28600`, the chasers) | | as drag |
+| Thrust from a matrix byte shifted 3 to 6 (the player `$2b00c`, the fliers `$2847c`, the missile) | | positive rows lose a unit or more (the player's `up>>3` of 15 becomes 7 and 7): fractions kept, or thrust on alternate passes |
+| The attitude, half the way to the mouse's, at most 5120 (`$2af56`) | | `1-1/sqrt(2)` a pass is not a shift: a multiply, the clamp halved |
+| Countdowns | the wave table's delays (`$265e4`, up to 3000 ticks), the seeders' 512, the chasers' reversals 511 and 169, stuns, the death sequence's 51 passes and its text at 16 to 19 (`$2b472`), the missile's life 256 in a byte | doubled, or counted on alternate passes |
+| Amounts a tick | fuel: thrust 3 (`$2afde`), the attractor 25, refuelling 25 (`$2b3fe`); a point a shot; keyboard steering 1536 and 3072 (`$2aebe`); turns 1792 and 2 (`$2833c`) | halved, odd ones alternating |
+| Gates on the counter's low bits | `$c9f4`: the spin matrices (`$2bafc`, `$2963c`), the dust every 2nd (`$2b33e`), the autopilot every 8th (`$2ace2`), the gauge's blink (`$293ae`), a sound every 64th (`$297b8`), the smoke every 8th (`$2981c`); `$c9f8`: about 12 in the object handlers; `$c9f5` bit 0: blinks and models | one more bit, or a 25 Hz counter and its phase |
+| Emission | exhaust 5 a tick (`$2b04e`), a shot a tick (`$2b0ee`), the trail puffs (`$2b2d2`), seeds every tick (`$26eb0`), smoke, bombs, enemy shots, the bomber's 21 instant infections a tick (`$258b4`) | alternate passes; otherwise the 375-particle cap fills and drops emissions, seeds among them |
+| Sounds started every tick | thrust, 5 and 54, which restart on each call (`$1ca58`, a positive flag word); 16, 22, 30, 37, 49 | alternate passes |
+| Decisions | mutants, two-hit fliers and the missile steer every tick, one way or the other | on alternate passes, or they aim twice as finely |
+
+That is on the order of 80 patch sites, and the game is then close to the 25 Hz one, not the
+same: collision tests run twice as often, so fast shots that pass through objects, tiles and
+ridges today hit (the player's shot moves up to about 576 a tick, the boxes are 320 and,
+against the ship, 192); the RNG (`$101a`) is drawn in another order, so infections, spreads
+and waves differ; and the demo is not a recording but an autopilot (`$2ace2`: every 8 ticks
+it heads for the nearest object, it fires and thrusts by distance and terrain), so it plays
+another game. Only 25 and 12.5 Hz are shifts of 50 Hz; 16.7 Hz is not. No comparison with the
+original's state applies (tools/gametime.py), so only play could judge it.
+
+**Drawing between ticks** gives the frames without any of that. Every mover integrates its
+stored velocity before it decides anything: the particles' dispatcher adds it before the
+handler (which adds only gravity to v), the object handlers integrate first, and so does the
+player. So the next tick reaches `pos + v`, and `pos + v/2` is its midpoint, except where it
+bounces, reverses (`$2721c`, `$27eb8` at their counts), lands or ends. A frame drawn on the
+field between ticks from those predicted positions (the camera, the ship, every object and
+particle, the spin matrices at half angles, the attitude halfway) leaves the simulation as it
+is: the game state stays byte-identical, the demo stays in sync and the comparisons still
+apply. The work is on the drawing side. The depth lists are filled during the simulation
+(the particles `$25252`, the objects `$26d08`, the ship `$2b23c`, the renderer's tiles), so
+the frame between needs a pass of its own that emits them again at the predicted positions
+without the handlers, and that changes nothing: the RNG kept across the draw (the
+lightning), no smoke spawned, no sound started. A wrong prediction shows for one field.
 
 ## Measurements
 

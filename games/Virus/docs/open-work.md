@@ -33,6 +33,10 @@ at 12.0 fps on the a500+ and 22 to 23 fps on the a1200 and the a1200-030. The A5
   sound 29) still has about 50 fields to go when the death sequence ends at 25 Hz, and the
   next life's sounds cut it after about 15. Making the next life wait for it would
   change the game, not its pace: decide by play.
+- With Enhanced framerate a pass that leaves the drawing out also leaves out the
+  renderer's RNG draws (the attractor's lightning) and smoke
+  ([internals](internals.md#game-time)): the game state then differs from the original's
+  at the same tick, though it plays alike. Accept, or make those draws when not drawing.
 - Without Enhanced framerate the game is the original, tied to the frame rate; with fast
   memory light scenes now run it at up to 50 fps, twice the pace it had before.
 - The chip copy of the moved block stays filled with `ILLEGAL` for now (a code reference
@@ -56,11 +60,11 @@ only, everything not DMA in fast memory, every cache on), is in
   now (after the fade-in, ending with the demo) the a3000, a3000-50, a1200-030, -040 and
   -060 draw 50.0, a frame every field, and the a500+-020 35.8, the a1200-fast 37.8. What is
   left on the 68020s is mostly the game itself.
-- Enhanced framerate's speeds stop at 25 Hz; the a1200-030 could now draw a 50 Hz tick
-  (a tick every field), but that is a faster game, not a smoother one. Smoother needs
-  drawing between ticks (interpolation).
-- The game speed still waits for whole fields; drawing between ticks (interpolation) or
-  a tick shorter than the drawing would need the renderer faster still.
+- **50 frames a second.** The a3000 and up draw 50 in the demo, but a frame a tick holds
+  them at 25. A 50 Hz tick at today's pace is on the order of 80 patch sites in integer code
+  and still another game (collisions, the RNG, the demo); a predicted frame drawn between
+  ticks keeps the simulation byte-identical and needs a drawing pass of its own for the
+  depth lists ([internals](internals.md#a-50-hz-tick)). Choose before building either.
 - Run on a 512 KB chip A500: find the render writes past `$80000` (a write watchpoint
   above `$80000`) and clip them, so `ws_BaseMemSize` can be `$80000`. The unused `_clamp`
   shows where the original author started.
