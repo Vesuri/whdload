@@ -22,6 +22,8 @@ sys.path.insert(0, str(ROOT.parents[1] / 'common/tools'))
 import capstone  # noqa: E402
 from amigaxdev import barto  # noqa: E402
 from game_server import game_server  # noqa: E402
+sys.path.insert(0, str(ROOT / 'tools'))
+import codebase  # noqa: E402
 
 TYPES = {0: 'free', 1: 'refresh', 2: 'CPU', 3: 'copper', 4: 'audio', 5: 'blitter', 6: 'bitplane'}
 
@@ -48,7 +50,7 @@ def main(args):
     srv = game_server('virus')
     trace = ROOT / 'tmp/prof/chipaccess.bin'
     trace.parent.mkdir(parents=True, exist_ok=True)
-    srv.request('until 0x641fe')
+    srv.request(f'until {0x641fe + codebase.delta(srv):#x}')
     srv.request(f'fields {skip}')
     srv.request(f'profile {n} {trace}')
     t = barto.load(str(trace))

@@ -7,7 +7,9 @@
 
 `run` goes to the demo's start, profiles FIELDS fields (default 1250, as tools/bench.py)
 and reads the frame counter. `report` groups every PC's units and chip units (cycles spent
-on chip-bus accesses, waits included) and prints the CACR the profile recorded.
+on chip-bus accesses, waits included) and prints the CACR the profile recorded. With the
+code in ExpMem (tools/codebase.py) `run` writes its distance to OUT.aprof.delta and the
+groups use the game's addresses.
 """
 import os
 import sys
@@ -17,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, os.environ.get('AMIGA_PYLIB') or os.path.expanduser('~/.local/share/amiga/pylib'))
 sys.path.insert(0, str(ROOT.parents[1] / 'common/tools'))
 from amigaxdev.aprof import parse_profile  # noqa: E402
+sys.path.insert(0, str(ROOT / 'tools'))
+import codebase  # noqa: E402
 
 SPIN = {0x6547e, 0x65484}
 
@@ -41,9 +45,13 @@ def group(pc):
 
 def report(path):
     h, pcs, _ = parse_profile(Path(path).read_text())
+    side = Path(f'{path}.delta')
+    d = int(side.read_text(), 0) if side.exists() else 0
     units = h['units']
     g = {}
     for pc, (u, _n, cu, ca) in pcs.items():
+        if d and codebase.CODE[0] + d <= pc < codebase.CODE[1] + d:
+            pc -= d
         a = g.setdefault(group(pc), [0, 0, 0])
         a[0] += u
         a[1] += cu
@@ -60,7 +68,9 @@ def report(path):
 def run(path, fields):
     from game_server import game_server
     srv = game_server('virus')
-    srv.request('until 0x641fe')
+    d = codebase.delta(srv)
+    Path(f'{path}.delta').write_text(hex(d))
+    srv.request(f'until {0x641fe + d:#x}')
     srv.request('gdb monitor aprof start')
     srv.request(f'fields {fields}')
     srv.request(f'gdb monitor aprof stop {Path(path).resolve()}')

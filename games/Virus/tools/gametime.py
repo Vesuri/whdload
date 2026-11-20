@@ -7,7 +7,8 @@
 `capture` runs to the demo's start, steps 5 fields at a time to FRAME-10 (default 200; it
 prints the fields that took), then stops at the main loop's top ($64204) with the frame
 counter $c9f4 at FRAME (a conditional breakpoint, outside any measurement) and dumps
-$1000-$3b7ff (OUT) and the Disk.1 image $3b800-$687ff (OUT.img). `compare` lists the bytes
+$1000-$3b7ff (OUT) and the Disk.1 image $3b800-$687ff (OUT.img; the code area from where it
+runs, tools/codebase.py). `compare` lists the bytes
 that differ.
 """
 import os
@@ -27,17 +28,25 @@ def capture(out, frame):
     def counter():
         return int(next(w for w in srv.request('peek c9f4 2').split() if len(w) == 4), 16)
 
-    srv.request('until 0x641fe')
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import codebase
+    d = codebase.delta(srv)
+    srv.request(f'until {0x641fe + d:#x}')
     n = 0
     while counter() < frame - 10:
         srv.request('fields 5')
         n += 5
     print(f'frame {counter()} after {n} fields')
-    srv.request(f'gdb break *0x64204 if *(unsigned short *)0xc9f4 == {frame}')
+    srv.request(f'gdb break *{0x64204 + d:#x} if *(unsigned short *)0xc9f4 == {frame}')
     srv.request('gdb continue')
     srv.request('gdb delete')
     srv.request(f'gdb dump binary memory {out} 0x1000 0x3b800')
-    srv.request(f'gdb dump binary memory {out}.img 0x3b800 0x68800')
+    # the image as the game sees it: chip below the code area, the code area where it runs
+    srv.request(f'gdb dump binary memory {out}.img 0x3b800 0x57000')
+    srv.request(f'gdb dump binary memory {out}.code {0x57000 + d:#x} {0x68800 + d:#x}')
+    img = Path(f'{out}.img')
+    img.write_bytes(img.read_bytes() + Path(f'{out}.code').read_bytes())
+    Path(f'{out}.code').unlink()
     print(f'stopped at frame {counter()}')
 
 

@@ -5,15 +5,19 @@
 A direct slave (`ws_Flags` Disk and NoError, no Kickstart), a v17 header since 2.0b for
 `ws_config` (`C1` Enhanced framerate, `C2` its game speed). It clears `$1000-$3b7ff`, loads
 the whole disk image `Disk.1` (184320 bytes) to `$3b800`, so a `Disk.1` offset is its
-address minus `$3b800`, loads the highscores, applies two patches and a patch list (the cache flush below; with
-CUSTOM1 also the Enhanced framerate patch list), turns the instruction cache on (`resload_SetCACR`) and
-jumps to the game's entry, `Disk.1` offset `$286c8` (`$63ec8`).
+address minus `$3b800`. With ExpMem it copies the code area there and relocates it
+([code in fast memory](#code-in-fast-memory)). Then it loads the highscores, applies its
+patch list (with CUSTOM1 also the Enhanced framerate patch list) to the code where it runs,
+turns the instruction cache on (`resload_SetCACR`) and jumps to the game's entry, `Disk.1`
+offset `$286c8` (`$63ec8`).
 
 ## Memory
 
 `ws_BaseMemSize` is `$88000` (544 KB). The ReadMe's reason: the render routines write past
 the 512 KB border. The game itself uses fixed chip addresses up to at least `$78000`
-(`$70000` and `$78000` stored at its entry), so no part moves to fast memory.
+(`$70000` and `$78000` stored at its entry). `ws_ExpMem` asks for an optional 72 KB
+(`$12000`) for the code area; WHDLoad gives fast memory when there is some, else chip
+memory above the 544 KB.
 
 ## The frame
 
@@ -53,13 +57,16 @@ the work memory at `$1000-$3b7ff` (variables, the two 64 KB landscape maps at `$
 particles), the rest of the image's data and the stack (`$4b546` down).
 
 Moving the CPU-only parts means relocating a raw memory image: the program has no
-relocation table. In the 6288 instructions the 25 s demo executes there are 518 absolute
+relocation table (the end of the disk holds the start of the original executable's
+`HUNK_RELOC32` block, `$2cac8` onward, cut off after 1336 bytes). In the 6288 instructions the 25 s demo executes there are 518 absolute
 long operands to game addresses (306 to work memory, 140 to code, 72 to image data), no
 absolute short ones, and 103 PC-relative ones (some reach data inside the code, as the
 pointer variable `$1d4b2` read by `movea.l (pc),a2; jmp (a2)`). Code pointers also sit in
 data: the span writers' pointer table at `$24920`, the sound table, particle records (built
 at run time from immediates). The title, the attract screen, play and the wave screens run
-code the demo does not, so a relocation needs a whole-image disassembly.
+code the demo does not, so a relocation needs a whole-image disassembly. The code area
+has been moved that way ([below](#code-in-fast-memory)); the work memory and the rest of
+the image's data have not.
 
 Self-modifying code: the landscape setup (`$28bd8`, at the game's start and from `$26706`
 and `$26728` by the wave number) rewrites five renderer instructions (`$29f7a-$29f85`,
@@ -70,6 +77,57 @@ a 68020/030 the map building in between likely evicted the 256 bytes, on a 68040
 necessarily. Since 2.0b the slave flushes at the setup's end (`$28cb6`, below). In a 10-field demo sample no other CPU write touched
 an executed instruction word. The slave's patches are written before its `resload_SetCACR`
 (`resload_Patch` flushes too).
+
+## Code in fast memory
+
+The code area `$57000-$687ff` (`Disk.1` `$1b800-$2cfff`, 72 KB) moves to ExpMem as a
+whole, with the variables and tables mixed into it (the clear flag `$606ac`, the key table
+`$60962`, the dispatcher's state `$58cb2`, palettes, the highscore table). Everything
+below `$57000` stays in chip memory: the work memory, the image's data (the copper lists
+and samples among it) and the stack. A split by address keeps every byte in one place:
+the code reads some of its variables PC-relative (`movea.l $58cb2(pc),a2`) and writes the
+same ones with absolute addresses, and it writes its own instructions (`$28bd8`) and some
+operands (`move.l #$aaaaaaaa,$5d86c`), so its data has to move with it.
+
+`tools/relocmap.py` disassembles the image recursively and lists every long in the code
+area that holds a code-area address: 833, written to `src/reloc.i` as offsets. They are:
+
+- absolute-long operands and long immediates with a code-area value, in every instruction
+  the walk reaches (all 62 such immediates are addresses: palettes, vectors, routines;
+  `suba.l #$60962` / `adda.l #$605b6` convert a pointer between two tables and stay
+  consistent);
+- the pointer tables: object and particle routines, the dispatcher's states (`$1d45a`),
+  the span writers' bases (`$24920`, entered at an offset from them), the key table's
+  pointers (`$24e36`), the 18-byte records' pointers (`$1c93e`), the dot masks
+  (`$29d50`), and the waves' enemy lists (`$265e4`: records of five longs, the routine
+  at +16, each list ended by a zero long);
+- the dispatcher's state variable `$1d4b2`.
+
+The walk starts at the entry, the code tables' entries, 114 entries that traced runs
+executed (`tools/coverage.py`: the title, the attract screen, the demo, play to wave 4,
+game over, the highscore entry, a new game, pause; executed PCs not reachable from other
+entries: span writer entries, interrupt handlers, routines reached through registers) and
+ten entries found by reading the unreached gaps (later waves' enemy states, fades, the
+score digits, one fade nothing references). `relocmap.py check` fails unless every executed PC is reached, no decoded
+instructions overlap, no PC-relative operand leaves the area, and every code-area value in
+unreached bytes is a listed pointer or in a range checked by hand to hold only lookalikes
+(the image data below `$57000`: word records, bitmaps, the font, samples; bitmaps and dot
+masks at `$57000-$57889`; the 18-byte records; one long straddling two wave records).
+
+The slave copies the area, adds the distance to each listed long and fills the chip copy
+with `ILLEGAL`, so a reference the table missed stops at once instead of running stale
+code or reading stale data. That is how the waves' enemy lists were found to need their
+own parser: the first relocated run stopped at `$62a00` (`$27200`) at wave 2. Its patch
+lists use offsets from `$57000` and are applied at the code's address; the slave's own
+calls into the game go through a stub that adds the distance (`GCALL`, `GJMP`).
+
+Checked: at demo tick 200 the game state is the original's (`tools/callwrites.py
+compare`, the code area read from where it runs) apart from code pointers, every one of
+them the original's plus the distance (934 longs on the a1200-030, 976 on the a500+ with
+the code in chip ExpMem). Play from the demo through waves 1 to 4 (the landscape change at
+wave 4), to game over and into a new game ran without stopping on the a1200-030; a crafted
+`Virus.hi` loads into the moved table; the a1200-060 ran the demo through the first
+wave's end.
 
 ## Game time
 
@@ -184,17 +242,35 @@ the blitter clears, the slots alternate blitter and CPU (35% each, bitplanes 27%
 the D-only clear runs at its full rate of a word every other cycle, and the polls take only
 the cycles it leaves, so they do not slow it.
 
+With the code in ExpMem (2.0b), the same window (tools/pace.py; frames a second):
+
+| Machine | Original | Code in ExpMem |
+|---|---|---|
+| a500+ (68000, no fast memory: ExpMem in chip) | 12.0 | 12.0 |
+| a1200 (68020, no fast memory: ExpMem in chip) | 22.2 | 22.2 |
+| a1200-fast (68020, fast memory) | 22.2 | 25.4 |
+| a1200-030, CACHE | 23.4 | 32.8 |
+| a1200-030, CACHE, Enhanced framerate 25 Hz | 21.9 drawn | 24.7 drawn (100.2% of the ticks) |
+
+FS-UAE's a1200-060 gives 47.6 with either, so it does not model what this changes. aprof on
+the a1200-030 (821 frames): the busy-wait for the clear is now 43.9% of all time (the poll
+reads `$606ac` in fast memory), and the rest is 83.6% chip access (96.9% before). The CPU's
+chip slots (tools/chipaccess.py, 10 fields from demo field 300) are now all data: work
+memory 46.3%, the image's data below `$57000` 44.5% (the stack's words most), the display
+buffers 9.0%.
+
 ## Slave patches
 
-Offsets are into `Disk.1`.
+Offsets are into `Disk.1`. All are patch-list entries applied to the code where it runs
+(the list's addresses are offsets from `$57000`).
 
 | `Disk.1` offset | Original | Patch |
 |---|---|---|
 | `$250c0` (level 2 interrupt, after reading CIA-A SDR into d0) | `bset #6,$bfee01` | `nop; jsr _keyboard`: does the same `bset`, then quits on F10 (`ws_keyexit`) or the reset-warning code `$78` through `resload_Abort` |
 | `$2b916` (highscore entry) | `move.w #3000,d7; cmp.w #127,d0` | `nop; jsr _savehi`: on key 13 (return) saves the table, then does the replaced instructions |
-| `$28cb6` (the landscape setup's end, after the code writes and the map) | `move.w $c9fe,$c9fc` | from a patch list, `jsr _flush` and four bytes of `nop`: the same, then `resload_FlushCache` |
+| `$28cb6` (the landscape setup's end, after the code writes and the map) | `move.w $c9fe,$c9fc` | `jsr _flush` and four bytes of `nop`: the same, then `resload_FlushCache` |
 
-With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), from a patch list:
+With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), a second patch list:
 
 | `Disk.1` offset | Original | Patch |
 |---|---|---|
@@ -219,5 +295,7 @@ depend on CPU speed.
 - Needs more than 512 KB of chip memory (above).
 - No blitter-wait fixes. The slave enables the instruction cache only and flushes it after
   the one self-modifying routine.
+- Only the code area moves to fast memory; the work memory, the image's data and the stack
+  stay in chip memory.
 - Enhanced framerate fixes the game's pace, not its frame rate: the drawing is as slow as
   before, and catching up costs a little of it.

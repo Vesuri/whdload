@@ -17,6 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT.parents[1] / 'common/tools'))
 from game_server import game_server  # noqa: E402
+sys.path.insert(0, str(ROOT / 'tools'))
+import codebase  # noqa: E402
 
 
 def symbols():
@@ -33,11 +35,13 @@ def main(args):
         txt = srv.request(f'peek {addr:x} {n}')
         return int(next(w for w in txt.split() if len(w) == 2 * n), 16)
 
-    srv.request('until 0x641fe')
-    enhanced = peek(0x64212, 2) == 0x4eb9
+    d = codebase.delta(srv)
+    print(f'code at ${0x57000 + d:x}')
+    srv.request(f'until {0x641fe + d:#x}')
+    enhanced = peek(0x64212 + d, 2) == 0x4eb9
     if enhanced:
         sym = symbols()
-        base = peek(0x64214, 4) - sym['_pass']
+        base = peek(0x64214 + d, 4) - sym['_pass']
         period = peek(base + sym['_period'], 4)
         frames = lambda: peek(base + sym['_frames'], 4)  # noqa: E731
         print(f'Enhanced framerate: a tick every {period} fields ({50 / period:.2f} Hz)')

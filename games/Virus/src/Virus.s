@@ -16,6 +16,11 @@ DISK_SIZE	= 184320
 GAME_START	= $63ec8
 HI_TABLE	= $66e2e
 HI_SIZE		= 280
+; The code with its own variables and tables, copied to ExpMem when there is some
+; (docs/internals.md, "Code in fast memory"); everything below stays in chip memory.
+CODE_START	= $57000
+CODE_SIZE	= $11800
+EXP_SIZE	= $12000
 
 ;======================================================================
 
@@ -31,7 +36,7 @@ base		moveq	#-1,d0
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	$58			;ws_keydebug = F9
 _keyexit	dc.b	$59			;ws_keyexit = F10
-		dc.l	0			;ws_ExpMem
+_expmem		dc.l	-EXP_SIZE		;ws_ExpMem: optional
 		dc.w	_name-base		;ws_name
 		dc.w	_copy-base		;ws_copy
 		dc.w	_info-base		;ws_info
@@ -72,20 +77,12 @@ _start		lea	_resload(pc),a1
 		move.l	_resload(pc),a2
 		jsr	resload_DiskLoad(a2)
 
-		bsr.b	_loadhi
-
-	; keyboard interrupt: nop + jsr _keyboard
-		move.l	#$4e714eb9,d0
-		move.l	d0,$608c0
-		lea	_keyboard(pc),a0
-		move.l	a0,$608c4
-	; highscore entry: nop + jsr _savehi
-		move.l	d0,$67116
-		lea	_savehi(pc),a0
-		move.l	a0,$6711a
+		bsr.w	_relocate
+		bsr.w	_loadhi
 
 		lea	_pl_game(pc),a0
-		sub.l	a1,a1
+		lea	CODE_START,a1		;patch addresses are offsets from it
+		add.l	_delta(pc),a1
 		move.l	_resload(pc),a2
 		jsr	resload_Patch(a2)
 
@@ -99,7 +96,8 @@ _start		lea	_resload(pc),a1
 		lea	_period(pc),a0
 		move.l	d0,(a0)
 		lea	_pl_enhanced(pc),a0
-		sub.l	a1,a1
+		lea	CODE_START,a1
+		add.l	_delta(pc),a1
 		move.l	_resload(pc),a2
 		jsr	resload_Patch(a2)
 .orig
@@ -108,7 +106,38 @@ _start		lea	_resload(pc),a1
 		move.l	_resload(pc),a2
 		jsr	resload_SetCACR(a2)	;instruction cache on
 
-		jmp	GAME_START
+		move.l	#GAME_START,a0
+		add.l	_delta(pc),a0
+		jmp	(a0)
+
+;----------------------------------------------------------------------
+; With ExpMem: copies the code area there and adds the distance (_delta) to every long in
+; it that holds a code-area address (src/reloc.i, from tools/relocmap.py). The chip copy
+; is then filled with ILLEGAL, so that a reference the table missed stops at once.
+
+_relocate	move.l	_expmem(pc),d0
+		beq.b	.none
+		sub.l	#CODE_START,d0
+		lea	_delta(pc),a0
+		move.l	d0,(a0)
+		lea	CODE_START,a0
+		move.l	_expmem(pc),a1
+		move.w	#CODE_SIZE/4-1,d1
+.copy		move.l	(a0)+,(a1)+
+		dbf	d1,.copy
+		move.l	_expmem(pc),a1
+		lea	_reloc(pc),a0
+		move.w	#RELOC_COUNT-1,d1
+.reloc		moveq	#0,d2
+		move.w	(a0)+,d2
+		add.l	d2,d2
+		add.l	d0,(a1,d2.l)
+		dbf	d1,.reloc
+		lea	CODE_START,a0
+		move.w	#CODE_SIZE/2-1,d1
+.fill		move.w	#$4afc,(a0)+
+		dbf	d1,.fill
+.none		rts
 
 ;----------------------------------------------------------------------
 
@@ -119,6 +148,7 @@ _loadhi		lea	_hiname(pc),a0
 		bne.b	.none
 		lea	_hiname(pc),a0
 		lea	HI_TABLE,a1
+		add.l	_delta(pc),a1
 		move.l	_resload(pc),a2
 		jsr	resload_LoadFile(a2)
 		bsr.b	_crypt
@@ -134,6 +164,7 @@ _savehi		cmp.w	#13,d0
 		move.l	#HI_SIZE,d0
 		lea	_hiname(pc),a0
 		lea	HI_TABLE,a1
+		add.l	_delta(pc),a1
 		move.l	_resload(pc),a2
 		jsr	resload_SaveFile(a2)
 		movem.l	(a7)+,d0-a6
@@ -145,6 +176,7 @@ _savehi		cmp.w	#13,d0
 ; Toggles the table between the game's form and the file's (its own inverse).
 
 _crypt		lea	HI_TABLE,a1
+		add.l	_delta(pc),a1
 		move.w	#HI_SIZE-1,d0
 .loop		move.b	(a1,d0.w),d1
 		ror.b	#4,d1
@@ -171,7 +203,11 @@ _clamp		cmp.l	#$78b40,a3
 ; the instruction cache after it.
 
 _pl_game	PL_START
-		PL_PSS	$644b6,_flush,4		;move.w $c9fe,$c9fc: the setup's end
+		PL_W	$608c0-CODE_START,$4e71		;level 2: bset #6,$bfee01 -> nop, jsr _keyboard
+		PL_PS	$608c2-CODE_START,_keyboard
+		PL_PSS	$644b6-CODE_START,_flush,4		;move.w $c9fe,$c9fc: the setup's end
+		PL_W	$67116-CODE_START,$4e71		;highscore entry -> nop, jsr _savehi
+		PL_PS	$67118-CODE_START,_savehi
 		PL_END
 
 _flush		move.w	$c9fe,$c9fc		;the type now set up
@@ -199,6 +235,27 @@ _keyboard	bset	#6,$bfee01		;CIA-A CRA SPMODE: handshake
 		move.l	_resload(pc),a2
 		jmp	resload_Abort(a2)
 
+;----------------------------------------------------------------------
+; Calls and jumps from the slave into the game's code, wherever it runs: the address plus
+; _delta. Registers and the stack as with jsr / jmp.
+
+GCALL		MACRO
+		pea	.r\@(pc)
+		pea	\1
+		bra.w	_gcall
+.r\@
+		ENDM
+GJMP		MACRO
+		pea	\1
+		bra.w	_gcall
+		ENDM
+
+_gcall		move.l	d0,-(sp)
+		move.l	_delta(pc),d0
+		add.l	d0,4(sp)
+		move.l	(sp)+,d0
+		rts
+
 ;======================================================================
 ; Enhanced framerate (CUSTOM1=1): fixed-rate game time (docs/internals.md, "Game time").
 ; The original runs one simulation step per rendered frame, so the game's speed follows
@@ -214,13 +271,13 @@ MAX_SKIP	= 3
 LIMIT		= 16
 
 _pl_enhanced	PL_START
-		PL_PS	$607fe,_vbl		;move.b $3ca1b,d0 (the VBL's fade countdown)
-		PL_PS	$641fe,_enter		;jsr $58d38: the main loop's entry
-		PL_PS	$64212,_pass		;tst.b $3ca07 (pause), bne.s; the calls
-		PL_W	$64218,$6032		;bra.s $6424c: the keys after the calls
-		PL_PS	$65d30,_attract_enter	;jsr $62236: the fade-in, then the ship
-		PL_PS	$65d84,_attract		;lea $1084,a1: the ship's frame, to $65db1
-		PL_W	$65d8a,$6026		;bra.s $65db2: the keys
+		PL_PS	$607fe-CODE_START,_vbl		;move.b $3ca1b,d0 (the VBL's fade countdown)
+		PL_PS	$641fe-CODE_START,_enter		;jsr $58d38: the main loop's entry
+		PL_PS	$64212-CODE_START,_pass		;tst.b $3ca07 (pause), bne.s; the calls
+		PL_W	$64218-CODE_START,$6032		;bra.s $6424c: the keys after the calls
+		PL_PS	$65d30-CODE_START,_attract_enter	;jsr $62236: the fade-in, then the ship
+		PL_PS	$65d84-CODE_START,_attract		;lea $1084,a1: the ship's frame, to $65db1
+		PL_W	$65d8a-CODE_START,$6026		;bra.s $65db2: the keys
 		PL_END
 
 ; In the level 3 handler's VBL part, all registers saved.
@@ -230,10 +287,10 @@ _vbl		lea	_fields(pc),a0
 		rts
 
 ; The main loop's entry, after the title, a wave or a pause screen: time starts now.
-_enter		jsr	$58d38			;clear the screen and wait
+_enter		GCALL	$58d38			;clear the screen and wait
 		bra.b	_rebase
 
-_attract_enter	jsr	$62236			;fade in
+_attract_enter	GCALL	$62236			;fade in
 _rebase		move.l	a0,-(sp)
 		lea	_due(pc),a0
 		move.l	_fields(pc),(a0)
@@ -247,27 +304,27 @@ _pass		tst.b	$3ca07			;paused: no game time passes
 		move.l	_period(pc),d1
 		bsr.w	_pace
 		move.l	(sp)+,d1
-		jsr	$672fc			;object rotations from the frame counter
-		jsr	$60a1c			;particles: move, into the depth lists
-		jsr	$66718			;the player, the camera
-		jsr	$6249a			;the other objects, the radar list
+		GCALL	$672fc			;object rotations from the frame counter
+		GCALL	$60a1c			;particles: move, into the depth lists
+		GCALL	$66718			;the player, the camera
+		GCALL	$6249a			;the other objects, the radar list
 		bsr.w	_draw
 		beq.b	.nodraw
-		jsr	$65174			;the renderer: landscape, objects, radar
+		GCALL	$65174			;the renderer: landscape, objects, radar
 		bra.b	.drawn
 .nodraw		move.l	#$9ea6,$1022		;the radar list, as the renderer leaves it
-.drawn		jsr	$64d74			;the depth lists emptied
-		jsr	$61f32			;the wave's end
+.drawn		GCALL	$64d74			;the depth lists emptied
+		GCALL	$61f32			;the wave's end
 		bsr.w	_draw
 		beq.b	.noswap
 		move.l	a0,-(sp)
 		lea	_frames(pc),a0
 		addq.l	#1,(a0)
 		movea.l	(sp)+,a0
-		jsr	$58d8c			;show the frame
-		jsr	$58cfe			;clear the other buffer from the next VBL
-.noswap		jsr	$65a78			;the score, extra lives
-		jmp	$64356			;the ship's trail
+		GCALL	$58d8c			;show the frame
+		GCALL	$58cfe			;clear the other buffer from the next VBL
+.noswap		GCALL	$65a78			;the score, extra lives
+		GJMP	$64356			;the ship's trail
 
 ; The attract screen's frame, d0-d3 pushed by the caller: d0/d1 the angles, 4(sp) the
 ; distance. Draws the ship, shows it and clears the other buffer, unless behind.
@@ -278,14 +335,14 @@ _attract	move.l	d1,-(sp)
 		bsr.w	_draw
 		beq.b	.skip
 		lea	$1084,a1
-		jsr	$604aa			;the rotation
+		GCALL	$604aa			;the rotation
 		movem.w	8(sp),d2
 		lea	$4b638,a6
 		moveq	#0,d0
 		moveq	#0,d1
-		jsr	$6776c			;the ship
-		jsr	$58d8c			;show it
-		jsr	$58d48			;clear the other buffer
+		GCALL	$6776c			;the ship
+		GCALL	$58d8c			;show it
+		GCALL	$58d48			;clear the other buffer
 .skip		rts
 
 ; Z set when this pass does not draw. Keeps every register.
@@ -328,6 +385,7 @@ _fields		dc.l	0			;VBLs since the start (tools/pace.py reads
 _frames		dc.l	0			;these two and _period from _pass's address)
 _due		dc.l	0			;the field the next tick is due
 _period		dc.l	3			;fields a tick
+_delta		dc.l	0			;the code's distance from CODE_START
 _skips		dc.b	0			;passes in a row without drawing
 _drawn		dc.b	0			;this pass draws
 
@@ -336,3 +394,5 @@ _drawn		dc.b	0			;this pass draws
 _resload	dc.l	0
 _hiname		dc.b	"Virus.hi",0
 		even
+
+		INCLUDE	reloc.i

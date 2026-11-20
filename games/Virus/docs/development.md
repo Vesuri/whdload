@@ -75,6 +75,39 @@ python3 tools/gametime.py capture tmp/prof/f200_030.bin   # then the same on SET
 python3 tools/gametime.py compare tmp/prof/f200_030.bin tmp/prof/f200_a500.bin
 ```
 
+## The relocation table
+
+`src/reloc.i` is generated: the longs in the code area that hold a code-area address
+([internals](internals.md#code-in-fast-memory)). After any change to the walk's knowledge
+in `tools/relocmap.py` (seeds, pointer tables, ranges of lookalikes):
+
+```sh
+python3 tools/relocmap.py check                  # must print ok
+python3 tools/relocmap.py inc                    # rewrites src/reloc.i (refuses if check fails)
+python3 tools/relocmap.py refs | indirect | imm | dis ADDR [N]   # what it found
+```
+
+The walk reads only `Disk.1`. `check` also compares it with `tmp/re/coverage.pkl` when that
+exists: the executed PCs that `tools/coverage.py` collects from traced runs, from a fresh
+`tools/boot.sh` on a core that records a trace, with the original slave (`SLAVE=original`:
+traced PCs must be at the game's addresses). For example the title to the demo, then play:
+
+```sh
+python3 tools/coverage.py until 63ec8 trace 1100 key 36 1 key 36 0 wander 1500
+python3 tools/coverage.py dive 1000 0 mouse 0 50 dive 300 0 key 40 1 key 40 0 trace 200
+python3 tools/coverage.py                        # the count by step
+```
+
+N (raw `$36`) hands the demo to the player. The game is mouse-only: RMB (`JOY1_2ND_BUTTON`)
+thrust, LMB (`JOY1_FIRE_BUTTON`) fire, moving the mouse pitches and turns (up: nose up).
+`NOTRACE=1` runs the same steps without tracing, to drive a build (the relocated one stops
+on its `ILLEGAL` fill if a reference was missed; WHDLoad's core dump is then in the run's
+`dh1`).
+
+The tools that need the code's address find it with `tools/codebase.py` (the game's level
+3 vector at `$6c`). `tools/callwrites.py capture` and `tools/bench.py` with `report.py` run
+the game's code at `$57000`: use them with `SLAVE=original`.
+
 ## Traps
 
 - `ws_BaseMemSize` is 544 KB, all chip memory, so WHDLoad cannot run it on a 512 KB chip
