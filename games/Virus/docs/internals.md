@@ -15,9 +15,9 @@ offset `$286c8` (`$63ec8`).
 
 `ws_BaseMemSize` is `$88000` (544 KB). The ReadMe's reason: the render routines write past
 the 512 KB border. The game itself uses fixed chip addresses up to at least `$78000`
-(`$70000` and `$78000` stored at its entry). `ws_ExpMem` asks for an optional 416 KB
-(`$68000`) for everything the CPU alone uses; WHDLoad gives fast memory when there is some,
-else chip memory above the 544 KB, which the slave leaves unused.
+(`$70000` and `$78000` stored at its entry). `ws_ExpMem` asks for an optional 488 KB
+(`$7a000`) for everything the CPU alone uses and the drawing buffer; WHDLoad gives fast
+memory when there is some, else chip memory above the 544 KB, which the slave leaves unused.
 
 ## The frame
 
@@ -146,6 +146,47 @@ sound countdowns, the slave's patches). The demo, play from it through waves 1 t
 landscape change at wave 4) to game over, the highscore entry and a new game ran without
 stopping on the a1200-030; the a500+ runs unmoved.
 
+## Drawing in fast memory
+
+With the game moved, its main loop draws into a buffer in fast memory instead of the chip
+back buffer, and nothing waits for the blitter. The buffer is a screen in the game's layout
+(four planes of 8000 bytes, 200 lines; the 3D view from line 16, `$280`, 184 lines), in
+ExpMem 4 KB after the moved block, with 32 KB after it for the renderer's writes past a
+screen's end (what the 544 KB `ws_BaseMemSize` covers in chip memory). The game's own
+pointers say where it draws: `$1006` the screen, `$100a` its view; `$100e`/`$1012` are the
+two chip screens, and `$3ca08` says which is the back one (0: `$1012`, while the copper
+list `$3ca1e` shows `$100e`; else `$100e`, the list `$3ca42` showing `$1012`).
+
+- The main loop's swap (`jsr $1d58c` at `$28a38`): when the frame was drawn in the buffer,
+  waits until the chip back screen has left the display (a VBL since the previous swap, the
+  same point at which the original's clear could start), copies the buffer's 32000 bytes
+  there, then swaps as the game does. When the frame was drawn in chip memory (the first
+  after the main loop's entry, or after the mode was left), swaps first and copies the new
+  back screen into the buffer. Either way `$1006`/`$100a` then point at the buffer.
+- The main loop's clear request (`jsr $1d4fe` at `$28a3e`) marks a clear due. It happens,
+  by the CPU in fast memory (the view's four planes), at the next wait for the clear: the
+  renderer's (`$29c7e`) or another of the game's (`$1d53e`, `$2a5e8`, `$2a722`, `$2c022`).
+  The original's blitter clear starts at the next VBL, and the renderer waits for its end;
+  the radar's bitmap (`$292cc`), the depth-tested particles and everything else drawn
+  after the wait are drawn after either.
+- Everything else that swaps (`$1d58c`), swaps only the pointers (`$1d5da`: the score is
+  drawn into both screens that way), requests a clear (`$1d4fe`, `$1d548`) first leaves the
+  mode: the due clear, the buffer copied to the chip back screen (once hidden), the
+  pointers back to it. The attract screen, the title, the wave and highscore screens and the
+  score's update therefore run on the chip screens as in the original.
+
+Measured (tools/pace.py, the demo window): 37.8 to 46.7 fps on the a1200-030, 32.2 to
+36.0 on the a1200-fast; Enhanced framerate at 25 Hz on the a1200-030 now draws 24.8 frames
+a second of its 25.0 ticks. aprof on the a1200-030: of all time, 46.7% waits for the chip
+back screen to leave the display (the frame is ready before the next VBL: the display's
+limit), 25.2% is the copy to chip memory (about 5 ms a frame), 2.6% the CPU clear, 25.5%
+the game.
+
+Checked: at demo tick 200 the game state is the original's (pointers, the unused clear
+request and the patches apart); screenshots at the same ticks (600, 900, 1166, 1175)
+match the original's; play through waves 1 to 4, game over, the highscore screen and a new
+game drew correctly on the a1200-030.
+
 ## Game time
 
 The original steps its simulation once per main loop pass, that is once per rendered
@@ -267,7 +308,7 @@ second):
 | a500+ (68000, no fast memory) | 12.0 | 12.0 (ExpMem in chip) | | not moved |
 | a1200 (68020, no fast memory) | 22.2 | 22.2 (ExpMem in chip) | | not moved |
 | a1200-fast (68020, fast memory) | 22.2 | 25.4 | | 32.2 |
-| a1200-030, CACHE | 23.4 | 32.8 | 36.0 | 37.8 |
+| a1200-030, CACHE | 23.4 | 32.8 | 36.0 | 37.8; 46.7 drawing in fast memory |
 | a1200-030, DCACHE | | | | 38.2 |
 | a1200-030, CACHE, Enhanced framerate 25 Hz | 21.9 drawn | 24.7 drawn (100.2% of the ticks) | | |
 
