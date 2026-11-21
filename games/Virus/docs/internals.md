@@ -275,7 +275,8 @@ a slope came on the next drawn pass if the ship was still in it, or not at all: 
 framerate runs that test itself on such a pass (below).
 
 **Enhanced framerate** (CUSTOM1=1) runs one pass per tick at a fixed rate: a tick every
-2, 3 or 4 fields (CUSTOM2 0, 1, 2: 25, 16.7, 12.5 Hz), counted by a hook in the VBL.
+3, 2 or 4 fields (CUSTOM2 0, 1, 2: 16.7, 25, 12.5 Hz;
+16.7 Hz, chosen by play, is the default: the list in `_config` and the table in `_start`), counted by a hook in the VBL.
 A pass waits while it is early. When the next tick is already due too, it leaves out the
 renderer, the swap and the clear request and only simulates; at most 3 passes in a row,
 then it draws anyway. Such a pass resets the radar list as the renderer would, and runs the

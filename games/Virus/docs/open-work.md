@@ -1,7 +1,7 @@
 # Open work
 
 2.0b (20.11.2026) on John Selck's reconstructed V1.0 slave. Enhanced framerate (CUSTOM1)
-gives the game fixed-rate game time, a tick every 2, 3 or 4 fields (CUSTOM2), with drawing
+gives the game fixed-rate game time, a tick every 3, 2 or 4 fields (CUSTOM2), with drawing
 left out while behind; off, the game runs as the original
 ([internals](internals.md#game-time)). With fast memory everything the CPU alone uses runs
 from it ([internals](internals.md#cpu-only-data-in-fast-memory)), and its main loop draws into a
@@ -10,14 +10,6 @@ buffer there, so nothing waits for the blitter clear
 the a1200-030 ([internals](internals.md#measurements)). With fast memory, CUSTOM3 adds frames
 between ticks ([below](#frames-between-ticks)). It boots to the game's attract
 mode on the a500+ and the a1200, and F10 quits with `OK`.
-
-## Game speed
-
-Which rate the game was meant for is not known: 25, 16.7 or 12.5 Hz (CUSTOM2 0, 1, 2;
-0 is the default only because it comes first in the list). The originals ran the demo
-at 12.0 fps on the a500+ and 22 to 23 fps on the a1200 and the a1200-030. The A500 holds
-12.5 Hz, 97% of 16.7 Hz and 91% of 25 Hz. Choose by play; reordering the `C2` list in
-`_config` and `_speed`'s mapping in `_start` changes the default.
 
 ## Before a first release
 

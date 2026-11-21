@@ -48,7 +48,7 @@ The trace needs a core that records one: the 68000, the 68020, or the 68030 with
 model (WHDLoad leaves the MMU alone without its `MMU` option, so the game runs the same).
 The 25 s window takes a few minutes and about 7 MB of trace a field, deleted chunk by chunk.
 
-Enhanced framerate is `WHD_ARGS="CUSTOM1=1 CUSTOM2=N"` (N 0-2: 25, 16.7, 12.5 Hz), with
+Enhanced framerate is `WHD_ARGS="CUSTOM1=1 CUSTOM2=N"` (N 0-2: 16.7, 25, 12.5 Hz; 0, the default, is 16.7), with
 `CACHE` on the a1200-030. Its checks ([internals](internals.md#game-time)), each from a fresh
 `tools/boot.sh`:
 

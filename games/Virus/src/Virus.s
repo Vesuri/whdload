@@ -73,7 +73,7 @@ _expmem		dc.l	-EXP_SIZE		;ws_ExpMem: optional
 		dc.w	_config-base		;ws_config
 
 _config		dc.b	"C1:B:Enhanced framerate;"
-		dc.b	"C2:L:Game speed:25 Hz,16.7 Hz,12.5 Hz;"
+		dc.b	"C2:L:Game speed:16.7 Hz,25 Hz,12.5 Hz;"
 		dc.b	"C3:B:Frames between ticks",0
 _name		dc.b	"Virus",0
 _copy		dc.b	"1988 D.J. Braben / Firebird",0
@@ -125,13 +125,17 @@ _start		lea	_resload(pc),a1
 
 		move.l	_enhanced(pc),d0
 		beq.b	.orig
-		move.l	_speed(pc),d0		;game speed 0-2: a tick every 2-4 fields
+		move.l	_speed(pc),d0		;game speed 0-2: 16.7, 25, 12.5 Hz
 		cmp.l	#2,d0
 		bls.b	.speed
 		moveq	#0,d0
-.speed		addq.l	#2,d0
+.speed		moveq	#0,d1
+		move.b	.fields(pc,d0.l),d1	;a tick every 3, 2 or 4 fields
 		lea	_period(pc),a0
-		move.l	d0,(a0)
+		move.l	d1,(a0)
+		bra.b	.patch
+.fields		dc.b	3,2,4,0
+.patch
 		lea	_pl_enhanced(pc),a0
 		lea	CODE_START,a1
 		add.l	_delta(pc),a1

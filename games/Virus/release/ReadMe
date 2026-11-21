@@ -31,8 +31,8 @@
 
 	Highscores are saved to HD.
 
-	CUSTOM1=1: Enhanced framerate. CUSTOM2 sets its game speed: 0 25 Hz
-	(the default), 1 16.7 Hz, 2 12.5 Hz. Unset, the game runs as before.
+	CUSTOM1=1: Enhanced framerate. CUSTOM2 sets its game speed: 0 16.7 Hz
+	(the default), 1 25 Hz, 2 12.5 Hz. Unset, the game runs as before.
 	CUSTOM3=1: frames between ticks, with CUSTOM1=1 and FastMem: frames
 	interpolated between the game's steps, up to 50 a second.
 
