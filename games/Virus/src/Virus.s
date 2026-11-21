@@ -30,7 +30,20 @@ CHIP_END	= $4a546
 FB_OFF		= (MOVE_END-MOVE_START+$1fff)&-$1000	;from ExpMem, 4 KB after the block
 FB_SIZE		= $10000
 ROWS_OFF	= FB_OFF+FB_SIZE			;the chip screens' row flags, 2 * ROWS
-EXP_SIZE	= FB_OFF+FB_SIZE+$1000			;WHDLoad: whole 4 KB
+; Frames between ticks (CUSTOM3): the depth-list entries of the last two ticks by key
+; (docs/internals.md, "Frames between ticks").
+KEYS		= 1024				;particle slot * 2 + 0/1, K_OBJ +, K_LIGHT +, K_SHIP
+RECS		= 1024				;entries a tick: at most 375 * 2 + 128 + 128 + 1
+BUCKET		= 3276				;a depth list's bucket
+STG_OFF		= ROWS_OFF+$1000		;the staging lists: 10 buckets
+ENT_OFF		= STG_OFF+$8000			;the entries by key: two tables of KEYS * 32
+TAG_OFF		= ENT_OFF+2*KEYS*32		;their tags: tick.w, size.b, bucket.b
+USE_OFF		= TAG_OFF+2*KEYS*4		;the tick a last tick's entry was paired in
+REC_OFF		= USE_OFF+KEYS*2		;the tick's records: two lists of RECS * 12
+GONE_OFF	= REC_OFF+2*RECS*12		;the tick a slot was moved away in: 384 + 128
+BTV_OFF		= GONE_OFF+(384+128)*2		;and BTV_SIZE bytes of the slave's own (BV_)
+BT_END		= BTV_OFF+$200
+EXP_SIZE	= (BT_END+$fff)&-$1000			;WHDLoad: whole 4 KB
 SCREEN		= 4*8000				;the four planes
 VIEW		= $280					;the 3D view: 16 lines down
 VIEW_SIZE	= 184*40				;its 184 lines a plane
@@ -60,7 +73,8 @@ _expmem		dc.l	-EXP_SIZE		;ws_ExpMem: optional
 		dc.w	_config-base		;ws_config
 
 _config		dc.b	"C1:B:Enhanced framerate;"
-		dc.b	"C2:L:Game speed:25 Hz,16.7 Hz,12.5 Hz",0
+		dc.b	"C2:L:Game speed:25 Hz,16.7 Hz,12.5 Hz;"
+		dc.b	"C3:B:Frames between ticks",0
 _name		dc.b	"Virus",0
 _copy		dc.b	"1988 D.J. Braben / Firebird",0
 _info		dc.b	"installed by John Selck",10
@@ -119,6 +133,16 @@ _start		lea	_resload(pc),a1
 		lea	_period(pc),a0
 		move.l	d0,(a0)
 		lea	_pl_enhanced(pc),a0
+		lea	CODE_START,a1
+		add.l	_delta(pc),a1
+		move.l	_resload(pc),a2
+		jsr	resload_Patch(a2)
+		move.l	_between(pc),d0		;frames between ticks: with fast memory too
+		beq.b	.orig
+		move.l	_fbuf(pc),d0
+		beq.b	.orig
+		bsr.w	_btinit
+		lea	_pl_between(pc),a0
 		lea	CODE_START,a1
 		add.l	_delta(pc),a1
 		move.l	_resload(pc),a2
@@ -342,6 +366,10 @@ _sr_vbl		equ	*
 
 ; The main loop's entry, after the title, a wave or a pause screen: time starts now.
 _enter		GCALL	$58d38			;clear the screen and wait
+		move.l	a0,-(sp)
+		lea	_okcur(pc),a0
+		sf	(a0)			;no last tick to draw from
+		movea.l	(sp)+,a0
 		bra.b	_rebase
 
 _attract_enter	GCALL	$62236			;fade in
@@ -363,12 +391,15 @@ _sr_pass	equ	*
 		lea	_shipent(pc),a0
 		clr.l	(a0)			;not in the lists yet
 		movea.l	(sp)+,a0
+		bsr.w	_btbegin		;frames between ticks: record the entries
 		GCALL	$672fc			;object rotations from the frame counter
 		GCALL	$60a1c			;particles: move, into the depth lists
 		GCALL	$66718			;the player, the camera
 		GCALL	$6249a			;the other objects, the radar list
+		bsr.w	_btcapture
 		bsr.w	_draw
 		beq.b	.nodraw
+		bsr.w	_btframes		;the frames between the last tick and this one
 		GCALL	$65174			;the renderer: landscape, objects, radar
 		bra.b	.drawn
 .nodraw		move.l	#$9ea6,($1022).l	;the radar list, as the renderer leaves it
@@ -394,6 +425,8 @@ _death		move.l	d1,-(sp)
 		move.l	_period(pc),d1
 		bsr.w	_pace
 		move.l	a0,-(sp)
+		lea	_rec(pc),a0
+		sf	(a0)			;the pass's entries are not a whole tick
 		cmp.w	#50,($c9f6).l		;the pass count
 _sr_dcount	equ	*
 		bcs.b	.paced
@@ -458,7 +491,17 @@ _shipemit	move.l	#$673aa,a2		;the replaced instructions: the object drawer
 		lea	_shipent(pc),a0
 		move.l	a1,(a0)
 		movea.l	(sp)+,a0
-		rts
+		bsr.w	_recording		;frames between ticks: its record
+		beq.b	.r
+		movem.l	d0-d3/a0,-(sp)
+		move.w	#K_SHIP,d0
+		move.w	d0,d1
+		move.w	d5,d2
+		moveq	#32,d3
+		movea.l	a1,a0
+		bsr.w	_record
+		movem.l	(sp)+,d0-d3/a0
+.r		rts
 
 ; One row of the drawer's rotation ($67454): \1 = row (a1)+ . (d0,d1,d2), d6 used.
 SROW		MACRO
@@ -523,6 +566,692 @@ _shiptest	movem.l	d0-d7/a0-a6,-(sp)
 .next		dbf	d7,.vertex
 .done		movem.l	(sp)+,d0-d7/a0-a6
 		rts
+
+;======================================================================
+; Frames between ticks (CUSTOM3=1, with Enhanced framerate and fast memory): on the fields
+; between the last tick's frame and this one's, frames interpolated between the two ticks
+; (docs/internals.md, "Frames between ticks"). Hooks at the simulation's depth-list stores
+; record each entry: its key (from its slot now), the key it had on the last tick (the same
+; slot or, right after a removal's move, the last slot's), its bucket, size and place.
+; After the simulation the entries are copied by key into this tick's table; the other
+; table holds the last tick's. A frame between builds staging lists from the two, points
+; the renderer at them with the camera blended, and restores or holds back everything the
+; renderer would change in the game state.
+
+K_OBJ		= 768
+K_LIGHT		= 896
+K_SHIP		= 1023
+BV_STS		= 0				;the staging buckets' starts and ends (10 * 8)
+BV_STP		= 80				;their write pointers and ends
+BV_TMP		= 160				;a blended entry (32)
+BV_TAB		= 192				;the game's list tables, saved (160)
+BV_GV		= 352				;the game's variables, saved (26)
+
+_pl_between	PL_START
+		PL_PSS	$60aa4-CODE_START,_hdot,2	;move.l d4,(a4); movem.w d0-d1,4(a4)
+		PL_PS	$60b12-CODE_START,_hdot2	;move.l #$5788a,(a4)
+		PL_PSS	$60b48-CODE_START,_hground,2	;move.l d4,(a4); movem.w d0/d5,4(a4)
+		PL_PSS	$60bbc-CODE_START,_hshard,2	;lea $673aa(pc),a2; movem.l a2/a5,(a1)
+		PL_PSS	$60c1e-CODE_START,_hpmove,4	;movem.w (a3),d0-d6/a4-a5; ...,-14(a6)
+		PL_PSS	$625ac-CODE_START,_hobject,2	;lea $673aa(pc),a2; movem.l a2/a5,(a1)
+		PL_PSS	$62626-CODE_START,_homove,2	;movem.w (a3),d0-d7/a4-a5; ...,(a6)
+		PL_PS	$634dc-CODE_START,_hlight	;move.l #$63982,(a1)
+		PL_PS	$64b7e-CODE_START,_rsound	;the renderer's sounds: jsr $58258
+		PL_PS	$64ba8-CODE_START,_rsound
+		PL_PS	$64cbc-CODE_START,_rsound
+		PL_PS	$64cce-CODE_START,_rsound
+		PL_PS	$64fca-CODE_START,_rsound
+		PL_PS	$6501c-CODE_START,_rsmoke	;its smoke: jsr $6147e
+		PL_END
+
+; At install: the tables' places, the tags and marks cleared, the staging buckets.
+_btinit		movem.l	d0-d2/a0-a1,-(sp)
+		move.l	_fbuf(pc),d1
+		sub.l	#FB_OFF,d1		;ExpMem
+		lea	_ecur(pc),a1
+		move.l	d1,d0
+		add.l	#ENT_OFF,d0
+		move.l	d0,(a1)+		;_ecur
+		add.l	#KEYS*32,d0
+		move.l	d0,(a1)+		;_eprv
+		move.l	d1,d0
+		add.l	#TAG_OFF,d0
+		move.l	d0,(a1)+		;_tcur
+		add.l	#KEYS*4,d0
+		move.l	d0,(a1)+		;_tprv
+		move.l	d1,d0
+		add.l	#REC_OFF,d0
+		move.l	d0,(a1)+		;_rcur
+		add.l	#RECS*12,d0
+		move.l	d0,(a1)+		;_rprv
+		move.l	d0,(a1)+		;_recp
+		move.l	d0,(a1)+		;_recend
+		move.l	d0,(a1)+		;_rpend: the last tick's list empty
+		move.l	d1,d0
+		add.l	#USE_OFF,d0
+		move.l	d0,(a1)+		;_use
+		move.l	d1,d0
+		add.l	#GONE_OFF,d0
+		move.l	d0,(a1)+		;_gone
+		move.l	d1,d0
+		add.l	#BTV_OFF,d0
+		move.l	d0,(a1)+		;_btv
+		move.l	d1,a0
+		add.l	#TAG_OFF,a0
+		move.w	#(BT_END-TAG_OFF)/4-1,d2
+.clr		clr.l	(a0)+
+		dbf	d2,.clr
+		move.l	d1,d0
+		add.l	#STG_OFF,d0
+		move.l	_btv(pc),a0
+		moveq	#10-1,d2
+.bucket		move.l	d0,(a0)+		;BV_STS
+		add.l	#BUCKET,d0
+		move.l	d0,(a0)+
+		dbf	d2,.bucket
+		lea	_tick(pc),a0
+		move.w	#2,(a0)			;the tags are 0: never the last tick's
+		lea	_bt(pc),a0
+		st	(a0)
+		movem.l	(sp)+,d0-d2/a0-a1
+		rts
+
+; Z clear while the pass records. Keeps every register.
+_recording	move.l	a0,-(sp)
+		lea	_rec(pc),a0
+		tst.b	(a0)
+		movea.l	(sp)+,a0
+		rts
+
+; Records an entry: d0 its key, d1 its key on the last tick (-1: none), d2 its bucket,
+; d3 its size, a0 the entry. Keeps every register.
+_record		movem.l	a1-a2,-(sp)
+		lea	_recp(pc),a1
+		movea.l	(a1),a2
+		cmpa.l	_recend(pc),a2
+		bcc.b	.full
+		move.w	d0,(a2)+
+		move.w	d1,(a2)+
+		move.w	d2,(a2)+
+		move.w	d3,(a2)+
+		move.l	a0,(a2)+
+		move.l	a2,(a1)
+.full		movem.l	(sp)+,a1-a2
+		rts
+
+; The keys of particle slot d7, part d1 (0 the dot or shard, 1 the ground dot): d0 now,
+; d1 on the last tick (-1: none).
+_pkey		movem.l	d2/a0,-(sp)
+		move.w	d7,d0
+		add.w	d0,d0
+		add.w	d1,d0
+		move.w	d7,d2
+		cmp.w	_pmd(pc),d2
+		bne.b	.own
+		move.w	_pmo(pc),d2		;moved here this tick from the last slot
+		bra.b	.key
+.own		move.l	_gone(pc),a0
+		add.w	d2,d2
+		move.w	(a0,d2.w),d2
+		cmp.w	_tick(pc),d2
+		beq.b	.none			;its record was moved away this tick
+		move.w	d7,d2
+.key		add.w	d2,d2
+		add.w	d2,d1
+		bra.b	.done
+.none		moveq	#-1,d1
+.done		movem.l	(sp)+,d2/a0
+		rts
+
+; The keys of the object in hand ($c9f2) from d1 (K_OBJ, K_LIGHT): d0 now, d1 on the last
+; tick (-1: none).
+_okey		movem.l	d2/a0,-(sp)
+		move.l	_pc9ec(pc),a0
+		move.w	$c9f2-$c9ec(a0),d2
+		move.w	d2,d0
+		add.w	d1,d0
+		cmp.w	_omd(pc),d2
+		bne.b	.own
+		move.w	_omo(pc),d2
+		bra.b	.key
+.own		move.l	_gone(pc),a0
+		lea	384*2(a0),a0
+		add.w	d2,d2
+		move.w	(a0,d2.w),d2
+		cmp.w	_tick(pc),d2
+		beq.b	.none
+		move.l	_pc9ec(pc),a0
+		move.w	$c9f2-$c9ec(a0),d2
+.key		add.w	d2,d1
+		bra.b	.done
+.none		moveq	#-1,d1
+.done		movem.l	(sp)+,d2/a0
+		rts
+
+; A particle's dot ($60aa4, $60b12): d7 its slot, d6 the bucket, a4 the entry.
+_hdot		move.l	d4,(a4)
+		movem.w	d0-d1,4(a4)
+_pdot		bsr.w	_recording
+		beq.b	.r
+		movem.l	d0-d3/a0,-(sp)
+		moveq	#0,d1
+		bsr.w	_pkey
+		move.w	d6,d2
+		moveq	#8,d3
+		movea.l	a4,a0
+		bsr.w	_record
+		movem.l	(sp)+,d0-d3/a0
+.r		rts
+
+_hdot2		move.l	d0,-(sp)
+		move.l	#$5788a,d0		;the dot of a dot and its ground dot
+		add.l	_delta(pc),d0
+		move.l	d0,(a4)
+		move.l	(sp)+,d0
+		bra.b	_pdot
+
+; Its ground dot ($60b48).
+_hground	move.l	d4,(a4)
+		movem.w	d0/d5,4(a4)
+		bsr.w	_recording
+		beq.b	.r
+		movem.l	d0-d3/a0,-(sp)
+		moveq	#1,d1
+		bsr.w	_pkey
+		move.w	d6,d2
+		moveq	#8,d3
+		movea.l	a4,a0
+		bsr.w	_record
+		movem.l	(sp)+,d0-d3/a0
+.r		rts
+
+; A shard ($60bbc): d7 its slot, d5 the bucket, a1 the entry.
+_hshard		move.l	#$673aa,a2		;the object drawer
+		add.l	_delta(pc),a2
+		movem.l	a2/a5,(a1)
+		bsr.w	_recording
+		beq.b	.r
+		movem.l	d0-d3/a0,-(sp)
+		moveq	#0,d1
+		bsr.w	_pkey
+		move.w	d5,d2
+		moveq	#32,d3
+		movea.l	a1,a0
+		bsr.w	_record
+		movem.l	(sp)+,d0-d3/a0
+.r		rts
+
+; An object ($625ac): $c9f2 its slot, d5 the bucket, a1 the entry.
+_hobject	move.l	#$673aa,a2
+		add.l	_delta(pc),a2
+		movem.l	a2/a5,(a1)
+		bsr.w	_recording
+		beq.b	.r
+		movem.l	d0-d3/a0,-(sp)
+		move.w	#K_OBJ,d1
+		bsr.w	_okey
+		move.w	d5,d2
+		moveq	#32,d3
+		movea.l	a1,a0
+		bsr.w	_record
+		movem.l	(sp)+,d0-d3/a0
+.r		rts
+
+; The attractor's lightning ($634dc): its object's slot, d6 the bucket, a1 the entry.
+_hlight		move.l	d0,-(sp)
+		move.l	#$63982,d0		;its plotter
+		add.l	_delta(pc),d0
+		move.l	d0,(a1)
+		move.l	(sp)+,d0
+		bsr.w	_recording
+		beq.b	.r
+		movem.l	d0-d3/a0,-(sp)
+		move.w	#K_LIGHT,d1
+		bsr.w	_okey
+		move.w	d6,d2
+		moveq	#16,d3
+		movea.l	a1,a0
+		bsr.w	_record
+		movem.l	(sp)+,d0-d3/a0
+.r		rts
+
+; A particle's removal ($60c1e): the last record (a3) into the freed slot d7, handled next.
+_hpmove		movem.w	(a3),d0-d6/a4-a5
+		movem.w	d0-d6/a4-a5,-14(a6)
+		movem.l	d0/a0-a1,-(sp)
+		move.l	_pc9ec(pc),a1
+		lea	_pmd(pc),a0
+		move.w	d7,(a0)+		;this slot's entries are now the last slot's
+		move.w	(a1),d0			;the last slot: the count now
+		move.w	d0,(a0)			;_pmo
+		move.l	_gone(pc),a0
+		add.w	d0,d0
+		move.w	_tick(pc),(a0,d0.w)	;nothing left there
+		movem.l	(sp)+,d0/a0-a1
+		rts
+
+; An object's removal ($62626): the last record into the slot in hand ($c9f2).
+_homove		movem.w	(a3),d0-d7/a4-a5
+		movem.w	d0-d7/a4-a5,(a6)
+		movem.l	d0/a0-a1,-(sp)
+		move.l	_pc9ec(pc),a1
+		lea	_omd(pc),a0
+		move.w	$c9f2-$c9ec(a1),(a0)+
+		move.w	$c9ee-$c9ec(a1),d0
+		move.w	d0,(a0)			;_omo
+		move.l	_gone(pc),a0
+		lea	384*2(a0),a0
+		add.w	d0,d0
+		move.w	_tick(pc),(a0,d0.w)
+		movem.l	(sp)+,d0/a0-a1
+		rts
+
+; The pass's start: this tick's table becomes the last tick's, recording starts.
+_btbegin	move.l	a0,-(sp)
+		lea	_bt(pc),a0
+		tst.b	(a0)
+		movea.l	(sp)+,a0
+		beq.b	.r
+		movem.l	d0/a0-a1,-(sp)
+		lea	_ecur(pc),a0
+		move.l	(a0),d0			;the entries
+		move.l	4(a0),(a0)
+		move.l	d0,4(a0)
+		move.l	8(a0),d0		;their tags
+		move.l	12(a0),8(a0)
+		move.l	d0,12(a0)
+		move.l	24(a0),32(a0)		;_rpend: the last tick's list's end
+		move.l	16(a0),d0		;the records
+		move.l	20(a0),16(a0)
+		move.l	d0,20(a0)
+		move.l	16(a0),d0
+		move.l	d0,24(a0)		;_recp
+		add.l	#RECS*12,d0
+		move.l	d0,28(a0)		;_recend
+		lea	_camc(pc),a0
+		lea	_camp(pc),a1
+		move.l	(a0)+,(a1)+
+		move.w	(a0),(a1)
+		lea	_okcur(pc),a0
+		move.b	(a0),1(a0)		;_okprv
+		sf	(a0)
+		st	2(a0)			;_rec
+		lea	_tick(pc),a0
+		addq.w	#1,(a0)+
+		move.w	#-1,(a0)+		;_pmd: no move yet
+		addq.l	#2,a0
+		move.w	#-1,(a0)		;_omd
+		movem.l	(sp)+,d0/a0-a1
+.r		rts
+
+; After the simulation: the entries copied by key into this tick's table, with the camera.
+_btcapture	movem.l	d0-d4/a0-a3,-(sp)
+		lea	_rec(pc),a0
+		tst.b	(a0)
+		beq.w	.done			;not a whole tick (the death sequence ran)
+		sf	(a0)
+		movea.l	_rcur(pc),a2
+		movea.l	_recp(pc),a3
+		move.w	_tick(pc),d4
+.rec		cmpa.l	a3,a2
+		bcc.b	.cam
+		movem.w	(a2)+,d0-d3		;key, last key, bucket, size
+		movea.l	(a2)+,a0
+		move.w	d0,d1
+		lsl.w	#5,d1
+		movea.l	_ecur(pc),a1
+		adda.w	d1,a1
+		move.w	d3,d1
+		lsr.w	#2,d1
+		subq.w	#1,d1
+.copy		move.l	(a0)+,(a1)+
+		dbf	d1,.copy
+		movea.l	_tcur(pc),a1
+		add.w	d0,d0
+		add.w	d0,d0
+		adda.w	d0,a1
+		move.w	d4,(a1)+		;the tick
+		move.b	d3,(a1)+		;the size
+		move.b	d2,(a1)			;the bucket
+		bra.b	.rec
+.cam		move.l	_gv(pc),a0
+		lea	$107e-$1000(a0),a0
+		lea	_camc(pc),a1
+		move.l	(a0)+,(a1)+
+		move.w	(a0),(a1)
+		lea	_okcur(pc),a0
+		st	(a0)
+.done		movem.l	(sp)+,d0-d4/a0-a3
+		rts
+
+; Before the renderer of a pass that draws: frame k = 1 to P-1 at alpha k/P, each while
+; its field (the tick's field plus k-1) has not gone, when the last pass recorded a tick.
+_btframes	movem.l	d0-d7/a0-a6,-(sp)
+		move.b	_bt(pc),d0
+		beq.w	.done
+		move.b	_okprv(pc),d0
+		beq.w	.done
+		move.l	_period(pc),d6
+		moveq	#1,d7
+.frame		cmp.l	d6,d7
+		bcc.w	.done
+		move.l	_fields(pc),d0
+		sub.l	_due(pc),d0
+		add.l	d6,d0			;fields since this tick was due
+		cmp.l	d7,d0
+		bcc.b	.next
+		move.l	d7,d0
+		swap	d0
+		lsr.l	#1,d0
+		divu.w	d6,d0
+		move.w	d0,d5			;alpha in 1/32768
+		move.w	d7,d0
+		add.w	d0,d0
+		cmp.w	d6,d0
+		scc	d4			;nearer this tick (alpha >= 1/2)
+	IFD	BTCHECK
+		moveq	#0,d5			;the check build: alpha 0, the last tick's frame
+		sf	d4
+	ENDC
+		bsr.w	_btbuild
+		bsr.w	_btrender
+		lea	_frames(pc),a0
+		addq.l	#1,(a0)+
+		addq.l	#1,(a0)			;_bframes
+		bsr.w	_show
+		bsr.w	_request
+.next		addq.l	#1,d7
+		bra.b	.frame
+.done		movem.l	(sp)+,d0-d7/a0-a6
+		rts
+
+; a + (b - a) * alpha: (a1)+ the last tick's word, (a2)+ this tick's, to (a3)+; d5 alpha.
+BLENDW		MACRO
+		move.w	(a1)+,d0
+		move.w	(a2)+,d1
+		sub.w	d0,d1
+		muls.w	d5,d1
+		add.l	d1,d1
+		swap	d1
+		add.w	d1,d0
+		move.w	d0,(a3)+
+		ENDM
+
+; The staging lists at alpha d5, nearer this tick if d4: the pairs blended, the unpaired
+; as on the nearer tick.
+_btbuild	movem.l	d0-d7/a0-a6,-(sp)
+		move.l	_btv(pc),a0
+		lea	BV_STP(a0),a1
+		moveq	#20-1,d0
+.init		move.l	(a0)+,(a1)+
+		dbf	d0,.init
+		move.w	_tick(pc),d7
+		subq.w	#1,d7			;the last tick
+		movea.l	_rcur(pc),a4
+.cur		cmpa.l	_recp(pc),a4
+		bcc.w	.last
+		movem.w	(a4)+,d0-d3		;key, last key, bucket, size
+		addq.l	#4,a4
+		movea.l	_ecur(pc),a2
+		move.w	d0,d6
+		lsl.w	#5,d6
+		adda.w	d6,a2			;its entry now
+		tst.w	d1
+		bmi.b	.alone
+		movea.l	_tprv(pc),a1
+		move.w	d1,d6
+		add.w	d6,d6
+		add.w	d6,d6
+		adda.w	d6,a1
+		cmp.w	(a1)+,d7		;made on the last tick,
+		bne.b	.alone
+		cmp.b	(a1)+,d3		;the same size
+		bne.b	.alone
+		moveq	#0,d6
+		move.b	(a1),d6			;its bucket then
+		movea.l	_use(pc),a1
+		move.w	d1,d0
+		add.w	d0,d0
+		move.w	_tick(pc),(a1,d0.w)	;paired
+		movea.l	_eprv(pc),a1
+		lsl.w	#5,d1
+		adda.w	d1,a1			;its entry on the last tick
+		tst.b	d4
+		bne.b	.blend
+		move.w	d6,d2
+.blend		bsr.w	_blend
+		bra.b	.cur
+.alone		tst.b	d4
+		beq.b	.cur			;new: from the frames nearer this tick
+		movea.l	a2,a0
+		bsr.w	_append
+		bra.b	.cur
+.last		tst.b	d4
+		bne.b	.done
+		movea.l	_rprv(pc),a4		;nearer the last tick: its unpaired ones
+		move.w	_tick(pc),d7
+.prv		cmpa.l	_rpend(pc),a4
+		bcc.b	.done
+		movem.w	(a4)+,d0-d3
+		addq.l	#4,a4
+		movea.l	_use(pc),a1
+		move.w	d0,d6
+		add.w	d6,d6
+		cmp.w	(a1,d6.w),d7
+		beq.b	.prv
+		movea.l	_eprv(pc),a0
+		lsl.w	#5,d0
+		adda.w	d0,a0
+		bsr.w	_append
+		bra.b	.prv
+.done		movem.l	(sp)+,d0-d7/a0-a6
+		rts
+
+; Appends the entry a0 of d3 bytes to staging bucket d2 (its offset, 8 a bucket), if it
+; fits. Keeps every register.
+_append		movem.l	d0/a0-a3,-(sp)
+		move.l	_btv(pc),a1
+		lea	BV_STP(a1,d2.w),a1
+		movea.l	(a1),a2
+		lea	(a2,d3.w),a3
+		cmpa.l	4(a1),a3
+		bhi.b	.full
+		move.l	a3,(a1)
+		move.w	d3,d0
+		lsr.w	#2,d0
+		subq.w	#1,d0
+.copy		move.l	(a0)+,(a2)+
+		dbf	d0,.copy
+.full		movem.l	(sp)+,d0/a0-a3
+		rts
+
+; Blends the last tick's entry a1 with this tick's a2 (d3 bytes) at alpha d5 and appends
+; it; d2 the bucket of a dot or the lightning, d4 nearer this tick. A 3D entry's matrix
+; is blended unless a word moves more than 16384 (another matrix, not a turn): then the
+; nearer one's; its bucket comes from the blended depth, as the writers compute it.
+_blend		movem.l	d0-d3/d6/a0-a4,-(sp)
+		move.l	_btv(pc),a3
+		lea	BV_TMP(a3),a3
+		movea.l	a1,a4
+		tst.b	d4
+		beq.b	.near
+		movea.l	a2,a4			;the nearer tick's entry
+.near		move.l	(a4),(a3)+		;the plotter
+		addq.l	#4,a1
+		addq.l	#4,a2
+		cmp.w	#16,d3
+		beq.w	.light
+		bcs.w	.dot
+		move.l	4(a4),(a3)+		;the model
+		addq.l	#4,a1
+		addq.l	#4,a2
+		movem.l	a1-a2,-(sp)
+		moveq	#9-1,d6
+.test		move.w	(a2)+,d0
+		sub.w	(a1)+,d0
+		bpl.b	.abs
+		neg.w	d0
+.abs		cmp.w	#16384,d0
+		bhi.b	.other
+		dbf	d6,.test
+		movem.l	(sp)+,a1-a2
+		moveq	#9-1,d6
+.mat		BLENDW
+		dbf	d6,.mat
+		bra.b	.xyz
+.other		movem.l	(sp)+,a1-a2
+		lea	8(a4),a4
+		moveq	#9-1,d6
+.copy		move.w	(a4)+,(a3)+
+		dbf	d6,.copy
+		lea	18(a1),a1
+		lea	18(a2),a2
+.xyz		BLENDW
+		BLENDW
+		BLENDW
+		move.w	-2(a3),d2		;the depth
+		sub.w	#2304,d2
+		asr.w	#5,d2
+		and.w	#-8,d2
+		cmp.w	#80,d2
+		bcs.b	.add
+		tst.w	d2
+		bmi.b	.near0
+		moveq	#72,d2
+		bra.b	.add
+.near0		moveq	#0,d2
+		bra.b	.add
+.light		moveq	#6-1,d6
+.lw		BLENDW
+		dbf	d6,.lw
+		bra.b	.add
+.dot		BLENDW
+		BLENDW
+.add		move.l	_btv(pc),a0
+		lea	BV_TMP(a0),a0
+		bsr.w	_append
+		movem.l	(sp)+,d0-d3/d6/a0-a4
+		rts
+
+; A frame between at alpha d5: the renderer on the staging lists at the blended camera and
+; the nearer tick's counter (d4: this tick's); the game's list tables, camera, counter, RNG,
+; radar list ends, the ship's terrain contact and the fuel warning's latch restored after
+; it; its sounds and smoke held back (_inb).
+_btrender	movem.l	d0-d7/a0-a6,-(sp)
+		move.l	#$64d94,a0		;the write pointers and ends, then the starts
+		add.l	_delta(pc),a0
+		move.l	_btv(pc),a4
+		lea	BV_TAB(a4),a1
+		moveq	#40-1,d0
+.save		move.l	(a0)+,(a1)+
+		dbf	d0,.save
+		lea	-160(a0),a0
+		lea	BV_STP(a4),a1
+		moveq	#20-1,d0
+.stp		move.l	(a1)+,(a0)+		;the staging lists'
+		dbf	d0,.stp
+		lea	BV_STS(a4),a1
+		moveq	#20-1,d0
+.sts		move.l	(a1)+,(a0)+
+		dbf	d0,.sts
+		move.l	_gv(pc),a5
+		lea	$101a-$1000(a5),a0	;the RNG, the radar list's ends
+		lea	BV_GV(a4),a1
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		lea	$107e-$1000(a5),a0	;the camera
+		move.l	(a0)+,(a1)+
+		move.w	(a0),(a1)+
+		move.l	_p3ca0f(pc),a0
+		move.b	(a0),(a1)+		;the ship's terrain contact
+		move.b	$3ca17-$3ca0f(a0),(a1)+	;the fuel warning's latch
+		move.l	_pc9ec(pc),a0
+		move.w	$c9f4-$c9ec(a0),(a1)+	;the counter
+		lea	_camp(pc),a1
+		lea	_camc(pc),a2
+		lea	$107e-$1000(a5),a3
+		BLENDW
+		BLENDW
+		BLENDW
+		move.l	_pc9ec(pc),a0
+		tst.b	d4
+		bne.b	.count
+		subq.w	#1,$c9f4-$c9ec(a0)	;the counter: the nearer tick's (its blinks)
+.count		lea	_inb(pc),a0
+		st	(a0)
+		GCALL	$65174			;the renderer
+		lea	_inb(pc),a0
+		sf	(a0)
+		move.l	#$64d94,a0
+		add.l	_delta(pc),a0
+		move.l	_btv(pc),a4
+		lea	BV_TAB(a4),a1
+		moveq	#40-1,d0
+.rtab		move.l	(a1)+,(a0)+
+		dbf	d0,.rtab
+		move.l	_gv(pc),a5
+		lea	$101a-$1000(a5),a0
+		lea	BV_GV(a4),a1
+		move.l	(a1)+,(a0)+
+		move.l	(a1)+,(a0)+
+		move.l	(a1)+,(a0)+
+		move.l	(a1)+,(a0)+
+		lea	$107e-$1000(a5),a0
+		move.l	(a1)+,(a0)+
+		move.w	(a1)+,(a0)
+		move.l	_p3ca0f(pc),a0
+		move.b	(a1)+,(a0)
+		move.b	(a1)+,$3ca17-$3ca0f(a0)
+		move.l	_pc9ec(pc),a0
+		move.w	(a1)+,$c9f4-$c9ec(a0)
+		movem.l	(sp)+,d0-d7/a0-a6
+		rts
+
+; The renderer's sound starts and smoke, held back in a frame between.
+_rsound		bsr.b	_inbetween
+		bne.b	.no
+		GJMP	$58258
+.no		rts
+
+_rsmoke		bsr.b	_inbetween
+		bne.b	.no
+		GJMP	$6147e
+.no		rts
+
+; Z clear in a frame between. Keeps every register.
+_inbetween	move.l	a0,-(sp)
+		lea	_inb(pc),a0
+		tst.b	(a0)
+		movea.l	(sp)+,a0
+		rts
+
+_ecur		dc.l	0			;the entries by key: this tick's,
+_eprv		dc.l	0			;the last tick's
+_tcur		dc.l	0			;their tags
+_tprv		dc.l	0
+_rcur		dc.l	0			;the records: this tick's,
+_rprv		dc.l	0			;the last tick's
+_recp		dc.l	0			;this tick's next
+_recend		dc.l	0			;and its end
+_rpend		dc.l	0			;the last tick's end
+_use		dc.l	0			;the tick a last tick's entry was paired in
+_gone		dc.l	0			;the tick a slot's record was moved away in
+_btv		dc.l	0			;BV_
+_camp		dc.w	0,0,0			;the camera on the last tick,
+_camc		dc.w	0,0,0			;this tick
+_tick		dc.w	0			;the ticks recorded
+_pmd		dc.w	-1			;the slot a particle moved into this tick,
+_pmo		dc.w	0			;the slot it came from
+_omd		dc.w	-1			;the same for the objects
+_omo		dc.w	0
+_okcur		dc.b	0			;this tick's table is a whole tick
+_okprv		dc.b	0			;the last tick's
+_rec		dc.b	0			;recording
+_bt		dc.b	0			;frames between ticks on
+_inb		dc.b	0			;in a frame between
+		even
 
 ; Z set when this pass does not draw. Keeps every register.
 _draw		move.l	a0,-(sp)
@@ -843,6 +1572,7 @@ _gv		dc.l	$1000			;the game's variables, $3ca08 and $606ac,
 _p3ca08		dc.l	$3ca08			;where they are (relocated with _srel)
 _p606ac		dc.l	$606ac
 _p3ca0f		dc.l	$3ca0f
+_pc9ec		dc.l	$c9ec			;the particle and object counts, the object in hand
 _shipent	dc.l	0			;the ship's entry this pass (0: none)
 _swapped	dc.l	0			;_fields at the main loop's last swap
 _lastrows	dc.l	0			;the row flags of the screen copied last
@@ -854,9 +1584,12 @@ _tags		dc.l	WHDLTAG_CUSTOM1_GET
 _enhanced	dc.l	0
 		dc.l	WHDLTAG_CUSTOM2_GET
 _speed		dc.l	0
+		dc.l	WHDLTAG_CUSTOM3_GET
+_between	dc.l	0
 		dc.l	TAG_END
 _fields		dc.l	0			;VBLs since the start (tools/pace.py reads
-_frames		dc.l	0			;these two and _period from _pass's address)
+_frames		dc.l	0			;these, _bframes and _period from _pass's address)
+_bframes	dc.l	0			;of them frames between ticks
 _due		dc.l	0			;the field the next tick is due
 _period		dc.l	3			;fields a tick
 _delta		dc.l	0			;the distance moved (0: not moved)
@@ -870,7 +1603,7 @@ _srel		dc.w	_sr_flush-8-base,_sr_flush-4-base,_sr_vbl-4-base,_sr_pass-4-base
 		dc.w	_sr_nodraw-8-base,_sr_nodraw-4-base,_sr_attract1-4-base
 		dc.w	_sr_attract2-4-base,_sr_death-4-base,_sr_dcount-4-base,_sr_dnodraw-8-base
 		dc.w	_sr_dnodraw-4-base,_gv-base,_p3ca08-base,_p606ac-base
-		dc.w	_p3ca0f-base,0
+		dc.w	_p3ca0f-base,_pc9ec-base,0
 
 _resload	dc.l	0
 _hiname		dc.b	"Virus.hi",0

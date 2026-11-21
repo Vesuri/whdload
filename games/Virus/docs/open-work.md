@@ -7,7 +7,8 @@ left out while behind; off, the game runs as the original
 from it ([internals](internals.md#cpu-only-data-in-fast-memory)), and its main loop draws into a
 buffer there, so nothing waits for the blitter clear
 ([internals](internals.md#drawing-in-fast-memory)): the demo went from 23.4 to 46.7 fps on
-the a1200-030 ([internals](internals.md#measurements)). It boots to the game's attract
+the a1200-030 ([internals](internals.md#measurements)). With fast memory, CUSTOM3 adds frames
+between ticks ([below](#frames-between-ticks)). It boots to the game's attract
 mode on the a500+ and the a1200, and F10 quits with `OK`.
 
 ## Game speed
@@ -49,42 +50,25 @@ at 12.0 fps on the a500+ and 22 to 23 fps on the a1200 and the a1200-030. The A5
 
 ## Frames between ticks
 
-50 frames a second at a 25 Hz tick, and three and four frames a tick at 16.7 and 12.5 Hz:
-on the fields between two ticks' frames, frames interpolated between the two ticks, with
-the game state byte-identical. Tick N's own frame then shows P−1 fields later (20 ms at
-25 Hz). The design and the code behind it are in
-[internals](internals.md#frames-between-ticks).
+CUSTOM3=1, with Enhanced framerate and fast memory: on the fields between two ticks'
+frames, frames interpolated between the two ticks, with the game state byte-identical; tick
+N's own frame then shows P−1 fields later (20 ms at 25 Hz). The a1200-030 and the a3000
+draw 50 frames a second at every speed, the 14 MHz 68020s 36 to 39 at 25 Hz instead of 25
+([internals](internals.md#frames-between-ticks)). Still open:
 
-It needs Enhanced framerate and fast memory (the drawing buffer). Which machines it can
-help: the a3000, a3000-50 and the a1200-030, -040 and -060 draw a whole pass in a field in
-the demo (50.0 fps with Enhanced off), and a frame between ticks leaves out the simulation;
-the 14 MHz 68020s draw 35.8 and 37.8 fps, 26 to 28 ms a pass, so at 25 Hz only light scenes
-leave room. Both are still to be measured.
-
-Steps, each checked before the next:
-
-1. **Pairing** (done): tools/pairs.py, in the demo and in play, found every source that
-   exists on two ticks paired by its slot and the dispatchers' moves, and no record changed
-   between ticks ([internals](internals.md#frames-between-ticks)). Not met yet: the
-   attractor's lightning and 12 of the 18 object handlers.
-2. **Record.** The hooks at the 7 stores and 2 removals, and the two tables in ExpMem.
-   Checks: no game state changes (tools/callwrites.py `compare` at demo tick 200 against
-   Enhanced without it); the recorded entries are the native lists'.
-3. **Draw between.** Staging, the six skipped calls, the restore, the renderer and the swap.
-   Checks:
-   - a frame at α = 1 is tick N's own, pixel for pixel;
-   - the game state is byte-identical with frames between ticks on and off, at demo tick 200
-     and at the demo's end;
-   - screenshots of consecutive fields show the moving things midway.
-4. **Pace.** Frame k only while it can show on its field; CUSTOM3 ("Frames between ticks")
-   turns it on. Measure with tools/pace.py, extended to count frames between ticks.
-   Even holds look smooth; a mix of one and two fields can look worse than a steady 25.
-5. **The death sequence.** Its 51 passes (the explosion's debris) get the same.
-6. **Play-test.**
-   - Matrices blended word by word: an object that turns fast looks smaller midway?
-   - Unpaired entries (new particles, the screen's edge) pop by a field.
+1. **The death sequence.** Its 51 passes (the explosion's debris) draw no frames between.
+2. **Not met yet** in tools/pairs.py's runs: the attractor's lightning and 12 of the 18
+   object handlers. Their entries pair the same way; a run that meets them checks it.
+3. **Play-test.**
+   - Matrices are blended word by word: an object that turns fast looks smaller midway?
+   - Unpaired entries (new particles, the screen's edge) appear a field late or leave a
+     field early.
+   - On the 14 MHz 68020s frames show for one field or two in a mix: smoother than 25, or
+     worse? If worse, draw frames between only where they fit every tick, decided over a
+     window.
    - 16.7 and 12.5 Hz, with two and three frames between ticks.
    - A pause, a wave's end, game over.
+   - Off by default until then.
 
 Input is still read once a tick, and tick N's frame comes P−1 fields later than without it:
 the controls answer that much later.
@@ -106,10 +90,9 @@ only, everything not DMA in fast memory, every cache on), is in
   now (after the fade-in, ending with the demo) the a3000, a3000-50, a1200-030, -040 and
   -060 draw 50.0, a frame every field, and the a500+-020 35.8, the a1200-fast 37.8. What is
   left on the 68020s is mostly the game itself.
-- **50 frames a second.** The a3000 and up draw 50 in the demo, but a frame a tick holds
-  them at 25. A 50 Hz tick at today's pace is on the order of 80 patch sites in integer code
-  and still another game ([internals](internals.md#a-50-hz-tick)). Frames interpolated
-  between ticks are the plan instead ([above](#frames-between-ticks)).
+- **50 frames a second.** A 50 Hz tick at today's pace is on the order of 80 patch sites
+  in integer code and still another game ([internals](internals.md#a-50-hz-tick)); frames
+  between ticks give the frames instead ([above](#frames-between-ticks)).
 - Run on a 512 KB chip A500: find the render writes past `$80000` (a write watchpoint
   above `$80000`) and clip them, so `ws_BaseMemSize` can be `$80000`. The unused `_clamp`
   shows where the original author started.

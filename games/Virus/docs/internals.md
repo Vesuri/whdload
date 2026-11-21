@@ -15,9 +15,10 @@ offset `$286c8` (`$63ec8`).
 
 `ws_BaseMemSize` is `$88000` (544 KB). The ReadMe's reason: the render routines write past
 the 512 KB border. The game itself uses fixed chip addresses up to at least `$78000`
-(`$70000` and `$78000` stored at its entry). `ws_ExpMem` asks for an optional 488 KB
-(`$7a000`) for everything the CPU alone uses and the drawing buffer; WHDLoad gives fast
-memory when there is some, else chip memory above the 544 KB, which the slave leaves unused.
+(`$70000` and `$78000` stored at its entry). `ws_ExpMem` asks for an optional 620 KB
+(`$9b000`) for everything the CPU alone uses, the drawing buffer and, after them, the 132 KB
+of frames between ticks' tables ([below](#frames-between-ticks)); WHDLoad gives fast memory
+when there is some, else chip memory above the 544 KB, which the slave leaves unused.
 
 ## The frame
 
@@ -360,8 +361,9 @@ Drawing between ticks gives the frames without any of that: see the next section
 ## Frames between ticks
 
 Frames drawn between two ticks, interpolated: on the fields between tick N−1's frame and
-tick N's, the game draws what lies a fraction α of the way from N−1 to N. Not built yet;
-[open work](open-work.md#frames-between-ticks) has the steps. The game state stays as it is:
+tick N's, the game draws what lies a fraction α of the way from N−1 to N. CUSTOM3=1 turns
+it on, with Enhanced framerate and ExpMem in fast memory; what is still open is in
+[open work](open-work.md#frames-between-ticks). The game state stays as it is:
 the frames between only read it, and everything the renderer writes is restored or kept
 from happening, so the demo stays in sync and the state comparisons (tools/gametime.py,
 tools/callwrites.py) still apply.
@@ -465,15 +467,61 @@ comes from the call graph, read statically; a state comparison with the frames b
 and off checks it at run time.
 
 **Where it goes.** In the main loop's pass (`_pass`), after the simulation and before the
-renderer: hooks at the 7 stores and the 2 removals record each entry (its slot, the slot it
-had on the last tick, its bucket and where it is); after the simulation the entries are
-copied, by slot, into one of two tables in fast memory, the other holding the last tick's.
-Then, when the pass draws and the last pass recorded a whole tick, for k = 1 to P−1 while
-frame k can still be shown on its field (the tick's field plus k−1): build the staging
-lists at α = k/P, stage, run the renderer, restore, swap and request the clear as a drawn
-pass does. Then the pass goes on as now: the renderer draws tick N's own frame. The game's
-calls keep their order, and the copy waits for the display as now, so there is at most one
-frame a field.
+renderer. Hooks at the 7 stores and the 2 removals record each entry: its key (particle slot
+times 2 plus 0 or 1 for the ground dot, `K_OBJ`, `K_LIGHT` or `K_SHIP` plus the object's
+slot), the key it had on the last tick, its bucket, size and place. A removal notes the slot
+it fills and marks the last slot as moved away for the rest of the tick, so a particle
+spawned there later pairs with nothing. After the simulation (`_btcapture`) the entries are
+copied by key into one of two tables in ExpMem, tagged with the tick, the size and the
+bucket; the other table holds the last tick's. A pass in which the death sequence ran
+records no whole tick, and the main loop's entry forgets the last one, so the next pass draws
+no frames between.
+
+When the pass draws and the last pass recorded a whole tick (`_btframes`), for k = 1 to
+P−1, while the tick's field plus k−1 has not gone: build the staging lists at α = k/P
+(`_btbuild`), point the game's list tables at them, stage the camera and the counter `$c9f4`
+(the nearer tick's: the renderer's blinks and gates follow it), run the renderer with its
+sounds and smoke held back (`_btrender`), restore, then swap and request the clear as a
+drawn pass does. Then the pass goes on as before: the renderer draws tick N's own frame.
+The game's calls keep their order, and the copy waits for the display as before, so there
+is at most one frame a field. In ExpMem: 32 KB of staging lists, two entry tables of 32 KB
+(1024 keys of 32 bytes), their tags, the pairing marks and two lists of 1024 records.
+
+**Checks.**
+
+- The game state: tools/callwrites.py `compare` at demo tick 200 against the original's
+  capture, with frames between ticks at 25 and 16.7 Hz on the a1200-030 and at 25 Hz on the
+  a1200-fast (where some frames between are left out): no byte differs. At tick 1150, near
+  the demo's end, none against Enhanced framerate without it. (Enhanced framerate against
+  the original differs there in 3 bytes of the VBL's sound state, `$584d7-$584d9`, which
+  keeps real time; at tick 200 in none.) Two places the frames between leave changed are
+  the renderer's own and are left out of the comparison: the object drawer's polygon list
+  `$c704-$c9bf` and its saved place `$103a` (written by the plotter `$2bb5a`, read by
+  `$2bb96`).
+- A check build (`BTCHECK`) draws every frame between at α = 0, nearer the last tick: its
+  frames must be the last tick's own. On the a1200-030 in the demo at 25 Hz (29 ticks) and
+  16.7 Hz (20 ticks, two frames between each), the 3D view was the last tick's frame pixel
+  for pixel but for 2 dots of 4 by 2 pixels, where two dots of a bucket overlap and the
+  staging lists draw them in another order. The panel's radar and gauges differ by a few
+  pixels: they draw this tick's radar list and fuel, a field early.
+- Screenshots of consecutive fields show the landscape, objects and particles moving between
+  their places of two ticks.
+
+Measured (tools/pace.py, the window after the fade-in, 1250 fields; ticks against the
+nominal rate, drawn frames a second, of them frames between ticks):
+
+| Machine | Without | With |
+|---|---|---|
+| a1200-030, CACHE, 25 Hz | 100.0%, 25.0 fps | 100.0%, 50.0 fps (625 between) |
+| a1200-030, CACHE, 16.7 Hz | | 100.1%, 50.0 fps (834 between) |
+| a1200-030, CACHE, 12.5 Hz | | 100.2%, 50.0 fps (936 between) |
+| a3000, CACHE, 25 Hz | | 99.8%, 49.6 fps (615 between) |
+| a1200-fast, CACHE, 25 Hz | 100.5%, 24.8 fps | 100.5%, 39.0 fps (383 between) |
+| a500+-020, CACHE, 25 Hz | 100.5%, 24.5 fps | 100.3%, 36.3 fps (323 between) |
+| a500+ (no fast memory) | 90.6%, 10.0 fps | unchanged: not enabled |
+
+On the 14 MHz 68020s a frame between fits on some ticks and not on others, so frames show
+for one field or two in a mix.
 
 ## Measurements
 
@@ -561,6 +609,21 @@ With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), a second patch lis
 | `$2b250` (the ship's depth-list entry) | `lea $2bbaa(pc),a2; movem.l a2/a6,(a1)` | `jsr _shipemit; nop`: the same, and notes the entry for `_shiptest` |
 | `$2b472` (the death sequence's pass) | `tst.b $609a2` | `jsr _death`: waits for the tick, then the same |
 | `$2b47c`, `$2b494`, `$2b4e4` (its clear request, renderer, swap) | `jsr` to `$1d4fe`, `$29974`, `$1d58c` | `jsr`: the same, left out when behind (the radar list reset instead of the renderer); in fast memory the main loop's buffer swap and clear |
+
+With CUSTOM3=1 as well and ExpMem in fast memory (frames between ticks,
+[above](#frames-between-ticks)), a third:
+
+| `Disk.1` offset | Original | Patch |
+|---|---|---|
+| `$252a4`, `$25348` (a particle's dot, its ground dot) | `move.l d4,(a4); movem.w ...,4(a4)` | `jsr; nop`: the same, and records the entry |
+| `$25312` (the dot of a dot and ground dot) | `move.l #$1c08a,(a4)` | `jsr`: the same, and records it |
+| `$253bc`, `$26dac` (a shard's, an object's entry) | `lea $2bbaa(pc),a2; movem.l a2/a5,(a1)` | `jsr; nop`: the same, and records it |
+| `$27cdc` (the lightning's entry) | `move.l #$28182,(a1)` | `jsr`: the same, and records it |
+| `$2541e`, `$26e26` (a particle's, an object's removal) | the last record copied into the freed slot | `jsr` and `nop`s: the same, and notes the move |
+| `$2937e`, `$293a8`, `$294bc`, `$294ce`, `$297ca` (the renderer's sounds) | `jsr` to `$1ca58` | `jsr`: the same, but not in a frame between |
+| `$2981c` (the renderer's smoke) | `jsr` to `$25c7e` | `jsr`: the same, but not in a frame between |
+
+The ship's store (`$2b250`, above) records its entry too.
 
 The highscore table is 280 bytes at `$2b62e` (`$66e2e`). `Virus.hi` holds it nibble-swapped
 and inverted (`_crypt`, its own inverse); it is loaded at start when its size is 280.

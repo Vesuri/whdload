@@ -7,7 +7,8 @@ Needs a server just booted with tools/boot.sh. Runs to the demo's start ($641fe)
 fade-in (the first main loop pass's end, $6434c) and to the next field (tools/codebase.py
 `to_window`), then FIELDS fields (default 1250) in CHUNK-field steps (default 50), reading
 after each the game's frame counter $c9f4 (one a main loop pass: a tick) and, with Enhanced
-framerate on, the slave's _frames (passes that drew) and _period (fields a tick). The
+framerate on, the slave's _frames (frames drawn), _bframes (of them frames between ticks)
+and _period (fields a tick). The
 slave's address is the jsr target at $64214 (_pass); the variables' offsets come from the
 release build's listing (tmp/build/release/Virus.lst). Without the patch every pass draws.
 The demo is a recording of 1189 ticks from there: a machine at 50 fps plays it in about
@@ -47,12 +48,14 @@ def main(args):
         base = peek(0x64214 + d, 4) - sym['_pass']
         period = peek(base + sym['_period'], 4)
         frames = lambda: peek(base + sym['_frames'], 4)  # noqa: E731
+        bframes = lambda: peek(base + sym['_bframes'], 4)  # noqa: E731
         print(f'Enhanced framerate: a tick every {period} fields ({50 / period:.2f} Hz)')
     else:
-        period, frames = None, None
+        period, frames, bframes = None, None, None
         print('original: one tick a drawn frame')
     t0 = peek(codebase.at(0xc9f4, d), 2)
     f0 = frames() if frames else 0
+    b0 = bframes() if bframes else 0
     done = 0
     rows = []
     while done < total:
@@ -77,6 +80,8 @@ def main(args):
     d, t, f = rows[last]
     nominal = f', nominal {d / period:.1f} ({100 * t * period / d:.1f}%)' if period else ''
     print(f'{d} fields: {t} ticks ({50 * t / d:.2f}/s{nominal}), {f} drawn ({50 * f / d:.2f} fps)')
+    if bframes:
+        print(f'frames between ticks: {bframes() - b0} in all {done} fields')
 
 
 if __name__ == '__main__':

@@ -24,7 +24,7 @@
 
 
 	You need 0.6 MB ChipMem and 0.6 MB OtherMem.
-	With 488 KB FastMem more, the game runs and draws there.
+	With 620 KB FastMem more, the game runs and draws there.
 	You can quit the game by pressing F10 (key can be changed with
 	Tooltype "QuitKey=").
 
@@ -33,6 +33,8 @@
 
 	CUSTOM1=1: Enhanced framerate. CUSTOM2 sets its game speed: 0 25 Hz
 	(the default), 1 16.7 Hz, 2 12.5 Hz. Unset, the game runs as before.
+	CUSTOM3=1: frames between ticks, with CUSTOM1=1 and FastMem: frames
+	interpolated between the game's steps, up to 50 a second.
 
 	version 2.0b (20.11.2026) done by Vesuri:
 	- Enhanced framerate (CUSTOM1): the game keeps one pace on every Amiga
@@ -41,6 +43,8 @@
 	- instruction cache flushed after the game rewrites its renderer
 	- the game runs and draws in fast memory when there is enough: faster on
 	  68020 and up (the demo: 23 to 47 frames a second on a 50 MHz 68030)
+	- frames between ticks (CUSTOM3): up to 50 frames a second with
+	  Enhanced framerate
 
 	This game needs 544 KB ChipMem instead of 512 KB because of
 	some memory leaks in the render routines which make Virus

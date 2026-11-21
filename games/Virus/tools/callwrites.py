@@ -26,10 +26,11 @@ differ in the work memory and the image, the stack below $4b546 left out.
 `compare` lists the bytes that differ between two captures of the same tick (tools/
 gametime.py: work memory and image) outside what is not game state: every byte the drawing
 calls write in 10 passes from DUMP, the renderer's object transforms ($1100-$11ff, which
-nothing else reads or writes), the depth lists' storage ($16ac-$a36f), the radar list
+nothing else reads or writes), the object drawer's polygon list ($c704-$c9bf) and its saved
+place ($103a, the plotters $2bb5a and $2bb96 alone), the depth lists' storage ($16ac-$a36f), the radar list
 ($9ea6-$a2a5), the stack, the polygon filler's edge state ($67d86-$67d8d), the clear
 request ($606a6-$606b3), the VBL's sound countdowns ($58480-$584cf) and the slave's
-patches (in the original or Enhanced). What is left is game state.
+patches (in the original, Enhanced or frames between ticks). What is left is game state.
 """
 import ctypes
 import os
@@ -145,10 +146,14 @@ PATCHED = ((0x607fe, 0x60804), (0x608c0, 0x608c8), (0x63f8a, 0x63f8e), (0x6420e,
            (0x65d30, 0x65d36), (0x65d84, 0x65d8c), (0x67116, 0x6711e),
            # the death sequence's and the ship test's (Enhanced framerate)
            (0x66c72, 0x66c78), (0x66c7c, 0x66c82), (0x66c94, 0x66c9a), (0x66ce4, 0x66cea), (0x66a50, 0x66a58),
+           # frames between ticks
+           (0x60aa4, 0x60aac), (0x60b12, 0x60b18), (0x60b48, 0x60b50), (0x60bbc, 0x60bc4), (0x60c1e, 0x60c28),
+           (0x625ac, 0x625b4), (0x62626, 0x6262e), (0x634dc, 0x634e2), (0x64b7e, 0x64b84), (0x64ba8, 0x64bae),
+           (0x64cbc, 0x64cc2), (0x64cce, 0x64cd4), (0x64fca, 0x64fd0), (0x6501c, 0x65022),
            # the drawing in fast memory
            (0x64238, 0x64244), (0x58cfe, 0x58d04), (0x58d3e, 0x58d44), (0x58d48, 0x58d4e), (0x58d8c, 0x58d94),
            (0x58dda, 0x58de2), (0x6547e, 0x65484), (0x65de8, 0x65dee), (0x65f22, 0x65f28), (0x67822, 0x67828))
-NOT_STATE = ((0x1100, 0x1200), (0x16ac, 0xa370), (0x4b000, 0x4b546), (0x67d86, 0x67d8e), (0x606a6, 0x606b4),
+NOT_STATE = ((0x1100, 0x1200), (0x103a, 0x103e), (0xc704, 0xc9c0), (0x16ac, 0xa370), (0x4b000, 0x4b546), (0x67d86, 0x67d8e), (0x606a6, 0x606b4),
              (0x58480, 0x584d0)) + PATCHED
 
 
