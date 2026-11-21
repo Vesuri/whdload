@@ -25,6 +25,10 @@ first). `release/slaves.sha256` records the current release build.
 
 ## Driving it
 
+`make run` and `make serve` set CUSTOM1=1 (Enhanced framerate, as the installed icon does)
+unless `ENHANCED=0` or `WHD_ARGS` sets CUSTOM1 (`game.conf`); `tools/boot.sh` runs with
+`ENHANCED=0`, so its analyses below get the original unless `WHD_ARGS` says CUSTOM1=1.
+
 `make serve WARP=1 WINDOW=none &`, then `make server CMD=...`. About 15 s in warp reaches the
 attract mode on the a500+. Keys go through the stub as raw hex codes:
 `CMD='gdb monitor key 59 1'` presses F10, `... 59 0` releases it; with `VERIFY_EXIT=1`,
