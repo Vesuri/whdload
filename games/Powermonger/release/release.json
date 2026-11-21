@@ -1,0 +1,15 @@
+{
+  "archives": [
+    {
+      "input": "Powermonger.lha",
+      "output": "PowermongerEnhanced-{version}-{date}.lha",
+      "replace": {
+        "Powermonger Install/Powermonger.Slave": "build:Powermonger",
+        "Powermonger Install/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "tooltypes": {}
+    }
+  ]
+}
