@@ -21,8 +21,8 @@ mode on the a500+ and the a1200, and F10 quits with `OK`.
   every time (`tools/coverage.py ... wander 2500 wander 2000` from the demo, then
   crashes with `thrust`, no shots); the game-over screen took SPACE only on a
   second press, and RETURN in the entry was not reached yet.
-- The death sequence is paced by ticks now; its game-over text (the last life's death)
-  is not seen yet. A second sound of the crash (on another channel than the explosion,
+- The death sequence is paced by ticks now, its game-over text included (play-tested). A
+  second sound of the crash (on another channel than the explosion,
   sound 29) still has about 50 fields to go when the death sequence ends at 25 Hz, and the
   next life's sounds cut it after about 15. Making the next life wait for it would
   change the game, not its pace: decide by play.
@@ -58,7 +58,7 @@ the death sequence too ([internals](internals.md#frames-between-ticks)). Still o
      worse? If worse, draw frames between only where they fit every tick, decided over a
      window.
    - 16.7 and 12.5 Hz, with two and three frames between ticks.
-   - A pause, a wave's end, game over.
+   - A pause, a wave's end (game over is fine).
 
 Input is still read once a tick, and tick N's frame comes P−1 fields later than without it:
 the controls answer that much later.
