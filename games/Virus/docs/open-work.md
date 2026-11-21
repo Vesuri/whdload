@@ -1,6 +1,6 @@
 # Open work
 
-2.0b (20.11.2026) on John Selck's reconstructed V1.0 slave. Enhanced framerate (CUSTOM1)
+2.0b (21.11.2026) on John Selck's reconstructed V1.0 slave. Enhanced framerate (CUSTOM1)
 gives the game fixed-rate game time, a tick every 3, 2 or 4 fields (CUSTOM2), with drawing
 left out while behind; off, the game runs as the original
 ([internals](internals.md#game-time)). With fast memory everything the CPU alone uses runs

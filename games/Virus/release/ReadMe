@@ -13,7 +13,7 @@
 
 
 	That install applies to "Virus" © 1988 D.J.Braben.
-	Virus Enhanced 2.0b (20.11.2026)
+	Virus Enhanced 2.0b (21.11.2026)
 	Original install: John Selck. Version 2.0b: Vesuri.
 
 
@@ -36,17 +36,14 @@
 	FastMem it also draws frames interpolated between the game's steps, up
 	to 50 a second. 0 or unset runs the game as before.
 
-	version 2.0b (20.11.2026) done by Vesuri:
-	- Enhanced framerate (CUSTOM1, on in the installed icon): the game keeps
-	  one pace on every Amiga instead of following the frame rate; CUSTOM2
-	  picks the game speed
-	- the attract screen lasts as long on slower Amigas as on faster ones,
-	  and the title at least as long on faster Amigas as on an A1200
-	- instruction cache flushed after the game rewrites its renderer
-	- the game runs and draws in fast memory when there is enough: faster on
-	  68020 and up (the demo: 23 to 47 frames a second on a 50 MHz 68030)
-	- Enhanced framerate with FastMem draws frames between the game's steps:
-	  up to 50 frames a second
+	version 2.0b (21.11.2026) done by Vesuri:
+	- Enhanced framerate (CUSTOM1, on in the installed icon): the game runs
+	  at the same speed on every Amiga; CUSTOM2 picks the speed
+	- with FastMem the game runs and draws there; with Enhanced framerate
+	  it shows up to 50 frames a second, smoothed between the game's steps
+	- the title no longer flashes by on fast Amigas, and the attract
+	  screen no longer drags on slow ones
+	- instruction cache flushed after the game changes its own code
 
 	This game needs 544 KB ChipMem instead of 512 KB because of
 	some memory leaks in the render routines which make Virus
