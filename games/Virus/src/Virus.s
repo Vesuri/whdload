@@ -279,6 +279,8 @@ _pl_game	PL_START
 		PL_W	$608c0-CODE_START,$4e71		;level 2: bset #6,$bfee01 -> nop, jsr _keyboard
 		PL_PS	$608c2-CODE_START,_keyboard
 		PL_PSS	$644b6-CODE_START,_flush,4		;move.w $c9fe,$c9fc: the setup's end
+		PL_PS	$6406c-CODE_START,_title		;jsr $62236: the title's fade-in
+		PL_PS	$640fe-CODE_START,_untitle	;jsr $621a6: its fade-out
 		PL_W	$67116-CODE_START,$4e71		;highscore entry -> nop, jsr _savehi
 		PL_PS	$67118-CODE_START,_savehi
 		PL_END
@@ -329,6 +331,30 @@ _gcall		move.l	d0,-(sp)
 		add.l	d0,4(sp)
 		move.l	(sp)+,d0
 		rts
+
+;----------------------------------------------------------------------
+; The title shows while the game builds its tables, from the fade-in to the fade-out: 543
+; fields on the a500+, 166 on the a1200, 12 on a 50 MHz 68030. It now shows at least the
+; a1200's TITLE fields.
+
+TITLE		= 166
+
+_title		GCALL	$62236			;fade in
+		move.l	a0,-(sp)
+		lea	_shown(pc),a0
+		move.l	_fields(pc),(a0)
+		movea.l	(sp)+,a0
+		rts
+
+_untitle	move.l	d0,-(sp)
+.wait		move.l	_fields(pc),d0
+		sub.l	_shown(pc),d0
+		cmp.l	#TITLE,d0
+		bcs.b	.wait
+		move.l	(sp)+,d0
+		GJMP	$621a6			;fade out
+
+_shown		dc.l	0			;_fields when the title had faded in
 
 ;======================================================================
 ; Enhanced framerate (CUSTOM1=1): fixed-rate game time (docs/internals.md, "Game time").

@@ -294,9 +294,13 @@ counts passes, now ticks.
 
 Input is the original's: the mouse position (accumulated by the VBL), the buttons and the
 key table are read when a pass reads them, so catch-up ticks see the latest state. Fades,
-sounds and the "press SPACE" waits are VBL-timed and keep real time. From the game's entry to
-the attract screen (`$2a4e4`) the title shows for 159 fields on the a1200-030 and 567 on the
-a500+: start-up work, not frame-tied, unchanged.
+sounds and the "press SPACE" waits are VBL-timed and keep real time.
+
+The title shows while the game builds its tables, from its fade-in (`$2886c`) to its fade-out
+(`$288fe`): 543 fields on the a500+, 166 on the a1200, 12 on the a1200-030 with `CACHE`.
+In every mode the slave now holds it for at least 166 fields, the a1200's
+(`TITLE`, `_title` and `_untitle`, below): the a1200-030 reaches the attract screen in 177
+fields, as the a1200 does; the a500+ and the a1200 are unchanged.
 
 Measured (tools/pace.py, the first 1250 fields of the demo; ticks against the nominal
 rate, drawn frames a second):
@@ -604,6 +608,8 @@ Offsets are into `Disk.1`. All are patch-list entries applied to the code where 
 | `$250c0` (level 2 interrupt, after reading CIA-A SDR into d0) | `bset #6,$bfee01` | `nop; jsr _keyboard`: does the same `bset`, then quits on F10 (`ws_keyexit`) or the reset-warning code `$78` through `resload_Abort` |
 | `$2b916` (highscore entry) | `move.w #3000,d7; cmp.w #127,d0` | `nop; jsr _savehi`: on key 13 (return) saves the table, then does the replaced instructions |
 | `$28cb6` (the landscape setup's end, after the code writes and the map) | `move.w $c9fe,$c9fc` | `jsr _flush` and four bytes of `nop`: the same, then `resload_FlushCache` |
+| `$2886c` (the title's fade-in) | `jsr $62236` | `jsr _title`: the fade-in, then notes the field count |
+| `$288fe` (the title's fade-out) | `jsr $621a6` | `jsr _untitle`: waits until the title has shown 166 fields, then the fade-out |
 
 With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), a second patch list:
 

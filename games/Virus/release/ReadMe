@@ -40,7 +40,8 @@
 	- Enhanced framerate (CUSTOM1, on in the installed icon): the game keeps
 	  one pace on every Amiga instead of following the frame rate; CUSTOM2
 	  picks the game speed
-	- the attract screen lasts as long on slower Amigas as on faster ones
+	- the attract screen lasts as long on slower Amigas as on faster ones,
+	  and the title at least as long on faster Amigas as on an A1200
 	- instruction cache flushed after the game rewrites its renderer
 	- the game runs and draws in fast memory when there is enough: faster on
 	  68020 and up (the demo: 23 to 47 frames a second on a 50 MHz 68030)
