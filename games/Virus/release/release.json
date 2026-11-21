@@ -8,7 +8,12 @@
         "Virus-install/README": "release/ReadMe"
       },
       "add": {},
-      "remove": []
+      "remove": [],
+      "tooltypes": {
+        "Virus-install/Virus.inf": [
+          "CUSTOM1=1"
+        ]
+      }
     }
   ]
 }

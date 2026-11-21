@@ -31,14 +31,15 @@
 
 	Highscores are saved to HD.
 
-	CUSTOM1=1: Enhanced framerate. CUSTOM2 sets its game speed: 0 16.7 Hz
-	(the default), 1 25 Hz, 2 12.5 Hz. With FastMem it also draws frames
-	interpolated between the game's steps, up to 50 a second. Unset, the
-	game runs as before.
+	CUSTOM1=1: Enhanced framerate, set in the installed icon. CUSTOM2 sets
+	its game speed: 0 16.7 Hz (the default), 1 25 Hz, 2 12.5 Hz. With
+	FastMem it also draws frames interpolated between the game's steps, up
+	to 50 a second. 0 or unset runs the game as before.
 
 	version 2.0b (20.11.2026) done by Vesuri:
-	- Enhanced framerate (CUSTOM1): the game keeps one pace on every Amiga
-	  instead of following the frame rate; CUSTOM2 picks the game speed
+	- Enhanced framerate (CUSTOM1, on in the installed icon): the game keeps
+	  one pace on every Amiga instead of following the frame rate; CUSTOM2
+	  picks the game speed
 	- the attract screen lasts as long on slower Amigas as on faster ones
 	- instruction cache flushed after the game rewrites its renderer
 	- the game runs and draws in fast memory when there is enough: faster on
