@@ -133,8 +133,9 @@ to hold only lookalikes (`NOT_POINTERS`: mask, trigonometry and font tables, bit
 leftover at `$682c8`; the chip data).
 
 The slave copies the block, adds the distance to each listed long and to its own eight
-references (`_srel`), and fills the chip copy, but for the chip data, with `ILLEGAL`: a code
-reference the table missed stops at once (that is how the waves' enemy lists were found to
+references (`_srel`). The developer build (`BUILD=developer`, `DEVELOPER`) then fills the chip
+copy, but for the chip data, with `ILLEGAL`, so a code reference the table missed stops at
+once; the release leaves the copy as it was (that is how the waves' enemy lists were found to
 need their own parser: the first relocated code stopped at `$62a00`, `$27200`, at wave 2).
 A missed data reference would read the stale copy instead, so `tools/chipaccess.py` counts
 the CPU's accesses to it: none in the demo. Its patch lists use offsets from `$57000` and

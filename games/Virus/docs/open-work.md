@@ -36,9 +36,6 @@ mode on the a500+ and the a1200, and F10 quits with `OK`.
   ship's entry.
 - Without Enhanced framerate the game is the original, tied to the frame rate; with fast
   memory light scenes now run it at up to 50 fps, twice the pace it had before.
-- The chip copy of the moved block stays filled with `ILLEGAL` for now (a code reference
-  `src/reloc.i` missed then stops at once rather than misbehaving later): revisit before
-  the release.
 
 ## Frames between ticks
 

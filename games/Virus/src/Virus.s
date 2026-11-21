@@ -161,8 +161,9 @@ _start		lea	_resload(pc),a1
 ;----------------------------------------------------------------------
 ; With fast ExpMem: copies $1000-$687ff there and adds the distance (_delta) to every long
 ; in the image that holds an address in it (src/reloc.i, from tools/relocmap.py) and to the
-; slave's own (_srel). The chip copy, but for the chip data, is then filled with ILLEGAL, so
-; that a code reference the table missed stops at once.
+; slave's own (_srel). In the developer build (DEVELOPER) the chip copy, but for the chip
+; data, is then filled with ILLEGAL, so that a code reference the table missed stops at once;
+; the release leaves it as it was.
 
 _relocate	move.l	_expmem(pc),d0
 		beq.w	.none
@@ -201,7 +202,9 @@ _relocate	move.l	_expmem(pc),d0
 		beq.b	.fill
 		add.l	d0,(a1,d2.w)
 		bra.b	.srel
-.fill		lea	(MOVE_START).w,a0	;the chip copy, but for the chip data
+.fill
+	IFD	DEVELOPER
+		lea	(MOVE_START).w,a0	;the chip copy, but for the chip data
 		move.l	#(CHIP_START-MOVE_START)/2,d1
 		bsr.b	.ill
 		lea	CHIP_END,a0
@@ -209,6 +212,7 @@ _relocate	move.l	_expmem(pc),d0
 .ill		move.w	#$4afc,(a0)+
 		subq.l	#1,d1
 		bne.b	.ill
+	ENDC
 .none		rts
 
 ;----------------------------------------------------------------------

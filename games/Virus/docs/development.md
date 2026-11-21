@@ -120,7 +120,7 @@ python3 tools/coverage.py                        # the count by step
 On the attract screen SPACE (raw `$40`, tested at `Disk.1` `$2a5b2`) or a mouse button
 (`$251fe`) starts a game; `wander`'s buttons do it there. Key `$36` does nothing. The game is mouse-only: RMB (`JOY1_2ND_BUTTON`)
 thrust, LMB (`JOY1_FIRE_BUTTON`) fire, moving the mouse pitches and turns (up: nose up).
-`NOTRACE=1` runs the same steps without tracing, to drive a build (the relocated one stops
+`NOTRACE=1` runs the same steps without tracing, to drive a build (`BUILD=developer` stops
 on its `ILLEGAL` fill if a reference was missed; WHDLoad's core dump is then in the run's
 `dh1`).
 
