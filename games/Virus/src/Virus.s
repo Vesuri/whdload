@@ -30,7 +30,7 @@ CHIP_END	= $4a546
 FB_OFF		= (MOVE_END-MOVE_START+$1fff)&-$1000	;from ExpMem, 4 KB after the block
 FB_SIZE		= $10000
 ROWS_OFF	= FB_OFF+FB_SIZE			;the chip screens' row flags, 2 * ROWS
-; Frames between ticks (CUSTOM3): the depth-list entries of the last two ticks by key
+; Frames between ticks (with Enhanced framerate): the depth-list entries of the last two ticks by key
 ; (docs/internals.md, "Frames between ticks").
 KEYS		= 1024				;particle slot * 2 + 0/1, K_OBJ +, K_LIGHT +, K_SHIP
 RECS		= 1024				;entries a tick: at most 375 * 2 + 128 + 128 + 1
@@ -73,8 +73,7 @@ _expmem		dc.l	-EXP_SIZE		;ws_ExpMem: optional
 		dc.w	_config-base		;ws_config
 
 _config		dc.b	"C1:B:Enhanced framerate;"
-		dc.b	"C2:L:Game speed:16.7 Hz,25 Hz,12.5 Hz;"
-		dc.b	"C3:B:Frames between ticks",0
+		dc.b	"C2:L:Game speed:16.7 Hz,25 Hz,12.5 Hz",0
 _name		dc.b	"Virus",0
 _copy		dc.b	"1988 D.J. Braben / Firebird",0
 _info		dc.b	"installed by John Selck",10
@@ -141,9 +140,7 @@ _start		lea	_resload(pc),a1
 		add.l	_delta(pc),a1
 		move.l	_resload(pc),a2
 		jsr	resload_Patch(a2)
-		move.l	_between(pc),d0		;frames between ticks: with fast memory too
-		beq.b	.orig
-		move.l	_fbuf(pc),d0
+		move.l	_fbuf(pc),d0		;frames between ticks: with fast memory
 		beq.b	.orig
 		bsr.w	_btinit
 		lea	_pl_between(pc),a0
@@ -578,7 +575,7 @@ _shiptest	movem.l	d0-d7/a0-a6,-(sp)
 		rts
 
 ;======================================================================
-; Frames between ticks (CUSTOM3=1, with Enhanced framerate and fast memory): on the fields
+; Frames between ticks (with Enhanced framerate and fast memory): on the fields
 ; between the last tick's frame and this one's, frames interpolated between the two ticks
 ; (docs/internals.md, "Frames between ticks"). Hooks at the simulation's depth-list stores
 ; record each entry: its key (from its slot now), the key it had on the last tick (the same
@@ -1610,8 +1607,6 @@ _tags		dc.l	WHDLTAG_CUSTOM1_GET
 _enhanced	dc.l	0
 		dc.l	WHDLTAG_CUSTOM2_GET
 _speed		dc.l	0
-		dc.l	WHDLTAG_CUSTOM3_GET
-_between	dc.l	0
 		dc.l	TAG_END
 _fields		dc.l	0			;VBLs since the start (tools/pace.py reads
 _frames		dc.l	0			;these, _bframes and _period from _pass's address)

@@ -32,9 +32,9 @@
 	Highscores are saved to HD.
 
 	CUSTOM1=1: Enhanced framerate. CUSTOM2 sets its game speed: 0 16.7 Hz
-	(the default), 1 25 Hz, 2 12.5 Hz. Unset, the game runs as before.
-	CUSTOM3=1: frames between ticks, with CUSTOM1=1 and FastMem: frames
-	interpolated between the game's steps, up to 50 a second.
+	(the default), 1 25 Hz, 2 12.5 Hz. With FastMem it also draws frames
+	interpolated between the game's steps, up to 50 a second. Unset, the
+	game runs as before.
 
 	version 2.0b (20.11.2026) done by Vesuri:
 	- Enhanced framerate (CUSTOM1): the game keeps one pace on every Amiga
@@ -43,8 +43,8 @@
 	- instruction cache flushed after the game rewrites its renderer
 	- the game runs and draws in fast memory when there is enough: faster on
 	  68020 and up (the demo: 23 to 47 frames a second on a 50 MHz 68030)
-	- frames between ticks (CUSTOM3): up to 50 frames a second with
-	  Enhanced framerate
+	- Enhanced framerate with FastMem draws frames between the game's steps:
+	  up to 50 frames a second
 
 	This game needs 544 KB ChipMem instead of 512 KB because of
 	some memory leaks in the render routines which make Virus

@@ -68,13 +68,13 @@ each depth-list entry with its source's on the tick before
 ([internals](internals.md#frames-between-ticks)); a dump in play is the same `capture`'s
 dump taken at `$64204` after a game was started.
 
-Frames between ticks are `WHD_ARGS="CACHE CUSTOM1=1 CUSTOM3=1"` on a machine with fast
+Frames between ticks come with `WHD_ARGS="CACHE CUSTOM1=1"` on a machine with fast
 memory; `tools/pace.py` then also prints the frames between ticks. Its check build draws them
 at α = 0, each the last tick's frame again:
 
 ```sh
 VASM_EXTRA=-DBTCHECK=1 make build BUILD=btcheck
-SETUP=a1200-030 NOBUILD=1 BUILD=btcheck WHD_ARGS="CACHE CUSTOM1=1 CUSTOM3=1" tools/boot.sh
+SETUP=a1200-030 NOBUILD=1 BUILD=btcheck WHD_ARGS="CACHE CUSTOM1=1" tools/boot.sh
 ```
 
 (`BUILD=` alone rebuilds without the define.) A screenshot takes a field itself: shots one

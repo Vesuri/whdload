@@ -7,8 +7,8 @@ left out while behind; off, the game runs as the original
 from it ([internals](internals.md#cpu-only-data-in-fast-memory)), and its main loop draws into a
 buffer there, so nothing waits for the blitter clear
 ([internals](internals.md#drawing-in-fast-memory)): the demo went from 23.4 to 46.7 fps on
-the a1200-030 ([internals](internals.md#measurements)). With fast memory, CUSTOM3 adds frames
-between ticks ([below](#frames-between-ticks)). It boots to the game's attract
+the a1200-030 ([internals](internals.md#measurements)). With fast memory, Enhanced framerate also draws
+frames between ticks ([below](#frames-between-ticks)). It boots to the game's attract
 mode on the a500+ and the a1200, and F10 quits with `OK`.
 
 ## Before a first release
@@ -42,7 +42,7 @@ mode on the a500+ and the a1200, and F10 quits with `OK`.
 
 ## Frames between ticks
 
-CUSTOM3=1, with Enhanced framerate and fast memory: on the fields between two ticks'
+Always with Enhanced framerate when there is fast memory: on the fields between two ticks'
 frames, frames interpolated between the two ticks, with the game state byte-identical; tick
 N's own frame then shows P−1 fields later (20 ms at 25 Hz). The a1200-030 and the a3000
 draw 50 frames a second at every speed, the 14 MHz 68020s 36 to 39 at 25 Hz instead of 25;
@@ -59,7 +59,6 @@ the death sequence too ([internals](internals.md#frames-between-ticks)). Still o
      window.
    - 16.7 and 12.5 Hz, with two and three frames between ticks.
    - A pause, a wave's end, game over.
-   - Off by default until then.
 
 Input is still read once a tick, and tick N's frame comes P−1 fields later than without it:
 the controls answer that much later.

@@ -362,8 +362,8 @@ Drawing between ticks gives the frames without any of that: see the next section
 ## Frames between ticks
 
 Frames drawn between two ticks, interpolated: on the fields between tick N−1's frame and
-tick N's, the game draws what lies a fraction α of the way from N−1 to N. CUSTOM3=1 turns
-it on, with Enhanced framerate and ExpMem in fast memory; what is still open is in
+tick N's, the game draws what lies a fraction α of the way from N−1 to N. Enhanced framerate
+always draws them when ExpMem is in fast memory; what is still open is in
 [open work](open-work.md#frames-between-ticks). The game state stays as it is:
 the frames between only read it, and everything the renderer writes is restored or kept
 from happening, so the demo stays in sync and the state comparisons (tools/gametime.py,
@@ -618,7 +618,7 @@ With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), a second patch lis
 | `$2b472` (the death sequence's pass) | `tst.b $609a2` | `jsr _death`: waits for the tick, then the same |
 | `$2b47c`, `$2b494`, `$2b4e4` (its clear request, renderer, swap) | `jsr` to `$1d4fe`, `$29974`, `$1d58c` | `jsr`: the same, left out when behind (the radar list reset instead of the renderer); in fast memory the main loop's buffer swap and clear |
 
-With CUSTOM3=1 as well and ExpMem in fast memory (frames between ticks,
+With ExpMem in fast memory as well (frames between ticks,
 [above](#frames-between-ticks)), a third:
 
 | `Disk.1` offset | Original | Patch |
