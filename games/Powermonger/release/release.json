@@ -9,7 +9,11 @@
       },
       "add": {},
       "remove": [],
-      "tooltypes": {}
+      "tooltypes": {
+        "Powermonger Install/Powermonger.romicon": ["CUSTOM4=1"],
+        "Powermonger Install/Powermonger.newexot": ["CUSTOM4=1"],
+        "Powermonger Install/Powermonger.colicon": ["CUSTOM4=1"]
+      }
     }
   ]
 }

@@ -2,7 +2,9 @@
 
 Bullfrog's Powermonger (1990, Electronic Arts) under WHDLoad: Wepl's direct DIC slave,
 v1.4.1 (19.02.2025), with the v1.4 fast-memory drawing and frame-rate cap by Paraj and Wepl.
-The original slave is by Wepl, updated by Paraj (game.conf `AUTHOR`, `UPSTREAM`).
+Version 2.0b adds Enhanced framerate (CUSTOM4: the world at the A500's pace, drawing as fast
+as the machine allows, and with fast memory copying only changed screen parts to chip memory). The
+original slave is by Wepl, updated by Paraj (game.conf `AUTHOR`, `UPSTREAM`).
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.
 

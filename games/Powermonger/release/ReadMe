@@ -39,6 +39,28 @@
 	or	aminet:dev/misc/whdload#?
 	and	aminet:game/patch/
 
+	Powermonger Enhanced 2.0b (21.11.2026)
+	Original install: Wepl, update 1.4: Paraj and Wepl. Version 2.0b: Vesuri.
+
+	CUSTOM4=1: Enhanced framerate, set in the installed icon. The game runs
+	at the speed of an Amiga 500 on every Amiga, and draws as many frames
+	as the machine can. 0 or unset runs the game as version 1.4.1.
+
+	version 2.0b (21.11.2026) done by Vesuri:
+	- Enhanced framerate (CUSTOM4, on in the installed icon): the people
+	  and the world move at the Amiga 500 speed on every Amiga, also on
+	  fast ones where version 1.4 ran the game too fast
+	- with Enhanced framerate and FastMem the 3D view draws much faster,
+	  because the terrain renderer runs from FastMem and drawing no longer
+	  waits for the display. An emulated 37 MHz 68020 with FastMem draws
+	  about 26 frames a second, where version 1.4 drew about 7
+	- with Enhanced framerate, CUSTOM1 Auto also uses FastMem on a 68020
+	- turning and moving the view finish sooner on faster Amigas
+	- with Enhanced framerate and FastMem only the changed parts of the
+	  screen are copied to ChipMem, for more frames a second on fast
+	  Amigas (in an emulated 37 MHz 68020 about 31 instead of 26 when the
+	  view stands still, 27 instead of 26 while it turns)
+
 	version 1.4.1 (19.02.2025):
 	- made Manual.pdf compatible to APDF, thanks Retroplay
 

@@ -60,6 +60,7 @@ _config
 		; C2 is frame rate limit
 		dc.b	"C3:X:All maps conquered:0;"
 		dc.b	"C3:X:Win on retire:1;"
+		dc.b	"C4:B:Enhanced framerate;"
 		dc.b	0
 
 ;============================================================================
@@ -68,7 +69,11 @@ _name		dc.b	"Powermonger",0
 _copy		dc.b	"1990 Bullfrog Productions",0
 _info		dc.b	"installed & fixed by Wepl",10
 		dc.b	"update by paraj",10
-		dc.b	"version 1.4 "
+		dc.b	"Enhanced framerate by Vesuri",10
+		dc.b	"version 2.0b "
+		INCBIN	".date"
+		dc.b	0
+		dc.b	"$VER: Powermonger.Slave 2.0b "
 		INCBIN	".date"
 		dc.b	0
 _keyexit2	dc.b	$45				;ws_keyexit = ESC
@@ -96,9 +101,13 @@ _Start	;	A0 = resident loader
 		beq	.nofast
 		bra	.usefast
 .autofast
-	;auto -> use if 030+
+	;auto -> use if 030+; with Enhanced framerate (CUSTOM4) also on a 68020, where the
+	;fast memory drawing measured faster (docs/internals.md)
 		moveq	#-4,d0
-		and.b	(_attnflags+3,pc),d0
+		btst	#0,(_custom4+3,pc)
+		beq	.mask
+		moveq	#-2,d0			;AFF_68020 and up
+.mask		and.b	(_attnflags+3,pc),d0
 		beq	.nofast
 .usefast
 	;move stack to fast mem
@@ -231,6 +240,14 @@ DIR = $400
 		patch	$bcc4,_handlecopyprot		;dismiss immediately
 
 	IFD QUICKSTART
+	;test builds: the random seed comes from the beam position; make it constant so
+	;runs on different machines and builds can be compared tick by tick
+		move.w	#$23fc,$137ce			;move.l #$12345678,$7e0b4
+		move.l	#$12345678,$137d0
+		move.w	#$23fc,$bb5a
+		move.l	#$12345678,$bb5c
+		move.w	#$d0bc,$bc62			;add.l #$9abcdef0,d0
+		move.l	#$9abcdef0,$bc64
 		nops	1,$136bc			;skip name entry dialog
 		patchs	$13712,_quickstart		;click "start"
 	ELSE
@@ -238,6 +255,19 @@ DIR = $400
 	ENDC
 
 		bsr	_fastpatches
+
+	;Enhanced framerate (CUSTOM4): the world step runs by the field clock, drawing every pass
+		move.l	(_custom4,pc),d0
+		beq	.nofixed
+		patchs	$12938,_tickgate		;replaces tst.w $7e006 (paused)
+		patchs	$12986,_drawgate		;replaces subi.w #1,$7e004 (frame skip)
+		move.w	#$4e71,$1298c			;nop: the rest of the subi
+	;the per-pass logic ($129c2-$129d9: people, effects, the pass counter $7e000) runs
+	;only in a pass that ran a world step
+		patchs	$129c2,_ticklogic
+		move.w	#$6000+($129da-$129c8-2),$129c8	;bra.s $129da
+		patchs	$129da,_tickcommands		;replaces jsr $7274 (the captains' command queue)
+.nofixed
 
 		lea	(_pl_trainer,pc),a0
 		sub.l	a1,a1
@@ -444,16 +474,27 @@ _initbuffers
 		move.l	a0,$1add2
 		move.l	a0,$1ad28
 		move.l	a0,$1aa80
+		bsr	_initshadows
 .nofast
 		jmp	$1363a
 
 _doswap
+	;Enhanced framerate: wait here, before overwriting the chip buffer that the previous swap
+	;stops showing at its vertical blank, not before drawing (_ingamewaitswap): the
+	;drawing goes to a buffer in fast memory that is not shown.
+		btst	#0,(_custom4+3,pc)
+		beq	.go
+.prev		tst.w	BufferSwapped
+		beq	.prev
+.go
 		movem.l d0/a0-a1,-(sp)
 		move.l	CurBufferOffset,d0
 		move.l	(_origbufs,pc,d0.l),a0
 		lea	(_currentfb,pc),a1
 		move.l	a0,(a1)
 		move.l	BitplanePtr2,a1
+		btst	#0,(_custom4+3,pc)	;the shadows exist (_initshadows)
+		bne	_shadowcopy
 		move.w	#BUFSIZE/16-1,d0
 .l
 		move.l	(a1)+,(a0)+
@@ -513,9 +554,12 @@ _ingamewaitswap
 		; original code
 		move.w	$3b79,$3b79c
 		clr.w	$3b79a
+		btst	#0,(_custom4+3,pc)		;Enhanced framerate: _doswap waits
+		bne	.nowait
 .waitswap
 		tst.w	BufferSwapped
 		beq	.waitswap
+.nowait
 		; frame rate limit
 		movem.l d0-d1/a0,-(sp)
 		lea	(_nexttime,pc),a0
@@ -533,7 +577,12 @@ _ingameswap
 	IFD SHOWTIME
 		bsr	_showtime
 	ENDC
+		movem.l	a0,-(sp)
+		lea	(_ingame,pc),a0
+		st	(a0)			;_doswap may copy only changed parts
 		bsr	_doswap
+		sf	(a0)
+		movem.l	(sp)+,a0
 		; continue with original code
 		movem.l d0/a0,-(sp)
 		move.l	BitplanePtr1,a0
@@ -545,6 +594,7 @@ _endseq
 		move.l	$df9a,a0
 		move.l	(_currentfb,pc),a1
 		jsr	$1af94
+		bsr	_shadowsstale		;the picture went straight to a chip buffer
 		lea	$1abc2,a1		;original code
 		rts
 
@@ -612,6 +662,98 @@ _drawnum
 		dc.b	%00111100,%01100110,%01100110,%00111100,%01100110,%01100110,%00111100,%00000000  ; 8
 		dc.b	%00111100,%01100110,%01100110,%00111110,%00000110,%00001100,%00111000,%00000000  ; 9
 	ENDC
+
+;--------------------------------
+; Enhanced framerate (CUSTOM4): fixed game speed. The in-game main loop ($128ea-$13194) runs one world step
+; per pass ($12940-$12964) and draws every $7e002th pass, so the game's speed is the
+; machine's pass rate. Here a world step runs only when the field clock (FrameCounter, one
+; count per field) reaches _nexttick, every TICKFIELDS fields; every other pass only draws.
+; While a pass leaves the clock still due, drawing is left out (at most MAXSKIP passes in
+; a row) so the world catches up.
+
+TICKFIELDS = 13			;fields per world tick: the A500 averaged 12.95 (docs/internals.md)
+MAXSKIP = 8			;passes in a row without drawing while behind
+MAXBEHIND = TICKFIELDS*4	;further behind than this, the clock restarts
+
+; replaces "tst.w $7e006" before "bne.s skip-world-step": Z set runs the world step
+_tickgate	movem.l	d0-d1/a0,-(sp)
+		lea	(_nexttick,pc),a0
+		move.l	FrameCounter,d0
+		tst.w	$7e006			;paused?
+		bne	.restart
+		move.l	d0,d1
+		sub.l	(a0),d1			;fields past the due time
+		bmi	.notdue
+		cmp.l	#MAXBEHIND,d1
+		bhi	.restart
+		add.l	#TICKFIELDS,(a0)
+		st	(_ticked-_nexttick,a0)
+		moveq	#0,d0			;Z: run the step
+		bra	.out
+.restart	add.l	#TICKFIELDS,d0
+		move.l	d0,(a0)
+.notdue		sf	(_ticked-_nexttick,a0)
+		moveq	#1,d0			;NZ: skip the step
+.out		movem.l	(sp)+,d0-d1/a0		;movem does not change the flags
+		rts
+
+; replaces "subi.w #1,$7e004" before "bne.s skip-drawing": Z set draws
+_drawgate	movem.l	d0/a0,-(sp)
+		lea	(_skipped,pc),a0
+		move.l	FrameCounter,d0
+		cmp.l	(_nexttick,pc),d0
+		bcs	.draw			;not behind
+		cmp.w	#MAXSKIP,(a0)
+		bcc	.draw
+		addq.w	#1,(a0)
+		moveq	#1,d0			;NZ: leave the drawing out
+		bra	.out
+.draw		clr.w	(a0)
+	IFD QUICKSTART
+		addq.l	#1,$f8.w		;frames drawn, for measurements (unused vector)
+	ENDC
+	IFD SPIN
+		addq.w	#4,$f854		;test build: the camera turns on every frame drawn
+	ENDC
+		moveq	#0,d0			;Z: draw
+.out		movem.l	(sp)+,d0/a0
+		rts
+
+; replaces "jsr $1b3c0" at $129c2, the first of four calls that the main loop makes every
+; pass: $1b3c0 (effects and the pass counter $7e000, which world code reads as a phase),
+; $1719a, $15e98 and $14450 (the people: their state machine and movement). They are game
+; logic, so they run only in a pass that ran a world step. Three of them also draw into the
+; frame being built: $1b3c0 the rain or snow ($1b060, while $71b56 is set), $1719a the
+; compass needle and $15e98 the captains' markers on the map ($1719a and $15e98 only draw).
+; Every other pass draws those without the logic, or they would show only in frames with a
+; world step and blink.
+_ticklogic	btst	#0,(_ticked,pc)
+		beq	.draw
+		jsr	$1b3c0
+		jsr	$1719a
+		jsr	$15e98
+		jsr	$14450
+		rts
+.draw		move.w	$71b56,d7		;rain: the call that $1b3c0 makes at $1b550
+		beq	.marks
+		moveq	#16,d0
+		moveq	#4,d2
+		move.w	#194,d1
+		jsr	$1b060
+.marks		jsr	$1719a
+		jmp	$15e98
+
+; replaces "jsr $7274": the command queue ($7e030, one entry per captain) whose handlers
+; move people; on an A500 it ran about once per tick, so it runs in a pass with a tick
+_tickcommands	btst	#0,(_ticked,pc)
+		beq	.no
+		jsr	$7274
+.no		rts
+
+_nexttick	dc.l	0
+_ticked		dc.b	0
+		even
+_skipped	dc.w	0
 
 ;--------------------------------
 	IFD QUICKSTART
@@ -698,8 +840,7 @@ _fastpatches
 		move.w	#$3,fmode+_custom
 		move.b	#$b8,$1815	; adjust ddfstop
 .noaga
-
-		rts
+		bra	_fastrender
 .table
 		; SPRITE16
 		dc.l	7520
@@ -717,6 +858,185 @@ _fastpatches
 		dc.l	0
 
 _dlgdata	dc.l	0
+
+;--------------------------------
+; Copy only changed screen parts (CUSTOM4, with fast memory). _doswap copies each finished
+; frame (32000 bytes) from fast memory to the chip buffer that will be shown; chip writes
+; are slow. A shadow in fast memory holds what each of the two chip buffers contains, so
+; the in-game swap writes only the 16-byte blocks that differ from it. Every other swap
+; (menus, sequences) copies everything and refreshes the shadow. The four places that draw
+; straight into a chip buffer (_currentfb: $4626, $1add0, $1ad26, $1aa7e) and the end
+; sequence mark both shadows stale, which makes the next copy into each buffer complete,
+; and so does every SHADOWREFRESHth in-game swap (docs/internals.md).
+
+SHADOWREFRESH = 64
+
+; jumped to from _doswap with its d0/a0-a1 on the stack: d0 = CurBufferOffset (0 or 4),
+; a0 = the chip buffer, a1 = the new frame
+_shadowcopy	movem.l	d1-d3/d7/a2-a3,-(sp)
+		lea	(_shadows,pc),a3
+		move.l	(a3,d0.l),a2		;this buffer's shadow
+		lsr.w	#2,d0
+		lea	(_shadowok,pc),a3
+		add.w	d0,a3			;this buffer's valid flag
+		move.w	#BUFSIZE/16-1,d7
+		btst	#0,(_ingame,pc)
+		beq	.full
+		tst.b	(a3)
+		beq	.full
+		move.l	a3,d1
+		lea	(_refresh,pc),a3
+		subq.w	#1,(a3)
+		bpl	.blk
+		move.w	#SHADOWREFRESH-1,(a3)
+		move.l	d1,a3
+		bra	.full
+.blk		movem.l	(a1)+,d0-d3
+		cmp.l	(a2)+,d0
+		bne	.w1
+		cmp.l	(a2)+,d1
+		bne	.w2
+		cmp.l	(a2)+,d2
+		bne	.w3
+		cmp.l	(a2)+,d3
+		bne	.w4
+		lea	(16,a0),a0
+		dbf	d7,.blk
+		bra	.done
+.w1		subq.l	#4,a2
+		bra	.wr
+.w2		subq.l	#8,a2
+		bra	.wr
+.w3		lea	(-12,a2),a2
+		bra	.wr
+.w4		lea	(-16,a2),a2
+.wr		movem.l	d0-d3,(a2)
+		lea	(16,a2),a2
+		movem.l	d0-d3,(a0)
+		lea	(16,a0),a0
+		dbf	d7,.blk
+		bra	.done
+.full		st	(a3)			;the shadow is valid after this copy
+.fl		movem.l	(a1)+,d0-d3
+		movem.l	d0-d3,(a2)
+		lea	(16,a2),a2
+		movem.l	d0-d3,(a0)
+		lea	(16,a0),a0
+		dbf	d7,.fl
+.done		movem.l	(sp)+,d1-d3/d7/a2-a3
+		movem.l	(sp)+,d0/a0-a1
+		rts
+
+; called by _initbuffers (once, when the game program starts) after it set the _currentfb uses: allocate
+; the shadows once and hook the four places that draw straight into a chip buffer
+_initshadows	btst	#0,(_custom4+3,pc)
+		beq	.no
+		movem.l	d0/a0-a1,-(sp)
+		lea	(_shadows,pc),a0
+		tst.l	(a0)
+		bne	.hooks
+		move.l	(_fastbuf,pc),d0
+		move.l	d0,(a0)+
+		add.l	#BUFSIZE,d0
+		move.l	d0,(a0)
+		add.l	#BUFSIZE,d0
+		lea	(_fastbuf,pc),a1
+		move.l	d0,(a1)
+.hooks		bsr	_shadowsstale
+	IFD QUICKSTART
+		lea	(_shadows,pc),a1
+		move.l	a1,$f4.w		;for tools/shadowcheck.sh (unused vector)
+	ENDC
+		patchs	$4626,_fbdraw1			;movea.l _currentfb,a0
+		patchs	$1aa7e,_fbdraw1
+		patchs	$1add0,_fbdraw2			;move.l _currentfb,$dfb2
+		move.l	#$4e714e71,$1add6
+		patchs	$1ad26,_fbdraw3			;move.l _currentfb,$dfbe
+		move.l	#$4e714e71,$1ad2c
+		move.l	(_resload,pc),a0
+		jsr	(resload_FlushCache,a0)
+		movem.l	(sp)+,d0/a0-a1
+.no		rts
+
+; mark both shadows stale; movem, lea and Scc keep the flags
+_shadowsstale	movem.l	a1,-(sp)
+		lea	(_shadowok,pc),a1
+		sf	(a1)+
+		sf	(a1)
+		movem.l	(sp)+,a1
+		rts
+
+; the four places that draw straight into the chip buffer that is shown
+_fbdraw1	move.l	(_currentfb,pc),a0	;movea: the flags stay
+		bra	_shadowsstale
+_fbdraw2	move.l	(_currentfb,pc),$dfb2	;the original move sets the flags too
+		bra	_shadowsstale
+_fbdraw3	move.l	(_currentfb,pc),$dfbe
+		bra	_shadowsstale
+
+_shadows	dc.l	0,0			;the shadows of chip buffer 0 and 1 (CurBufferOffset 0, 4)
+_shadowok	dc.b	0,0
+_ingame		dc.b	0
+		even
+_refresh	dc.w	SHADOWREFRESH-1
+
+;--------------------------------
+; The terrain renderer ($e1d4-$f14a: the span filler at $e1d8 and the tile renderer at
+; $e81c that calls it) runs from chip memory, where every instruction fetch waits for the
+; chip bus: its loop is longer than a 68020's 256-byte instruction cache. With fast memory
+; it is copied there, after _fastpatches has set the table addresses in it ($e4c4).
+; Outside code enters it at four places and writes one variable in it; inside, one
+; PC-relative read leaves it and one absolute write ($ead2) names its own data. Nothing else refers to it (docs/internals.md).
+RENDSTART = $e1d4
+RENDEND = $f14a
+
+_fastrender
+	IFD NORELOC
+		rts
+	ENDC
+		btst	#0,(_custom4+3,pc)	;only with Enhanced framerate: without it the slave is v1.4
+		beq	.done
+		lea	(_fastbuf,pc),a3
+		move.l	(a3),d0
+		addq.l	#3,d0
+		and.b	#-4,d0
+		move.l	d0,a1			;the copy
+		lea	RENDSTART,a0
+		move.w	#(RENDEND-RENDSTART)/2-1,d1
+.copy		move.w	(a0)+,(a1)+
+		dbf	d1,.copy
+	;the stub for "add.l $f85c(pc),d6" at $e1e4, which cannot reach $f85c from the copy
+		move.l	a1,a2
+		move.w	#$dcb9,(a1)+		;add.l $f85c.l,d6
+		move.l	#$f85c,(a1)+
+		move.w	#$4e75,(a1)+		;rts
+		move.l	a1,(a3)			;the rest of fast memory stays free
+		move.l	d0,a0
+		lea	($e1e4-RENDSTART,a0),a1
+		move.w	#$6100,(a1)+		;bsr.w stub
+		sub.l	a1,a2
+		move.w	a2,(a1)
+	;the one absolute reference inside it to its own data ($ead2: move.b d1,$efb8.l)
+		move.l	d0,d1
+		add.l	#$efb8-RENDSTART,d1
+		move.l	d1,($ead4-RENDSTART,a0)
+	;the variable that the main loop writes ($1297a: move.l a0,$e1d4)
+		move.l	d0,$1297c
+	;the entries: jmp from the original to the copy
+		lea	(.entries,pc),a2
+.entry		moveq	#0,d1
+		move.w	(a2)+,d1
+		beq	.done
+		move.l	d1,a1
+		move.w	#$4ef9,(a1)+
+		move.l	d0,d2
+		add.l	d1,d2
+		sub.l	#RENDSTART,d2
+		move.l	d2,(a1)
+		bra	.entry
+.done		move.l	(_resload,pc),a2
+		jmp	(resload_FlushCache,a2)
+.entries	dc.w	$e3b4,$e3fc,$e4b6,$e81c,0
 
 _a6dlgdata
 		move.l	(_dlgdata,pc),a6
@@ -763,6 +1083,8 @@ _tags		dc.l	WHDLTAG_CUSTOM1_GET
 _custom1	dc.l	0
 		dc.l	WHDLTAG_CUSTOM2_GET
 _custom2	dc.l	0
+		dc.l	WHDLTAG_CUSTOM4_GET
+_custom4	dc.l	0
 		dc.l	WHDLTAG_ATTNFLAGS_GET
 _attnflags	dc.l	0
 		dc.l	TAG_DONE
