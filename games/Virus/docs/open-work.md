@@ -53,13 +53,12 @@ at 12.0 fps on the a500+ and 22 to 23 fps on the a1200 and the a1200-030. The A5
 CUSTOM3=1, with Enhanced framerate and fast memory: on the fields between two ticks'
 frames, frames interpolated between the two ticks, with the game state byte-identical; tick
 N's own frame then shows P−1 fields later (20 ms at 25 Hz). The a1200-030 and the a3000
-draw 50 frames a second at every speed, the 14 MHz 68020s 36 to 39 at 25 Hz instead of 25
-([internals](internals.md#frames-between-ticks)). Still open:
+draw 50 frames a second at every speed, the 14 MHz 68020s 36 to 39 at 25 Hz instead of 25;
+the death sequence too ([internals](internals.md#frames-between-ticks)). Still open:
 
-1. **The death sequence.** Its 51 passes (the explosion's debris) draw no frames between.
-2. **Not met yet** in tools/pairs.py's runs: the attractor's lightning and 12 of the 18
+1. **Not met yet** in tools/pairs.py's runs: the attractor's lightning and 12 of the 18
    object handlers. Their entries pair the same way; a run that meets them checks it.
-3. **Play-test.**
+2. **Play-test.**
    - Matrices are blended word by word: an object that turns fast looks smaller midway?
    - Unpaired entries (new particles, the screen's edge) appear a field late or leave a
      field early.

@@ -473,9 +473,12 @@ slot), the key it had on the last tick, its bucket, size and place. A removal no
 it fills and marks the last slot as moved away for the rest of the tick, so a particle
 spawned there later pairs with nothing. After the simulation (`_btcapture`) the entries are
 copied by key into one of two tables in ExpMem, tagged with the tick, the size and the
-bucket; the other table holds the last tick's. A pass in which the death sequence ran
-records no whole tick, and the main loop's entry forgets the last one, so the next pass draws
-no frames between.
+bucket; the other table holds the last tick's. The death sequence's passes (`_death`,
+`_drender`) are ticks of their own and record and draw the same way; the main loop's pass
+in which the ship crashed records no whole tick, so the death sequence's first pass draws no
+frames between, and the main loop's entry (the next life) forgets the last tick. On the last
+life the death sequence draws its text after the renderer from its pass 16 on; a frame
+between draws it too (`_bttext`).
 
 When the pass draws and the last pass recorded a whole tick (`_btframes`), for k = 1 to
 P−1, while the tick's field plus k−1 has not gone: build the staging lists at α = k/P
@@ -504,8 +507,12 @@ is at most one frame a field. In ExpMem: 32 KB of staging lists, two entry table
   for pixel but for 2 dots of 4 by 2 pixels, where two dots of a bucket overlap and the
   staging lists draw them in another order. The panel's radar and gauges differ by a few
   pixels: they draw this tick's radar list and fuel, a field early.
+- In play (a game started with SPACE, the a1200-030 at 25 Hz, the same input on the same
+  fields: thrust and pitch until a crash, the death sequence, the next life), the game state
+  at tick 3150 is byte-identical with frames between ticks on and off.
 - Screenshots of consecutive fields show the landscape, objects and particles moving between
-  their places of two ticks.
+  their places of two ticks, the death sequence's debris too, and its GAME OVER on every
+  field.
 
 Measured (tools/pace.py, the window after the fade-in, 1250 fields; ticks against the
 nominal rate, drawn frames a second, of them frames between ticks):
@@ -623,7 +630,8 @@ With CUSTOM3=1 as well and ExpMem in fast memory (frames between ticks,
 | `$2937e`, `$293a8`, `$294bc`, `$294ce`, `$297ca` (the renderer's sounds) | `jsr` to `$1ca58` | `jsr`: the same, but not in a frame between |
 | `$2981c` (the renderer's smoke) | `jsr` to `$25c7e` | `jsr`: the same, but not in a frame between |
 
-The ship's store (`$2b250`, above) records its entry too.
+The ship's store (`$2b250`, above) records its entry too, and the death sequence's pass and
+renderer (`$2b472`, `$2b494`, above) start, record and draw its ticks the same way.
 
 The highscore table is 280 bytes at `$2b62e` (`$66e2e`). `Virus.hi` holds it nibble-swapped
 and inverted (`_crypt`, its own inverse); it is loaded at start when its size is 280.

@@ -425,8 +425,7 @@ _death		move.l	d1,-(sp)
 		move.l	_period(pc),d1
 		bsr.w	_pace
 		move.l	a0,-(sp)
-		lea	_rec(pc),a0
-		sf	(a0)			;the pass's entries are not a whole tick
+		bsr.w	_btbegin		;frames between ticks: a tick of its own
 		cmp.w	#50,($c9f6).l		;the pass count
 _sr_dcount	equ	*
 		bcs.b	.paced
@@ -443,8 +442,15 @@ _drequest	bsr.w	_draw
 		bne.w	_request
 		rts
 
-_drender	bsr.w	_draw
+_drender	bsr.w	_btcapture
+		bsr.w	_draw
 		beq.b	.no
+		move.l	a0,-(sp)
+		lea	_dpass(pc),a0
+		st	(a0)
+		bsr.w	_btframes		;its frames between ticks
+		sf	(a0)
+		movea.l	(sp)+,a0
 		GJMP	$65174			;the renderer
 .no		move.l	#$9ea6,($1022).l	;the radar list, as the renderer leaves it
 _sr_dnodraw	equ	*
@@ -955,6 +961,7 @@ _btframes	movem.l	d0-d7/a0-a6,-(sp)
 	ENDC
 		bsr.w	_btbuild
 		bsr.w	_btrender
+		bsr.w	_bttext
 		lea	_frames(pc),a0
 		addq.l	#1,(a0)+
 		addq.l	#1,(a0)			;_bframes
@@ -964,6 +971,20 @@ _btframes	movem.l	d0-d7/a0-a6,-(sp)
 		bra.b	.frame
 .done		movem.l	(sp)+,d0-d7/a0-a6
 		rts
+
+; In the death sequence's passes from 16 on, on the last life, the game draws its text
+; after the renderer ($2b4be-$2b4e3): a frame between draws it too.
+_bttext		move.b	_dpass(pc),d0
+		beq.b	.no
+		move.l	_pc9ec(pc),a0
+		cmp.w	#1,$ca02-$c9ec(a0)	;the lives
+		bne.b	.no
+		cmp.w	#16,$c9f6-$c9ec(a0)	;the pass count
+		blt.b	.no
+		move.l	#$66d7a,a0		;the text
+		add.l	_delta(pc),a0
+		GCALL	$58cc6
+.no		rts
 
 ; a + (b - a) * alpha: (a1)+ the last tick's word, (a2)+ this tick's, to (a3)+; d5 alpha.
 BLENDW		MACRO
@@ -1251,6 +1272,7 @@ _okprv		dc.b	0			;the last tick's
 _rec		dc.b	0			;recording
 _bt		dc.b	0			;frames between ticks on
 _inb		dc.b	0			;in a frame between
+_dpass		dc.b	0			;in the death sequence's pass
 		even
 
 ; Z set when this pass does not draw. Keeps every register.
