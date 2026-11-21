@@ -49,78 +49,45 @@ at 12.0 fps on the a500+ and 22 to 23 fps on the a1200 and the a1200-030. The A5
 
 ## Frames between ticks
 
-The plan for 50 frames a second at a 25 Hz tick, and for three and four frames a tick at
-16.7 and 12.5 Hz: between ticks, draw frames predicted from the tick's own state, and leave
-the game state byte-identical. The design and the code behind it are in
+50 frames a second at a 25 Hz tick, and three and four frames a tick at 16.7 and 12.5 Hz:
+on the fields between two ticks' frames, frames interpolated between the two ticks, with
+the game state byte-identical. Tick N's own frame then shows P−1 fields later (20 ms at
+25 Hz). The design and the code behind it are in
 [internals](internals.md#frames-between-ticks).
 
-It needs Enhanced framerate and fast memory (the drawing buffer). In the slave it is:
-
-- 7 hooks that record the depth lists' entries;
-- 2 hooks that keep a frame between ticks from starting sounds and spawning smoke;
-- a writer that emits the four kinds of entry again;
-- the staging and restoring, the pacing, and a CUSTOM3 switch.
-
-Which machines it can help:
-
-- The a3000, a3000-50 and the a1200-030, -040 and -060 draw a whole pass in a field in the
-  demo (50.0 fps with Enhanced off). A frame between ticks leaves out the simulation, so it
-  should fit there; that is still to be measured.
-- The 14 MHz 68020s draw 35.8 and 37.8 fps, 26 to 28 ms a pass on average. At 25 Hz that
-  leaves room for a frame between ticks only in light scenes.
+It needs Enhanced framerate and fast memory (the drawing buffer). Which machines it can
+help: the a3000, a3000-50 and the a1200-030, -040 and -060 draw a whole pass in a field in
+the demo (50.0 fps with Enhanced off), and a frame between ticks leaves out the simulation;
+the 14 MHz 68020s draw 35.8 and 37.8 fps, 26 to 28 ms a pass, so at 25 Hz only light scenes
+leave room. Both are still to be measured.
 
 Steps, each checked before the next:
 
-1. **Measure the prediction, with no slave change.** A tool (`tools/predict.py`) records each
-   entry the simulation emits, with its source, over consecutive ticks of the demo and of
-   the scripted play. It can run Unicorn from a chip dump as tools/callwrites.py does, or use
-   the gdb stub. It compares the prediction at α = 1 with the next tick's entries, paired by
-   the source's slot, skipping slots that a removal refilled. It reports the share that is
-   exact for each writer, and what the rest are. It also settles two things the static
-   reading does not:
-   - whether every one of the 18 object handlers' jumps to the tail `$26d08` comes with the
-     record final;
-   - whether the objects' and shards' own matrices change enough between ticks to need
-     predicting.
-2. **Record.** The 7 hooks and the table in ExpMem, the bucket pointers and the radar list's
-   end. Checks:
-   - no game state changes (tools/callwrites.py `compare` at demo tick 200, against
-     Enhanced without it);
-   - emitting again at α = 0 gives the native lists byte for byte at every tick of the demo
-     window.
-3. **Draw at α.** The frame between ticks: the staging, the two hooks, the restore, the
-   renderer and the swap. Checks:
-   - at α = 0 it draws the tick's frame again, pixel for pixel;
+1. **Pairing** (done): tools/pairs.py, in the demo and in play, found every source that
+   exists on two ticks paired by its slot and the dispatchers' moves, and no record changed
+   between ticks ([internals](internals.md#frames-between-ticks)). Not met yet: the
+   attractor's lightning and 12 of the 18 object handlers.
+2. **Record.** The hooks at the 7 stores and 2 removals, and the two tables in ExpMem.
+   Checks: no game state changes (tools/callwrites.py `compare` at demo tick 200 against
+   Enhanced without it); the recorded entries are the native lists'.
+3. **Draw between.** Staging, the six skipped calls, the restore, the renderer and the swap.
+   Checks:
+   - a frame at α = 1 is tick N's own, pixel for pixel;
    - the game state is byte-identical with frames between ticks on and off, at demo tick 200
      and at the demo's end;
-   - during a frame between ticks no sound starts and no particle is added (gdb
-     breakpoints);
    - screenshots of consecutive fields show the moving things midway.
-4. **Pace.** `_pass` draws the frames between ticks before it waits for the next tick.
-   - The frame shown on the k-th field after the tick's frame takes α = k/P, and it is drawn
-     only while it can show before the next tick's frame.
-   - A flag says the last pass drew and swapped. The main loop's entry, a pause, the death
-     sequence and a wave's end clear it.
-   - CUSTOM3 ("Frames between ticks") turns it on, off by default until play-tested.
-   - Measure with tools/pace.py, extended to count frames between ticks and how many fields
-     each frame shows for.
-   - Even holds look smooth; a mix of one and two fields can look worse than a steady 25. If
-     the 68020s only get that mix, draw frames between ticks only where they fit every tick,
-     decided over a window.
-5. **Rotations.** The ship's attitude between ticks, from the target captured at `$2af56`.
-   The spin matrices come with step 3. The other objects' matrices only if step 1 or the
-   screenshots show them stepping.
-6. **The death sequence.** Its 51 passes (the explosion's debris) get the same, through
-   `_death`'s pacing.
-7. **Play-test.**
-   - The one-frame mispredictions: bounces, landings, shots at their hit, reversals.
-   - Clipping at the new camera poses: a word overflow in a near-plane clip (the shared
-     simulation-and-presentation playbook) would show as a face filling the view.
+4. **Pace.** Frame k only while it can show on its field; CUSTOM3 ("Frames between ticks")
+   turns it on. Measure with tools/pace.py, extended to count frames between ticks.
+   Even holds look smooth; a mix of one and two fields can look worse than a steady 25.
+5. **The death sequence.** Its 51 passes (the explosion's debris) get the same.
+6. **Play-test.**
+   - Matrices blended word by word: an object that turns fast looks smaller midway?
+   - Unpaired entries (new particles, the screen's edge) pop by a field.
    - 16.7 and 12.5 Hz, with two and three frames between ticks.
    - A pause, a wave's end, game over.
 
-Input is still read once a tick. Frames between ticks predict forward, so they add no delay,
-but they do not make the controls answer sooner either.
+Input is still read once a tick, and tick N's frame comes P−1 fields later than without it:
+the controls answer that much later.
 
 ## Candidates
 
@@ -141,8 +108,8 @@ only, everything not DMA in fast memory, every cache on), is in
   left on the 68020s is mostly the game itself.
 - **50 frames a second.** The a3000 and up draw 50 in the demo, but a frame a tick holds
   them at 25. A 50 Hz tick at today's pace is on the order of 80 patch sites in integer code
-  and still another game ([internals](internals.md#a-50-hz-tick)). Frames drawn between
-  ticks are the plan instead ([above](#frames-between-ticks)).
+  and still another game ([internals](internals.md#a-50-hz-tick)). Frames interpolated
+  between ticks are the plan instead ([above](#frames-between-ticks)).
 - Run on a 512 KB chip A500: find the render writes past `$80000` (a write watchpoint
   above `$80000`) and clip them, so `ws_BaseMemSize` can be `$80000`. The unused `_clamp`
   shows where the original author started.

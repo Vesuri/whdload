@@ -359,126 +359,121 @@ Drawing between ticks gives the frames without any of that: see the next section
 
 ## Frames between ticks
 
-The design for drawing frames between ticks, read from the code. Nothing of it is built;
-[open work](open-work.md#frames-between-ticks) has the steps. A frame drawn a fraction α of
-the way to the next tick shows every mover at `pos + α·v`, and the game state stays as it
-is. The demo then stays in sync, and the state comparisons (tools/gametime.py,
+Frames drawn between two ticks, interpolated: on the fields between tick N−1's frame and
+tick N's, the game draws what lies a fraction α of the way from N−1 to N. Not built yet;
+[open work](open-work.md#frames-between-ticks) has the steps. The game state stays as it is:
+the frames between only read it, and everything the renderer writes is restored or kept
+from happening, so the demo stays in sync and the state comparisons (tools/gametime.py,
 tools/callwrites.py) still apply.
 
-This predicts forward rather than interpolating back. Interpolating between the last two
-ticks would show everything a tick late (40 ms at 25 Hz), and it would need each thing paired
-with itself across ticks, which the lists' compaction makes hard (a removal moves the last
-record into the freed slot). The prediction is exact in free motion because of the game's
-update order (below).
+Interpolating, not predicting forward. Both ends are known, so every pose between them is
+right: no frame shows a bounce, a landing or a hit before it happens. The cost is that tick
+N's own frame is shown P−1 fields later than now (P fields a tick: 20 ms at 25 Hz, 40 ms at
+16.7 Hz, 60 ms at 12.5 Hz). A forward prediction (`pos + α·v`) would add no delay, but
+tools/pairs.py's first version measured it: the ship's velocity changes every tick (thrust,
+drag), so the predicted camera was off on 99 of 99 ticks of the demo by 1 to 17 units, and
+the whole landscape would step back at every tick.
 
 **What the renderer draws.** The depth lists are 10 buckets of 3276 bytes at `$16ac-$96a3`,
 256 units of depth each:
 
-- `$29594` holds each bucket's write pointer and end, and `$295e4` its start. `$29574`
-  resets the lists after the renderer.
+- `$29594` holds each bucket's write pointer and end, and `$295e4` its start and end;
+  `$29574` copies the second over the first after the renderer.
 - An entry is a plotter's address followed by its data.
 - The renderer (`$29cc2`) draws the buckets far to near, between the landscape's rows. It
   calls each plotter with a5 at its data and only reads the entries.
 - The simulation fills the lists before the renderer runs. The renderer adds the tiles'
-  objects as it walks the grid.
+  objects as it walks the grid, at its camera (`$107e`, the only camera it reads).
 
-| Writer (`Disk.1`, tail and store) | Entry | Its position |
+| Writer (`Disk.1`, store) | Entry | Its position |
 |---|---|---|
-| Particles, a dot (`$25252`, `$252a4`) | 8 bytes: plotter, x, y | projected, against the camera of the tick before: the particles run before the player moves it |
-| Particles, a dot and its ground dot (`$252c2`, `$25312` and `$25348`) | two of 8 bytes | the same; the ground dot at the terrain height under it |
-| Particles, shards (`$25366`, `$253bc`) | 32 bytes: plotter `$2bbaa`, model, matrix (9 words), position | 3D, camera-relative |
-| Objects (`$26d08`, `$26dac`) | 32 bytes, as the shards | 3D, against this tick's camera (`$1096`, `$26cc6`) |
+| Particles, a dot (`$252a4`) | 8 bytes: plotter, x, y | on the screen, against the camera of the tick before |
+| Particles, a dot and its ground dot (`$25312`, `$25348`) | two of 8 bytes | the same; the ground dot at the terrain under it |
+| Particles, shards (`$253bc`) | 32 bytes: plotter `$2bbaa`, model, matrix (9 words), position | 3D, camera-relative |
+| Objects (`$26dac`) | 32 bytes, as the shards | 3D, camera-relative |
 | The attractor's lightning (`$27cdc`) | 16 bytes: plotter `$28182`, two points | 3D, camera-relative |
 | The ship (`$2b250`) | 32 bytes, its matrix in `$1084` from the attitude | 3D, camera-relative |
 | The renderer's tile objects (`$297d4`, stores `$29672`-`$29840`) | 32, 14 and 4 bytes | from the grid, at the renderer's camera |
 
-The entries hold copies of the matrices, not pointers:
+**Pairing.** Each entry of tick N is blended with the entry its source made on tick N−1. The
+source is a slot: a particle's in `$a2a6` (18 bytes a record), an object's in `$bd04` (20
+bytes), for the lightning its object's, and the ship. Records move only in the two
+dispatchers' removals (`$25406`, `$26e0a`): the last record is copied into the freed slot
+and handled at once, so a slot's entry is the record's that had the slot at the end of the
+last tick, but in the iteration right after a removal, where it is the last slot's. Nothing
+else removes particles or objects (the only writes to their counts, `$c9ec` and `$c9ee`, and
+list ends, `$102a` and `$102e`, are in the dispatchers, the spawns and the resets).
+Measured with tools/pairs.py (Unicorn from chip dumps, the record as the next tick's
+dispatcher finds it against the record at the source's tail): in the demo (1005 ticks) and
+in play (two games started with SPACE, 298 ticks), no record changed between its tail and
+the next tick's dispatcher, and the move rule pairs every source that existed on both ticks.
+What pairs and what does not, in the demo:
 
-- the spin matrices `$109c`, `$10ae` and `$10c0` (`$2bafc`, from the counter `$c9f4`);
-- the identity `$10d2` (`$288de`);
-- `$1084`, the scratch in which each object and the ship compute their own.
+| Writer | Sources | Paired | Unpaired: new (spawned during or after the dispatcher) |
+|---|---:|---:|---:|
+| Dot | 59122 | 96.8% | 3.2% |
+| Dot and ground dot | 47420 | 89.9% | 10.1% |
+| Shard | 255 | 96.9% | 3.1% |
+| Object | 2106 | 99.6% | 0.4% |
+| Ship | 1005 | 100% | |
 
-**Prediction.** Every mover adds its stored velocity before anything else changes it:
+The object handlers seen were 6 of the 18 (`$26eb0`, `$26fb2`, `$27094`, `$27382`, `$27426`,
+`$27514`), and no lightning: neither run met an attractor.
 
-- The particles' dispatcher adds it before the handler. The handler adds gravity, bounces
-  and writes the record back before its tail (`$25528`, `$2555c`).
-- The object handlers integrate first.
-- The ship integrates first too (`$2b136`).
+How the pairs differ from one tick to the next (the demo; play alike):
 
-So at an entry's tail its record holds what the next tick adds, and the next pose is
-`pos + v`, wrapping as words as in the game. The camera is the ship's position, its height
-256 below it or fixed at 512 low down (`$2b1e0`). The camera between ticks is that rule
-applied to the ship's predicted position.
+- the dots move up to 64 pixels a tick, mostly 3 to 16; 47% change their plotter (their
+  colour) and 22% their bucket;
+- the 3D entries move up to 256 units against the camera; the camera itself 9 to 256;
+- the objects' matrices are the spin matrix `$109c` (words up to 4096 apart, 1.0 being
+  `$7ffe`), the identity, or their own (up to 8192); the shards' spin `$10ae` up to 16384;
+  the ship's up to 16384, mostly under 4096; once an object changed matrix (32768 apart);
+- a source changes writer (a dot that gains or loses its ground dot) in 1%.
 
-The prediction is wrong for one frame where the next tick changes v in other ways:
+**Blending.** For a pair of entries of the same size, at α = k/P:
 
-- particles bounce on the ground;
-- objects reverse (`$2721c`, `$27eb8`);
-- the ship lands;
-- things end or collide (a shot is drawn half a tick on into what it hits);
-- a decision changes v.
+- positions, word by word, `a + (b − a)·α` (dots: x and y on the screen; 3D: x, y, z; the
+  lightning: both points);
+- matrices word by word, unless a word moves more than 16384 (a change of matrix, not a
+  turn): then the nearer tick's. Blending a turn of 30° shortens the axes by 3.4% at the
+  middle, 0.2% at the common 7° (a word step of 4096);
+- the plotter (a dot's colour) and the model from the nearer tick (α < ½: N−1);
+- the bucket: 3D entries' from their blended depth, as the writers compute it
+  (`(z − 2304) >> 5`, clamped to 0 to 72); the dots' and the lightning's from the nearer tick.
 
-Things spawned during a tick appear at the next tick, as now.
-
-Rotations:
-
-- The spin matrices go to the counter plus α. Angles are in 1/65536 of a turn and the rotation
-  (`$24caa`) looks the sine table up in steps of 32, so a half tick is exact and thirds
-  round to 32.
-- The ship's attitude moves half the way to its target each tick (`$2af56`). Between ticks
-  it is `att + α·(next - att)`, with the target the tick used.
-- The other objects keep the tick's matrix.
-
-The renderer reads the camera at full precision (the grid's offset in units, `$29974`), so a
-frame between ticks moves the landscape by its fraction too.
-
-**Recording and emitting again.** A hook at each of the simulation's 7 stores copies the
-entry and its source's position and velocity into a table in fast memory. That is at most
-the 375 particles twice and the objects, a few KB in practice and never more than the lists'
-32760 bytes. With them go the bucket pointers and the radar list's end, as they are before
-the renderer.
-
-A frame between ticks then resets the lists and emits every recorded entry again at α, with
-its writer's own cull, bucket and capacity rules:
-
-- dots are projected again (`asl.l #8` and `divs`, as at `$25278`);
-- the ground dot comes from the terrain height (`$29eb2`, which writes nothing) at the new
-  place;
-- 3D entries are moved.
-
-Then it calls the renderer, which adds the tiles at the staged camera. Emitting at α = 0
-must reproduce the native lists byte for byte; that is the first check.
+Unpaired entries are drawn as on their tick, on the frames nearer it: tick N's new ones
+from α ≥ ½, tick N−1's ones with none on N (removed, or culled on N) below ½. The camera
+(`$107e-$1082`) is blended as the positions, wrapping as words, so the landscape moves with
+the rest; the renderer adds the tiles' objects at it.
 
 **What a frame between ticks must leave as it was.** The renderer changes game state (see
-[Game time](#game-time)), and the frame between ticks must undo or prevent all of it:
+[Game time](#game-time)):
 
-| What | Where (`Disk.1`) | In the frame between |
+| What | Where (`Disk.1`) | In a frame between |
 |---|---|---|
-| The camera `$107e-$1082`, the counter `$c9f4` (the renderer's gates, the type-12 tile's spin `$2963c`) | | staged, then restored |
-| The spin matrices | `$2bafc` | at the counter plus α, then restored |
+| The camera `$107e-$1082` | | staged, then restored |
+| The depth lists' tables `$29594`, `$295e4` | | pointed at the slave's staging lists, then restored; the game's lists are not touched |
 | The RNG `$101a`/`$101e` (the lightning's 9 draws) | `$282dc` | saved, then restored |
-| Smoke from burning tiles (a particle and the RNG) | `$2981c` | not spawned (a hook on the call) |
-| The fuel warnings 25, 29 and 34, their latch `$3ca17`; sound 0 | `$2937a`-`$294ce`, `$297ca` | not started (one hook on the sound start `$1ca58`); the latch restored |
+| Smoke from burning tiles (a particle and the RNG) | `$2981c` | not spawned (the call skipped) |
+| The fuel warnings 25, 29 and 34, their latch `$3ca17`; sound 0 | `$2937a`-`$294ce`, `$297ca` | not started (the five calls skipped); the latch restored |
 | The ship's terrain contact `$3ca0f` | `$2be3e` | restored |
-| The radar list's end `$1022`, `$1026` | `$29358`, `$29362` | set to the tick's end, then restored |
+| The radar list's end `$1022`, `$1026` | `$29358`, `$29362` | restored |
 
 Everything else the renderer and its plotters write is their own scratch: the ranges in
 [Game time](#game-time), `$1072`, `$c704`, `$3ca06`, `$3ca0e`, `$3ca16` and `$1c088`. That list
-comes from the call graph, read statically; the checks in open work confirm it at run time.
+comes from the call graph, read statically; a state comparison with the frames between on
+and off checks it at run time.
 
-**Where it goes.** At the start of the main loop's pass (`_pass`), before it waits for the
-next tick, while the last pass drew and the next tick's frame is not due:
-
-1. Stage the camera, the counter, the spin matrices and the ship's matrix.
-2. Emit the lists again at α.
-3. Run the renderer.
-4. Swap and request the clear, as a drawn pass does: the copy waits for the display as now,
-   so this is at most one frame a field.
-5. Restore everything staged.
-
-The frame shown k fields after the tick's frame takes α = k/P (P fields a tick, CUSTOM2).
-The counter has already advanced there (`addi.w #1,$c9f4` at `$28a04`), so the frame stages
-it back by one.
+**Where it goes.** In the main loop's pass (`_pass`), after the simulation and before the
+renderer: hooks at the 7 stores and the 2 removals record each entry (its slot, the slot it
+had on the last tick, its bucket and where it is); after the simulation the entries are
+copied, by slot, into one of two tables in fast memory, the other holding the last tick's.
+Then, when the pass draws and the last pass recorded a whole tick, for k = 1 to P−1 while
+frame k can still be shown on its field (the tick's field plus k−1): build the staging
+lists at α = k/P, stage, run the renderer, restore, swap and request the clear as a drawn
+pass does. Then the pass goes on as now: the renderer draws tick N's own frame. The game's
+calls keep their order, and the copy waits for the display as now, so there is at most one
+frame a field.
 
 ## Measurements
 

@@ -63,7 +63,10 @@ drawing writes; `tmp/re/f200.chip` is a chip dump from the original at demo fram
 (`python3 tools/callwrites.py capture tmp/re/f200.chip`). `tools/callwrites.py` also lists
 what each main-loop call writes (`writes`), checks that leaving the drawing out keeps the
 game state (`split`) and finds who reads and writes an address range (`who`), all in
-Unicorn from that dump.
+Unicorn from that dump. `python3 tools/pairs.py DUMP [TICKS]` runs the same way and pairs
+each depth-list entry with its source's on the tick before
+([internals](internals.md#frames-between-ticks)); a dump in play is the same `capture`'s
+dump taken at `$64204` after a game was started.
 
 Other analyses, each from a fresh `tools/boot.sh`:
 
@@ -98,7 +101,8 @@ python3 tools/coverage.py dive 1000 0 mouse 0 50 dive 300 0 key 40 1 key 40 0 tr
 python3 tools/coverage.py                        # the count by step
 ```
 
-N (raw `$36`) hands the demo to the player. The game is mouse-only: RMB (`JOY1_2ND_BUTTON`)
+On the attract screen SPACE (raw `$40`, tested at `Disk.1` `$2a5b2`) or a mouse button
+(`$251fe`) starts a game; `wander`'s buttons do it there. Key `$36` does nothing. The game is mouse-only: RMB (`JOY1_2ND_BUTTON`)
 thrust, LMB (`JOY1_FIRE_BUTTON`) fire, moving the mouse pitches and turns (up: nose up).
 `NOTRACE=1` runs the same steps without tracing, to drive a build (the relocated one stops
 on its `ILLEGAL` fill if a reference was missed; WHDLoad's core dump is then in the run's
