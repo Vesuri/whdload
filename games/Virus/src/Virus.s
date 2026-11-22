@@ -79,8 +79,8 @@ _name		dc.b	"Virus",0
 _copy		dc.b	"1988 D.J. Braben / Firebird",0
 _info		dc.b	"installed by John Selck",10
 		dc.b	"enhanced by Vesuri",10
-		dc.b	"Version 2.0b (21.11.2026)",0
-		dc.b	"$VER: Virus.slave 2.0b (21.11.2026)",0
+		dc.b	"Version 2.0b (22.11.2026)",0
+		dc.b	"$VER: Virus.slave 2.0b (22.11.2026)",0
 		even
 
 ;======================================================================
