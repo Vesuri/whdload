@@ -34,6 +34,9 @@ mode on the a500+ and the a1200, and F10 quits with `OK`.
 - Play-test a crash into a slope (a wing, not the ship's centre) on the a500+ at 25 Hz,
   where passes leave the drawing out: the check build only made contacts by lowering the
   ship's entry.
+- The middle mouse button fires the homing missile (tested in FS-UAE, which does not model
+  POTGO): on a real Amiga check that it fires, and only on a press. The game never writes
+  POTGO and reads the right button the same way, from the state the OS left.
 - Without Enhanced framerate the game is the original, tied to the frame rate; with fast
   memory light scenes now run it at up to 50 fps, twice the pace it had before.
 

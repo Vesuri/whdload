@@ -298,6 +298,7 @@ _pl_game	PL_START
 		PL_PS	$607fe-CODE_START,_vbl		;move.b $3ca1b,d0 (the VBL's fade countdown)
 		PL_W	$608c0-CODE_START,$4e71		;level 2: bset #6,$bfee01 -> nop, jsr _keyboard
 		PL_PS	$608c2-CODE_START,_keyboard
+		PL_PS	$668f8-CODE_START,_missile	;movea.l $6064e(pc),a0; tst.b (a0): the missile key
 		PL_PSS	$644b6-CODE_START,_flush,4		;move.w $c9fe,$c9fc: the setup's end
 		PL_PS	$6406c-CODE_START,_title		;jsr $62236: the title's fade-in
 		PL_PS	$640fe-CODE_START,_untitle	;jsr $621a6: its fade-out
@@ -312,6 +313,21 @@ _sr_flush	equ	*
 		jsr	resload_FlushCache(a0)	;keeps every register
 		move.l	(sp)+,a0
 		rts
+
+;----------------------------------------------------------------------
+; The homing missile fires on its key (M unless redefined) or the middle mouse button
+; (POTINP bit 8, 0 while pressed). The game fires on a press: $3ca11 holds it until both are
+; released. a0 the key's flag and Z as the original's tst.b leave them.
+
+_missile	movea.l	#$6064e,a0		;the missile key's pointer
+		add.l	_delta(pc),a0
+		movea.l	(a0),a0
+		tst.b	(a0)
+		bne.b	.out
+		btst	#0,$dff016		;POTINP bit 8: Z set while pressed
+		seq	-(sp)
+		tst.b	(sp)+
+.out		rts
 
 ;----------------------------------------------------------------------
 ; Called from $608c4 with the raw CIA-A SDR byte in d0.

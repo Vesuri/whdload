@@ -30,6 +30,7 @@
 
 
 	Highscores are saved to HD.
+	The middle mouse button fires the homing missile, as M does.
 
 	CUSTOM1=1: Enhanced framerate, set in the installed icon. CUSTOM2 sets
 	its game speed: 0 16.7 Hz (the default), 1 25 Hz, 2 12.5 Hz. With
@@ -47,6 +48,7 @@
 	  screen no longer drags on slow ones
 	- instruction cache flushed after the game changes its own code
 	- mouse sensitivity (CUSTOM3): 100%, 75%, 50% or 25%
+	- the middle mouse button fires the homing missile
 
 	This game needs 544 KB ChipMem instead of 512 KB because of
 	some memory leaks in the render routines which make Virus

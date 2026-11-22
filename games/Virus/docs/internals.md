@@ -614,6 +614,7 @@ Offsets are into `Disk.1`. All are patch-list entries applied to the code where 
 | `Disk.1` offset | Original | Patch |
 |---|---|---|
 | `$250c0` (level 2 interrupt, after reading CIA-A SDR into d0) | `bset #6,$bfee01` | `nop; jsr _keyboard`: does the same `bset`, then quits on F10 (`ws_keyexit`) or the reset-warning code `$78` through `resload_Abort` |
+| `$2d0f8` (play's missile key test) | `movea.l $6064e(pc),a0; tst.b (a0)` (the redefinable key's flag, M by default) | `jsr _missile`: the same test, else the middle mouse button (POTINP bit 8, 0 while pressed); the game's latch `$3ca11` still fires once a press |
 | `$2b916` (highscore entry) | `move.w #3000,d7; cmp.w #127,d0` | `nop; jsr _savehi`: on key 13 (return) saves the table, then does the replaced instructions |
 | `$28cb6` (the landscape setup's end, after the code writes and the map) | `move.w $c9fe,$c9fc` | `jsr _flush` and four bytes of `nop`: the same, then `resload_FlushCache` |
 | `$2886c` (the title's fade-in) | `jsr $62236` | `jsr _title`: the fade-in, then notes the field count |
