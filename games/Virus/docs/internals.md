@@ -187,6 +187,12 @@ list `$3ca1e` shows `$100e`; else `$100e`, the list `$3ca42` showing `$1012`).
   score's pair), requests a clear (`$1d4fe`, `$1d548`) first leaves the mode: the due
   clear, the buffer copied to the chip back screen (once hidden), the pointers back to it. The attract screen, the title, the wave and highscore screens
   therefore run on the chip screens as in the original.
+- ESC (the key flag `$251a7`, `Disk.1` `$28b28`) goes from the main loop's pass straight to
+  game over (`$2b52c`) without the death sequence, whose swap would have left the mode: its
+  `jsr $1ca1e` (sound off, `$28b32`) leaves it first (`_fquit`). Without that the game-over
+  pointer swap and the score screen's were taken for the score's pair, the second pointed
+  the game back at the buffer, and the score screen's picture was drawn there and cleared
+  (ESC in the demo, then SPACE: only the logo's top showed).
 
 Measured (tools/pace.py, the demo window): 37.8 to 46.7 fps on the a1200-030, 32.2 to
 36.0 on the a1200-fast; Enhanced framerate at 25 Hz on the a1200-030 now draws 24.8 frames
@@ -224,7 +230,8 @@ a1200-030 puts the wait for the display at 47.8% against 46.6%.
 Checked: at demo tick 200 the game state is the original's (pointers, the unused clear
 request and the patches apart); screenshots at the same ticks (600, 900, 1166, 1175)
 match the original's; play through waves 1 to 4, game over, the highscore screen and a new
-game drew correctly on the a1200-030.
+game drew correctly on the a1200-030, and so did ESC in the demo, the score screen after it
+and a new game, with and without Enhanced framerate.
 
 ## Game time
 

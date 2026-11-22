@@ -1398,7 +1398,13 @@ _pl_fast	PL_START
 		PL_PS	$65de8-CODE_START,_fwait
 		PL_PS	$65f22-CODE_START,_fwait
 		PL_PS	$67822-CODE_START,_fwait
+		PL_PS	$64332-CODE_START,_fquit	;ESC: jsr $5821e (sound off), then game over
 		PL_END
+
+; ESC in the main loop goes from the pass straight to game over ($66d2c): out of the mode
+; first, as the death sequence's swap would have left it.
+_fquit		bsr.w	_leave
+		GJMP	$5821e
 
 ; The main loop's swap. Keeps every register.
 _fswap		movem.l	d0-d1/a0-a2,-(sp)
