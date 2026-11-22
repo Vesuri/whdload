@@ -100,7 +100,7 @@ slv_GameLoader
 	move.l	a5,a0
 	move.l	d5,d0
 	jsr	resload_CRC16(a2)
-	cmp.w	#$67e7,d0		; SPS 3025
+	cmpi.w	#$67e7,d0		; SPS 3025 (cmpi: the shipped encoding)
 	beq.b	.ok
 	pea	(TDREASON_WRONGVER).w
 	bra.w	QUIT

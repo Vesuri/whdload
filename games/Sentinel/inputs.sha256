@@ -1,0 +1,4 @@
+# "<sha256>  <file name>" per original archive or disk image (shasum -a 256).
+# The installed game first: both archives hold a Sentinel/ drawer and the first one wins.
+e55200740ad111b9143c32e86359a7cb19b7e3e370a41fdd4f62d10c2726006a  Sentinel_v1.01_3025.lha
+68da04218f63b6f5f24469e54300756b69b88cc8080eb21c45b704674d66ed55  Sentinel.lha

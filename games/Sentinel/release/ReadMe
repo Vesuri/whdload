@@ -1,0 +1,39 @@
+That patch applies to Sentinel (c) 1988 Firebird.
+
+This install has the slave-version 1.01.
+It needs WHDLoad v17+ and RawDIC in the path (eg in c:).
+To install from a different drive than df0: select
+Expert as installation mode.
+
+Fixed:  Disk system of that game is (was) one single great bug.
+        Game used odd-adress error, which failed on 68020+.
+        Keyboard interrupt.
+
+V1.01 (15.09.2017) done by StingRay:
+- Blitter wait added to avoid graphics corruption (Mantis #1942),
+  blitter wait patch can be disabled with CUSTOM1
+- RawDIC imager added
+- Interrupt fixed
+- Default quitkey changed to F10
+- Source code included
+- Install script updated
+
+
+Notes:  The icon is a dual romicon/newicon.
+        Lets fast remember the keys: a-absorb, sdl,u-movement,
+          h-end/fail level, btr-build, q-quit body, <esc>-quit level,
+          <cursor left/down>-(un)pause, <f2><f3>-toggle music/sound,
+          <space bar>-switch input mode.
+
+Default quitkey is F10. Change it with the QUITKEY-tooltype.
+
+The install is tested with 2 MB on an A1200, and on an 18 MB 68030.
+
+Disclaimer: Although i try to make my installs as reliable as possible, you 
+          use them wholly on your own risk.
+
+Full whdload package:	aminet:dev/misc/whdload#?.lha
+Other installs:		http://www.fh-zwickau.de/~jah/whdload/
+Report bugs with the bug report form on that page.
+
+Harry in October 1998.

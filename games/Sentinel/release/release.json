@@ -1,0 +1,20 @@
+{
+  "archives": [
+    {
+      "input": "Sentinel.lha",
+      "output": "SentinelEnhanced-{version}-{date}.lha",
+      "replace": {
+        "Sentinel/Sentinel.slave": "build:Sentinel",
+        "Sentinel/Readme": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {
+        "dir": "Sentinel/Source",
+        "variants": [
+          "Sentinel"
+        ]
+      }
+    }
+  ]
+}
