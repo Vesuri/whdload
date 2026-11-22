@@ -73,7 +73,8 @@ _expmem		dc.l	-EXP_SIZE		;ws_ExpMem: optional
 		dc.w	_config-base		;ws_config
 
 _config		dc.b	"C1:B:Enhanced framerate;"
-		dc.b	"C2:L:Game speed:16.7 Hz,25 Hz,12.5 Hz",0
+		dc.b	"C2:L:Game speed:16.7 Hz,25 Hz,12.5 Hz;"
+		dc.b	"C3:L:Mouse sensitivity:100%,75%,50%,25%",0
 _name		dc.b	"Virus",0
 _copy		dc.b	"1988 D.J. Braben / Firebird",0
 _info		dc.b	"installed by John Selck",10
@@ -122,6 +123,21 @@ _start		lea	_resload(pc),a1
 		jsr	resload_Patch(a2)
 .nofast
 
+		move.l	_sens(pc),d0		;mouse sensitivity 0-3: 100, 75, 50, 25%
+		beq.b	.fullsens
+		cmp.l	#3,d0
+		bhi.b	.fullsens
+		add.l	d0,d0
+		lea	_gain(pc),a0
+		move.w	.gains(pc,d0.l),(a0)
+		lea	_pl_mouse(pc),a0
+		lea	CODE_START,a1
+		add.l	_delta(pc),a1
+		move.l	_resload(pc),a2
+		jsr	resload_Patch(a2)
+		bra.b	.fullsens
+.gains		dc.w	256,192,128,64
+.fullsens
 		move.l	_enhanced(pc),d0
 		beq.b	.orig
 		move.l	_speed(pc),d0		;game speed 0-2: 16.7, 25, 12.5 Hz
@@ -335,6 +351,28 @@ _gcall		move.l	d0,-(sp)
 		add.l	d0,4(sp)
 		move.l	(sp)+,d0
 		rts
+
+;----------------------------------------------------------------------
+; Mouse sensitivity (CUSTOM3 1-3). The mouse steers by position: the VBL adds each field's
+; counts to $609f4/$609f6 (128 at the start), and play ($2ae12) takes the attitude the ship
+; turns towards from (count - 128) * 256 each, full at about 64 counts. That 256 becomes
+; _gain; the high words stay as the game left them.
+
+_pl_mouse	PL_START
+		PL_PSS	$66612-CODE_START,_mouse,6	;subi.w #128,d0; asl.w #8,d0; the same for d1
+		PL_END
+
+_mouse		move.w	d0,d2			;d2 is free: the game clears it next
+		sub.w	#128,d2
+		muls.w	_gain(pc),d2
+		move.w	d2,d0
+		move.w	d1,d2
+		sub.w	#128,d2
+		muls.w	_gain(pc),d2
+		move.w	d2,d1
+		rts
+
+_gain		dc.w	256
 
 ;----------------------------------------------------------------------
 ; The title shows while the game builds its tables, from the fade-in to the fade-out: 543
@@ -1637,6 +1675,8 @@ _tags		dc.l	WHDLTAG_CUSTOM1_GET
 _enhanced	dc.l	0
 		dc.l	WHDLTAG_CUSTOM2_GET
 _speed		dc.l	0
+		dc.l	WHDLTAG_CUSTOM3_GET
+_sens		dc.l	0
 		dc.l	TAG_END
 _fields		dc.l	0			;VBLs since the start (tools/pace.py reads
 _frames		dc.l	0			;these, _bframes and _period from _pass's address)

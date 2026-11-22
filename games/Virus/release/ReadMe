@@ -35,6 +35,8 @@
 	its game speed: 0 16.7 Hz (the default), 1 25 Hz, 2 12.5 Hz. With
 	FastMem it also draws frames interpolated between the game's steps, up
 	to 50 a second. 0 or unset runs the game as before.
+	CUSTOM3 sets the mouse sensitivity: 0 100% (the original), 1 75%,
+	2 50%, 3 25%.
 
 	version 2.0b (21.11.2026) done by Vesuri:
 	- Enhanced framerate (CUSTOM1, on in the installed icon): the game runs
@@ -44,6 +46,7 @@
 	- the title no longer flashes by on fast Amigas, and the attract
 	  screen no longer drags on slow ones
 	- instruction cache flushed after the game changes its own code
+	- mouse sensitivity (CUSTOM3): 100%, 75%, 50% or 25%
 
 	This game needs 544 KB ChipMem instead of 512 KB because of
 	some memory leaks in the render routines which make Virus

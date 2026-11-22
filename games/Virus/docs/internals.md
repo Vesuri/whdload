@@ -612,7 +612,19 @@ Offsets are into `Disk.1`. All are patch-list entries applied to the code where 
 | `$2886c` (the title's fade-in) | `jsr $62236` | `jsr _title`: the fade-in, then notes the field count |
 | `$288fe` (the title's fade-out) | `jsr $621a6` | `jsr _untitle`: waits until the title has shown 166 fields, then the fade-out |
 
-With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), a second patch list:
+With CUSTOM3=1-3 (mouse sensitivity 75, 50, 25%), one more, in any mode. The mouse steers by
+position: the VBL (`Disk.1` `$24fb2`) adds each field's counts to `$251f4`/`$251f6`, which
+start at 128, and play takes the attitude the ship turns towards from (count − 128) × 256
+each, full tilt at about 64 counts; the ship then turns half the way to it a tick (`$2af56`).
+Game time and frame rate leave that gain alone: Enhanced framerate changes only how often the
+half steps come, and frames between ticks show them 1 to 3 fields later. The option scales the
+256; 100% (0) leaves the code as it is.
+
+| `Disk.1` offset | Original | Patch |
+|---|---|---|
+| `$2ae12` (play's mouse read, after the call to `$251fe`) | `subi.w #128,d0; asl.w #8,d0`, the same for d1 | `jsr _mouse` and six bytes of `nop`: (count − 128) × `_gain` (192, 128 or 64) in the low words, as the game's |
+
+With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), another:
 
 | `Disk.1` offset | Original | Patch |
 |---|---|---|
@@ -626,7 +638,7 @@ With CUSTOM1=1 (Enhanced framerate, [game time](#game-time)), a second patch lis
 | `$2b47c`, `$2b494`, `$2b4e4` (its clear request, renderer, swap) | `jsr` to `$1d4fe`, `$29974`, `$1d58c` | `jsr`: the same, left out when behind (the radar list reset instead of the renderer); in fast memory the main loop's buffer swap and clear |
 
 With ExpMem in fast memory as well (frames between ticks,
-[above](#frames-between-ticks)), a third:
+[above](#frames-between-ticks)), one more:
 
 | `Disk.1` offset | Original | Patch |
 |---|---|---|
