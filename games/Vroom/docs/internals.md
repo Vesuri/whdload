@@ -5,7 +5,8 @@ hunk or file), current measurements and known limitations.
 
 ## Loading and memory
 
-A direct slave in 512 KB of chip memory (`ws_BaseMemSize` $80000, no ExpMem). The slave
+A direct slave in 512 KB of chip memory (`ws_BaseMemSize` $80000), with an optional 4 KB
+ExpMem for Enhanced framerate's fast memory (below, "Enhanced framerate"). The slave
 loads the boot block's loader from disk offset 0 to $60000, patches it and jumps to $6000C;
 the loader loads the main program (about $3658-$1E000) and calls the slave's `Patch`, which
 patches the program and jumps to its entry at $3658. Files are decrunched by the program's
@@ -197,6 +198,7 @@ rate, on every 68020 and up.
 | $D13C (`jsr $10F90`) | a pass that does not draw leaves out the sky and ground clear but keeps its state: the horizon's scroll (`$13F16`, its blits written into the idle queue, which is not started) and the clamp of the ground's top line $1136C |
 | $D142-$D14D (the wait for a new field) | a pass that does not draw goes on at $D1C2, leaving out the road spans `$10CD2`, the three objects `$140C0` and the scaler `$18154` |
 | $D510 (`move.l $A884,$E258`) | a pass that does not draw returns from `$D13C`, leaving out the swap ($E258, $A71C, `$12FA6`) |
+| $366E (`movea.l #$2FC96,a7`, at the program's start) | with fast ExpMem, the stack moves to its top (below, "Fast memory") |
 | 91 blitter starts in $11C20-$19B1C (`src/blitwait.i`) | `jsr $10C`-`$124.w` (the original slave's start-and-wait) become `jsr $1E0`-`$1F8.w`: start, one read of dmaconr, return (below) |
 
 At most 3 passes in a row leave out the drawing; behind by more than 50 fields (1 s), the
@@ -222,6 +224,21 @@ mostly lands below a field. The a1200-040 is unchanged (its frame is 2 fields ei
 `frames 150` at the swap on the a1200-040 and the a1200, before and after: every frame the
 same in lines 0-30 and 36-174. Lines 31-35 are the race clock (real time) and lines 175-199
 of the cockpit differ between two runs of the same build as well.
+
+**Fast memory.** The slave asks for a 4 KB ExpMem, optional (`ws_ExpMem` negative). When
+WHDLoad finds it in fast memory (not below $200000, chip memory, nor in $C00000-$DFFFFF,
+slow memory on the chip bus), the program's stack moves there. The stack is set once, at
+the program's start ($366E), to $2FC96, just past the second screen. The race uses it down
+to about $2FC10, and in the a500's CPU accesses to chip memory it is the most used data:
+in 100 race fields of a Barto trace, 128000 of 722000 data reads and writes, against 314000
+to the screens and the custom chips, which must stay in chip memory. With the option off
+(a scratch build), `bench 500`
+gives 25.05 fps on the a1200-040 (`CACHE`) against 24.75, and 22.30 on the a1200-030
+(`MMU`) against 21.42; the distance is the same. Without fast memory (the a1200, a 68000)
+the stack stays at $2FC96. On the a1200-040 the ExpMem is Zorro III memory ($41FF1000 in
+FS-UAE): the 32-bit stack addresses passed `statelog 600 tick` against the a500 (all 600
+passes, `CUSTOM3=2`), as did the a1200-030 at 25 Hz and the a1200-fast (Zorro II, 68020)
+at 25 Hz.
 
 **What a pass that does not draw still runs.** The race loop's own code, the landscape
 `$E4F8` whole, and every part of `$D13C` but the ones above.

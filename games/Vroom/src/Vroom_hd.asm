@@ -40,9 +40,7 @@ BLITWAIT_V14	MACRO
 
 
 CHIPMEMSIZE	=	$80000
-FASTMEMSIZE	=	$0
 BASEMEM		=	CHIPMEMSIZE
-EXPMEM		=	FASTMEMSIZE
 
 _base
 		SLAVE_HEADER		;ws_Security + ws_ID
@@ -55,7 +53,7 @@ _base
 		dc.w	0		;ws_DontCache
 _keydebug	dc.b	$5f		;ws_keydebug
 _keyexit	dc.b	$5d		;ws_keyexit = *
-_expmem		dc.l	EXPMEM		;ws_ExpMem
+_expmem		dc.l	-ENH_EXPSIZE	;ws_ExpMem (optional: src/enhanced.i)
 		dc.w	_name-_base	;ws_name
 		dc.w	_copy-_base	;ws_copy
 		dc.w	_info-_base	;ws_info

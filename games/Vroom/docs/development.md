@@ -70,6 +70,8 @@ change is the map's position marker, which the original draws there too (`intern
 | `tools/vroom.py` | the game server (`serve`, the shared commands) and the commands below |
 | `tools/statecmp.py A B [--skip ADDR,...] [--align N]` | compares two `statelog` files: the first frame whose state differs, and where; `--align` first shifts B by up to N rows to where its first row matches |
 | `tools/matrix.py [--full \| CELL ...]` | `bench` on the a500, a1200, a1200-030 (`MMU`) and a1200-040 (`CACHE`), then the a1200-030 with `MMU CUSTOM1=1 CUSTOM2=1` and the a1200-040 with `CACHE CUSTOM1=1`, one boot at a time with a deadline: the bench line, WHDLoad dumps and a screenshot per cell, in `tmp/matrix/<time>/`. The check after a finished change, not after every edit; `--full` adds the a1200-fast and the a1200-040 with `DCACHE`, for one-off decisions |
+| `tools/dmaregions.py TRACE [N]` | the CPU's chip memory accesses in a Barto trace of a 68000: instruction fetches, data reads and writes, and the data accesses by 4 KB block (the screens as one) |
+| `tools/eacensus.py TRACE LO HI [N]` | the executed instructions in a Barto trace with a memory operand or an immediate in [LO, HI): the census before a block moves to fast memory |
 | `tools/smc.py TRACE.bin ...` | finds self-modifying code in Barto traces: CPU writes onto instructions executed anywhere in the traces |
 | `tools/smcscan.py MEMORY.bin [--exec TRACE.bin ...]` | a static scan of a memory dump for writes into code (absolute, PC-relative, or through a `lea` of a code address) |
 

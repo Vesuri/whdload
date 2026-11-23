@@ -196,7 +196,16 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     before the game's wait (loops; 0.8 fps more at most) and drawing the smallest blits with
     the CPU.
 19. **Fast memory for data** (optional ExpMem, the patches skipped without it, as in
-    BuggyBoy's 2.0b). Moves in order of CPU read share:
+    BuggyBoy's 2.0b). The stack is done (`internals.md`, "Fast memory"): 25.05 fps on the
+    a1200-040 against 24.75, 22.30 on the a1200-030 against 21.42 (option off). The a500's
+    CPU data accesses in 100 race fields (`tools/dmaregions.py` on a Barto trace):
+    722000, of which 314000 go to the screens and the custom chips, 128000 to the stack,
+    126000 to $10000-$11FFF, 42000 to $D000-$DFFF, 43000 to the span table
+    ($34D00-$350FF), 22000 to the projection's variables ($3048E-$3049F), and most of the
+    rest is read-only data in $2FC96-$36800 (written before the race: copy it at the race's
+    start). `tools/eacensus.py` on the same trace finds nine immediate bases into
+    $2FC96-$36000 ($E4FE, $EC24, $F012, $F02C, $F53E, $F9C8, $FA62, $10CDA, $155A2),
+    plus pointer tables ($10AF2-$10B2A). Moves still open, in order of accesses:
     - the landscape work buffers ($2F000-$32FFF);
     - the span tables ($34000-$35FFF);
     - the renderer's variables and tables ($10000-$11FFF).

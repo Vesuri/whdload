@@ -26,6 +26,8 @@
 ; Link play (COMM, $87BC not 0) keeps the original loop: the two machines
 ; keep step through the serial link.
 ;
+; With fast ExpMem the program's stack moves there (enh_Fast).
+;
 ; The scheduler's variables are in low memory, where the tools can read them.
 ;
 ; Blitter waits: the original slave made every blitter start in $11000-$19C00
@@ -52,6 +54,9 @@ ENH_BLT1	= ENH_BLT0+6		; as the original slave's $10C-$124
 ENH_BLT4	= ENH_BLT0+12
 ENH_BLT5	= ENH_BLT0+18
 ENH_BLT6	= ENH_BLT0+24
+
+ENH_STACK	= $1000			; the ExpMem: the program's stack, to here
+ENH_EXPSIZE	= $1000			; ws_ExpMem (optional): a multiple of $1000
 
 ENH_LIMIT	= 50			; fields of debt kept: 1 s
 ENH_SKIPS_MAX	= 3			; passes in a row without drawing
@@ -94,6 +99,7 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		clr.l	ENH_DROPPED.w
 		clr.b	ENH_COUNT.w
 		bsr.b	enh_Rebase
+		bsr	enh_Fast
 .known		tst.b	(a2)
 		bmi.b	.done
 		lea	ENH_BLT0.w,a0		; jmp enh_Blt0 ... enh_Blt6
@@ -122,6 +128,28 @@ _enh_pl		PL_START
 		PL_PSS	$D510,enh_Swap,4	; move.l $A884,$E258
 	INCLUDE	blitwait.i
 		PL_END
+
+; With fast ExpMem the program's stack moves there. Its one setting is at the
+; program's start ($366E: movea.l #$2FC96,a7), which runs right after this
+; first call from Patch. ExpMem below $200000 is chip memory, and in
+; $C00000-$DFFFFF slow memory on the chip bus.
+enh_Fast	move.l	_expmem(pc),d0
+		beq.b	.out
+		cmp.l	#$200000,d0
+		blo.b	.out
+		cmp.l	#$C00000,d0
+		blo.b	.fast
+		cmp.l	#$E00000,d0
+		blo.b	.out
+.fast		cmp.l	#$2E7C0002,$366E	; movea.l #$2FC96,a7
+		bne.b	.out
+		cmp.w	#$FC96,$366E+4
+		bne.b	.out
+		lea	_enh_fast(pc),a0
+		move.l	d0,(a0)
+		add.l	#ENH_STACK,d0
+		move.l	d0,$366E+2
+.out		rts
 
 ; The tick clock starts again: the next tick is due now.
 enh_Rebase	move.l	$A884,ENH_DUE.w
@@ -242,5 +270,6 @@ enh_Blt6	move.w	d6,bltsize(a6)
 enh_Blt		tst.b	_custom+dmaconr
 		rts
 
+_enh_fast	dc.l	0		; the ExpMem when it is fast memory, else 0
 _enh_state	dc.b	0		; 0 unknown, -1 off, 1 on
 		even
