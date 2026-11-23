@@ -23,6 +23,8 @@
 ;   (SfxDmaWait), at least the 68000's length on every CPU
 ; - the pan step waits for its last blit before the field it shows it in (not
 ;   with CUSTOM1, like the wait at $30c)
+; - the PAL/NTSC test reads only the beam's line: AGA's chip ID in VPOSR made
+;   an NTSC A1200 run the game's PAL clock, 20% fast
 
 	INCDIR	SOURCES:Include/
 	INCLUDE	whdload.i
@@ -177,6 +179,7 @@ PLGAME	PL_START
 	PL_ELSE
 	PL_PS	$47ac,.wblit2		; the pan step: wait for the last blit
 	PL_ENDIF
+	PL_L	$3c9a,$1ff		; PAL/NTSC test: the line, not AGA's chip ID
 	; and in the sound module: PLSOUND, applied by Loader
 	PL_END
 

@@ -9,9 +9,9 @@ a1200-040 and the a1200-060, and since B5 the 68040 and 68060 draw correctly.
 ## Release
 
 2.0b (23.11.2026), not published: V1.01 with `$VER` and the info text in the slave, the
-ReadMe entry above StingRay's, the self-modification fix (B5) and the effect trigger's
-wait (B6a) and the pan step's blitter wait (B6b); `make dist` builds
-`SentinelEnhanced-2.0b-20261123.lha`.
+ReadMe entry above StingRay's, the self-modification fix (B5), the effect trigger's wait
+(B6a), the pan step's blitter wait (B6b) and the PAL/NTSC test on AGA (C8); `make dist`
+builds `SentinelEnhanced-2.0b-20261123.lha`.
 
 ## The goals
 
@@ -106,16 +106,26 @@ across phases. Status in brackets.
   were run again and the reference's first three lines re-recorded (frames from the middle
   of a step before); V1.01 still matches it on the a500.
 
-### C. Measure before optimising
+### C. Measure before optimising (done)
 
-- **C8** (to do) Game time (playbook §9): what moves the Sentinel, the sentries and the
-  energy, and at what rate. The VBL handler (`$570`) runs game code (`$6D0` calls into
-  `$2D36`); the field counter is `$58C6E`; CIA-A timer B is `$3900`, CIA-B timer B `$008E`.
-  Establish whether faster drawing changes game speed before changing the frame loop.
-- **C9** (to do) Profiles: the A500 per-routine split is in
-  [internals.md](internals.md#rendering-and-panning); repeat it on the a1200 and a 68020 with
-  fast memory (traced), and take strip-pause fields on the 040/060 from `swaps`, plus aprof
-  instruction counts on `68040-NOMMU`.
+- **C8** (done) Game time ([internals.md](internals.md#game-time), `tools/gametime.sh`): the
+  vertical blank counts the object timers down at 19.9 ticks a second, and the main loop serves
+  one of eight enemy slots a pass, acting on a timer that has run out (the Sentinel turns every
+  200 ticks, 502 fields). Drawing delays an action until its slot comes round; it never makes
+  the game run ahead of the ticks, so on faster machines the game is already a little faster:
+  during a held pan a turn waited up to 17 fields for its slot on the a500 (63 in a longer
+  run) and 9 on the a1200-040, and with no input the drain from 7 energy to 0 takes 765 fields
+  on the a500 and 580 on the a1200-040. CIA-A timer B times only the music; there is no boot
+  benchmark and no task. One bug (fixed in 2.0b, `$3C9A`): the PAL/NTSC test took AGA's chip
+  ID for a line, so an NTSC A1200 ran the PAL rate, 20% fast (the Sentinel turned every 8.4 s,
+  now 10.1 s as on PAL).
+- **C9** (done) Profiles ([internals.md](internals.md#rendering-and-panning)): a held pan on
+  the a500, the a1200 and a 28 MHz 68020 with Zorro III memory (cycle traces), the
+  a1200-040 (aprof, `68040-NOMMU`), and the strip pause from `swaps` on all six machines. On
+  the a500 the strip render is the pan (the span filler and the edge scanner 45%). On the
+  a1200-040 the strip pause is 4 to 8 fields, the render under a third of a pan's time, and
+  the scroll-in's blitter waits 40% and the field wait 20%. On the a1200-060 the pause is 3 to
+  4 fields.
 
 ### D. Fast strip rendering (68020 and up, a `CUSTOMn` option)
 
@@ -126,8 +136,8 @@ across phases. Status in brackets.
   writes it through `$195A`; find every other reader and writer of `$70000` first.
 - **D11** (to do) Rewrite the edge scanner and the span filler in the slave for the option's
   path, reading and writing fast memory, with no `movep` and no self-modification. Together
-  they are 45% of the A500's pan time. Fixture: identical strip bytes to the original's for
-  the recorded polygons (Unicorn), and the render check.
+  they are 45% of the A500's pan time and 9% of the a1200-040's (C9). Fixture: identical strip
+  bytes to the original's for the recorded polygons (Unicorn), and the render check.
 - **D12** (to do) The rest of the strip render (projection at `$11D8`, `$6BDA`, `$17A2` and
   smaller): profile again on the 020 and decide what else moves. The program's code stays in
   chip memory (absolute addressing throughout and no relocation table); with the
@@ -139,13 +149,17 @@ across phases. Status in brackets.
 ### E. Continuous 50 fps panning (the same option)
 
 - **E14** (to do) Measure the strip pause on the a1200-040 and a1200-060 after D11. If it is
-  under a field, the original sequential loop already pans continuously; otherwise E15.
+  under a field, the original sequential loop already pans continuously; otherwise E15. Before
+  D it is 4 to 8 fields on the 040 and 3 to 4 on the 060 (C9), and the span filler and edge
+  scanner are 9% of the 040's pan time, so D11 alone is not expected to get it under a field
+  (DERIVED).
 - **E15** (to be decided once B and D are done, 23.11.2026) Pipeline the pan. Run the 8
   scroll-in steps (the plane blits, the column copy, the swap) from the vertical-blank
   interrupt while the main loop renders the next strip, in the direction still held, into a
   second fast strip buffer; drop it when the pan stops or turns. This needs the point where
   the view angle is committed (`$1683` is a candidate; `$18C4` and `$18C6` follow the
-  pointer), and it must not let game time run ahead (C8). A strip render under 7 fields then
+  pointer). Game time needs nothing from it (C8): the timers run in the vertical blank, and
+  the enemy update must stay in every pass of the main loop. A strip render under 7 fields then
   gives a swap every field.
 - **E16** (to do) Chip bus. Drop blitter-nasty (`BLTPRI` in the `DMACON` write at `$342`) on
   the option's path so the CPU's few chip accesses are not held behind the scroll blits. The
@@ -153,6 +167,7 @@ across phases. Status in brackets.
   it, must not apply on that path.
 - **E17** (to do) Acceptance: with a pan held for 10 s on the a1200-040 and a1200-060, the
   pan meter shows a swap every field; the render and play checks pass; game speed is
-  unchanged (C8); with the option off the slave applies the original code paths, and the
-  68000 still works correctly with it on. FS-UAE's 040/060 timing is not hardware's (about an
+  unchanged (`tools/gametime.sh`: the Sentinel turns every 504 or 505 fields with no input, and
+  while panning a turn's wait and the drain are no longer than C8's); with the option off the
+  slave applies the original code paths, and the 68000 still works correctly with it on. FS-UAE's 040/060 timing is not hardware's (about an
   instruction count), so the 50 fps figure is confirmed on a real accelerator.
