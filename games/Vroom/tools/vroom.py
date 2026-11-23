@@ -3,6 +3,7 @@
 
   bench [<frames>]           fps over the first frames from the next green light
   statelog <frames> <file> [tick]  the race state at every frame end (or pass) from the next green light
+  onscreen <passes>          landscape starts while the last frame is still on screen
   racelog <fields> <file>    field, frame, clock and distance per field from the next green light
   meter <fields>             frames, clock and distance over the next fields
   race [stay]                from the boot through the title and menu to a player race
@@ -249,6 +250,38 @@ def state_log(server, g, rest):
     return f'{len(rows)} stops, fields {rows[0].split()[1]}..{rows[-1].split()[1]}' if rows else 'none'
 
 
+LANDSCAPE = 0xE4F8         # the landscape: it draws into the draw buffer $86EA
+PENDING = 0xA71C           # the buffer handed to the VBL; -1 once the VBL has taken it
+
+
+def onscreen(server, g, rest):
+    """onscreen <passes>: from the next green light, stop at the landscape's start ($E4F8)
+    <passes> times and count the starts with $A71C not -1: the last frame's buffer not yet
+    taken by the VBL, so the landscape draws into the screen on display (flicker). With
+    Enhanced framerate, also how many of those passes leave out the drawing."""
+    n = int(rest.split()[0]) if rest.split() else 300
+    g.stop()
+    early = early_undrawn = undrawn = 0
+    try:
+        if not green_light(g):
+            return 'no race start within 20000 fields'
+        g.cmd(f'break *{LANDSCAPE:#x}')
+        for i in range(n):
+            out = g.cmd('continue', timeout=120)
+            if 'Breakpoint' not in out:
+                return f'no stop after {i}: {out.strip().splitlines()[-1]}'
+            skip = longs(g, ENH_VARS + 16, 1)[0] >> 8 & 0xFF   # ENH_SKIP, the byte at $1D2
+            skip = skip != 0 and skip != 0xCC
+            undrawn += skip
+            if longs(g, PENDING, 1)[0] != 0xFFFFFFFF:
+                early += 1
+                early_undrawn += skip
+    finally:
+        g.cmd('delete')
+        g.cont()
+    return f'{n} landscape starts, {early} with the last frame on screen ({early_undrawn} of them undrawn passes); {undrawn} undrawn passes'
+
+
 # While WHDLoad has the OS in (a disk load) chip memory reads back as $FFFFFFFF.
 UNREADABLE = 0xFFFFFFFF
 BUTTONS = {'L': 'JOY1_FIRE_BUTTON', 'R': 'JOY1_2ND_BUTTON'}   # the port-0 mouse buttons
@@ -477,6 +510,6 @@ def drive(server, g, rest):
 
 server = game_server('vroom', commands={
     'bench': bench, 'statelog': state_log, 'racelog': race_log, 'meter': meter, 'race': to_race,
-    'drive': drive, 'do': do, 'decrunch': decrunch})
+    'drive': drive, 'do': do, 'onscreen': onscreen, 'decrunch': decrunch})
 if __name__ == '__main__':
     server.main(sys.argv[1:])

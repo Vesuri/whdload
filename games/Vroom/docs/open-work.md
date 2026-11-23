@@ -148,10 +148,11 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     catch-up. Gear changes act once. The a500 with `CUSTOM1=1` runs the original loop.
     Not covered: laps (no run went past a lap), link play, the data disk beyond its first
     demo race.
-    - The limit: an undrawn pass still runs the landscape and its projection, about 1.2
-      fields on the a1200 against 3.2 for a drawn one. At 25 Hz the 68020 then falls to
-      about 10 frames a second in the race's heavier parts (742 of 1241 passes undrawn),
-      below its 15.8 without the option; at 16.7 Hz it draws 396 of 400. The plan had
+    - The limit: an undrawn pass still runs the landscape and its projection, and waits
+      for the VBL to take the last frame (it draws into the draw buffer, which right after
+      a swap is still on screen). At 25 Hz the 68020 then draws 356 frames in 1200 fields
+      (14.8 fps), below its 15.8 without the option, and fewer in the heavier parts; at
+      16.7 Hz it draws 397 of 400. The plan had
       expected a catch-up tick to cost about 11% of a frame. Step 22 picks this up.
 
 ### D. Frames between ticks (Enhanced framerate, 68020 and up)

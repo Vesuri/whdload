@@ -59,7 +59,9 @@ and the period word. `CUSTOM3=n` makes n of every n+1 race loop passes leave out
 drawing, for the per-pass check: `statelog N FILE tick` on the a500 and on a 68020+ with
 `CUSTOM1=1 CUSTOM3=2`, then `tools/statecmp.py A B --skip DBD8,DBDC --align 10` (the two
 long words are the map marker's position in each screen; the a500 logs one more pass at the
-green light).
+green light). `onscreen 300` counts landscape starts before the VBL has taken the last frame
+(drawing into the screen on display): with the option it must be 0 (internals.md, "Enhanced
+framerate", lists the setups checked).
 
 ## Tools
 
@@ -76,6 +78,7 @@ green light).
 | Command | Does |
 |---|---|
 | `bench [N]` | from the next green light, the fields the first N frames take (default 500): fps, distance (at the last frame's end, through one breakpoint at $D510), fields per frame. Frames are counted from $E258, which changes once a frame (`internals.md`, "The swap"): with Enhanced framerate the drawn frames, and the line adds ticks, undrawn passes and dropped fields. Read-only, any CPU. In the first demo race after the boot, the same simulation on every machine, so the figure compares machines and builds |
+| `onscreen [N]` | from the next green light, stops at the landscape's start ($E4F8) N times (default 300) and counts the starts with $A71C not -1: the last frame not yet taken by the VBL, so the landscape draws into the screen on display. With Enhanced framerate, also how many were undrawn passes |
 | `statelog N FILE [tick]` | from the next green light, the race state (the block $DBC0-$E073, the score $8370, the simulation's long words in the renderer's area) and the race clock at each of N frame ends (a breakpoint at $D510: exact per frame, any CPU), or with `tick` at every race loop pass ($CD0E, drawn or not) |
 | `racelog N FILE` | from the next green light, one line per field: field, frame, clock, distance |
 | `meter N` | frames, fields per frame, clock and distance over N fields from now |
