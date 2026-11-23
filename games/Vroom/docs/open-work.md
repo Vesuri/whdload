@@ -197,8 +197,8 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     the CPU.
 19. **Fast memory for data and the race block** (done; `internals.md`, "Fast memory").
     With an optional 72 KB fast ExpMem the stack and the race block move there. Checked with
-    `statelog`, `frames`, an MMU-protected developer build through the menu and a driven
-    race, the data disk, and the matrix. Without fast memory, or on a
+    `statelog`, `frames`, an MMU-protected developer build through the menus, a driven race,
+    its end and a second race, the data disk, and the matrix. Without fast memory, or on a
     68000, nothing moves. What else in chip memory the CPU uses most (the a500's 100 race
     fields): the span table ($34D00-$350FF, 43000 data accesses), the projection's variables
     ($3048E-$3049F, 22000), and read-only data in $2FC96-$36800 written before the race. The

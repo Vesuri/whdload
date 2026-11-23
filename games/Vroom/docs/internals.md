@@ -269,8 +269,8 @@ The cockpit (lines 172-199: its height and the speed digits) and an object on th
 two builds that reach the race a few fields apart (the moved block's build is 13 fields
 earlier at the same tick). A developer build (`-DENH_PROTECT`, the a1200-030 with `MMU`)
 protects $B000-$1B4FF in chip memory between `Fix`es (from the first whole page: the VBL
-handler at $A076 can't run in a protected page). It ran the title, the menu and about
-30000 fields of a driven player race with no access.
+handler at $A076 can't run in a protected page). It ran the title, the menu, a driven
+player race through its 5 laps, the scores, the menu and a second race with no access.
 The data disk ran its prompt, the menu, a driven race and a second race on the a1200-040 (its
 lap-figure sites held the copy's addresses).
 
