@@ -71,9 +71,70 @@ condition codes as the replaced instructions did.
 A decrunch that lands on patched code (the program reloads part of itself to $439C) gets the
 patches again (`SMC_Decrunched`). The variables keep their state across a reload.
 
-## Measurements and verification
+## Frames and game time
 
-Correctness only so far: the demo race renders correctly and no WHDLoad dump appears on these setups:
+- **The race loop** ($BC08-$CD40): the opponents' updates (from $BDE2, over the car table at
+  $DC4E, 64 bytes per car: distance at +2, step at +16), the player ($C55A-$C7E4: the
+  distance $DC50 grows by the step), the landscape (`jsr $E4F8` at $C968), more game logic
+  ($C96E-$CCF2: frame countdowns such as $DC32, laps, sounds), then `$D13C` (`bsr` at
+  $CD0A/$CD2E), which draws the objects and swaps.
+- **The swap.** `$D13C` first waits ($D142) until the field counter $A884 differs from $E258,
+  the field of the previous swap, so a frame takes at least one field. At its end ($D50A-$D524)
+  it hands the draw buffer to the VBL through $A71C, sets $E258 and calls $12FA6, which
+  toggles $86DE (0/4) and sets the draw buffer $86EA from $86E2/$86E6 ($1FAC6 and $277C6,
+  4 planes of 8000 bytes each).
+- **The VBL** (level 3 $A076, then $A4F4): $A884 += 1; `jsr` through $A56C (in a race $A3A4:
+  the race clock $8500 += 2 while $8504 >= 0, a palette from $A844, the copper list's
+  bitplane pointers from $A71C) and through $A572 ($9432, the sound); then the mouse counters
+  and buttons into the block at ($A2CC).
+- **Game time.** The race clock is real time (2 hundredths of a second per field). The
+  simulation takes one fixed step per frame, with no elapsed-time factor. `tools/vroom.py racelog`
+  logs the player's distance each field from the green light of the first demo race. It passes
+  the same values in the same order on the a500, a1200, a1200-040 and a1200-060 (the 060 sometimes
+  skips a value between two field samples). So game speed follows the frame rate, while the
+  clock and the sound timers (the field counter, $8E7E-$905C) run in real time. A lap's clock
+  time therefore depends on the machine.
+
+From the green light of the first demo race, 1000 fields (`racelog`; `DETERMINISTIC=1`):
+
+| Setup | WHDLoad options | Frames | fps | Fields per frame | Distance after 1000 fields |
+|---|---|---|---|---|---|
+| a500 | - | 263 | 13.2 | 3-6, mostly 4 | 79935 (1.0x) |
+| a1200 (68020, no fast memory) | - | 350 | 17.5 | 2-5, mostly 3 | 106183 (1.3x) |
+| a1200-040 | - (BaseMem uncached) | 375 | 18.8 | 2-4 | 114203 (1.4x) |
+| a1200-040 | `CACHE` | 635 | 31.8 | 1-3, mostly 2 | 218755 (2.7x) |
+| a1200-040 | `DCACHE` | 785 | 39.3 | 1-2 | 279572 (3.5x) |
+| a1200-060 | `CACHE BRANCHCACHE` | 889 | 44.5 | 1 (807 of 889) | 333548 (4.2x) |
+
+With an MMU model, FS-UAE's `DCACHE` caches chip memory data, which no real board does
+(AmigaXDev `reference/headless-fsuae.md`, "Chip RAM and the data cache"). The `CACHE` row
+(instruction cache only) is the closer model of a real 68040 running this game. FS-UAE's
+040/060 timing is near an instruction count, so these rows rank the machines and do not
+predict an accelerator's frame rate.
+
+## Where the time goes (a500)
+
+A cycle trace of 100 fields of the second demo race (Austria, 19.2 fps there;
+`make server CMD="profile 100 ..."`, reduced with `amigaxdev.callprofile`):
+
+- The CPU never idles. Chip bus slots: 32% free, 36% CPU, 22.5% bitplanes, 7% blitter.
+- About 11% is simulation (the race loop's own code and `$13276`) and 89% rendering:
+  `$E4F8` (the landscape: projection $F600-$F9FF with `muls`, polygon spans) 40%; inside
+  `$D13C`, the road and verge spans `$10CD2` 22% (whole lines of each plane by the CPU), the
+  scaled objects `$18154` 15% (the CPU scaler), `$11C88` 5% and `$118D8` 3%.
+- The blitter: about 20 blits a field, mostly 1-5 words by 1-2 lines (the queue's
+  handlers $110A8-$111E8 and the sites the original slave patched). Each is followed by the
+  original slave's wait (`WaitBlit0`-`7`), 4.6% of all CPU cycles.
+- Memory: the program, its data and both screens are in chip memory. CPU reads over 40
+  fields: $10000-$10FFF 20% (the renderer's variables and tables, between its code),
+  $2F000-$32FFF 23% (landscape work buffers), $34000-$35FFF 11.5% (span tables),
+  $D000-$EFFF 10% (the car table, game state), $11000-$11FFF 7%, the object graphics
+  $49000-$58FFF about 6%. Writes go mostly to the screens, to the tables at $30000 and
+  $34000, and to the custom chips.
+
+## Verification
+
+The demo race renders correctly and no WHDLoad dump appears on these setups:
 
 | Setup | WHDLoad options | Run |
 |---|---|---|
@@ -81,5 +142,3 @@ Correctness only so far: the demo race renders correctly and no WHDLoad dump app
 | a1200 (68020) | `CACHE` | demo race |
 | a1200-040 | `CACHE`; `DCACHE` | demo race |
 | a1200-060 | `DCACHE BRANCHCACHE STOREBUFFER SUPERSCALAR` | 150 s, several demo races |
-
-No frame-rate measurement yet.

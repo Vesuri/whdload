@@ -50,9 +50,14 @@ button. Left alone, the title runs a demo race after about 20 s in warp.
 
 | Tool | Does |
 |---|---|
-| `tools/vroom.py` | the game server (`serve`, the shared commands) plus `decrunch <n> [<s>]`: stop after each file decrunch and report its destination and length |
+| `tools/vroom.py` | the game server (`serve`, the shared commands) plus `decrunch <n> [<s>]`: stop after each file decrunch and report its destination and length; `meter <fields>`: frames (buffer toggles), fields per frame, race clock and distance over that many fields, read-only, so it works on the 040/060; `racelog <fields> <file>`: from a race's green light, one line per field (field, frame, clock, distance) |
 | `tools/smc.py TRACE.bin ...` | finds self-modifying code in Barto traces: CPU writes onto instructions executed anywhere in the traces |
 | `tools/smcscan.py MEMORY.bin [--exec TRACE.bin ...]` | a static scan of a memory dump for writes into code (absolute, PC-relative, or through a `lea` of a code address) |
+
+`tools/vroom.py` runs as its own server: `SETUP=a1200-040 WHD_ARGS=CACHE WARP=1 WINDOW=none
+JOY0=none DETERMINISTIC=1 python3 tools/vroom.py serve`, after `. ../../common/env.sh`, then
+`python3 tools/vroom.py racelog 1000 $PWD/tmp/racelog.txt`. Its socket is
+`tmp/run/default/.run/vroom.sock`.
 
 `smc.py` decodes only instructions in chip memory, so it misses writers in the slave. The
 original slave's scaler stores are one such case; they surfaced only as garbage graphics with
