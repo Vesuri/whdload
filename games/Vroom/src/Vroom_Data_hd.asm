@@ -4,6 +4,7 @@
 ;  :Author.	Mr.Larmer of Wanted Team
 ;  :History.	02.02.2000
 ;		03.06.2006 updated by cfou
+;		23.11.2026 2.0b by Vesuri: CPU caches, fast CPUs
 ;  :Requires.	-
 ;  :Copyright.	Public Domain
 ;  :Language.	68000 Assembler
@@ -72,14 +73,11 @@ _data	dc.b	0
 _name	dc.b	"Vroom (Data Disk)",0
 _copy	dc.b	"1992 Lankhor ",0
 _info	dc.b	"Done by Mr.Larmer updated by CFou!",10
-	dc.b	"Version 1.4 "
-	IFD BARFLY
-	INCBIN	"T:date"
-	ELSE
-	dc.b	"(03.06.2006)"	; vasm: the date Barfly wrote into the shipped slave
-	ENDC
+	dc.b	"enhanced by Vesuri",10
+	dc.b	"Version 2.0b (23.11.2026)"
 	dc.b	10,"Greeting to Adrian Simpson"
 	dc.b	0
+	dc.b	"$VER: VroomData.slave 2.0b (23.11.2026)",0
 ;====================================================================== 
 	even
 ;======================================================================

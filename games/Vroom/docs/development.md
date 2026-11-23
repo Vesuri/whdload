@@ -23,7 +23,8 @@ commit has them unchanged, with the imager sources). The setup commit made these
 edits, after which both built byte-identically to the shipped slaves:
 
 - Barfly's `BOPT`, `SUPER` and `INCDIR` are commented out;
-- the date Barfly's `WDate` wrote into the info text, `(03.06.2006)`, is a string;
+- the date Barfly's `WDate` wrote into the info text, `(03.06.2006)`, is a string
+  (release 2.0b replaced the info text's version line);
 - `BLITWAIT` is `BLITWAIT_V14`, whdmacros.i's macro as it was before its 03.09.07 change,
   which the shipped bytes use;
 - `and`/`cmp`/`sub #imm,Dn` are written `andi`/`cmpi`/`subi`: Barfly emits the immediate
@@ -35,6 +36,9 @@ Barfly did (vasm pads with `nop`).
 
 The fixes since then are in `src/fixes.i` and `src/smc.i`, which both sources include.
 `ws_Version` is 16, for `PL_PA` and `PL_PSS`.
+Release 2.0b adds "enhanced by Vesuri" and its version line to the info text, and
+`$VER: Vroom.slave 2.0b (23.11.2026)` (`VroomData.slave` on the data disk); the v1.4
+slaves had no `$VER`.
 
 ## Driving it
 

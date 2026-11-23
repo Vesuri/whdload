@@ -19,4 +19,6 @@ a1200 and the a1200-060.
 
 ## Release
 
-A first release needs a dated `$VER` in both slaves and a ReadMe entry above CFou's.
+2.0b (23.11.2026): `$VER` and info text in both slaves, the ReadMe entry above CFou's;
+`make dist` builds `VroomEnhanced-2.0b-20261123.lha` (`lha t` passes). The 2.0b slave
+runs the demo race on the a1200-040 with `DCACHE`. Not published.

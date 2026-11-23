@@ -8,9 +8,12 @@
  CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
  PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
+ Vroom Enhanced 2.0b (23.11.2026)
+ Original install: Mr.Larmer, CFou. Version 2.0b: Vesuri.
+
  This install applies to "Vroom (& Data Disk)" © 1991-92 Lankhor.
 
- This install requires WHDLoad, DIC, RawDIC and The Patcher to be in the path.
+ This install requires WHDLoad 16 or newer, DIC, RawDIC and The Patcher to be in the path.
  The programs can be found in the WHDLoad package.
  To install from a different drive than DF0: select installation mode Expert.
 
@@ -27,6 +30,11 @@
 	http://www.whdload.de/
  or	aminet:dev/misc/whdload#?
  and	aminet:game/patch/
+
+ version 2.0b (23.11.2026) done by Vesuri
+ - fixed the black screen and crash with CPU caches on (68020-68060)
+ - fixed a crash on fast CPUs (68060) in races
+ - the drive motor is left to WHDLoad
 
  version 1.4 (03.06.06) done by CFou
  - ExitKey fixed for 68000
