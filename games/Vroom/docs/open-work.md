@@ -19,8 +19,8 @@ runs the demo race on the a1200-040 with `DCACHE`. Not published.
 1. **Correct on the a1200-040** (68040, MMU, Zorro III fast memory, instruction and data
    caches), and so on every fast machine, with the 68000 unchanged. That includes game
    speed: today a fast machine plays the game too fast (below).
-2. **50 fps on capable machines** (68040 and 68060) with the simulation at one fixed rate on
-   every machine, separate from rendering.
+2. **50 fps on capable machines** (68040 and 68060) with Enhanced framerate: the
+   simulation at one fixed rate on every 68020 or better, separate from rendering.
 
 What the measurements say ([internals.md](internals.md#frames-and-game-time)):
 
@@ -37,6 +37,29 @@ What the measurements say ([internals.md](internals.md#frames-and-game-time)):
   `CACHE` (instruction cache only, closest to real hardware) draws 31.8 fps at the race
   start, and the a1200-060 44.5. FS-UAE's `DCACHE` figure (39.3) comes from caching chip
   data, which no board does.
+
+## Decisions (the user's, 23.11.2026)
+
+- **Enhanced framerate** (`CUSTOM1=1`) is one toggle for the whole enhancement: the fixed
+  tick, the frames between ticks and every performance change (step E). It applies on a
+  68020 or better (`WHDLTAG_ATTNFLAGS_GET`, as `src/smc.i` gates already). Bug fixes
+  (step B) stay on for every CPU and every setting.
+- **Game speed** (`CUSTOM2`), as in Virus: 0 is 16.7 Hz (a tick every 3 fields, the
+  default), 1 is 25 Hz (every 2 fields). The slaves get WHDLoad's config splash with
+  `ws_config` `"C1:B:Enhanced framerate;C2:L:Game speed:16.7 Hz,25 Hz;"` (`ws_Version` 17,
+  so the ReadMe's requirement becomes WHDLoad 17).
+- **The 68000 and 68010 keep the original loop**, with the option on or off: one step per
+  frame, as today.
+- **Caches are left to the icon.** The slave makes no cache calls (`resload_SetCPU`). The
+  installed icon carries the cache tooltype beside `CUSTOM1=1` (step 21 picks which one).
+
+What this means per machine, from the race-start figures:
+- A 14 MHz 68020 with chip memory only (17.5 fps today) gets a steady game speed; at 25 Hz
+  it runs catch-up ticks instead of extra frames (a tick is about 11% of an a500 frame).
+  Frames between ticks appear only where frames are shorter than a tick.
+- The 68040 and 68060 get a steady speed from step C. The frames between ticks come with
+  step D, and reach 50 a second as step E brings their frame time under a field (31.8 and
+  44.5 fps today).
 
 ## Step by step
 
@@ -81,22 +104,24 @@ What the measurements say ([internals.md](internals.md#frames-and-game-time)):
 
 Then a fix-only release: B's fixes, with a ReadMe line for each.
 
-### C. Simulation on a fixed tick (a `CUSTOMn` option, on in the installed icon)
+### C. Simulation on a fixed tick (Enhanced framerate, 68020 and up)
 
-10. **Choose the tick (the user's decision).** Measure the a500's fields per frame over whole
-    demo and player races on several tracks. The data so far averages about 3, which would
-    make the tick 16.7 Hz (3 fields): the a500's usual speed, held on every machine. 25 Hz
-    (2 fields) would play faster than a typical a500. Also decide whether the 68000 gets the
-    fixed tick (steady speed, sometimes two ticks before a frame) or keeps the native loop
-    (playbook §9, "Choosing a simulation rate"; one tick costs about 11% of an a500 frame).
+10. **The option's plumbing.** `WHDLTAG_CUSTOM1_GET`/`CUSTOM2_GET` at install, with the
+    attnflags gate. Add `ws_config` to both slaves, and make `game.conf` default to
+    `CUSTOM1=1` for `make run`/`serve` unless `ENHANCED=0`, as Virus does. With CUSTOM1 off,
+    or on a 68000/68010, no Enhanced framerate patch is applied. Also measure the a500's
+    fields per frame over whole demo and player races on several tracks. That says how
+    16.7 Hz compares with the speed a500 players knew; the a500 runs at its native rate
+    either way.
 11. **Split the race loop** into a tick (simulation only) and a frame (rendering only).
     Audit every state write in `$E4F8` and `$D13C`, and every read in the logic after the
     landscape call ($C96E-$CCF2) of what `$E4F8` produces (the projected road, $E254,
     $DBEE). If off-road or collision checks use the projected road, that part of the
     projection runs in the tick. Rendering must leave the simulation's state as it found it:
     compare a state hash before and after a render-only frame.
-12. **The scheduler.** Each frame: from the field counter $A884, run the ticks owed (bound
-    the debt, say 1 s, and count dropped time in VERIFY), then render once. The race clock
+12. **The scheduler.** Each frame: from the field counter $A884, run the ticks owed at 3 or 2
+    fields each (CUSTOM2), with the debt bounded (say 1 s) and dropped time counted in
+    VERIFY. Then render once. The race clock
     stays as it is. Pause, the menus, the replay and the start lights rebase the tick clock
     without catch-up.
 13. **Input and frame-counted timers.**
@@ -108,11 +133,12 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
 14. **Validation.**
     - The per-tick state sequence equals the original per-frame sequence on the a500 (step 2):
       the simulation itself is unchanged.
-    - At equal fields, distance and laps agree within 1% on every machine and render rate,
-      including a deliberately slowed render (VERIFY).
+    - At equal fields, distance and laps agree within 1% on every 68020+ machine and render
+      rate, at both speeds, including a deliberately slowed render (VERIFY).
+    - The 68000 runs the original loop with CUSTOM1 on: the a500 racelog is unchanged.
     - One-shot inputs act once. With the option off, the original code runs.
 
-### D. 50 fps presentation (68020 and up, the same option)
+### D. Frames between ticks (Enhanced framerate, 68020 and up)
 
 15. **Interpolation.** At the end of each tick, keep what the renderer reads: the player's
     distance $DC50, the view's angle and offset ($DBEC, $DBF0, step 2), and each car's
@@ -126,14 +152,15 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     quantisation), consider a third screen: 32000 bytes of chip memory inside BaseMem,
     not yet found.
 
-### E. Speed: a frame per field on the 68040
+### E. Speed: a frame per field on the 68040 (Enhanced framerate, 68020 and up)
 
 17. **Ceiling first** (playbook §8, "Find the ceiling"). On the a1200-040 (`CACHE`) and
     a1200-060, run matched builds with an instant blitter and with single bypasses (an
     `rts` at the landscape spans, the road spans `$10CD2`, the scaler `$18154`). Add aprof
     instruction counts on `68040-NOMMU`. These tell how far each part is from one field.
 18. **Blitter waits.** Each small blit is followed by the original slave's wait, so on a
-    fast CPU the CPU idles through every blit. Move each wait to before the next blitter
+    fast CPU the CPU idles through every blit. The waits stay as they are without the
+    option. Move each wait to before the next blitter
     access, or draw the 1-5 word blits with the CPU on 68020+. Measure both.
 19. **Fast memory for data** (optional ExpMem, the patches skipped without it, as in
     BuggyBoy's 2.0b). Moves in order of CPU read share:
@@ -153,18 +180,35 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
 20. **Code in fast memory.** The 68040's 4 KB instruction cache holds the inner loops but not
     a frame's code. Once step 19 has moved the renderer, measure what else (the race loop,
     the scaler) is worth moving.
-21. **Cache policy (the user's decision).** ExpMem copyback is WHDLoad's default. For
-    BaseMem, either the slave enables the instruction cache itself (`resload_SetCPU`) or the
-    ReadMe recommends the `Cache` tooltype.
+21. **The icon's cache tooltype.**
+    - `Cache` turns on the instruction cache and turns the data cache off for the whole
+      program, so data moved to ExpMem in step 19 would run uncached.
+    - `DCache` caches both. Chip memory gets marked cacheable write-through, which real
+      boards refuse for data; BuggyBoy's notes say 68040/68060 boards are slower on such
+      accesses.
+    - Without either, WHDLoad leaves BaseMem uncached: 18.8 fps on the a1200-040, against
+      31.8 with `Cache`.
+
+    Measure `Cache` against `DCache` once step 19 is in. For real-hardware data-cache
+    figures, run `CPU=68040-NOMMU`/`68060-NOMMU` (playbook §8): without an MMU model, FS-UAE
+    refuses to cache chip data, as boards do. Choose
+    one tooltype for the icon. The ReadMe describes both and how to remove them.
 22. **Then the hot routines.** Profile again (a traced 68020 with fast memory, aprof on the
     040). Candidates: the projection's `muls` ($F672, $F680), the road spans' whole-line
     writes, the span filler ($10E72) and the scaler.
 
 ### F. Acceptance
 
-23. On the a1200-040 (`CACHE`, and `DCACHE` for function) and the a1200-060, the `bench`
+23. With the installed icon's tooltypes, on the a1200-040 and the a1200-060, the `bench`
     window and a real race show a swap every field. Game speed is within 1% of the chosen
     tick on every machine. The render and state checks (steps 2 and 14) pass. With the
     option off, the original code paths run. The 68000 works correctly with the option on
     and off. FS-UAE's 040/060 timing is not hardware's, so the 50 fps figure needs a real
     accelerator to confirm.
+24. **Release.**
+    - The installed icon gets `CUSTOM1=1` and the cache tooltype. `Vroom.inf` and
+      `Vroom.colicon` ship with no tooltypes, so the packager's `tooltypes` cannot add them.
+      Instead, add two `settooltype` lines to the Install script's `P_SelectIcon` block,
+      beside its `Slave` and `PreLoad` (a replaced `release/Install` in `release.json`).
+      That covers every icon variant, Vroom's and the data disk's.
+    - The ReadMe describes CUSTOM1, CUSTOM2 and the cache tooltype.
