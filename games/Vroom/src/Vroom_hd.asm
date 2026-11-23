@@ -13,18 +13,29 @@
 
 	OUTPUT	Vroom.slave
 
-	BOPT	O+		;enable optimizing
-	BOPT	OG+		;enable optimizing
-	BOPT	ODd-		;disable mul optimizing
-	BOPT	ODe-		;disable mul optimizing
-	BOPT	w4-		;disable 64k warnings
-	BOPT	wo-		;disable optimizer warnings
+;	BOPT	O+		;enable optimizing	; vasm: Barfly only
+;	BOPT	OG+		;enable optimizing	; vasm: Barfly only
+;	BOPT	ODd-		;disable mul optimizing	; vasm: Barfly only
+;	BOPT	ODe-		;disable mul optimizing	; vasm: Barfly only
+;	BOPT	w4-		;disable 64k warnings	; vasm: Barfly only
+;	BOPT	wo-		;disable optimizer warnings	; vasm: Barfly only
 	;BOPT	c-		;loawcase	= uppervase
-	SUPER	
+;	SUPER	; vasm: Barfly only
 
-	INCDIR	Include:
+;	INCDIR	Include:	; vasm: the build passes the include paths
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
+
+; vasm: whdmacros.i BLITWAIT as of the shipped slave (before its 03.09.07 change), which
+; the shipped bytes need.
+BLITWAIT_V14	MACRO
+		tst.b	(_custom+dmaconr)
+.wb\@	tst.b	(_ciaa)
+		tst.b	(_ciaa)
+		btst	#DMAB_BLTDONE-8,(_custom+dmaconr)
+		bne.b	.wb\@
+		tst.b	(_custom+dmaconr)
+		ENDM
 
 
 CHIPMEMSIZE	=	$80000
@@ -61,6 +72,8 @@ _info	dc.b	"Done by Mr.Larmer updated by CFou!",10
 	dc.b	"Version 1.4 "
 	IFD BARFLY
 	INCBIN	"T:date"
+	ELSE
+	dc.b	"(03.06.2006)"	; vasm: the date Barfly wrote into the shipped slave
 	ENDC
 	dc.b	10,"Greeting to Harry"
 	dc.b	0
@@ -252,7 +265,7 @@ WaitBlit5
 WaitBlit6
 		move.w	D6,$58(A6)
 WaitBlit
-		BLITWAIT
+		BLITWAIT_V14	; the shipped slave was built with this older form
 		rts
 
 ;--------------------------------
@@ -295,14 +308,14 @@ Patch2
 		lea	$19C00,a1
 .loop
 		move.l	(a0),d0
-		and.l	#$FFF0FFFF,d0
-		cmp.l	#$3D400058,d0		; move.w D?,$58(a6)
+		andi.l	#$FFF0FFFF,d0		; vasm: andi is the shipped encoding
+		cmpi.l	#$3D400058,d0		; move.w D?,$58(a6) (vasm: cmpi is the shipped encoding)
 		bne.b	.next
 
 		moveq	#0,d0
 		move.b	1(a0),d0
-		and.b	#$F,d0
-		cmp.b	#6,d0
+		andi.b	#$F,d0		; vasm: andi is the shipped encoding
+		cmpi.b	#6,d0		; vasm: cmpi is the shipped encoding
 		bhi.b	.next
 		lsl.w	#1,d0
 		move.w	#$4EB8,(a0)
@@ -344,7 +357,7 @@ Load		movem.l	d0-a6,-(a7)
 		moveq	#0,D0
 		move.w	$6EE88+$56,D0
 		mulu	#$16DC,D0
-		sub.l	#$DC,D0
+		subi.l	#$DC,D0		; vasm: subi is the shipped encoding
 
 		move.l	#$16DC,D1
 		moveq	#1,D2
@@ -364,7 +377,7 @@ Load2
 		moveq	#0,D0
 		move.w	$1D92C,D0
 		mulu	#$16DC,D0
-		sub.l	#$DC,D0
+		subi.l	#$DC,D0		; vasm: subi is the shipped encoding
 
 		move.l	#$16DC,D1
 		move.l	$1D906,A0
@@ -385,7 +398,7 @@ _savehighs
 		moveq	#0,D1
 		move.w	$1D92C,D1
 		mulu	#$16DC,D1
-		sub.l	#$DC,D1				;offset
+		subi.l	#$DC,D1				;offset (vasm: subi is the shipped encoding)
 		move.l	$1D906,a1			;address
 		lea	_savename(pc),a0		;filename
 		move.l	_resload(pc),a2
@@ -420,7 +433,7 @@ _Key	move.b	$bfec01,d0
 	cmp.b	_keyexit(pc),D0
 	beq	_Exit
 
-	cmp.b	#$58,d0
+	cmpi.b	#$58,d0		; vasm: cmpi is the shipped encoding
 	bne	.f9
 	move.w	#$f0,$dff180
 	move.w	#$f0,$dff180

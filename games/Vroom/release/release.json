@@ -1,0 +1,26 @@
+{
+  "archives": [
+    {
+      "input": "Vroom.lha",
+      "output": "VroomEnhanced-{version}-{date}.lha",
+      "replace": {
+        "VroomHd/Vroom.slave": "build:Vroom",
+        "VroomHd/VroomData.slave": "build:VroomData",
+        "VroomHd/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {
+        "dir": "VroomHd/.src",
+        "variants": [
+          "Vroom",
+          "VroomData"
+        ],
+        "keep": [
+          "Vroom.islave.asm",
+          "VroomData.islave.asm"
+        ]
+      }
+    }
+  ]
+}
