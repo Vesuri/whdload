@@ -25,6 +25,7 @@ program differs from Vroom's only in its init code ($3600-$4400) and a few data 
 | $1D0F8 | `Decrunch`: re-removes the protection after a reload to $439C |
 | $1D16C-$1D24A | drive head moves and delays removed |
 | $1D280, $1D3D8 | highscore save (`resload_SaveFileOffset`) and track loads |
+| $1DB32 (data disk, new) | the race start's directory read from `Disk.2` (`DataDir`, below) |
 | $A1D4 | keyboard: quit key, F9 |
 
 The new slaves keep all of these and add the fixes below (`src/fixes.i`, `src/smc.i`, called
@@ -34,6 +35,26 @@ data addresses (the data disk's data sits $C8 higher), the slaves' own `jsr` tar
 data disk's extra patch at $AA14. The one exception is the init code's two VBL vector writers,
 at $3B54/$3B5E in Vroom and $3B44/$3B4E on the data disk (`SMC_VBLW1`/`SMC_VBLW2` in each
 source).
+
+### The data disk's two disks
+
+The data disk's title asks for the Vroom disk ("Insert VROOM disk then click", the click
+wait at $1DABC) and reads its directory: 23 file offsets from track 1 into $1D950 ($1DAC8).
+The shared files come from it. Each race start ($36756) reads the directory again from the
+disk in the drive and the highscores with it ($1DB32). The two disks differ in that
+directory: on the data disk, entries 1-11 are empty and entries 1 and 2 are equal. When
+they are equal ($1DB3E), the race takes the data disk's circuits and lap figures. The data
+disk's own files are entries 12-21, with the circuits from archive $F and the scenery
+archive $15.
+
+The original slave's `Load2` reads `Disk.2` until the first load at offset $183C0 and
+`Disk.1` after it, then `Disk.2` again after a load at $33614. So the race start read
+Vroom's directory. It then asked for the data disk's sub-file $26 of archive $15, past the
+end of Vroom's archive, and the load ran over the program from the buffer at $3458. That
+crashed the first race, the demo's or the player's, on every CPU. The new slave has a
+`jsr DataDir` at $1DB32, which selects `Disk.2` before the directory read, as a player
+with the data disk in the drive would. Races on Vroom's own circuits, with the Vroom disk
+left in the drive, are not offered; the Vroom slave has them.
 
 Low memory holds `jmp` trampolines, so a 4-byte site can become `jsr $1xx.w`: the original
 slave's at $100-$129, `smc.i`'s at $130-$1A7 and `fixes.i`'s at $1B0.

@@ -5,8 +5,8 @@ The slaves now run with the caches on: the self-modifying code is made cache-saf
 and the blitter queue no longer overruns on fast CPUs (`docs/internals.md`, "Fixes" and
 "Self-modifying code"). Vroom's demo race renders correctly, with no WHDLoad dump, on the
 a500, the a1200 with `CACHE`, the a1200-040 with `DCACHE`, and the a1200-060 with every
-cache option on. The data disk reaches its title ("Insert VROOM disk then click") on the
-a1200 and the a1200-060.
+cache option on. The data disk runs its title, a player race, the scores and a second race
+on the a1200-040 (`CACHE`), and its demo race on the a500.
 
 ## Release
 
@@ -123,17 +123,11 @@ The tools are in `docs/development.md` ("Tools"); the facts they rest on are in
      ($817E), and `Fix_Decrunched` patched it again. No dump.
    - The highscore save is still untested: the test driver's score stays under the table's
      lowest entry (2000), and gdb cannot write memory to give it one.
-   - **The data disk crashes at its first demo race**, on every CPU and with CFou's v1.4
-     slave too, so the bug predates these slaves. After the title's "Insert VROOM disk then
-     click", the demo race loads its track archive ($F) into the small buffer at $3458. It then
-     asks for the large archive $15 while that buffer is still selected, and the load runs
-     over the program from $3658 on (an illegal instruction in the decruncher at $1D946, or
-     a crash in the stack area on the a500). The click
-     replaces the data disk's directory ($1D938, $1D950) with Vroom's, and from then on the
-     slave's `Load2` loads every track from `Disk.1`. It switches disks only on the first read
-     at offset $183C0 and on any read at $33614. So the data disk's own tracks are probably
-     never loaded where the real game swapped disks. Next: find where the data disk's program
-     asks for its own disk again and how it restores its directory, and switch `DiskNr` there.
+   - **The data disk's crash at its first race** (fixed; `internals.md`, "The data disk's
+     two disks"). Its race start read the directory from `Disk.1`, so the data disk's files
+     were loaded from the Vroom disk. On the a500 the demo race ran, and the title came back
+     after it. On the a1200-040 (`CACHE`) the title prompt, the menu, a player race to its end,
+     the scores and a second race all ran. No dump.
 9. **Game speed.** On a fast machine the game runs 2.7-4.2x too fast. That is fixed by step C,
    which is therefore part of goal 1, not only of 50 fps.
 
@@ -246,8 +240,9 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     - If the loader dominates, the slave reads each archive from the preloaded disk image
       into ExpMem. It unpacks it with its own copy of the unpacker, run from fast memory, so
       only the output goes to chip memory.
-    - It is a performance change, so it sits behind `CUSTOM1`. The data disk's load crash
-      (step 8) is in the same loader, so fix that first.
+    - It is a performance change, so it sits behind `CUSTOM1`. The data disk switches disks
+      in the same loader (`internals.md`, "The data disk's two disks"), so the copy must
+      keep that switch.
 
 ### F. Acceptance
 

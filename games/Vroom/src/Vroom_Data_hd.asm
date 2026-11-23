@@ -196,6 +196,10 @@ Patch
 		move.w	#$6052,$1D3DE		; skip decode MFM
 
 		move.w	#$6076,$1D9F6		; skip read protection track
+
+		move.w	#$4EB9,$1DB32		; the race start reads the directory
+		pea	DataDir(pc)		; (lea $8370,a0 replaced)
+		move.l	(a7)+,$1DB34
 		bsr 	_InstKey
 		bsr	Fix
 		jmp	$3658.w
@@ -415,6 +419,18 @@ Load2
 .disk1
 		movem.l	(A7)+,d0-a6
 		moveq	#0,D0
+		rts
+
+; At each race start ($36756) the program reads the directory of the disk in the drive
+; ($1DB32) and races the new circuits when it is the data disk's. The player has the data
+; disk in the drive by then: the Vroom disk is asked for only at the title, for the shared
+; files. Without the switch the race read Vroom's directory and then the data disk's
+; archive numbers ($15, sub-file $26) from it, past the end of the buffer at $3458.
+DataDir		move.l	a1,-(a7)
+		lea	DiskNr(pc),a1
+		move.b	#2,(a1)
+		move.l	(a7)+,a1
+		lea	$8370,a0
 		rts
 
 DiskNr		dc.b	2
