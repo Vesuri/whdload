@@ -50,14 +50,41 @@ button. Left alone, the title runs a demo race after about 20 s in warp.
 
 | Tool | Does |
 |---|---|
-| `tools/vroom.py` | the game server (`serve`, the shared commands) plus `decrunch <n> [<s>]`: stop after each file decrunch and report its destination and length; `meter <fields>`: frames (buffer toggles), fields per frame, race clock and distance over that many fields, read-only, so it works on the 040/060; `racelog <fields> <file>`: from a race's green light, one line per field (field, frame, clock, distance) |
+| `tools/vroom.py` | the game server (`serve`, the shared commands) and the commands below |
+| `tools/statecmp.py A B [--skip ADDR,...]` | compares two `statelog` files: the first frame whose state differs, and where |
+| `tools/matrix.py [--full \| CELL ...]` | `bench` on the a500, a1200, a1200-030 (`MMU`) and a1200-040 (`CACHE`), one boot at a time with a deadline: the bench line, WHDLoad dumps and a screenshot per cell, in `tmp/matrix/<time>/`. The check after a finished change, not after every edit; `--full` adds the a1200-fast and the a1200-040 with `DCACHE`, for one-off decisions |
 | `tools/smc.py TRACE.bin ...` | finds self-modifying code in Barto traces: CPU writes onto instructions executed anywhere in the traces |
 | `tools/smcscan.py MEMORY.bin [--exec TRACE.bin ...]` | a static scan of a memory dump for writes into code (absolute, PC-relative, or through a `lea` of a code address) |
 
-`tools/vroom.py` runs as its own server: `SETUP=a1200-040 WHD_ARGS=CACHE WARP=1 WINDOW=none
-JOY0=none DETERMINISTIC=1 python3 tools/vroom.py serve`, after `. ../../common/env.sh`, then
-`python3 tools/vroom.py racelog 1000 $PWD/tmp/racelog.txt`. Its socket is
-`tmp/run/default/.run/vroom.sock`.
+`tools/vroom.py` commands:
+
+| Command | Does |
+|---|---|
+| `bench [N]` | from the next green light, the fields the first N frames take (default 500): fps, distance, fields per frame. Frames are counted from $E258, which changes once a frame (`internals.md`, "The swap"). Read-only, any CPU. In the first demo race after the boot, the same simulation on every machine, so the figure compares machines and builds |
+| `statelog N FILE` | from the next green light, the race state block ($DBC0-$E073) and the race clock at each of N frame ends (a breakpoint at $D510: exact per frame, any CPU) |
+| `racelog N FILE` | from the next green light, one line per field: field, frame, clock, distance |
+| `meter N` | frames, fields per frame, clock and distance over N fields from now |
+| `race [stay]` | from the boot, through the title (right button) and the menu (left button on START) to the green light of a player race with the menu's settings as they are (ARCADE, MOUSE, MANUAL): see `internals.md`, "Input, the menu and the race controls" |
+| `drive N [GAIN] [FILE]` | a test driver for N fields: full throttle, shifting up when the speed stops rising, steering against the lateral position. FILE gets field, gear, speed, lateral, x, y every 2 fields |
+| `do ACTION ...` | low-level steps with the CPU stopped: `f<N>` fields, `L1`/`L0`/`R1`/`R0` mouse buttons, `m<dx>,<dy>`, `x<addr>[,<n>]` reads, `u<addr>=<hex>,<max>` waits, `pc`, `shot=<png>`; a last `stay` leaves the CPU stopped for the next command |
+| `decrunch N [S]` | stop after each of the next N file decrunches and report the destination and length |
+
+Run it as its own server, after `. ../../common/env.sh`:
+
+```sh
+SETUP=a1200-040 WHD_ARGS=CACHE WARP=1 WINDOW=none JOY0=none DETERMINISTIC=1 \
+  python3 tools/vroom.py serve &
+python3 tools/vroom.py bench 500          # once tmp/run/default/.run/vroom.sock exists
+python3 tools/vroom.py quit
+```
+
+The commands that wait for a green light take the first demo race when the title is left
+alone (the field counter reads about 8000 there on the a500). Between commands the CPU runs on (in warp, a
+command's host time is many fields), so a sequence that must stay on one screen goes in one
+`do`, or ends each command with `stay`. A player race is repeatable only from a fixed
+start: serve with `BOOT_BREAK=0x3658` (the server stops at the program's entry), then
+`race stay` and `drive`. Two such boots gave identical `drive` logs. The demo race needs
+none of this; it is the same frame by frame on every machine.
 
 `smc.py` decodes only instructions in chip memory, so it misses writers in the slave. The
 original slave's scaler stores are one such case; they surfaced only as garbage graphics with
@@ -71,3 +98,5 @@ program starts, with the patches applied.
 - `make serve` takes a few seconds to open its socket; wait for
   `tmp/run/default/.run/game.sock` before sending commands.
 - Between demo races the screen is black for a while; check at more than one time.
+- During the slave's disk loads the gdb stub reads chip memory as $FFFFFFFF (and the
+  field counter stops): a wait on a value must not take that for the value.

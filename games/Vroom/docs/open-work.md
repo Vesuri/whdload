@@ -63,24 +63,43 @@ What this means per machine, from the race-start figures:
 
 ## Step by step
 
-### A. Harness (first; no slave change)
+### A. Harness (done)
 
-1. **Benchmark window.** The first demo race from the green light is the same race on every
-   machine (the simulation is per frame and deterministic). `tools/vroom.py racelog`
-   already logs it per field. Add `bench N`: the fields taken for frames 0-N after the green
-   light. That gives one fps figure per machine, comparable before and after each change.
-2. **Per-step state log.** The equivalence check for step C: at every frame (later: every
-   tick) record the car table ($DC4E, 64 bytes per car), $DC50, $DBEC and $DBF0 (the view's
-   angle and lateral offset, still to be confirmed) and the race clock. Sampling at field boundaries mixes up frames on fast machines, so this needs an
-   exact point: a breakpoint at $12FA6 on the 68000/68020 (slow, but exact), or a
-   VERIFY-only slave log read at the end (gdb cannot write memory).
-3. **A real race through the menus** with `monitor mouse`/`monitor input`: right button on
-   the title, the menu with the left button, a race with steering and throttle held. This is
-   needed for steps 6, 7 and 13, and for gameplay checks the demo cannot give. The race
-   controls are not yet mapped.
-4. **Machine matrix script**: a500, a1200, a1200 with fast memory, a1200-030 (WHDLoad
-   `MMU`), a1200-040 (`CACHE`, then `DCACHE` for the functional run), a1200-060, one boot at
-   a time with a deadline. It reports `bench`, dumps and a screenshot per cell.
+The tools are in `docs/development.md` ("Tools"); the facts they rest on are in
+`internals.md` ("Input, the menu and the race controls").
+
+1. **Benchmark window** (done). `tools/vroom.py bench N` gives the fields the first N frames
+   take after the green light of the first demo race, with the distance as a check: the demo
+   replays recorded controls once a frame, so it is the same race on every machine. Equal
+   distance at equal frames on every machine below.
+2. **Per-step state log** (done). `statelog N FILE` reads the race state block $DBC0-$E073
+   (globals, the 16 cars of 64 bytes, the car order) at every frame end, through a
+   breakpoint at $D510, which works on every CPU. `tools/statecmp.py` compares two logs. The
+   first demo race's 300 frames agree on the 68000, 68020, 68040 and 68060. What $DBEC
+   and $DBF0 mean (for step 15) is still open: $DBF0's high word follows the player's
+   lateral position $DC56.
+3. **A real race through the menus** (done). `race` goes from the boot through the title
+   (right button) and the menu (left button held on START) to the green light of an ARCADE
+   race. `drive` then drives it: full throttle, shifting, steering against the lateral
+   position. It crashes now and then and goes on. Served with `BOOT_BREAK=0x3658`, two boots
+   drive identically. The controls are positions read once a frame (step 13).
+4. **Machine matrix** (done). `tools/matrix.py` boots each cell once with a deadline and
+   reports `bench`, dumps and a screenshot. `bench 300` from the demo's green light:
+
+   | Machine | Options | Fields | fps | Fields per frame | Distance |
+   |---|---|---|---|---|---|
+   | a500 | - | 1125 | 13.3 | 3-6, mostly 4 | 90304 |
+   | a1200 | - | 872 | 17.2 | 2-5, mostly 3 | 90304 |
+   | a1200-030 | `MMU` | 616 | 24.4 | 1-3, mostly 2 | 90304 |
+   | a1200-040 | `CACHE` | 504 | 29.8 | 1-3, mostly 2 | 90304 |
+   | a1200-fast (`--full`) | - | 816 | 18.4 | 2-4 | 90304 |
+   | a1200-040 (`--full`) | `DCACHE` | 413 | 36.3 | 1-3, mostly 1 | 90304 |
+
+   No cell left a WHDLoad dump. The four default cells are the check after a finished change
+   (a few minutes); `--full` adds the two others for one-off decisions such as step 21.
+   The a1200-060 is left out for now: its `bench` drives 96505 in 300 frames, so frames are
+   being missed there or it runs differently, and under the `statelog` breakpoint it matches
+   the others. Work on the 68040 comes first; the 060 is checked again after it.
 
 ### B. Correct on the 68040 (bug fixes, always on)
 
@@ -125,8 +144,11 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     stays as it is. Pause, the menus, the replay and the start lights rebase the tick clock
     without catch-up.
 13. **Input and frame-counted timers.**
-    - The VBL adds the mouse deltas into ($A2CC) every field. Decide how catch-up ticks
-      share them; steering must not depend on the frame rate.
+    - The VBL adds the mouse's movement into ($A2CC) every field, but the race reads the
+      throttle and steering as clamped positions once a frame ($AF56), so catch-up ticks
+      can read the same values. The gear shift acts on a button's release ($DC1A): a tick
+      must not see one release twice or miss one. The demo's recorded controls advance one
+      entry a frame ($DC26), so in the tick they advance one entry a tick.
     - Find every countdown in frames ($DC32 = 50 at $CA50, the start lights, sound triggers
       from the loop) and classify it with the playbook's timer table. Those inside the tick
       need nothing.
@@ -141,7 +163,7 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
 ### D. Frames between ticks (Enhanced framerate, 68020 and up)
 
 15. **Interpolation.** At the end of each tick, keep what the renderer reads: the player's
-    distance $DC50, the view's angle and offset ($DBEC, $DBF0, step 2), and each car's
+    distance $DC50, the view's angle and offset (probably $DBEC and $DBF0; step 11 settles it), and each car's
     distance and lateral position. Each frame, write interpolated copies with
     alpha = fields since the tick / fields per tick, render, then put the tick's values back.
     Wrap distances at the track length ($DBD4), take angles by the shorter way, and snap at

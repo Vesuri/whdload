@@ -82,7 +82,10 @@ patches again (`SMC_Decrunched`). The variables keep their state across a reload
   the field of the previous swap, so a frame takes at least one field. At its end ($D50A-$D524)
   it hands the draw buffer to the VBL through $A71C, sets $E258 and calls $12FA6, which
   toggles $86DE (0/4) and sets the draw buffer $86EA from $86E2/$86E6 ($1FAC6 and $277C6,
-  4 planes of 8000 bytes each).
+  4 planes of 8000 bytes each). The wait comes before the frame's end, so at most one frame
+  ends in a field, and $E258 changes at each: that is the frame count the tools read. The
+  buffer index is not one: when the panel changes (laps, times), the race loop calls $12FA6
+  in pairs ($CC12-$CCE6) to draw it into both screens.
 - **The VBL** (level 3 $A076, then $A4F4): $A884 += 1; `jsr` through $A56C (in a race $A3A4:
   the race clock $8500 += 2 while $8504 >= 0, a palette from $A844, the copper list's
   bitplane pointers from $A71C) and through $A572 ($9432, the sound); then the mouse counters
@@ -93,7 +96,11 @@ patches again (`SMC_Decrunched`). The variables keep their state across a reload
   the same values in the same order on the a500, a1200, a1200-040 and a1200-060 (the 060 sometimes
   skips a value between two field samples). So game speed follows the frame rate, while the
   clock and the sound timers (the field counter, $8E7E-$905C) run in real time. A lap's clock
-  time therefore depends on the machine.
+  time therefore depends on the machine. `statelog` makes the check exact: the race state
+  block $DBC0-$E073 (globals, the 16 cars, the car order at $E050) at every frame end ($D510), from the
+  green light of the first demo race, is the same in each of 300 frames on the a500, the
+  a1200, the a1200-040 (`CACHE`) and the a1200-060 (`CACHE BRANCHCACHE`). 255 of its long
+  words change in that time.
 
 From the green light of the first demo race, 1000 fields (`racelog`; `DETERMINISTIC=1`):
 
@@ -106,11 +113,45 @@ From the green light of the first demo race, 1000 fields (`racelog`; `DETERMINIS
 | a1200-040 | `DCACHE` | 785 | 39.3 | 1-2 | 279572 (3.5x) |
 | a1200-060 | `CACHE BRANCHCACHE` | 889 | 44.5 | 1 (807 of 889) | 333548 (4.2x) |
 
+These frames were counted from the buffer index (above, "The swap": not a frame count where
+the panel's pairs fall across a field boundary). `bench` counts $E258 instead; on the a500 to the
+a1200-040 it gives the same distance at equal frames on every machine. The a1200-060 row is not confirmed: there `bench` drove
+96505 in its first 300 frames against 90304 on every other machine, still unexplained
+(open-work.md).
+
 With an MMU model, FS-UAE's `DCACHE` caches chip memory data, which no real board does
 (AmigaXDev `reference/headless-fsuae.md`, "Chip RAM and the data cache"). The `CACHE` row
 (instruction cache only) is the closer model of a real 68040 running this game. FS-UAE's
 040/060 timing is near an instruction count, so these rows rank the machines and do not
 predict an accelerator's frame rate.
+
+## Input, the menu and the race controls
+
+- **The input block** at ($A2CC), which is $825C: the word $825C holds the buttons (bit 0 the
+  left mouse button, bit 1 the right one or the port-1 fire button). $825E (x) and $8260 (y)
+  add up the mouse's movement, half the counter steps, every field. Each screen clamps or
+  clears them.
+- **The title** waits for the right button. It is still loading the menu in the background
+  (through the slave's disk loads, during which the field counter stops and chip memory
+  reads back as $FFFFFFFF from the gdb stub). It takes a click during that load, and the menu
+  appears when the load is done.
+- **The menu** ($4800-$4E80, waiting in $8DC0). $86EE points at the highlighted item: $86F2
+  START, $8732 ARCADE (TRAIN), $878A NOCOMM, $87D2 ALL, $8826 5 LAPS, $8886 MOUSE,
+  $88C6 MANUAL. An item holds its neighbours for eight directions at +0-+$1C, its position at
+  +$28/+$2C and the setting's index at +$30. When $825E or $8260 passes ±35 the highlight moves
+  to that neighbour and both are cleared; a diagonal move (both past 35) goes nowhere. The
+  left button on START starts the race, but the loop reads the button ($4862) only between its
+  waits, so the button must be held (30 fields are enough). On another item, the button
+  changes that item's setting.
+- **The race controls** (from $AF56, once a frame). With MOUSE, y ($8260, clamped to ±94) is
+  the throttle ($DBF8 = -y: forward is faster) and x ($825E, clamped to ±271) the steering
+  position ($10C46). Both are positions, not movements. With MANUAL, the right button shifts
+  up and the left one down, on release ($DC1A; the gear is $DC04, 0 neutral to 6).
+- **The demo race** replays the same controls from a table at $1E73E, three bytes a frame
+  (y, x, buttons; index $DC26). It is therefore the same race, frame by frame, on every
+  machine.
+- The player's lateral position is the word at $DC56 (car table +8); the high word of $DBF0
+  follows it.
 
 ## Where the time goes (a500)
 
