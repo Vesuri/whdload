@@ -26,13 +26,23 @@ for p in ${PANS:-22:3 21:3 28:2 38:2}; do
   t fields 100 > /dev/null
 done > "$out/hashes.txt"
 # the same pans with the pointer at the screen edge (the left button enters pointer mode);
-# a step's picture depends on the steps before it, so these have their own lines (p22 ...)
+# a step's picture depends on the steps before it, so these have their own lines (p22 ...).
+# A pan runs only with the pointer in a band at the edge (measured: x 2418, the right limit;
+# x under 128; y 2996, the top limit; y 120 to 190, the view's bottom lines, not the status
+# line below), so it is steered to just outside the band, enters with one mouse move and
+# leaves with one after the last step, as a key is pressed and released: the steps then do
+# not depend on the CPU's speed
 t click > /dev/null; t fields 10 > /dev/null
 for p in ${PANS:-22:3 21:3 28:2 38:2}; do
   k=${p%:*} n=${p#*:}
-  case $k in 22) e="9999 1536";; 21) e="0 1536";; 28) e="1280 9999";; 38) e="1280 0";; esac
+  case $k in   # near the edge; the move in (mouse counts: x 4 units each, y -8)
+    22) e="2378 1536" mx=20 my=0;; 21) e="160 1536" mx=-10 my=0;;
+    28) e="1280 2956" mx=0 my=-10;; 38) e="1280 216" mx=0 my=5;;
+  esac
   t pointer $e > /dev/null
+  t mouse $mx $my > /dev/null
   t strips "$n" "$PWD/$out/p$k" | sed "s/^/$k /"
+  t mouse $((-3 * mx)) $((-3 * my)) > /dev/null
   t pointer 1280 1536 > /dev/null
   t fields 100 > /dev/null
 done > "$out/pointer.txt"

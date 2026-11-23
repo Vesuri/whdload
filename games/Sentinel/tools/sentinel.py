@@ -14,8 +14,9 @@ Commands (each stops the CPU and leaves it stopped at a vsync, except `go`):
     peek ADDR N              N bytes at ADDR, hex
     swaps N                  run N fields one at a time; the fields between buffer swaps
                              (changes of the back-buffer pointer $58C76)
-    strips K [FILE]          run until K more pan steps (8 swaps each) have been shown, at most
-                             60 fields a step; after each, the SHA-256 of the front buffer
+    strips K [FILE]          run until K more pan steps have been shown (a step ends when the
+                             pan loop's swap count $17D3 is back at -1 after a swap), at most
+                             480 fields in all; after each, the SHA-256 of the front buffer
                              (the 32000 bytes of the displayed buffer); FILE.<n>.bin keeps them
     route [SHOTS]            from the entry (ENTRY=1): the title (400 fields), space, the
                              landscape number (150), return for 0000, its overview (400),
@@ -53,6 +54,7 @@ ENTRY = BASE + 0x10d4
 BACK = 0x58c76            # the back buffer, $60000 or $78000
 BUFFERS = (0x60000, 0x78000)
 BUFFER_SIZE = 4 * 8000
+STEPS = 0x17d3            # the pan step's swaps left, -1 between steps
 
 
 def peek(g, addr, n):
@@ -148,7 +150,7 @@ def strips(server, g, rest):
     k, stem = int(w[0]), (w[1] if len(w) > 1 else None)
     g.stop()
     tmp = os.path.join(server.run_dir, 'front.bin')
-    last, count, out, since = long(g, BACK), 0, [], 0
+    last, count, out, since, swapped = long(g, BACK), 0, [], 0, False
     while len(out) < k:
         g.cmd('monitor fields 1')
         since += 1
@@ -156,14 +158,17 @@ def strips(server, g, rest):
         if b != last:
             count += 1
             last = b
-            if count % 8 == 0:
-                front = BUFFERS[1] if b == BUFFERS[0] else BUFFERS[0]
-                data = read_block(g, front, BUFFER_SIZE, tmp)
-                n = len(out) + 1
-                if stem:
-                    Path(f'{stem}.{n}.bin').write_bytes(data)
-                out.append(f'{n} {since} {hashlib.sha256(data).hexdigest()[:16]}')
-                since = 0
+            swapped = True
+        # a step ends when the pan loop leaves with its swap count $17D3 at -1
+        if swapped and peek(g, STEPS, 1)[0] == 0xff:
+            swapped = False
+            front = BUFFERS[1] if b == BUFFERS[0] else BUFFERS[0]
+            data = read_block(g, front, BUFFER_SIZE, tmp)
+            n = len(out) + 1
+            if stem:
+                Path(f'{stem}.{n}.bin').write_bytes(data)
+            out.append(f'{n} {since} {hashlib.sha256(data).hexdigest()[:16]}')
+            since = 0
         if since > 60 * 8:
             out.append(f'stalled after {count} swaps')
             break

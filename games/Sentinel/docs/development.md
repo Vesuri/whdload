@@ -45,10 +45,13 @@ The keys: D (raw `$22`) pans right, S (`$21`) left, L (`$28`) up, comma (`$38`) 
 mouse button enters pointer mode (`$1853` set); there the pointer at an edge pans (`$5F84A`
 x 0..2418 and `$5F84C` y 0..2996, larger is up; edges tested at `$7870`), and space returns
 to key mode. A mouse count moves x by 4 and y by -8; `pointer X Y` steers through the
-emulator's mouse input until the game's pointer is there or stops at an edge, so a pan with
-the pointer is `pointer 9999 1536` (right), `0 1536`, `1280 9999` (up) or `1280 0`.
-`swaps N` reports the fields between buffer swaps: a pan step is 8 swaps a field apart, then
-the pause while the next strip is drawn.
+emulator's mouse input until the game's pointer is there or stops at an edge. The pointer
+pans in a band at each edge (measured): x 2418, the right limit; x under 128; y 2996, the top
+limit; y 120 to 190, the view's bottom lines (not the status line below them). `swaps N`
+reports the fields between buffer swaps: a pan step is 8 swaps a field apart, then the pause
+while the next strip is drawn. `strips K` counts steps by the pan loop's swap count `$17D3`,
+which is back at -1 when a step ends, not by groups of 8 swaps: a swap before it starts
+(the first view's draw, a pan already under way) would shift the groups.
 
 Two commands bound what the shared ones leave open: `waitfor ADDR HEX MAX` runs field by
 field until memory holds a value and says `timeout` after MAX fields; `brk ADDR SECONDS` is a
@@ -63,9 +66,12 @@ the displayed buffer after each step; the hashes must equal `tools/render_check.
 `22 1 ...` for keys, `p22 1 ...` for the pointer), recorded on the a500 (`tools/render_check.sh
 record`). A step's picture depends on the steps before it (the same view reached on the way
 back has other bytes), not on the CPU or on keys against pointer: from the first view the
-pointer's steps equal D's. It prints the fields each half took. `INSTANCE=b` runs one beside
-another; start them a few seconds apart (several launched in the same second failed to
-boot).
+pointer's steps equal D's. The pointer is steered to just outside the band, enters it with
+one mouse move and leaves it with one after the last step, as a key is pressed and
+released; steered into it in several moves, a fast CPU had begun a step before `strips`
+started (the a1200-060 and the a1200-040 with `DCACHE` differed). It prints the fields each
+half took. `INSTANCE=b` runs one beside another; start them a few seconds apart (several
+launched in the same second failed to boot).
 
 The reference is V1.01's picture: V1.01 matches it on the a500 (`SLAVE=original`), and the
 control `SLAVE=original SETUP=a1200-040` must fail (it differs in 43 diff lines).
@@ -103,21 +109,23 @@ code.
 
 ## The matrix
 
-`tools/matrix.sh [FILTER]` runs the render check and the play check over the machines and
+`tools/matrix.sh [FILTER]` runs the render check and the play check on the a500, the a1200,
+the a1200-030 and the a1200-040, two at a time: the check after a change to the slave.
+`FULL=1` runs the whole list, for a question that needs it (B7 was one): the machines and
 WHDLoad's cache options (`NoCache`, `Cache`, `DCache`, `ChipNoCache`, `BranchCache`; `MMU` on
 the 030), a 28 MHz 68020 with Zorro III memory and a 68060 that traps `movep`
 (`--uae_cpu_no_unimplemented=true`), two at a time; the list is in the script. Two controls
 must fail: V1.01's render check on the a1200-040, and V1.01's play check (the sound patch
 missing). A line whose result is not its expected one fails the run; `tmp/matrix/summary.txt`
-lists them. The whole list takes about an hour of warp emulation; FILTER (a grep pattern)
-runs part of it.
+lists them. The whole list takes about an hour of warp emulation; FILTER (a grep pattern on
+the list's lines) runs part of it.
 
 ## Checks
 
 - `tools/edgecheck.py [N]`: `EdgeStep` against the game's edge scan converter under Unicorn
   (`make check` runs it with 20000 edges; it reads the program from `tmp/game`).
 - `tools/render_check.sh`, `tools/play_check.sh` and `tools/matrix.sh` above: minutes each,
-  so not in `make check`; run the render and play checks on the a500 and a1200-040 for any
-  change to the slave, and the matrix before a release.
+  so not in `make check`; run the matrix (its minimal set) for any change to the slave, and
+  `FULL=1` only when a question needs every option.
 - `tools/sentinel.py census N STATE` and `tools/smc_census.py STATE...`: executed bytes the
   CPU also wrote, from 68000 traces (`tmp/` holds the states: they contain game bytes).

@@ -1,26 +1,30 @@
 #!/bin/bash
-# tools/matrix.sh [FILTER]: the render check and the play check over every machine and
-# WHDLoad cache option, with the controls that must fail (docs/development.md#the-matrix).
-# Two runs at a time, started a few seconds apart. FILTER (a grep pattern) picks lines of the
-# list below by name. Results go to tmp/matrix/: one log per line and summary.txt; the exit
-# status is non-zero if any line did not give its expected result.
+# tools/matrix.sh [FILTER]: the render check and the play check on the a500, a1200,
+# a1200-030 and a1200-040, the check after a change (docs/development.md#the-matrix).
+# FULL=1: every machine and WHDLoad cache option and the controls that must fail, for a
+# question that needs them (an hour). Two runs at a time, started a few seconds apart.
+# FILTER (a grep pattern) picks lines of the list below. Results go to tmp/matrix/: one log
+# per line and summary.txt; the exit status is non-zero if any line did not give its
+# expected result.
 set -u
 cd "$(dirname "$0")/.."
-# name | check (render, play) | expected (pass, fail) | run options
+# name | check (render, play) | expected (pass, fail) | run options; * marks the minimal set
 LIST='
-a500                 |render|pass|SETUP=a500
-a500                 |play  |pass|SETUP=a500
-a1200                |render|pass|SETUP=a1200
-a1200                |play  |pass|SETUP=a1200
+*a500                |render|pass|SETUP=a500
+*a500                |play  |pass|SETUP=a500
+*a1200               |render|pass|SETUP=a1200
+*a1200               |play  |pass|SETUP=a1200
 020-z3               |render|pass|SETUP=a1200 FAST_KB=0 "EXTRA_ARGS=--cpu=68020 --uae_cpu_frequency=28375160 --fast_memory=0 --zorro_iii_memory=32768"
 020-z3               |play  |pass|SETUP=a1200 FAST_KB=0 "EXTRA_ARGS=--cpu=68020 --uae_cpu_frequency=28375160 --fast_memory=0 --zorro_iii_memory=32768"
+*030                 |render|pass|SETUP=a1200-030
+*030                 |play  |pass|SETUP=a1200-030
 030-mmu              |render|pass|SETUP=a1200-030 "WHD_ARGS=MMU"
 030-mmu-nocache      |render|pass|SETUP=a1200-030 "WHD_ARGS=MMU NOCACHE"
 030-mmu-cache        |render|pass|SETUP=a1200-030 "WHD_ARGS=MMU CACHE"
 030-mmu-dcache       |render|pass|SETUP=a1200-030 "WHD_ARGS=MMU DCACHE"
 030-mmu-dcache       |play  |pass|SETUP=a1200-030 "WHD_ARGS=MMU DCACHE"
-040                  |render|pass|SETUP=a1200-040
-040                  |play  |pass|SETUP=a1200-040
+*040                 |render|pass|SETUP=a1200-040
+*040                 |play  |pass|SETUP=a1200-040
 040-nocache          |render|pass|SETUP=a1200-040 WHD_ARGS=NOCACHE
 040-cache            |render|pass|SETUP=a1200-040 WHD_ARGS=CACHE
 040-dcache           |render|pass|SETUP=a1200-040 WHD_ARGS=DCACHE
@@ -39,7 +43,9 @@ control-v101-040     |render|fail|SETUP=a1200-040 SLAVE=original
 control-v101-sound   |play  |fail|SETUP=a500 SLAVE=original
 '
 out=tmp/matrix; mkdir -p "$out"; : > "$out/summary.txt"
-lines=$(printf '%s\n' "$LIST" | grep -v '^ *$' | grep -e "${1:-.}")
+lines=$(printf '%s\n' "$LIST" | grep -v '^ *$')
+[ "${FULL:-0}" = 1 ] || lines=$(printf '%s\n' "$lines" | grep '^\*')
+lines=$(printf '%s\n' "$lines" | sed 's/^\*//' | grep -e "${1:-.}")
 n=0 status=0 pids=''
 run() {   # run INDEX NAME CHECK EXPECTED OPTIONS
   local i=$1 name=$2 check=$3 want=$4 opts=$5 got
