@@ -11,7 +11,8 @@ cd "$(dirname "$0")/.."
 mode=check; [ "${1-}" = record ] && { mode=record; shift; }
 . ../../common/env.sh
 export WARP=1 WINDOW=none DETERMINISTIC=1 JOY0=none ENTRY=1 "$@"
-inst=${INSTANCE:-default}
+export INSTANCE=${INSTANCE:-render}   # never the default instance: that is the user's make run
+inst=$INSTANCE
 out=tmp/render_check/${SETUP:-a500}-$inst; rm -rf "$out"; mkdir -p "$out"
 t() { python3 tools/sentinel.py "$@"; }
 t serve > "$out/serve.log" 2>&1 &

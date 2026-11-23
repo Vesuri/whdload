@@ -13,7 +13,8 @@ set -u
 cd "$(dirname "$0")/.."
 . ../../common/env.sh
 export WARP=1 WINDOW=none DETERMINISTIC=1 JOY0=none ENTRY=1 VERIFY_EXIT=1 "$@"
-inst=${INSTANCE:-default}
+export INSTANCE=${INSTANCE:-play}   # never the default instance: that is the user's make run
+inst=$INSTANCE
 out=tmp/play_check/${SETUP:-a500}-$inst; rm -rf "$out"; mkdir -p "$out"
 exitfile=tmp/run/$inst/.run/dh0/whdload-exit.txt
 rm -f "$exitfile"
