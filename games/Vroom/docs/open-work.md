@@ -195,33 +195,21 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     before): drawn frames still take whole fields. Left: the 40 starts that reach a branch
     before the game's wait (loops; 0.8 fps more at most) and drawing the smallest blits with
     the CPU.
-19. **Fast memory for data** (optional ExpMem, the patches skipped without it, as in
-    BuggyBoy's 2.0b). The stack is done (`internals.md`, "Fast memory"): 25.05 fps on the
-    a1200-040 against 24.75, 22.30 on the a1200-030 against 21.42 (option off). The a500's
-    CPU data accesses in 100 race fields (`tools/dmaregions.py` on a Barto trace):
-    722000, of which 314000 go to the screens and the custom chips, 128000 to the stack,
-    126000 to $10000-$11FFF, 42000 to $D000-$DFFF, 43000 to the span table
-    ($34D00-$350FF), 22000 to the projection's variables ($3048E-$3049F), and most of the
-    rest is read-only data in $2FC96-$36800 (written before the race: copy it at the race's
-    start). `tools/eacensus.py` on the same trace finds nine immediate bases into
-    $2FC96-$36000 ($E4FE, $EC24, $F012, $F02C, $F53E, $F9C8, $FA62, $10CDA, $155A2),
-    plus pointer tables ($10AF2-$10B2A). Moves still open, in order of accesses:
-    - the landscape work buffers ($2F000-$32FFF);
-    - the span tables ($34000-$35FFF);
-    - the renderer's variables and tables ($10000-$11FFF).
-
-    The renderer's variables sit between its code and are read PC-relative. So move the
-    renderer block ($E000-$11400 or so) whole into fast memory: code and data together keep
-    their PC-relative reach. Patch the absolute references into and out of it from a static
-    census, and check it against every address observed in a 68000 trace. Next come the car
-    table and state ($D000-$EFFF; the race loop reads them PC-relative too, so the same
-    approach) and the object graphics ($49000-$58FFF, read by the scaler; first confirm
-    the blitter never reads them).
-
-    The screens, copper lists and anything the blitter reads or writes stay in chip memory.
+19. **Fast memory for data and the race block** (done; `internals.md`, "Fast memory").
+    With an optional 100 KB fast ExpMem the stack and the race block ($A924-$11FBA: the
+    race's setup and loop, its state and the renderer) move there. At 25 Hz the a1200-fast
+    (68020) draws 24.18 fps against 17.87 with only the stack moved, the a1200-030 25.05
+    against 24.37; the a1200-040 is at 25 fps either way. Checked with `statelog`, `frames`,
+    an MMU-protected developer build through the menus, a driven race, its end and a second
+    race, the data disk, and the matrix. Without fast memory, or on a 68000, nothing moves.
+    What else in chip memory the CPU uses most (the a500's 100 race fields): the span table
+    ($34D00-$350FF, 43000 data accesses), the projection's variables ($3048E-$3049F,
+    22000), and read-only data in $2FC96-$36800 written before the race. The screens, copper
+    lists and anything the blitter reads or writes stay in chip memory.
 20. **Code in fast memory.** The 68040's 4 KB instruction cache holds the inner loops but not
-    a frame's code. Once step 19 has moved the renderer, measure what else (the race loop,
-    the scaler) is worth moving.
+    a frame's code. Step 19 moved the race loop and the renderer; profile again (aprof on
+    the a1200-040, a traced 68020 with fast memory) for what else (the scaler at $18154,
+    the objects at $140C0, both outside the block) is worth moving.
 21. **The icon's cache tooltype.**
     - `Cache` turns on the instruction cache and turns the data cache off for the whole
       program, so data moved to ExpMem in step 19 would run uncached.

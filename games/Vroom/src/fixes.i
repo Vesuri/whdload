@@ -8,6 +8,9 @@
 FIX_TRAMP	= $1B0			; a JMP trampoline, after src/smc.i's
 
 Fix		movem.l	d0-d1/a0-a2,-(a7)
+	IFD	ENH_PROTECT
+		bsr	enh_Unprotect
+	ENDC
 		lea	FIX_TRAMP.w,a0
 		move.w	#$4EF9,(a0)+		; jmp xxx.l
 		pea	fix_Queue(pc)
@@ -80,8 +83,9 @@ _fix_pl020	PL_START
 		PL_PS	$C968,fix_Landscape	; jsr $E4F8
 		PL_END
 
-fix_Queue	jsr	$1123A			; uses a6
-		lea	$11268,a6
+fix_Queue	move.l	_blk_1123A(pc),a6	; it uses a6 (any CPU: src/enhanced.i's
+		jsr	(a6)			; race block, maybe in fast memory)
+		move.l	_blk_11268(pc),a6
 		rts
 
 fix_BlitInt	move.w	#INTF_BLIT,_custom+intreq
@@ -94,8 +98,10 @@ fix_KbdDelay	move.l	d0,-(a7)
 		move.l	(a7)+,d0
 		rts
 
+	MACHINE	MC68020				; a 68020 or higher only
 fix_Landscape	bsr.b	fix_WaitShown
-		jmp	$E4F8
+		jmp	([_blk_E4F8,pc])
+	MACHINE	MC68000
 
 ; Wait until the VBL has taken the last frame ($A71C = -1), so the buffer to
 ; draw into is no longer on screen; at most 2 fields, in case no VBL takes it.

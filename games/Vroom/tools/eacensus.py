@@ -37,8 +37,9 @@ for fi in range(NF):
                     bi=m.base_reg-M68K_REG_A0
                     base = r[8+bi] if 0<=bi<8 else None
                 if base is None: continue
-                if am in (M68K_AM_REGI_ADDR,M68K_AM_REGI_ADDR_POST_INC): ea=base
-                elif am==M68K_AM_REGI_ADDR_PRE_DEC: ea=base-op.size if hasattr(op,'size') else base-2
+                if am in (M68K_AM_REGI_ADDR,M68K_AM_REGI_ADDR_POST_INC,M68K_AM_REGI_ADDR_PRE_DEC):
+                    ea=r[8+op.reg-M68K_REG_A0]  # capstone keeps (An) modes' register in op.reg
+                    if am==M68K_AM_REGI_ADDR_PRE_DEC: ea-=1
                 elif am==M68K_AM_REGI_ADDR_DISP: ea=base+m.disp
                 elif am==M68K_AM_AREGI_INDEX_8_BIT_DISP:
                     x=m.index_reg; xi = r[x-M68K_REG_D0] if x<=M68K_REG_D7 else r[8+x-M68K_REG_A0]

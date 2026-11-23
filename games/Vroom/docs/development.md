@@ -72,6 +72,9 @@ change is the map's position marker, which the original draws there too (`intern
 | `tools/matrix.py [--full \| CELL ...]` | `bench` on the a500, a1200, a1200-030 (`MMU`) and a1200-040 (`CACHE`), then the a1200-030 with `MMU CUSTOM1=1 CUSTOM2=1` and the a1200-040 with `CACHE CUSTOM1=1`, one boot at a time with a deadline: the bench line, WHDLoad dumps and a screenshot per cell, in `tmp/matrix/<time>/`. The check after a finished change, not after every edit; `--full` adds the a1200-fast and the a1200-040 with `DCACHE`, for one-off decisions |
 | `tools/dmaregions.py TRACE [N]` | the CPU's chip memory accesses in a Barto trace of a 68000: instruction fetches, data reads and writes, and the data accesses by 4 KB block (the screens as one) |
 | `tools/eacensus.py TRACE LO HI [N]` | the executed instructions in a Barto trace with a memory operand or an immediate in [LO, HI): the census before a block moves to fast memory |
+| `tools/reloc.py [--write] [--no-seeds LO-HI] IMAGE PROFILE...` | the race block's relocation census (`internals.md`, "Fast memory"): IMAGE is chip memory from 0 at the program's entry (`BOOT_BREAK=0x3658`, `gdb dump binary memory`), the PROFILEs aprof profiles of whole sessions and Barto PC sets (.pkl). Prints the tables found, the immediates kept as numbers, the PC-relative edge crossings and the undecoded long words into the block to review; `--write` writes `src/reloc_<variant>.i` (the data disk with `--no-seeds 3600-4400`, its different init code). Run it again when a patch changes the program's memory |
+| `DEFINES_<build>=-DENH_PROTECT=1` (`BUILD=<build>`) | the race block left in chip memory, from $B000, protected between `Fix`es: any access by a missed reference ends in a WHDLoad dump. A 68030 with `MMU` (the 68040's 8 KB pages would cover the title's idle loop at $12F9E, which then crawls) |
+| `DEFINES_<build>=-DENH_NOBLOCK=1` | only the stack moves to fast memory: the A side of a measurement of the block's move |
 | `tools/smc.py TRACE.bin ...` | finds self-modifying code in Barto traces: CPU writes onto instructions executed anywhere in the traces |
 | `tools/smcscan.py MEMORY.bin [--exec TRACE.bin ...]` | a static scan of a memory dump for writes into code (absolute, PC-relative, or through a `lea` of a code address) |
 
@@ -86,12 +89,12 @@ change is the map's position marker, which the original draws there too (`intern
 | `tools/framecmp.py A B [--by tick\|frame] [--lines F-L]` | compares two `frames` files frame by frame: which planes and lines differ. Lines 31-35 (the race clock) and 175-199 (the cockpit's bottom) differ between runs of the same build |
 | `tools/blitsites.py MEM [--check MEM2 ...]` | writes `src/blitwait.i` from a race memory image: the blitter starts the game waits after itself (`internals.md`, "Blitter waits") |
 | `shown [N]` | from the next green light, for N frames (default 40): at each swap ($D522) reads the screen still on display, and again when the VBL takes the new frame ($A404); reports the frames where it changed, with the planes and lines. Exact on any machine, slow (two 32000-byte reads a frame) |
-| `statelog N FILE [tick]` | from the next green light, the race state (the block $DBC0-$E073, the score $8370, the simulation's long words in the renderer's area) and the race clock at each of N frame ends (a breakpoint at $D510: exact per frame, any CPU), or with `tick` at every race loop pass ($CD0E, drawn or not) |
+| `statelog N FILE [tick]` | from the next green light, the race state (the block $DBC0-$E073, the score $8370, the simulation's long words in the renderer's area) and the race clock at each of N frame ends (a breakpoint at $D510: exact per frame, any CPU), or with `tick` at every race loop pass ($CD0E, drawn or not). Pointers into the race block's fast memory copy are logged as the program's addresses, so logs with and without fast memory compare |
 | `racelog N FILE` | from the next green light, one line per field: field, frame, clock, distance |
 | `meter N` | frames, fields per frame, clock and distance over N fields from now |
 | `race [stay]` | from the boot, through the title (right button, given only while the title idles at $12F9E: a click during the menu's wipe leaves the menu again) and the menu (left button on START) to the green light of a player race with the menu's settings as they are (ARCADE, MOUSE, MANUAL): see `internals.md`, "Input, the menu and the race controls" |
-| `drive N [GAIN] [FILE]` | a test driver for N fields: full throttle, shifting up when the speed stops rising, steering against the lateral position. FILE gets field, gear, speed, lateral, x, y every 2 fields |
-| `do ACTION ...` | low-level steps with the CPU stopped: `f<N>` fields, `L1`/`L0`/`R1`/`R0` mouse buttons, `m<dx>,<dy>`, `x<addr>[,<n>]` reads (`xsp` at the stack pointer), `u<addr>=<hex>,<max>` waits, `b<addr>` runs to a breakpoint, `r<reg>[,<reg>...]` registers, `pc`, `shot=<png>`; a last `stay` leaves the CPU stopped for the next command. A failing action ends the list, and the reply keeps what came before it |
+| `drive N [GAIN] [FILE]` | a test driver for N fields: full throttle, shifting up when the speed stops rising, steering against the lateral position. A shift holds the button 4 fields and the release 4 (the race reads the controls once a tick: a shorter release can fall between two reads, and the gear never engages). FILE gets field, gear, speed, lateral, x, y every 2 fields |
+| `do ACTION ...` | low-level steps with the CPU stopped: `f<N>` fields, `L1`/`L0`/`R1`/`R0` mouse buttons, `m<dx>,<dy>`, `x<addr>[,<n>]` reads (`xsp` at the stack pointer; an address in the race block reads its fast memory copy, `X` the address itself), `u<addr>=<hex>,<max>` waits, `b<addr>` runs to a breakpoint, `r<reg>[,<reg>...]` registers, `pc`, `shot=<png>`; a last `stay` leaves the CPU stopped for the next command. A failing action ends the list, and the reply keeps what came before it |
 | `decrunch N [S]` | stop after each of the next N file decrunches and report the destination and length |
 
 Run it as its own server, after `. ../../common/env.sh`:
@@ -102,6 +105,10 @@ SETUP=a1200-040 WHD_ARGS=CACHE WARP=1 WINDOW=none JOY0=none DETERMINISTIC=1 \
 python3 tools/vroom.py bench 500          # once tmp/run/default/.run/vroom.sock exists
 python3 tools/vroom.py quit
 ```
+
+With fast memory the race block ($A924-$11FBA) runs from its copy there: the commands'
+breakpoints and reads of block addresses go to the copy, at the offset the slave leaves at
+$1D6 (`internals.md`, "Fast memory").
 
 The commands that wait for a green light take the first demo race when the title is left
 alone (the field counter reads about 8000 there on the a500). Between commands the CPU runs on (in warp, a

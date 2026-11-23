@@ -450,6 +450,7 @@ _Key	move.b	$bfec01,d0
 SMC_VBLW1	= $3B54		; the address in move.l #x,$A572
 SMC_VBLW2	= $3B5E		; the address in move.l #x,$A56C
 	INCLUDE	fixes.i
+	INCLUDE	reloc_Vroom.i
 ;--------------------------------
 _resload	dc.l	0			;address of resident loader 
 ;--------------------------------

@@ -23,6 +23,7 @@ Each command's docstring has the details; docs/development.md ("Tools") how to u
 """
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
@@ -71,9 +72,46 @@ POS = 0xDC50              # the player's distance along the track (long)
 STEP = 0xDC60             # the player's last step (word), as added to POS at $C782/$C7C2
 
 
+# With fast memory, Enhanced framerate runs the race block from a copy at an offset that
+# src/enhanced.i keeps at $1D6 (docs/internals.md, "Fast memory"): the reads and
+# breakpoints below take a block address there.
+BLOCK = (0xA924, 0x11FBA)
+ENH_BLOCK = 0x1D6
+_block = {'off': 0, 'read': 0.0}
+
+
+def block_off(g):
+    """The race block's offset (0: in chip memory). A valid one is a multiple of $10000
+    above chip memory; once found it is kept (it is set before the program starts)."""
+    if _block['off'] or time.time() - _block['read'] < 2:
+        return _block['off']
+    out = g.cmd(f'x/1xw {ENH_BLOCK:#x}')
+    _block['read'] = time.time()
+    try:
+        v = int(out.rsplit(':', 1)[1].split()[0], 16)
+    except (IndexError, ValueError):
+        return 0
+    if v and v % 0x10000 == 0 and 0x200000 <= v < 0xFF000000:
+        _block['off'] = v
+    return _block['off']
+
+
+def A(g, addr):
+    """Where the program's address addr is now: in the race block's copy, or itself."""
+    return addr + block_off(g) if BLOCK[0] <= addr < BLOCK[1] else addr
+
+
+def unmoved(g, v):
+    """A value that points into the race block's copy, as the program's own address (so
+    that logs with and without fast memory compare)."""
+    off = block_off(g)
+    return v - off if off and BLOCK[0] + off <= v < BLOCK[1] + off else v
+
+
 def longs(g, addr, n):
-    """n longs from addr; UNREADABLE for what gdb cannot read."""
-    out = g.cmd(f'x/{n}xw {addr:#x}')
+    """n longs from addr (a race block address reads its copy); UNREADABLE for what gdb
+    cannot read."""
+    out = g.cmd(f'x/{n}xw {A(g, addr):#x}')
     vals = []
     for line in out.splitlines():
         if ':' in line:
@@ -189,7 +227,7 @@ def bench(server, g, rest):
         # The last frame to its end ($D510, before $E258 is set): read at a field boundary,
         # the position may already include the next frame's step.
         at = longs(g, FIELDS, 1)[0]
-        g.cmd(f'break *{FRAME_END:#x}')
+        g.cmd(f'break *{A(g, FRAME_END):#x}')
         try:
             g.cmd('continue', timeout=600)
         finally:
@@ -226,7 +264,8 @@ def state_log(server, g, rest):
     """statelog <frames> <file> [tick]: from the next green light, stop at every frame end
     ($D510), or with `tick` at every race loop pass ($CD0E, after `bsr $D13C`: the passes
     that Enhanced framerate leaves undrawn too), for <frames> stops, and write one line per
-    stop: number, field counter, race clock, then the long words of STATE in hex. Exact on
+    stop: number, field counter, race clock, then the long words of STATE in hex (pointers
+    into the race block's copy as the program's addresses, `unmoved`). Exact on
     any machine (a breakpoint, so slower than `racelog`). tools/statecmp.py compares two
     logs."""
     args = rest.split()
@@ -237,13 +276,14 @@ def state_log(server, g, rest):
     try:
         if not green_light(g):
             return 'no race start within 20000 fields'
-        g.cmd(f'break *{at:#x}')
+        g.cmd(f'break *{A(g, at):#x}')
         for frame in range(n):
             out = g.cmd('continue', timeout=120)
             if 'Breakpoint' not in out:
                 return f'no stop after {frame}: {out.strip().splitlines()[-1]}'
             f, c = longs(g, FIELDS, 1)[0], longs(g, CLOCK, 1)[0]
-            block = ''.join(f'{v:08x}' for lo, hi in STATE for v in longs(g, lo, (hi - lo) // 4))
+            block = ''.join(f'{unmoved(g, v):08x}' for lo, hi in STATE
+                            for v in longs(g, lo, (hi - lo) // 4))
             rows.append(f'{frame} {f} {c} {block}')
     finally:
         g.cmd('delete')
@@ -306,7 +346,7 @@ def frames(server, g, rest):
     try:
         if not green_light(g):
             return 'no race start within 20000 fields'
-        g.cmd(f'break *{SWAPPED:#x}')
+        g.cmd(f'break *{A(g, SWAPPED):#x}')
         for i in range(n):
             out = g.cmd('continue', timeout=120)
             if 'Breakpoint' not in out:
@@ -335,7 +375,7 @@ def shown(server, g, rest):
         if not green_light(g):
             return 'no race start within 20000 fields'
         for i in range(n):
-            g.cmd(f'break *{SWAPPED:#x}')
+            g.cmd(f'break *{A(g, SWAPPED):#x}')
             out = g.cmd('continue', timeout=120)
             g.cmd('delete')
             if 'Breakpoint' not in out:
@@ -344,7 +384,7 @@ def shown(server, g, rest):
             a, b = longs(g, SCREENS, 2)
             old = b if new == a else a
             before = screen_sum(g, old)
-            g.cmd(f'break *{VBL_TAKEN:#x}')
+            g.cmd(f'break *{A(g, VBL_TAKEN):#x}')
             out = g.cmd('continue', timeout=120)
             g.cmd('delete')
             if 'Breakpoint' not in out:
@@ -377,7 +417,8 @@ def shot(server, g, path):
 def do(server, g, rest):
     """do <action> ...: run actions with the CPU stopped, then let it run again. Actions:
     f<N> run N fields; L1/L0, R1/R0 press/release the left/right mouse button; m<dx>,<dy>
-    move the mouse (then run fields so the game reads it); x<addr>[,<n>] read n longs (hex; addr `sp` reads at the stack pointer);
+    move the mouse (then run fields so the game reads it); x<addr>[,<n>] read n longs (hex; addr `sp` reads at the stack pointer;
+    X reads the address itself, not the race block's copy);
     u<addr>=<hex>,<max> (or != or >=, unsigned) run fields until the long at addr
     compares so with hex, at most max (>= skips $FFFFFFFF, read during disk loads);
     b<addr> run to a breakpoint at addr (hex); r<reg>[,<reg>...] read registers; pc the
@@ -396,6 +437,12 @@ def do(server, g, rest):
             elif a[0] == 'm':
                 dx, dy = a[1:].split(',')
                 g.cmd(f'monitor mouse {int(dx)} {int(dy)}')
+            elif a[0] == 'X':                  # raw: the race block's chip copy too
+                addr, _, n = a[1:].partition(',')
+                out = g.cmd(f'x/{int(n or 1)}xw {int(addr, 16):#x}')
+                lines.append(f'{addr} ' + ' '.join(
+                    v for line in out.splitlines() if ':' in line
+                    for v in line.split(':', 1)[1].split()))
             elif a[0] == 'x':
                 addr, _, n = a[1:].partition(',')
                 if addr == 'sp':
@@ -419,7 +466,7 @@ def do(server, g, rest):
                     waited += 5
                 lines.append(f'{a} after {waited} fields')
             elif a[0] == 'b':
-                g.cmd(f'break *{int(a[1:], 16):#x}')
+                g.cmd(f'break *{A(g, int(a[1:], 16)):#x}')
                 try:
                     g.cmd('continue', timeout=600)
                 finally:
@@ -574,7 +621,8 @@ def drive(server, g, rest):
                 g.cmd('monitor input JOY1_2ND_BUTTON 1')
                 g.cmd('monitor fields 4')
                 g.cmd('monitor input JOY1_2ND_BUTTON 0')
-                best, flat, field = 0, 0, field + 4
+                g.cmd('monitor fields 4')       # the release past a tick (3 fields at
+                best, flat, field = 0, 0, field + 8  # 16.7 Hz): it engages the gear
             g.cmd('monitor fields 2')
             rows.append(f'{field} {gear} {speed} {lat} {x} {y}')
             field += 2

@@ -26,7 +26,11 @@
 ; Link play (COMM, $87BC not 0) keeps the original loop: the two machines
 ; keep step through the serial link.
 ;
-; With fast ExpMem the program's stack moves there (enh_Fast).
+; With fast ExpMem the program's stack and the race block ($A924-$11FBA: the
+; race's setup and loop, its state and the renderer) move there (enh_Fast,
+; enh_Move, enh_RelocOut; docs/internals.md, "Fast memory"). Developer builds:
+; -DENH_PROTECT protects the block left in chip memory (a 68030 with MMU),
+; -DENH_NOBLOCK moves only the stack (for A/B measurements).
 ;
 ; The scheduler's variables are in low memory, where the tools can read them.
 ;
@@ -55,14 +59,25 @@ ENH_BLT4	= ENH_BLT0+12
 ENH_BLT5	= ENH_BLT0+18
 ENH_BLT6	= ENH_BLT0+24
 
-ENH_STACK	= $1000			; the ExpMem: the program's stack, to here
-ENH_EXPSIZE	= $1000			; ws_ExpMem (optional): a multiple of $1000
+ENH_BLOCK	= $1D6			; long: the race block's offset in fast memory (0: not moved)
+
+ENH_LO		= $A924			; the race block, moved to fast memory
+ENH_HI		= $11FBA
+ENH_STACK	= $A900			; the stack's top, below the block in the copy
+ENH_STACKSIZE	= $1000			; and its size
+ENH_BOTTOM	= ENH_STACK-ENH_STACKSIZE ; the lowest address used, in the copy
+ENH_EXPSIZE	= ($FFF8+ENH_HI-ENH_BOTTOM+$100+$FFF)&$FFFFF000	; ws_ExpMem
+					; (optional; small for the 1 MB A500): the
+					; stack, the block and its trampolines after
+					; the first 64 KB boundary less ENH_BOTTOM
 
 ENH_LIMIT	= 50			; fields of debt kept: 1 s
 ENH_SKIPS_MAX	= 3			; passes in a row without drawing
 
 ; CUSTOM3=n (for the checks, not in ws_config): n of every n+1 passes leave
 ; out the drawing, whatever the time. The simulation must not notice.
+
+	MACHINE	MC68020				; all of it runs on a 68020 or higher
 
 ; IN:	-
 ; OUT:	-	all registers preserved
@@ -86,6 +101,7 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		move.b	20+3(a7),ENH_FORCE.w	; CUSTOM3
 		lea	28(a7),a7
 		st	(a2)			; -1: off
+		clr.l	ENH_BLOCK.w
 		tst.l	d0
 		beq.b	.done
 		move.b	#1,(a2)			; 1: on
@@ -115,6 +131,12 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		sub.l	a1,a1
 		move.l	_resload(pc),a2
 		jsr	resload_Patch(a2)
+		lea	_enh_moved(pc),a0
+		tst.b	(a0)			; once, after every patch is in
+		bne.b	.moved
+		st	(a0)
+		bsr	enh_Move
+.moved		bsr	enh_RelocOut
 .done		movem.l	(a7)+,d0-d1/a0-a2
 		rts
 
@@ -126,13 +148,26 @@ _enh_pl		PL_START
 		PL_PS	$D13C,enh_Clear		; jsr $10F90: the sky and ground clear
 		PL_PSS	$D142,enh_Objects,6	; move.l $E258(pc),d7; cmp.l $A884,d7; beq.s *-6
 		PL_PSS	$D510,enh_Swap,4	; move.l $A884,$E258
+	; the two reads into the race block from outside it, PC-relative
+		PL_PSS	$13F6E,enh_Read10B32,4	; movea.l $10B32(pc),a0; cmpa.l #8000,a0
+		PL_PS	$180F4,enh_Read10C4E	; move.w $10C4E(pc),d1; asr.w #1,d1
 	INCLUDE	blitwait.i
 		PL_END
 
-; With fast ExpMem the program's stack moves there. Its one setting is at the
-; program's start ($366E: movea.l #$2FC96,a7), which runs right after this
-; first call from Patch. ExpMem below $200000 is chip memory, and in
-; $C00000-$DFFFFF slow memory on the chip bus.
+;---------------------------------------------------------------------------
+; Fast memory. With fast ExpMem, the race block ($A924-$11FBA: the race's
+; setup and loop, the race state, the renderer and its variables) runs from a
+; copy there, and the program's stack moves below the copy. The copy sits at
+; ENH_LO plus a multiple of $10000, so its addresses keep their low words.
+; tools/reloc.py lists the long addresses into the block, in it and outside it
+; (src/reloc_<variant>.i). The PC-relative references across its edges are
+; rewritten here, and the slave's own references go through _blk_ptrs.
+; ExpMem below $200000 is chip memory, and in $C00000-$DFFFFF slow memory on
+; the chip bus: the block stays.
+;---------------------------------------------------------------------------
+
+; The stack's one setting is at the program's start ($366E: movea.l #$2FC96,a7),
+; which runs right after this first call from Patch.
 enh_Fast	move.l	_expmem(pc),d0
 		beq.b	.out
 		cmp.l	#$200000,d0
@@ -145,11 +180,198 @@ enh_Fast	move.l	_expmem(pc),d0
 		bne.b	.out
 		cmp.w	#$FC96,$366E+4
 		bne.b	.out
-		lea	_enh_fast(pc),a0
-		move.l	d0,(a0)
+		add.l	#$FFFF-ENH_BOTTOM,d0	; the copy's offset: a multiple of $10000,
+					; its ENH_BOTTOM in the ExpMem
+		clr.w	d0
+		move.l	d0,ENH_BLOCK.w
 		add.l	#ENH_STACK,d0
 		move.l	d0,$366E+2
+	IFD	ENH_NOBLOCK			; for A/B measurements: the stack only
+		clr.l	ENH_BLOCK.w
+	ENDC
 .out		rts
+
+; Copy the block, relocate it and the references to it, rewrite the edges.
+enh_Move	movem.l	d0-d2/a0-a3,-(a7)
+		move.l	ENH_BLOCK.w,d2
+		beq	.out
+		lea	ENH_LO,a0		; the copy
+		lea	(a0,d2.l),a1
+		move.w	#(ENH_HI-ENH_LO)/2-1,d0
+.copy		move.w	(a0)+,(a1)+
+		dbf	d0,.copy
+		lea	enh_Tramps(pc),a0	; the trampolines, after it
+		move.w	#(enh_TrampsEnd-enh_Tramps)/2-1,d0
+.tramp		move.w	(a0)+,(a1)+
+		dbf	d0,.tramp
+		lea	RELOC_IN(pc),a0		; the addresses in it
+		lea	ENH_LO,a1
+		add.l	d2,a1
+.in		move.w	(a0)+,d0
+		bmi.b	.edges
+		add.l	d2,(a1,d0.w)
+		bra.b	.in
+.edges		lea	_enh_edges(pc),a0	; bsr.w to the trampolines
+.edge		move.w	(a0)+,d0
+		bmi.b	.ptrs
+		lea	ENH_LO,a1
+		add.l	d2,a1
+		add.w	d0,a1
+		move.w	(a0)+,(a1)+		; the opcode
+		move.w	(a0)+,(a1)+		; the displacement
+		move.w	(a0)+,d1		; and the words to fill with nop
+		bra.b	.fill
+.nop		move.w	#$4E71,(a1)+
+.fill		dbf	d1,.nop
+		bra.b	.edge
+.ptrs		lea	_blk_ptrs(pc),a0	; the slave's references
+		moveq	#(_blk_end-_blk_ptrs)/4-1,d0
+.ptr		add.l	d2,(a0)+
+		dbf	d0,.ptr
+		move.l	_resload(pc),a2
+		jsr	resload_FlushCache(a2)
+.out		movem.l	(a7)+,d0-d2/a0-a3
+		rts
+
+; The addresses into the block from outside it, where the site still holds
+; the address (after each Fix: a reload over the program brings back the
+; original code, and data loaded over code must stay as it is).
+; IN:	-
+; OUT:	-	all registers preserved
+enh_RelocOut	movem.l	d0-d2/a0-a1,-(a7)
+		move.l	ENH_BLOCK.w,d2
+		beq.b	.out
+		lea	RELOC_OUT(pc),a0
+.next		moveq	#0,d0
+		move.w	(a0)+,d0
+		beq.b	.flush
+		add.l	d0,d0
+		move.l	d0,a1			; the site
+		moveq	#0,d1
+		move.w	(a0)+,d1
+		add.l	#ENH_LO,d1		; the address it holds
+		cmp.l	(a1),d1
+		bne.b	.next
+		add.l	d2,(a1)
+		bra.b	.next
+.flush		move.l	_resload(pc),a1
+		jsr	resload_FlushCache(a1)
+	IFD	ENH_PROTECT
+		bsr.b	enh_Protect
+	ENDC
+.out		movem.l	(a7)+,d0-d2/a0-a1
+		rts
+
+	IFD	ENH_PROTECT
+; A check (-DENH_PROTECT, a 68030 with MMU): between Fixes any access to the
+; block left in chip memory faults (the patch lists, applied again by every
+; Fix, write there). From its first whole page: the VBL handler at $A076
+; can't run in a protected page.
+ENH_PROT_LO	= $B000
+enh_Protect	lea	_enh_prot(pc),a0
+		st	(a0)
+		move.l	#ENH_HI-ENH_PROT_LO,d0
+		lea	ENH_PROT_LO,a0
+		move.l	_resload(pc),a1
+		jmp	resload_ProtectReadWrite(a1)
+enh_Unprotect	movem.l	d0-d1/a0-a1,-(a7)
+		lea	_enh_prot(pc),a0
+		tst.b	(a0)
+		beq.b	.out
+		clr.b	(a0)
+		move.l	#ENH_HI-ENH_PROT_LO,d0
+		lea	ENH_PROT_LO,a0
+		move.l	_resload(pc),a1
+		jsr	resload_ProtectRemove(a1)
+.out		movem.l	(a7)+,d0-d1/a0-a1
+		rts
+_enh_prot	dc.b	0
+		even
+	ENDC
+
+; The PC-relative reads out of the block, and its one branch out: in the copy
+; each becomes a bsr.w (the branch a ble.w) to a trampoline after it. site, opcode,
+; displacement (the trampoline's offset from the site, the same for any
+; copy), words of nop after it.
+ENH_EDGE	MACRO	; site, opcode, trampoline, nop words
+		dc.w	\1-ENH_LO,\2,ENH_HI+(\3-enh_Tramps)-(\1+2),\4
+		ENDM
+_enh_edges	ENH_EDGE	$ADAE,$6100,enh_T8764d4,0	; move.w $8764(pc),d4
+		ENH_EDGE	$ADBE,$6100,enh_T8764d4,0
+		ENH_EDGE	$AF9A,$6100,enh_T8260,0		; move.w $8260(pc),d1
+		ENH_EDGE	$AF9E,$6100,enh_T825E,0		; move.w $825E(pc),d2
+		ENH_EDGE	$AFA2,$6100,enh_T825D,0		; move.b $825D(pc),d3
+		ENH_EDGE	$B0F4,$6100,enh_T8764d1,0	; move.w $8764(pc),d1
+		ENH_EDGE	$BF86,$6100,enh_T87BC,0		; move.w $87BC(pc),d3
+		ENH_EDGE	$CC4A,$6100,enh_T8500,0		; move.l $8500(pc),d0
+		ENH_EDGE	$CC60,$6100,enh_T8500,0
+		ENH_EDGE	$CF52,$6F00,enh_T7D30,0		; ble.w $7D30
+		ENH_EDGE	$D1AC,$6100,enh_T86EA,0		; movea.l $86EA(pc),a5
+		ENH_EDGE	$D436,$6100,enh_T8500,0
+		ENH_EDGE	$D51A,$6100,enh_TSwap,2		; move.l $86EA(pc),$A71C
+		ENH_EDGE	$11990,$6100,enh_T12150,0	; move.w $12150(pc),d0
+		dc.w	-1
+
+; Copied after the block: position-independent, reached by bsr.w and ble.w
+; from the copy. Each returns the condition codes its replaced read set.
+enh_Tramps
+enh_T8764d4	move.w	$8764,d4
+		rts
+enh_T8764d1	move.w	$8764,d1
+		rts
+enh_T8260	move.w	$8260,d1
+		rts
+enh_T825E	move.w	$825E,d2
+		rts
+enh_T825D	move.b	$825D,d3
+		rts
+enh_T87BC	move.w	$87BC,d3
+		rts
+enh_T8500	move.l	$8500,d0
+		rts
+enh_T86EA	move.l	$86EA,a5
+		rts
+enh_TSwap	move.l	$86EA,$A71C
+		rts
+enh_T12150	move.w	$12150,d0
+		rts
+enh_T7D30	jmp	$7D30
+enh_TrampsEnd
+	IFGT	ENH_HI+(enh_TrampsEnd-enh_Tramps)-ENH_BOTTOM+$FFF8-ENH_EXPSIZE
+	FAIL	"the trampolines run past the ExpMem"
+	ENDC
+
+; The two reads into the block from outside it (PL_PSS/PL_PS above)
+enh_Read10B32	move.l	([_blk_10B32,pc]),a0
+		cmpa.l	#8000,a0
+		rts
+enh_Read10C4E	move.w	([_blk_10C4E,pc]),d1
+		asr.w	#1,d1
+		rts
+
+; The slave's references into the block (here, in src/fixes.i and src/smc.i):
+; enh_Move adds the copy's offset.
+_blk_ptrs
+_blk_DC30	dc.l	$DC30
+_blk_DC34	dc.l	$DC34
+_blk_D1C2	dc.l	$D1C2
+_blk_E258	dc.l	$E258
+_blk_E4F8	dc.l	$E4F8
+_blk_F8E4	dc.l	$F8E4
+_blk_F9A0	dc.l	$F9A0
+_blk_F9C6	dc.l	$F9C6
+_blk_FAD4	dc.l	$FAD4
+_blk_FAD6	dc.l	$FAD6
+_blk_1065A	dc.l	$1065A
+_blk_1067E	dc.l	$1067E
+_blk_10B32	dc.l	$10B32
+_blk_10C42	dc.l	$10C42
+_blk_10C4E	dc.l	$10C4E
+_blk_10F90	dc.l	$10F90
+_blk_1123A	dc.l	$1123A
+_blk_11268	dc.l	$11268
+_blk_1136C	dc.l	$1136C
+_blk_end
 
 ; The tick clock starts again: the next tick is due now.
 enh_Rebase	move.l	$A884,ENH_DUE.w
@@ -157,7 +379,10 @@ enh_Rebase	move.l	$A884,ENH_DUE.w
 		sf	ENH_SKIPS.w
 		rts
 
-enh_Enter	clr.w	$DC30
+enh_Enter	move.l	a0,-(a7)
+		move.l	_blk_DC30(pc),a0
+		clr.w	(a0)
+		move.l	(a7)+,a0
 		bra.b	enh_Rebase
 
 enh_Unpause	clr.w	$8504
@@ -203,14 +428,14 @@ enh_Pass	movem.l	d0-d1,-(a7)
 		moveq	#0,d1
 .count		move.b	d1,ENH_COUNT.w
 .done		movem.l	(a7)+,d0-d1
-		tst.w	$DC34
+		tst.w	([_blk_DC34,pc])
 		rts
 .link		bsr.b	enh_Rebase
 		bra.b	.done
 
 
 ; The landscape, then the wait for the VBL to take the last frame
-enh_Landscape	jsr	$E4F8
+enh_Landscape	jsr	([_blk_E4F8,pc])
 		bra	fix_WaitShown
 
 ; $D13C's first drawing: $10F90 waits for the blitter queue ($1B0, src/fixes.i's
@@ -220,28 +445,31 @@ enh_Landscape	jsr	$E4F8
 ; written as $10F90 would, but not started.
 enh_Clear	tst.b	ENH_SKIP.w
 		bne.b	.undrawn
-		jmp	$10F90
+		jmp	([_blk_10F90,pc])
 .undrawn	jsr	FIX_TRAMP.w		; fix_Queue: a6 = the queue, now idle
-		move.w	$10C42,d7		; as $10F94
+		move.w	([_blk_10C42,pc]),d7	; as $10F94
 		jsr	$13F16
 		move.l	#8000,d0		; as $11016-$11036
-		sub.l	$1136C,d0
+		sub.l	([_blk_1136C,pc]),d0
 		ble.b	.done
 		divu.w	#40,d0
 		cmp.w	#132,d0
 		ble.b	.done
-		move.l	#2720,$1136C
+		move.l	a0,-(a7)
+		move.l	_blk_1136C(pc),a0
+		move.l	#2720,(a0)
+		move.l	(a7)+,a0
 .done		rts
 
 ; $D13C's wait for a new field and its road spans, objects and scaler. A pass
 ; that does not draw goes on at $D1C2 (the start lights).
 enh_Objects	tst.b	ENH_SKIP.w
 		bne.b	.out
-		move.l	$E258,d7		; the field of the last swap
+		move.l	([_blk_E258,pc]),d7	; the field of the last swap
 .wait		cmp.l	$A884,d7
 		beq.b	.wait
 		rts
-.out		move.l	#$D1C2,(a7)
+.out		move.l	_blk_D1C2(pc),(a7)
 		rts
 
 ; $D13C's swap: a pass that does not draw returns from $D13C instead
@@ -249,7 +477,10 @@ enh_Objects	tst.b	ENH_SKIP.w
 enh_Swap	tst.b	ENH_SKIP.w
 		bne.b	.out
 		addq.l	#1,ENH_FRAMES.w
-		move.l	$A884,$E258
+		move.l	a0,-(a7)
+		move.l	_blk_E258(pc),a0
+		move.l	$A884,(a0)
+		move.l	(a7)+,a0
 		rts
 .out		addq.l	#4,a7
 		rts
@@ -270,6 +501,6 @@ enh_Blt6	move.w	d6,bltsize(a6)
 enh_Blt		tst.b	_custom+dmaconr
 		rts
 
-_enh_fast	dc.l	0		; the ExpMem when it is fast memory, else 0
 _enh_state	dc.b	0		; 0 unknown, -1 off, 1 on
+_enh_moved	dc.b	0		; the block has been copied (or stays)
 		even

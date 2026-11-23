@@ -101,29 +101,29 @@ smc_VblB	jmp	([_smc_vecB,pc])
 ;    _smc_insA/_smc_insB instead); the sites call these through trampolines
 smc_DispA	cmpi.w	#$6100,_smc_insA(pc)	; bsr?
 		beq.b	smc_Bsr
-smc_Move	move.w	$FAD4,(a0)+
+smc_Move	move.w	([_blk_FAD4,pc]),(a0)+
 		rts
 smc_DispB	cmpi.w	#$6100,_smc_insB(pc)
 		bne.b	smc_Move
-smc_Bsr		jmp	$FAD6
+smc_Bsr		jmp	([_blk_FAD6,pc])
 
 ;--- RTS at $F8DE (subq.w #1,d4 / ble.w $F9A0), set at $F91C and cleared at
 ;    $F928 around the renderer's recursive call
 smc_F8DE	jmp	([_smc_pF8DE,pc])
 smc_F8DE_run	subq.w	#1,d4
 		ble.b	.le
-		jmp	$F8E4
-.le		jmp	$F9A0
+		jmp	([_blk_F8E4,pc])
+.le		jmp	([_blk_F9A0,pc])
 
 ;--- RTS at $10654 (move.w $1067E(pc),d7 / cmp.w (a3),d7) and $F9C0
 ;    (move.b #-1,9(a0)), set at $FCB2/$FCBA and cleared at $FCDA/$FCE2
 smc_10654	jmp	([_smc_p10654,pc])
-smc_10654_run	move.w	$1067E,d7
+smc_10654_run	move.w	([_blk_1067E,pc]),d7
 		cmp.w	(a3),d7
-		jmp	$1065A
+		jmp	([_blk_1065A,pc])
 smc_F9C0	jmp	([_smc_pF9C0,pc])
 smc_F9C0_run	move.b	#-1,9(a0)
-		jmp	$F9C6
+		jmp	([_blk_F9C6,pc])
 
 smc_Rts		rts
 

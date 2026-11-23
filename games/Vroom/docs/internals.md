@@ -5,7 +5,7 @@ hunk or file), current measurements and known limitations.
 
 ## Loading and memory
 
-A direct slave in 512 KB of chip memory (`ws_BaseMemSize` $80000), with an optional 4 KB
+A direct slave in 512 KB of chip memory (`ws_BaseMemSize` $80000), with an optional 100 KB
 ExpMem for Enhanced framerate's fast memory (below, "Enhanced framerate"). The slave
 loads the boot block's loader from disk offset 0 to $60000, patches it and jumps to $6000C;
 the loader loads the main program (about $3658-$1E000) and calls the slave's `Patch`, which
@@ -198,7 +198,9 @@ rate, on every 68020 and up.
 | $D13C (`jsr $10F90`) | a pass that does not draw leaves out the sky and ground clear but keeps its state: the horizon's scroll (`$13F16`, its blits written into the idle queue, which is not started) and the clamp of the ground's top line $1136C |
 | $D142-$D14D (the wait for a new field) | a pass that does not draw goes on at $D1C2, leaving out the road spans `$10CD2`, the three objects `$140C0` and the scaler `$18154` |
 | $D510 (`move.l $A884,$E258`) | a pass that does not draw returns from `$D13C`, leaving out the swap ($E258, $A71C, `$12FA6`) |
-| $366E (`movea.l #$2FC96,a7`, at the program's start) | with fast ExpMem, the stack moves to its top (below, "Fast memory") |
+| $366E (`movea.l #$2FC96,a7`, at the program's start) | with fast ExpMem, the stack moves there, below the race block's copy (below, "Fast memory") |
+| $A924-$11FBA (the race block) | with fast ExpMem, copied there at the first `Fix` and run from there; its 13 PC-relative reads out and its branch out become `bsr.w` to trampolines after the copy (`_enh_edges`) |
+| $13F6E (`movea.l $10B32,a0`), $180F4 (`move.w $10C4E,d1`) | the two reads into the block from outside it: `jsr` stubs that read the copy |
 | 91 blitter starts in $11C20-$19B1C (`src/blitwait.i`) | `jsr $10C`-`$124.w` (the original slave's start-and-wait) become `jsr $1E0`-`$1F8.w`: start, one read of dmaconr, return (below) |
 
 At most 3 passes in a row leave out the drawing; behind by more than 50 fields (1 s), the
@@ -225,20 +227,57 @@ mostly lands below a field. The a1200-040 is unchanged (its frame is 2 fields ei
 same in lines 0-30 and 36-174. Lines 31-35 are the race clock (real time) and lines 175-199
 of the cockpit differ between two runs of the same build as well.
 
-**Fast memory.** The slave asks for a 4 KB ExpMem, optional (`ws_ExpMem` negative). When
-WHDLoad finds it in fast memory (not below $200000, chip memory, nor in $C00000-$DFFFFF,
-slow memory on the chip bus), the program's stack moves there. The stack is set once, at
-the program's start ($366E), to $2FC96, just past the second screen. The race uses it down
-to about $2FC10, and in the a500's CPU accesses to chip memory it is the most used data:
-in 100 race fields of a Barto trace, 128000 of 722000 data reads and writes, against 314000
-to the screens and the custom chips, which must stay in chip memory. With the option off
-(a scratch build), `bench 500`
-gives 25.05 fps on the a1200-040 (`CACHE`) against 24.75, and 22.30 on the a1200-030
-(`MMU`) against 21.42; the distance is the same. Without fast memory (the a1200, a 68000)
-the stack stays at $2FC96. On the a1200-040 the ExpMem is Zorro III memory ($41FF1000 in
-FS-UAE): the 32-bit stack addresses passed `statelog 600 tick` against the a500 (all 600
-passes, `CUSTOM3=2`), as did the a1200-030 at 25 Hz and the a1200-fast (Zorro II, 68020)
-at 25 Hz.
+**Fast memory.** The slave asks for a 100 KB ExpMem, optional (`ws_ExpMem` negative): no
+more, so that the 1 MB a500 (512 KB of slow memory), where WHDLoad also allocates it, still
+loads WHDLoad's overlays. When WHDLoad finds it in fast memory (not below $200000, chip
+memory, nor in $C00000-$DFFFFF, slow memory on the chip bus), the stack and the race block
+move there. Without it (the a1200, a 68000) nothing moves.
+
+- **The stack** is set once, at the program's start ($366E), to $2FC96, just past the
+  second screen. The race uses it down to about $2FC10, and in the a500's CPU accesses to
+  chip memory it is the most used data: in 100 race fields of a Barto trace, 128000 of
+  722000 data reads and writes, against 314000 to the screens and the custom chips, which
+  must stay in chip memory. It moves to the copy's $A900 (4 KB below the block).
+- **The race block**, $A924-$11FBA: the race's setup and loop, the race state
+  ($DBC0-$E25B), the renderer and its variables. No DMA reaches it (the copper lists end at
+  $A8FF) and the program's reloads ($439C-$817E, $55DE-$678A) stay below it. On the 68040
+  it held 26% of the game code's chip accesses (`aprof`, 100 race fields). The copy's base
+  is the original address plus a multiple of $10000 (`ENH_BLOCK`, $1D6, holds the offset;
+  the tools read it), so its addresses keep their low words. `enh_Move` copies it once, at
+  the first `Fix`, after every patch is in, and relocates the long addresses into it
+  (`RELOC_IN` in `src/reloc_<variant>.i`). The long addresses into it from outside
+  (`RELOC_OUT`: 79 in Vroom, 86 on the data disk, whose race start writes the lap figures
+  into the race loop's immediates at $CAE4-$CAFC) are relocated after every `Fix`, where
+  the site still holds its value (a reload over the program brings it back). The slave's
+  own references go through `_blk_ptrs`. The block's PC-relative reads out of it ($825D-
+  $8260, $8500, $86EA, $8764, $87BC, $12150) and its branch out ($CF52 to $7D30) go
+  through trampolines after the copy, and the two reads in through stubs (patch table).
+  `tools/reloc.py` makes the tables: a recursive disassembly from aprof profiles of whole
+  sessions and the a500's trace, the dispatch tables and code addresses it lists, and a
+  review of what it leaves undecoded. Every `Fix` still applies the patch lists to the
+  chip copy too, which nothing runs any more.
+
+Checks of the moved block. `statelog 600 tick` against the a500 (`CUSTOM3=2`, pointers into
+the copy logged as the program's addresses) agreed in all 600 passes on the a1200-040.
+`frames 150` there, the block moved against `-DENH_NOBLOCK`: every frame the same in lines
+0-30 and 36-171. The cockpit (lines 172-199: its height and the speed digits) follows the
+fields, not the ticks: with the block in chip it differs between the a1200-040 and the
+a1200-030 as well. A developer build (`-DENH_PROTECT`, the a1200-030 with `MMU`) protects $B000-$11FBA in chip
+memory between `Fix`es (from the first whole page: the VBL handler at $A076 can't run in a
+protected page; the 68040's 8 KB pages would also cover the title's idle loop at $12F9E).
+It ran the title, the menu, a driven player race with a crash to the end of its time, the
+scores, the menu and a second race with no access. After a driven race, chip memory at
+$A924-$AFFF differed from the program's entry image only in the slave's own `jsr`
+targets. The data disk ran its prompt, the menu, a driven race to the scores and a second
+race on the a1200-040 (its lap-figure sites held the copy's addresses).
+
+Measurements (`bench 500`, the first demo race; the block in chip with `-DENH_NOBLOCK`, a
+scratch knob that moves only the stack). At 25 Hz (`CUSTOM1=1 CUSTOM2=1`) the a1200-fast
+(68020, Zorro II) draws 24.18 fps with 18 of 517 passes undrawn, against 17.87 with 200 of
+699; the a1200-030 (`MMU`) 25.05 with none undrawn, against 24.37 with 14 of 513; the
+a1200-040 (`CACHE`) is at 25 fps either way. The stack alone, option off: 25.05 fps on the
+a1200-040 against 24.75, 22.30 on the a1200-030 against 21.42. On the a1200-040 the
+ExpMem is Zorro III memory (offset $41FD0000 in FS-UAE): 32-bit addresses throughout.
 
 **What a pass that does not draw still runs.** The race loop's own code, the landscape
 `$E4F8` whole, and every part of `$D13C` but the ones above.
