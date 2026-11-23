@@ -234,16 +234,30 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
 22. **Then the hot routines.** Profile again (a traced 68020 with fast memory, aprof on the
     040). Candidates: the projection's `muls` ($F672, $F680), the road spans' whole-line
     writes, the span filler ($10E72) and the scaler.
+23. **Loading time.** From the boot to a race's green light (`race`, field counter $A884)
+    takes 930 fields on the a1200-030 with `CACHE` and 976 on the a1200-040, about 19 s.
+    With `DCACHE` it is 691 and 578, and on the a1200-030 without caches 2221. PC samples
+    put most of the load in the program's streaming loader and unpacker ($1D4xx-$1D8xx,
+    entry $1D798), which runs from chip memory. Its track buffers ($7C174, $3458) and its
+    output are in chip memory too. The steps:
+    - Profile the boot on the a1200-040 with `CACHE` with aprof, not field-boundary
+      samples (those land in the VBL handler). That gives the loader's share against the
+      fixed waits (the menu wipes, the start lights).
+    - If the loader dominates, the slave reads each archive from the preloaded disk image
+      into ExpMem. It unpacks it with its own copy of the unpacker, run from fast memory, so
+      only the output goes to chip memory.
+    - It is a performance change, so it sits behind `CUSTOM1`. The data disk's load crash
+      (step 8) is in the same loader, so fix that first.
 
 ### F. Acceptance
 
-23. With the installed icon's tooltypes, on the a1200-040 and the a1200-060, the `bench`
+24. With the installed icon's tooltypes, on the a1200-040 and the a1200-060, the `bench`
     window and a real race show a swap every field. Game speed is within 1% of the chosen
     tick on every machine. The render and state checks (steps 2 and 14) pass. With the
     option off, the original code paths run. The 68000 works correctly with the option on
     and off. FS-UAE's 040/060 timing is not hardware's, so the 50 fps figure needs a real
     accelerator to confirm.
-24. **Release.**
+25. **Release.**
     - The installed icon gets `CUSTOM1=1` and the cache tooltype. `Vroom.inf` and
       `Vroom.colicon` ship with no tooltypes, so the packager's `tooltypes` cannot add them.
       Instead, add two `settooltype` lines to the Install script's `P_SelectIcon` block,
