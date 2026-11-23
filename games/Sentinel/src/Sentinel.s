@@ -19,6 +19,8 @@
 ; - version and info text
 ; - the edge scan converter no longer modifies its own code (EdgeStep): with
 ;   the instruction cache on, 68040 and 68060 drew faces wrongly
+; - the sound effect trigger's CPU-timed DMA-off wait is beam-timed
+;   (SfxDmaWait), at least the 68000's length on every CPU
 
 	INCDIR	SOURCES:Include/
 	INCLUDE	whdload.i
@@ -28,6 +30,7 @@ QUITKEY		= $59		; F10
 ;DEBUG
 
 BASE		= $57fe4	; destination address for binary
+SOUND		= $20000	; the sound module, loaded by the game
 
 ; absolute skip
 PL_SA	MACRO
@@ -168,6 +171,7 @@ PLGAME	PL_START
 
 ; Vesuri's patches (2.0b)
 	PL_P	$14be,EdgeStep		; the edge scan converter's stepping
+	; and in the sound module: PLSOUND, applied by Loader
 	PL_END
 
 .ackVBI	move.w	#1<<4|1<<5|1<<6,$dff09c
@@ -192,9 +196,41 @@ Loader	movem.l	d0-a6,-(a7)
 	mulu.w	#512*10,d0
 	mulu.w	#512*10,d1
 	moveq	#1,d2
+	move.l	a0,a3
 	move.l	resload(pc),a2
 	jsr	resload_DiskLoad(a2)
-	movem.l	(a7)+,d0-a6
+	cmpa.l	#SOUND,a3		; the sound module?
+	bne.b	.done
+	cmpi.l	#$303c0200,SOUND+$f2e	; move.w #512,d0
+	bne.b	.done
+	cmpi.l	#$51c8fffe,SOUND+$f32	; dbf d0,*
+	bne.b	.done
+	lea	PLSOUND(pc),a0
+	move.l	a3,a1
+	jsr	resload_Patch(a2)
+.done	movem.l	(a7)+,d0-a6
+	rts
+
+; The sound module at $20000 (offsets in it). Its effect trigger turns the
+; channel's DMA off, then waited with a CPU loop (move.w #512,d0; dbf d0,*,
+; 11.3 raster lines on the 68000, about one on a 68040) before letting the
+; next vertical blank turn it on with the effect's sample; Paula needs it
+; off for a sample period to restart the channel. The trigger runs with
+; interrupts off and the caller saves every register.
+PLSOUND	PL_START
+	PL_PSS	$f2e,SfxDmaWait,2
+	PL_END
+
+; at least 12 raster lines on every CPU, d0.w ends as after the dbf
+SfxDmaWait
+	move.l	d1,-(a7)
+	moveq	#13-1,d1
+.line	move.b	$dff006,d0
+.same	cmp.b	$dff006,d0
+	beq.b	.same
+	dbf	d1,.line
+	move.l	(a7)+,d1
+	moveq	#-1,d0
 	rts
 
 resload	dc.l	0

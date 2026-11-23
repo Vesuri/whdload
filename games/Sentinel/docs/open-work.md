@@ -9,7 +9,8 @@ a1200-040 and the a1200-060, and since step 5 the 68040 and 68060 draw correctly
 ## Release
 
 2.0b (23.11.2026), not published: V1.01 with `$VER` and the info text in the slave, the
-ReadMe entry above StingRay's, and the self-modification fix (step 5); `make dist` builds
+ReadMe entry above StingRay's, the self-modification fix (step 5) and the effect trigger's
+wait (step 6); `make dist` builds
 `SentinelEnhanced-2.0b-20261123.lha`.
 
 ## The goals
@@ -40,22 +41,27 @@ four directions against the a500's pictures), [development.md](development.md#dr
    matches on the a500, a1200, a1200-030 (`MMU DCACHE`), a1200-040 (defaults, `NOCACHE`,
    `CACHE`, `DCACHE`) and a1200-060 (defaults, `DCACHE`, `BRANCHCACHE DCACHE`).
 6. **Other fast-CPU hazards** found while reading, each checked and fixed if real:
-   - the sound module's DMA-off, `dbf`, DMA-on wait (`$20110`..`$2012E`, file offset in the
-     module), the CPU-timed audio wait that loses notes on 68040/060 (playbook §8); judge it
-     with FS-UAE's audio workaround off;
-   - blitter waits: StingRay's wait at `$30C` covers the start of each plane's blit, but
+   - the sound effect trigger's CPU-timed DMA-off wait (module `$F2E`, 11.3 lines on the
+     68000, under one on the 040): fixed, `SfxDmaWait` waits 12 lines or more on every CPU
+     ([internals.md](internals.md#sound)); the music and the player's resume are as on the
+     68000. Not judged by ear: FS-UAE's audio hack did not fire for the trigger in the runs
+     (its DMA-on is usually a later field).
+   - blitter waits (open): StingRay's wait at `$30C` covers the start of each plane's blit, but
      nothing waits for the last plane before the swap or before the CPU next writes that
      buffer; with code in the instruction cache the 68040 is no longer held by blitter-nasty
      (`BLTPRI`) as the 68000 is;
-   - CPU-timed delays: the `dbf`-to-self and count-down loops (playbook §8);
-   - `jmp ($10)` at `$1ED6` (the illegal-instruction vector used as a pointer) under
-     WHDLoad's vector handling with the MMU;
+   - CPU-timed delays: the other `dbf` and count-down loops in the program read as benign
+     (none times hardware); `jmp ($10)` at `$1ED6` is never reached.
    - `movep`: 23 sites in the program (the span filler's are hot); the 68060 traps every one.
-     Count them per strip on the 060 and measure the cost.
+     FS-UAE's 68060 executes `movep` unless `--uae_cpu_no_unimplemented=true`; with it the
+     render check matches on the a1200-060 (109 fields in pans against 104), so the trap
+     works and its cost is small in emulation; real 68060 cost is not measured.
    - the data cache on chip memory: with the MMU, WHDLoad's `Cache` and `DCache` make chip
      memory cacheable write-through, so a CPU read of chip memory the blitter or a disk load
      wrote since the CPU last read it can see the old bytes (the buffer copy at `$4822` reads
-     a buffer the scroll blits wrote). Find every such read and invalidate the lines first.
+     a buffer the scroll blits wrote). FS-UAE's MMU model caches chip data (real boards'
+     chip memory is usually not cached); no stale read showed in the render check with
+     `DCACHE` on the 030, 040 and 060.
 7. **Matrix**: a500, a1200, a1200-030 with WHDLoad's `MMU`, a1200-040 and a1200-060, each
    with WHDLoad's defaults and with `NoCache`, `Cache` and `DCache` (and `ChipNoCache`, and
    `BranchCache` on the 060), and a 28 MHz 68020 with Zorro III memory (`EXTRA_ARGS`): the

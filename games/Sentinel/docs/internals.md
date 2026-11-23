@@ -33,8 +33,8 @@ Offsets are into the program as loaded, from `BASE` (so the file offset into the
 | `$C0A` | skip to `$C6C`: the protection track check | StingRay |
 | `$30C` | `jsr` a blitter wait before writing `BLTCON0` `$09F0` (not with CUSTOM1) | StingRay |
 | `$6D4` | `jsr`: acknowledge the vertical blank interrupt twice, for 68040/060 and fast chipsets | StingRay |
-
 | `$14BE` | jump to `EdgeStep` (2.0b): the edge scan converter's stepping (`$14BE`..`$165B`) without self-modification | Vesuri |
+| module `$F2E` | `jsr SfxDmaWait` (2.0b), applied by `Loader` when it loads the sound module to `$20000` and the bytes match: the effect trigger's DMA-off wait, below | Vesuri |
 
 CUSTOM1 (`C1:B:Disable Blitter Waits`) drops the `$30C` wait.
 
@@ -42,6 +42,28 @@ CUSTOM1 (`C1:B:Disable Blitter Waits`) drops the `$30C` wait.
 the loops, and has a loop for each x-major mode instead of writing the `bcc.s` displacement.
 It leaves registers, N, Z, V, C and memory as the game's code does; `tools/edgecheck.py`
 (`make check`) compares the two under Unicorn's 68000 on random edges.
+
+## Sound
+
+The sound module is loaded to `$20000` (offsets below are into it). The game calls it from
+wrappers that save every register and run with interrupts off (`SR` `$2700`): `$0` starts
+the music, `$E9C` an effect, `$F62` is the vertical blank player.
+
+- **The effect trigger** turns the channel's DMA off (`$EEC`), sets up the channel, waits
+  (`move.w #512,d0; dbf d0,*` at `$F2E`) and sets the channel's flag (`$F36`); the next
+  vertical blank player tick sets the effect's registers and turns DMA on (`$10B2`). That
+  tick can come straight after the trigger returns, so the wait is the only time the DMA is
+  sure to be off, and Paula restarts a channel only if it sees it off. The `dbf` is 5134
+  cycles or more, 11.3 raster lines on the 68000 (more under blitter-nasty), under one line
+  on the a1200-040 (beam read at entry and exit). 2.0b's `SfxDmaWait` waits for 13 changes
+  of the `VHPOSR` line (12 lines or more) on every CPU; measured 13 lines on the a500 and
+  the a1200-040.
+- **The player's resume** (`$FE4`..`$1014`, at the end of an effect) turns DMA off, sets
+  four registers and turns it on again, with no wait on any CPU; FS-UAE logs it as "DMA wait
+  hack DISABLED" (under 60 instructions, so it emulates Paula not restarting) on the a500
+  as on the a1200-040. It is the game's behaviour on a 68000 too, so it stays.
+- The music's DMA-off and DMA-on (`$236`, `$2D2`) are on separate ticks; `$F3C` is a
+  `dbf`-to-self nothing calls.
 
 ## Rendering and panning
 
