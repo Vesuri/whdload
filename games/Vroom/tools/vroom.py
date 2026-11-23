@@ -2,7 +2,7 @@
 """Vroom's gdb-stub server: the shared commands (docs/running.md) plus
 
   bench [<frames>]           fps over the first frames from the next green light
-  statelog <frames> <file>   the race state at every frame end from the next green light
+  statelog <frames> <file> [tick]  the race state at every frame end (or pass) from the next green light
   racelog <fields> <file>    field, frame, clock and distance per field from the next green light
   meter <fields>             frames, clock and distance over the next fields
   race [stay]                from the boot through the title and menu to a player race
@@ -162,13 +162,15 @@ def bench(server, g, rest):
     left alone after the boot, that is the same simulation on every machine (one step a
     frame), so the fps it gives compare between machines and builds. Also the distance driven
     at the last frame's end (a breakpoint at $D510; the same on every machine) and the
-    fields-per-frame histogram."""
+    fields-per-frame histogram. With Enhanced framerate the frames are the drawn ones: then
+    also the ticks (race loop passes), the passes left undrawn and the fields dropped."""
     n = int(rest.split()[0]) if rest.split() else 500
     g.stop()
     try:
         if not green_light(g):
             return 'no race start within 20000 fields'
         f0, last, _, p0, _ = sample(g)
+        e0 = longs(g, ENH_VARS, 4)
         frames, fields, since, gaps = 0, 0, 0, {}
         while frames < n - 1:
             g.cmd('monitor fields 1')
@@ -193,44 +195,58 @@ def bench(server, g, rest):
         last_gap = since + now - at
         gaps[last_gap] = gaps.get(last_gap, 0) + 1
         fields += now - at
+        e1 = longs(g, ENH_VARS, 4)
     finally:
         g.cont()
+    enh = ''
+    if e1[1] != e0[1] and UNREADABLE not in e0 + e1:   # Enhanced framerate's counters move
+        enh = f' ticks {e1[1] - e0[1]} undrawn {e1[1] - e0[1] - (e1[2] - e0[2])} dropped {e1[3] - e0[3]}'
     return (f'bench {n} frames {fields} fields fps {50.0 * n / fields:.2f} distance {p - p0} '
-            f'fields/frame {dict(sorted(gaps.items()))}')
+            f'fields/frame {dict(sorted(gaps.items()))}{enh}')
 
 
 FRAME_END = 0xD510         # the end of a race frame (it stores the field in $E258)
+TICK_END = 0xCD0E          # after the race loop's `bsr $D13C`: every pass, drawn or not
 # The race state around the car table: globals from $DBC0, the 16 cars of 64 bytes at $DC4E,
-# the car order list at $E050.
-STATE = (0xDBC0, 0xE074)
+# the car order list at $E050. Then the ARCADE score ($8370) and the long words of the
+# renderer's area that hold simulation values: $10AAA (with the shake index $10AA8, which only
+# the projection writes), $10ABA, $10AC4, $10AD8-$10ADB, $10C46, $10C4E, $11786.
+STATE = ((0xDBC0, 0xE074), (0x8370, 0x8374), (0x10AA8, 0x10AAC), (0x10AB8, 0x10ABC),
+         (0x10AC4, 0x10AC8), (0x10AD8, 0x10ADC), (0x10C44, 0x10C48), (0x10C4C, 0x10C50),
+         (0x11784, 0x11788))
+ENH_VARS = 0x1C0           # src/enhanced.i: due, ticks, frames drawn, fields dropped
 
 
 def state_log(server, g, rest):
-    """statelog <frames> <file>: from the next green light, stop at every frame end ($D510)
-    for <frames> frames and write one line per frame: frame, field counter, race clock, then the state block $DBC0-$E073 in hex. Exact per frame on any
-    machine (a breakpoint, so slower than `racelog`). tools/statecmp.py compares two logs."""
+    """statelog <frames> <file> [tick]: from the next green light, stop at every frame end
+    ($D510), or with `tick` at every race loop pass ($CD0E, after `bsr $D13C`: the passes
+    that Enhanced framerate leaves undrawn too), for <frames> stops, and write one line per
+    stop: number, field counter, race clock, then the long words of STATE in hex. Exact on
+    any machine (a breakpoint, so slower than `racelog`). tools/statecmp.py compares two
+    logs."""
     args = rest.split()
     n, path = int(args[0]), args[1]
-    words = (STATE[1] - STATE[0]) // 4
+    at = TICK_END if args[2:3] == ['tick'] else FRAME_END
     g.stop()
     rows = []
     try:
         if not green_light(g):
             return 'no race start within 20000 fields'
-        g.cmd(f'break *{FRAME_END:#x}')
+        g.cmd(f'break *{at:#x}')
         for frame in range(n):
             out = g.cmd('continue', timeout=120)
             if 'Breakpoint' not in out:
-                return f'no frame end after frame {frame}: {out.strip().splitlines()[-1]}'
+                return f'no stop after {frame}: {out.strip().splitlines()[-1]}'
             f, c = longs(g, FIELDS, 1)[0], longs(g, CLOCK, 1)[0]
-            block = ''.join(f'{v:08x}' for v in longs(g, STATE[0], words))
+            block = ''.join(f'{v:08x}' for lo, hi in STATE for v in longs(g, lo, (hi - lo) // 4))
             rows.append(f'{frame} {f} {c} {block}')
     finally:
         g.cmd('delete')
         g.cont()
-        Path(path).write_text(f'# frame field clock state ${STATE[0]:X}-${STATE[1] - 1:X}\n'
+        ranges = ' '.join(f'${lo:X}-${hi - 1:X}' for lo, hi in STATE)
+        Path(path).write_text(f'# frame field clock state {ranges} (at ${at:X})\n'
                               + '\n'.join(rows) + '\n')
-    return f'{len(rows)} frames, fields {rows[0].split()[1]}..{rows[-1].split()[1]}'
+    return f'{len(rows)} stops, fields {rows[0].split()[1]}..{rows[-1].split()[1]}' if rows else 'none'
 
 
 # While WHDLoad has the OS in (a disk load) chip memory reads back as $FFFFFFFF.

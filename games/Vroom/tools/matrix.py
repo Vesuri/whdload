@@ -4,8 +4,8 @@
     python3 tools/matrix.py [--frames N] [--deadline S] [--build B] [--full | CELL ...]
 
 A cell is SETUP or SETUP:WHD_ARGS (several options joined with `+`, as in
-`a1200-040:CACHE+NOVBRMOVE`); without cells, the four-machine matrix below (CELLS), with
-`--full` the six of FULL. Each cell boots
+`a1200-040:CACHE+NOVBRMOVE`); without cells, the four machines below (CELLS, the a1200-030 and
+the a1200-040 also with Enhanced framerate), with `--full` two more (FULL). Each cell boots
 `tools/vroom.py serve` in its own instance (`matrix`), waits for the first demo race's green
 light, runs `bench N`, takes a screenshot, and quits. It reports per cell the bench line, the
 WHDLoad dumps (`.whdl_*` on DH1; the next boot moves them to `tmp/dumps/`) and the screenshot.
@@ -28,8 +28,11 @@ RUN = ROOT / 'tmp/run' / INSTANCE / '.run'
 SOCK = RUN / 'vroom.sock'
 
 # The check after a change: one machine of each CPU class, the 68040 as a real board runs it
-# (instruction cache only). The full list is for one-off decisions (open-work.md, step 21).
-CELLS = ['a500', 'a1200', 'a1200-030:MMU', 'a1200-040:CACHE']
+# (instruction cache only), with Enhanced framerate off; then Enhanced framerate where it
+# sometimes catches up (the 68030 at 25 Hz) and where it waits (the 68040 at 16.7 Hz). The full list is
+# for one-off decisions (open-work.md, step 21).
+CELLS = ['a500', 'a1200', 'a1200-030:MMU', 'a1200-040:CACHE',
+         'a1200-030:MMU+CUSTOM1=1+CUSTOM2=1', 'a1200-040:CACHE+CUSTOM1=1']
 FULL = CELLS + ['a1200-fast', 'a1200-040:DCACHE']
 
 

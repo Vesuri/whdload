@@ -6,7 +6,9 @@ and the blitter queue no longer overruns on fast CPUs (`docs/internals.md`, "Fix
 "Self-modifying code"). Vroom's demo race renders correctly, with no WHDLoad dump, on the
 a500, the a1200 with `CACHE`, the a1200-040 with `DCACHE`, and the a1200-060 with every
 cache option on. The data disk runs its title, a player race, the scores and a second race
-on the a1200-040 (`CACHE`), and its demo race on the a500.
+on the a1200-040 (`CACHE`), and its demo race on the a500. With Enhanced framerate
+(`CUSTOM1=1`) the race runs on a fixed tick on a 68020 and up (step C): 16.7 Hz, or 25 Hz with
+`CUSTOM2=1`.
 
 ## Release
 
@@ -15,7 +17,8 @@ on the a1200-040 (`CACHE`), and its demo race on the a500.
 `VroomEnhanced-2.0b-20261123.lha` (`lha t` passes; its slaves match
 `release/slaves.sha256`). Vroom's slave passed the four-machine matrix. The data disk's slave
 ran its demo race on the a500 and the a1200, and the menu, a player race and a second race on
-the a1200-040. Not published.
+the a1200-040. Not published. Its archive was built at commit 494c65a1; the slaves since
+then carry step C (`ws_Version` 17), which the 2.0b ReadMe does not describe.
 
 ## Decisions (the user's, 23.11.2026)
 
@@ -112,42 +115,44 @@ The tools are in `docs/development.md` ("Tools"); the facts they rest on are in
 
 Then a fix-only release: B's fixes, with a ReadMe line for each.
 
-### C. Simulation on a fixed tick (Enhanced framerate, 68020 and up)
+### C. Simulation on a fixed tick (Enhanced framerate, 68020 and up; done)
 
-10. **The option's plumbing.** `WHDLTAG_CUSTOM1_GET`/`CUSTOM2_GET` at install, with the
-    attnflags gate. Add `ws_config` to both slaves, and make `game.conf` default to
-    `CUSTOM1=1` for `make run`/`serve` unless `ENHANCED=0`, as Virus does. With CUSTOM1 off,
-    or on a 68000/68010, no Enhanced framerate patch is applied. Also measure the a500's
-    fields per frame over whole demo and player races on several tracks. That says how
-    16.7 Hz compares with the speed a500 players knew; the a500 runs at its native rate
-    either way.
-11. **Split the race loop** into a tick (simulation only) and a frame (rendering only).
-    Audit every state write in `$E4F8` and `$D13C`, and every read in the logic after the
-    landscape call ($C96E-$CCF2) of what `$E4F8` produces (the projected road, $E254,
-    $DBEE). If off-road or collision checks use the projected road, that part of the
-    projection runs in the tick. Rendering must leave the simulation's state as it found it:
-    compare a state hash before and after a render-only frame.
-12. **The scheduler.** Each frame: from the field counter $A884, run the ticks owed at 3 or 2
-    fields each (CUSTOM2), with the debt bounded (say 1 s) and dropped time counted in
-    VERIFY. Then render once. The race clock
-    stays as it is. Pause, the menus, the replay and the start lights rebase the tick clock
-    without catch-up.
-13. **Input and frame-counted timers.**
-    - The VBL adds the mouse's movement into ($A2CC) every field, but the race reads the
-      throttle and steering as clamped positions once a frame ($AF56), so catch-up ticks
-      can read the same values. The gear shift acts on a button's release ($DC1A): a tick
-      must not see one release twice or miss one. The demo's recorded controls advance one
-      entry a frame ($DC26), so in the tick they advance one entry a tick.
-    - Find every countdown in frames ($DC32 = 50 at $CA50, the start lights, sound triggers
-      from the loop) and classify it with the playbook's timer table. Those inside the tick
-      need nothing.
-14. **Validation.**
-    - The per-tick state sequence equals the original per-frame sequence on the a500 (step 2):
-      the simulation itself is unchanged.
-    - At equal fields, distance and laps agree within 1% on every 68020+ machine and render
-      rate, at both speeds, including a deliberately slowed render (VERIFY).
-    - The 68000 runs the original loop with CUSTOM1 on: the a500 racelog is unchanged.
-    - One-shot inputs act once. With the option off, the original code runs.
+`src/enhanced.i`; `internals.md`, "Enhanced framerate", has the design and the checks.
+
+10. **The option's plumbing** (done). `CUSTOM1`, `CUSTOM2` (and `CUSTOM3`, a test knob for
+    step 14) read at install, applied on a 68020 or higher only. Both slaves have
+    `ws_config` (`ws_Version` 17). `game.conf` adds `CUSTOM1=1` to `make run`/`serve` unless
+    `ENHANCED=0` or `WHD_ARGS` sets `CUSTOM1`. The a500 runs its first three demo races
+    (three circuits) at 13.8, 17.5 and 13.9 fps, so 16.7 Hz is about 1.2 times its speed on
+    two of them and the same on the third. A player race on several circuits is not
+    measured: the test driver's car was nearly stopped in the windows taken.
+11. **The tick and the frame** (done). Each race loop pass stays one tick. A pass that
+    catches up leaves out only what draws: in `$D13C` the road spans, the objects, the
+    scaler and the swap. The landscape `$E4F8` runs whole, because it is not only drawing:
+    its first part follows the track for the simulation, and its projection decides whether
+    the car is off the road ($10AAA, at $FA62/$FAC6). A build that left the projection out
+    diverged at that flag only. `$D13C` runs its timekeeping in every pass: the ARCADE score,
+    the start lights, the pit stop, the crash sequences.
+12. **The scheduler** (done). At the start of each pass ($AF56): wait while early; a pass
+    whose next tick is due already does not draw (at most 3 in a row); debt over 50 fields
+    is dropped and counted ($1CC). The race's entry ($AF50) and the end of a pause ($B724)
+    restart the tick clock. Link play keeps the original loop.
+13. **Input and frame-counted timers** (done, no change needed). The mouse is read as
+    positions once a pass; a gear change acts on the release, once however many passes see
+    the press; the demo's controls advance one entry a pass. Every frame-counted timer is in
+    the pass, so it counts ticks.
+14. **Validation** (done). The per-pass state equals the a500's for 599 passes on the
+    a1200-040 with two of three passes undrawn and on the a1200 at 25 Hz. The distance at
+    equal fields matches the a500's at the same tick (within one tick, 0.56%) on the a1200,
+    a1200-030 and a1200-040 at both speeds. A pause runs no ticks and restarts with no
+    catch-up. Gear changes act once. The a500 with `CUSTOM1=1` runs the original loop.
+    Not covered: laps (no run went past a lap), link play, the data disk beyond its first
+    demo race.
+    - The limit: an undrawn pass still runs the landscape and its projection, about 1.2
+      fields on the a1200 against 3.2 for a drawn one. At 25 Hz the 68020 then falls to
+      about 10 frames a second in the race's heavier parts (742 of 1241 passes undrawn),
+      below its 15.8 without the option; at 16.7 Hz it draws 396 of 400. The plan had
+      expected a catch-up tick to cost about 11% of a frame. Step 22 picks this up.
 
 ### D. Frames between ticks (Enhanced framerate, 68020 and up)
 
@@ -206,7 +211,9 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     one tooltype for the icon. The ReadMe describes both and how to remove them.
 22. **Then the hot routines.** Profile again (a traced 68020 with fast memory, aprof on the
     040). Candidates: the projection's `muls` ($F672, $F680), the road spans' whole-line
-    writes, the span filler ($10E72) and the scaler.
+    writes, the span filler ($10E72) and the scaler. Also the off-road flag ($10AAA, from
+    the nearest projected line at $FA62): worked out without the projection, a pass that
+    catches up could leave the projection out, which the 68020 at 25 Hz needs (step 14).
 23. **Loading time.** From the boot to a race's green light (`race`, field counter $A884)
     takes 930 fields on the a1200-030 with `CACHE` and 976 on the a1200-040, about 19 s.
     With `DCACHE` it is 691 and 578, and on the a1200-030 without caches 2221. PC samples

@@ -57,7 +57,8 @@ with the data disk in the drive would. Races on Vroom's own circuits, with the V
 left in the drive, are not offered; the Vroom slave has them.
 
 Low memory holds `jmp` trampolines, so a 4-byte site can become `jsr $1xx.w`: the original
-slave's at $100-$129, `smc.i`'s at $130-$1A7 and `fixes.i`'s at $1B0.
+slave's at $100-$129, `smc.i`'s at $130-$1A7 and `fixes.i`'s at $1B0. `enhanced.i` keeps its
+variables at $1C0-$1D5.
 
 ## Fixes (every CPU)
 
@@ -144,7 +145,8 @@ their state across a reload.
   bitplane pointers from $A71C) and through $A572 ($9432, the sound); then the mouse counters
   and buttons into the block at ($A2CC).
 - **Game time.** The race clock is real time (2 hundredths of a second per field). The
-  simulation takes one fixed step per frame, with no elapsed-time factor. `tools/vroom.py racelog`
+  simulation takes one fixed step per frame, with no elapsed-time factor (with Enhanced
+  framerate, below, one per tick). `tools/vroom.py racelog`
   logs the player's distance each field from the green light of the first demo race. It passes
   the same values in the same order on the a500, a1200, a1200-040 and a1200-060 (the 060 sometimes
   skips a value between two field samples). So game speed follows the frame rate, while the
@@ -175,6 +177,101 @@ With an MMU model, FS-UAE's `DCACHE` caches chip memory data, which no real boar
 (instruction cache only) is the closer model of a real 68040 running this game. FS-UAE's
 040/060 timing is near an instruction count, so these rows rank the machines and do not
 predict an accelerator's frame rate.
+
+## Enhanced framerate (68020 and higher, `CUSTOM1=1`)
+
+`src/enhanced.i`, applied from `Fix` after the 68020 fixes, when `CUSTOM1` is set and the CPU
+is a 68020 or higher. A 68000 or 68010, or `CUSTOM1=0`, runs the original loop.
+
+**Every race loop pass is a tick**, due every 3 fields (16.7 Hz) or with `CUSTOM2=1` every
+2 (25 Hz), counted by the game's own field counter $A884. The simulation is the original
+one step per pass, so the game runs at the speed of a machine that draws at exactly that
+rate, on every 68020 and up.
+
+| Where | What |
+|---|---|
+| $AF50 (`clr.w $DC30`) | the loop's entry: the tick clock starts now |
+| $AF56 (`tst.w $DC34`) | a pass starts: it waits while its tick is early; if the next tick is due already, it is a pass that does not draw |
+| $B724 (`clr.w $8504`) | the end of a pause (the pause loops at $B676-$B6C8 inside a pass): the tick clock starts again |
+| $C968 (`jsr $E4F8`) | a pass that draws first waits for the VBL to take the last frame (`fix_Landscape`); one that does not, does not wait |
+| $D142-$D14D (the wait for a new field) | a pass that does not draw goes on at $D1C2, leaving out the road spans `$10CD2`, the three objects `$140C0` and the scaler `$18154` |
+| $D510 (`move.l $A884,$E258`) | a pass that does not draw returns from `$D13C`, leaving out the swap ($E258, $A71C, `$12FA6`) |
+
+At most 3 passes in a row leave out the drawing; behind by more than 50 fields (1 s), the
+debt past it is dropped and counted. Link play ($87BC not 0: the pass waits for the other
+machine's data at $C4A0) keeps the original loop. The scheduler's variables are at
+$1C0-$1D5 (`ENH_VARS`), where the tools read them: the next tick's field, ticks, frames
+drawn, fields dropped, the period. `CUSTOM3=n` (for the checks, not in `ws_config`) leaves
+out the drawing in n of every n+1 passes, whatever the time.
+
+**What a pass that does not draw still runs.** The race loop's own code, the landscape
+`$E4F8` whole, and every part of `$D13C` but the ones above:
+- `$E4F8` is not only drawing. Before its projection ($E4F8-$F417) it follows the track
+  for the simulation: the curve under the car ($10AD9/$10ADB), the lateral force $10AC4,
+  the view angle $DBEC, the car's height $10C4E, a bounce state machine ($E0D8-$E0E0),
+  the engine sound's pitch ($9FC4, $A03C). Its projection decides whether the car is off
+  the road: `$FA62` reads the road edges of the nearest projected line from the span table
+  at $34D92 and writes $10AAA (with the camera shake index $10AA8, one long at $FAC6), which
+  the acceleration, the steering and the crash code read. A build that left the projection
+  out of undrawn passes diverged at that flag only.
+- `$D13C` keeps time too: the ARCADE score ($D3C6-$D408: $8370 grows with the speed every
+  pass), the start lights (`$D52A`, $DC36 counts passes), the pit stop (`$D5FC`, $DC38),
+  the crash sequences (through $E0E4 and `$DAE0`, $E0DC counts passes, clearing $DC34's
+  bit 0 and the steering).
+- The panel, the mirrors, the lights and the crash sprites draw into the screen the next
+  drawn pass draws again, keeping their per-screen bookkeeping (indexed by $86DE).
+
+Every frame-counted timer is in the pass ($DC32's 50 at $CA50, the race countdown $DC20's
+30 per step, the start lights, the pit stop, the crash sequences, the fuel and tyre
+counters), so it now counts ticks. The race clock ($8500) and the sound timers run on the
+VBL, in real time, as before.
+
+**Input.** The race reads the mouse as positions once a pass ($AF56-$AFF2: y clamped to
+±94, x to ±271), so a pass that catches up reads the same position again, as a slow frame
+did. A gear change happens on the button's release ($DC1A remembers the press), so a press
+counts once however many passes see it. The demo's recorded controls advance one entry a
+pass ($DC26), that is one a tick.
+
+**The checks**, from the first demo race's green light:
+- *The same ticks.* `statelog 600 FILE tick` (the state at $CD0E, after the loop's
+  `bsr $D13C`, in every pass) on the a500, on the a1200-040 with `CUSTOM1=1 CUSTOM3=2` (two
+  of every three passes undrawn) and on the a1200 with `CUSTOM1=1 CUSTOM2=1` (193 of 668
+  passes undrawn, as it falls behind 25 Hz). The two 68020+ logs agree in all 600 passes,
+  and with the a500's in all 599 compared (`statecmp --align`: the a500 logs one more pass at
+  the green light). Left out: $DBD8/$DBDC, the map marker's position in each screen ($C8FE,
+  indexed by the draw buffer), which follow the screen order.
+- *The same speed at equal fields.* `racelog 1200`: the distance at field 600 and at field
+  1199 is the a500's after fields/period ticks, or one tick away (at most 0.56%), on the
+  a1200, the a1200-030 (`MMU`) and the a1200-040, at both speeds; no fields dropped. Frames
+  drawn in the 1200 fields:
+
+  | Speed | a1200 (68020) | a1200-030 | a1200-040 |
+  |---|---|---|---|
+  | 16.7 Hz | 396 (4 passes undrawn) | 400 | 400 |
+  | 25 Hz | 429 | 546 | 596 |
+
+- *Pause.* On the a1200-040, 300 fields of pause ran no ticks; the 105 fields after it ran
+  36 (one tick every 3 fields from the unpause), none dropped.
+- *Gear changes.* From the green light, full throttle: six presses of the right button, 4
+  and 10 fields long with 20 between them, change the gear 0 to 6 one step each, with the
+  option (a1200, 25 Hz: a 10-field press spans 5 ticks) and without it.
+- *A 68000.* The a500 with `CUSTOM1=1` runs the original loop: the scheduler's variables
+  stay untouched.
+- *The data disk.* Its first demo race (Hockenheim) with the option: the a1200 at 25 Hz drew
+  546 frames in 1200 fields, the a1200-040 at 16.7 Hz 400; no dump.
+
+**The limit: catching up costs most of a pass.** An undrawn pass still runs the
+landscape and its projection. On the a1200 (68020) at 25 Hz, `bench 500` from the green light
+drew 499 frames in 1241 passes, 742 undrawn, no fields dropped: about 2480 fields leaving out
+one 828-field gap where the demo race ended inside the window. At its 3.2 fields a drawn frame
+(15.8 fps without the option), an undrawn pass costs about 1.2 fields, which a 2-field tick
+barely repays: in the race's heavier parts it shows about 10 frames a second, against 15.8
+without the option. At 16.7 Hz the same machine draws 396 of 400 passes. Working out the
+off-road flag without the projection (open-work, step 22) would make undrawn passes cheap.
+
+The a500's own speed, for comparison: the first three demo races (three circuits) run at
+13.8, 17.5 and 13.9 fps (`meter 1500` from each green light; mostly 3-4 fields a frame), so
+16.7 Hz is about 1.2 times its speed on two of them and the same on the third.
 
 ## Input, the menu and the race controls
 

@@ -23,6 +23,7 @@ Fix		movem.l	d0-d1/a0-a2,-(a7)
 		lea	_fix_pl020(pc),a0
 		sub.l	a1,a1
 		jsr	resload_Patch(a2)
+		bsr	Enhanced		; CUSTOM1: the race on a fixed tick
 .done		movem.l	(a7)+,d0-d1/a0-a2
 		rts
 
@@ -132,4 +133,5 @@ fix_WaitLines	movem.l	d0-d1,-(a7)
 		movem.l	(a7)+,d0-d1
 		rts
 
+	INCLUDE	enhanced.i
 	INCLUDE	smc.i

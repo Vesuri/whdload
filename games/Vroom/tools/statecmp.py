@@ -11,10 +11,15 @@ import sys
 
 
 def load(path):
+    """The long words' addresses (from the header's ranges) and the rows."""
     base, rows = None, []
     for line in open(path):
         if line.startswith('#'):
-            base = int(line.split('$')[1].split('-')[0], 16)
+            base = []
+            for r in line.split()[5:]:
+                if r.startswith('$') and '-' in r:
+                    lo, hi = (int(v.lstrip('$'), 16) for v in r.split('-'))
+                    base += range(lo, hi + 1, 4)
             continue
         frame, field, clock, block = line.split()
         rows.append((int(frame), int(field), int(clock), block))
@@ -26,21 +31,34 @@ def main():
     ap.add_argument('a')
     ap.add_argument('b')
     ap.add_argument('--skip', default='')
+    ap.add_argument('--align', type=int, default=0, metavar='N',
+                    help='first shift B by up to N rows to where its first row matches')
     args = ap.parse_args()
     skip = {int(x, 16) for x in args.skip.split(',') if x}
     base, a = load(args.a)
     base_b, b = load(args.b)
     if base != base_b:
         sys.exit('the logs cover different blocks')
+    def same(ra, rb):
+        return all(ra[3][8 * w:8 * w + 8] == rb[3][8 * w:8 * w + 8]
+                   for w in range(len(ra[3]) // 8) if base[w] not in skip)
+    if args.align:
+        shift = next((k for k in range(-args.align, args.align + 1)
+                      if -len(a) < k < len(b) and same(a[max(0, -k)], b[max(0, k)])),
+                     None)
+        if shift is None:
+            sys.exit(f'no row of B within {args.align} matches the first of A')
+        a, b = a[max(0, -shift):], b[max(0, shift):]
+        print(f'B shifted by {shift}')
     n = min(len(a), len(b))
     for i in range(n):
         da, db = a[i][3], b[i][3]
-        diff = [base + 4 * w for w in range(len(da) // 8)
-                if da[8 * w:8 * w + 8] != db[8 * w:8 * w + 8] and base + 4 * w not in skip]
+        diff = [w for w in range(len(da) // 8)
+                if da[8 * w:8 * w + 8] != db[8 * w:8 * w + 8] and base[w] not in skip]
         if diff:
             print(f'frame {i} differs (fields {a[i][1]} / {b[i][1]}): ' + ' '.join(
-                f'${x:X} {da[(x - base) * 2:(x - base) * 2 + 8]}/{db[(x - base) * 2:(x - base) * 2 + 8]}'
-                for x in diff[:12]) + (' ...' if len(diff) > 12 else ''))
+                f'${base[w]:X} {da[8 * w:8 * w + 8]}/{db[8 * w:8 * w + 8]}'
+                for w in diff[:12]) + (' ...' if len(diff) > 12 else ''))
             sys.exit(1)
     print(f'{n} frames agree ({len(a)} and {len(b)} logged)')
 

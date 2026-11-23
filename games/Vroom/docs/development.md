@@ -49,16 +49,25 @@ button. Left alone, the title runs a demo race after about 20 s in warp.
 On a 68020 and up, `make run` and `make serve` add `CACHE` to the WHDLoad options, as the
 installed icon will (`game_prepare` in `game.conf`). Without it the boot to the race takes
 2.4 times as long, mostly the loader unpacking in Chip RAM: on the a1200-030 2221 fields
-instead of 930. `WHD_DEFAULTS='PRELOAD SPLASHDELAY=0 NOREQ'` boots without it;
-`tools/matrix.py` does that, so a cell runs only the options it names.
+instead of 930. They also add `CUSTOM1=1` (Enhanced framerate; a 68000 ignores it) unless
+`ENHANCED=0` or `WHD_ARGS` sets `CUSTOM1`. `WHD_DEFAULTS='PRELOAD SPLASHDELAY=0 NOREQ'`
+boots without either; `tools/matrix.py` does that, so a cell runs only the options it names.
+
+With Enhanced framerate the scheduler's counters are at $1C0 (`internals.md`, "Enhanced
+framerate"): `do x1c0,6` reads the next tick's field, ticks, frames drawn, fields dropped,
+and the period word. `CUSTOM3=n` makes n of every n+1 race loop passes leave out the
+drawing, for the per-pass check: `statelog N FILE tick` on the a500 and on a 68020+ with
+`CUSTOM1=1 CUSTOM3=2`, then `tools/statecmp.py A B --skip DBD8,DBDC --align 10` (the two
+long words are the map marker's position in each screen; the a500 logs one more pass at the
+green light).
 
 ## Tools
 
 | Tool | Does |
 |---|---|
 | `tools/vroom.py` | the game server (`serve`, the shared commands) and the commands below |
-| `tools/statecmp.py A B [--skip ADDR,...]` | compares two `statelog` files: the first frame whose state differs, and where |
-| `tools/matrix.py [--full \| CELL ...]` | `bench` on the a500, a1200, a1200-030 (`MMU`) and a1200-040 (`CACHE`), one boot at a time with a deadline: the bench line, WHDLoad dumps and a screenshot per cell, in `tmp/matrix/<time>/`. The check after a finished change, not after every edit; `--full` adds the a1200-fast and the a1200-040 with `DCACHE`, for one-off decisions |
+| `tools/statecmp.py A B [--skip ADDR,...] [--align N]` | compares two `statelog` files: the first frame whose state differs, and where; `--align` first shifts B by up to N rows to where its first row matches |
+| `tools/matrix.py [--full \| CELL ...]` | `bench` on the a500, a1200, a1200-030 (`MMU`) and a1200-040 (`CACHE`), then the a1200-030 with `MMU CUSTOM1=1 CUSTOM2=1` and the a1200-040 with `CACHE CUSTOM1=1`, one boot at a time with a deadline: the bench line, WHDLoad dumps and a screenshot per cell, in `tmp/matrix/<time>/`. The check after a finished change, not after every edit; `--full` adds the a1200-fast and the a1200-040 with `DCACHE`, for one-off decisions |
 | `tools/smc.py TRACE.bin ...` | finds self-modifying code in Barto traces: CPU writes onto instructions executed anywhere in the traces |
 | `tools/smcscan.py MEMORY.bin [--exec TRACE.bin ...]` | a static scan of a memory dump for writes into code (absolute, PC-relative, or through a `lea` of a code address) |
 
@@ -66,8 +75,8 @@ instead of 930. `WHD_DEFAULTS='PRELOAD SPLASHDELAY=0 NOREQ'` boots without it;
 
 | Command | Does |
 |---|---|
-| `bench [N]` | from the next green light, the fields the first N frames take (default 500): fps, distance (at the last frame's end, through one breakpoint at $D510), fields per frame. Frames are counted from $E258, which changes once a frame (`internals.md`, "The swap"). Read-only, any CPU. In the first demo race after the boot, the same simulation on every machine, so the figure compares machines and builds |
-| `statelog N FILE` | from the next green light, the race state block ($DBC0-$E073) and the race clock at each of N frame ends (a breakpoint at $D510: exact per frame, any CPU) |
+| `bench [N]` | from the next green light, the fields the first N frames take (default 500): fps, distance (at the last frame's end, through one breakpoint at $D510), fields per frame. Frames are counted from $E258, which changes once a frame (`internals.md`, "The swap"): with Enhanced framerate the drawn frames, and the line adds ticks, undrawn passes and dropped fields. Read-only, any CPU. In the first demo race after the boot, the same simulation on every machine, so the figure compares machines and builds |
+| `statelog N FILE [tick]` | from the next green light, the race state (the block $DBC0-$E073, the score $8370, the simulation's long words in the renderer's area) and the race clock at each of N frame ends (a breakpoint at $D510: exact per frame, any CPU), or with `tick` at every race loop pass ($CD0E, drawn or not) |
 | `racelog N FILE` | from the next green light, one line per field: field, frame, clock, distance |
 | `meter N` | frames, fields per frame, clock and distance over N fields from now |
 | `race [stay]` | from the boot, through the title (right button, given only while the title idles at $12F9E: a click during the menu's wipe leaves the menu again) and the menu (left button on START) to the green light of a player race with the menu's settings as they are (ARCADE, MOUSE, MANUAL): see `internals.md`, "Input, the menu and the race controls" |
