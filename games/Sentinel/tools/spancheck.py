@@ -5,7 +5,8 @@
 
 Runs the game's span filler (program offsets $18B4..$1B17, from tmp/game/Sentinel/Disk.1,
 with its tables at $55000 as the game loads them) and the slave's SpanFill (assembled from
-src/Sentinel.s, after SpanTables has checked those tables) in Unicorn's 68020 on N random
+src/Sentinel.s, after SpanTables has checked those tables; its edge tables, as EdgeStepF writes them, elsewhere) in
+Unicorn's 68020 on N random
 polygons (default 3000): random edges and rows (spans inside, across and outside the
 window, rows whose right edge is left of their left edge, overflowing words), the game's
 clip windows (320 pixels from 0, 112 from 64, 128 from 0, a multiple of 8 from 0) and some
@@ -34,6 +35,8 @@ SENTINEL, SRSAVE = RET + 6, RET + 0x100
 LOW = 0x10000
 PIC, PIC_END = 0x70000, 0x81000
 SCRATCH = range(0x191a, 0x191e)
+FAST_TABLES = 0x17b00     # SpanFill's edge tables in the check: edgedelta $10000
+TABLES = range(0x7b00, 0x7f00)
 WINDOWS = ((0, 320), (64, 112), (0, 128))
 
 
@@ -49,7 +52,8 @@ def assemble():
     start = src.index('\tMACHINE\t68020\nSpanTables\n')
     end = src.index("; The pan step's column for a horizontal step")
     text = (f'\tORG\t${CODE_NEW:x}\nBASE\t= ${BASE:x}\n{group}\n'
-            f'\tjmp\tSpanFill\n\tjmp\tSpanTables\n\tdc.l\tspanok\n{src[start:end]}\n')
+            f'\tjmp\tSpanFill\n\tjmp\tSpanTables\n\tdc.l\tspanok,edgedelta\n{src[start:end]}\n'
+            f'edgedelta\tdc.l\t0\n')
     tmp = Path(tempfile.mkdtemp(dir=ROOT / 'tmp'))
     s, b = tmp / 'span.s', tmp / 'span.bin'
     s.write_text(text, encoding='latin-1')
@@ -160,6 +164,8 @@ def main():
     if new_m.read(flag, 1) != b'\xff':
         print('SpanTables: the tables are not the plain ones')
         return 1
+    delta_at = int.from_bytes(new_m.read(CODE_NEW + 16, 4), 'big')
+    new_m.write(delta_at, (FAST_TABLES - 0x7b00).to_bytes(4, 'big'))
     rng = random.Random(1)
     bad = fast = drawn = 0
     for i in range(n):
@@ -172,6 +178,8 @@ def main():
         for m, pc in ((old_m, OLD), (new_m, CODE_NEW)):
             m.write(0, low)
             m.write(PIC, pic)
+            if m is new_m:
+                m.write(FAST_TABLES, low[TABLES.start:TABLES.stop])
             r = m.call(pc, regs, ccr)
             mem = bytearray(m.read(0, LOW))
             for a in SCRATCH:

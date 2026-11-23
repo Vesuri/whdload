@@ -25,6 +25,8 @@
 ;   with CUSTOM1, like the wait at $30c)
 ; - the PAL/NTSC test reads only the beam's line: AGA's chip ID in VPOSR made
 ;   an NTSC A1200 run the game's PAL clock, 20% fast
+; - CUSTOM2 (a 68020 or better, the optional ExpMem): the render buffer and
+;   the edge tables in the ExpMem, a span filler without movep (SpanFill)
 
 	INCDIR	SOURCES:Include/
 	INCLUDE	whdload.i
@@ -36,7 +38,8 @@ QUITKEY		= $59		; F10
 BASE		= $57fe4	; destination address for binary
 STRIP		= $70000	; the game's render buffer: 320x200, 4 word-interleaved planes
 STRIPSIZE	= $7d00
-FASTSIZE	= $8000		; ExpMem: the render buffer
+EDGES		= $8000		; ExpMem: the render buffer, then the edge tables
+FASTSIZE	= $9000
 SOUND		= $20000	; the sound module, loaded by the game
 
 ; one 16-pixel group of the span (a2, 4 plane words, advanced past it):
@@ -316,6 +319,9 @@ FastSetup
 	dbf	d1,.col
 	add.l	d0,$502e(a0)		; movea.l #$70000: the dissolve
 	add.l	d0,$5e8e(a0)		; movea.l #$70000
+	add.l	#STRIP+EDGES-$7b00,d0	; the edge tables
+	lea	edgedelta(pc),a0
+	move.l	d0,(a0)
 .off	rts
 
 fast	dc.l	0			; the render buffer in ExpMem, or 0
@@ -329,7 +335,19 @@ PLFAST	PL_START
 	PL_P	$66f8,Tables		; the data at $55000 with the row tables
 	PL_P	$48e4,ColumnH		; the pan step's horizontal column copy
 	PL_P	$18b4,SpanFill		; the span filler
+	PL_P	$14be,EdgeStepF		; the edge scan converter's stepping
+	PL_PSS	$13d0,EdgePoint,10	; a one-row polygon's edges
 	PL_END
+
+; move.w $18fa,$7b00(a4); move.w $18fc,$7d00(a4) into the ExpMem's tables
+EdgePoint
+	move.l	a0,-(a7)
+	move.l	edgedelta(pc),a0
+	adda.l	a4,a0
+	move.w	$18fa.w,$7b00(a0)
+	move.w	$18fc.w,$7d00(a0)
+	move.l	(a7)+,a0
+	rts
 
 ; the game's copy of the loaded data to $55000..$56fff, then the row pointers
 ; into the render buffer (the text rows at $56010, the span rows at $56100)
@@ -447,7 +465,8 @@ SpanTables
 ; The span filler ($18b4..$1b17) on the fast drawing path, without movep:
 ; for each row from $1680 down to $167e (the row at $56100+($ef-row)*4+
 ; [$18ba], plus [$195a]; 160 bytes a row, 16 pixels in 4 plane words), the
-; span from the left edge ($7b00+row*2) to the right one ($7d00), clipped to
+; span from the left edge ($7b00+row*2, in the ExpMem's copy of the tables
+; that EdgeStepF and EdgePoint write) to the right one ($7d00), clipped to
 ; the window $18f0 (left) and $18f2 (width): the edge pixels in colour
 ; [$1693]>>4, the others in [$1693]&15. It stops at a row whose right edge is
 ; left of its left edge, and returns at once if the middle row's is. Memory
@@ -483,7 +502,8 @@ SpanFill
 	add.w	d1,d0
 	lsr.w	#1,d0
 	add.w	d0,d0
-	movea.w	d0,a0
+	movea.l	edgedelta(pc),a0	; the ExpMem's edge tables
+	adda.w	d0,a0
 	move.w	$7d00(a0),d0
 	sub.w	$7b00(a0),d0
 	bmi.w	.exit
@@ -523,7 +543,8 @@ SpanFill
 	lea	rows(pc),a0
 	move.w	d0,(a0)			; the rows after this one
 	add.w	d1,d1
-	lea	($7b00).w,a5
+	movea.l	edgedelta(pc),a5
+	lea	$7b00(a5),a5
 	adda.w	d1,a5
 
 .row	move.w	$200(a5),d1		; R
@@ -597,7 +618,13 @@ SpanFill
 	move.l	d1,d2
 	movea.l	d2,a2
 	rts
-.orig	move.b	$1680.w,d0
+.orig	movea.l	edgedelta(pc),a0	; the game's code: the edge tables back
+	lea	$7b00(a0),a0
+	lea	($7b00).w,a1
+	move.w	#$400/4-1,d0
+.copy	move.l	(a0)+,(a1)+
+	dbf	d0,.copy
+	move.b	$1680.w,d0
 	jmp	BASE+$18ba
 
 ; d2 (bytes b3 b2 b1 b0): d4 = b3 b3 b2 b2, d5 = b1 b1 b0 b0; d2 kept
@@ -675,8 +702,13 @@ ColumnH	move.w	#192-1,d7
 ; left edges, $7d00 right), $18de dy, $18e0 |dx|, $18e8/$18ec the x ends,
 ; $18ea clipped, $18eb the rows.
 
-EdgeStep
+; \1: 0 the tables at $7b00 and $7d00, 1 those in the ExpMem (edgedelta from
+; them), for the fast drawing path
+EDGESTEP	MACRO
 	move.l	d3,-(a7)
+	IFNE	\1
+	bsr.w	EdgeUnder
+	ENDC
 	move.w	$18ec.w,d0
 	sub.w	$18e8.w,d0
 	bpl.b	.left
@@ -695,6 +727,9 @@ EdgeStep
 	asl.w	#1,d6
 	add.w	$18dc.w,d6
 	movea.l	d6,a6
+	IFNE	\1
+	adda.l	edgedelta(pc),a6
+	ENDC
 	move.b	$18eb.w,d6
 	cmp.w	d5,d4
 	bcc.w	.xmajor
@@ -721,6 +756,10 @@ EdgeStep
 	bne.b	.yloop
 .store	move.b	d2,$16f9.w
 .exit	move.l	(a7)+,d3
+	IFNE	\1
+	suba.l	edgedelta(pc),a6	; a6 as the game's code leaves it
+	bsr.w	EdgeOver
+	ENDC
 	clr.l	d1
 	clr.l	d2
 	rts
@@ -743,6 +782,9 @@ EdgeStep
 .ycin	move.w	$18dc.w,2(a7)		; the game's d3.w
 	addi.w	#$200,2(a7)
 	movea.w	2(a7),a6
+	IFNE	\1
+	adda.l	edgedelta(pc),a6
+	ENDC
 	subq.b	#1,d6
 	bra.b	.ynext
 
@@ -775,7 +817,11 @@ EdgeStep
 	sub.w	d4,d0
 	subq.w	#2,a6
 	subq.b	#1,d6
+	IFNE	\1
+	beq.w	.done0
+	ELSE
 	beq.b	.done0
+	ENDC
 .xestore
 	move.w	d1,(a6)
 .xenext	subq.w	#1,d2
@@ -811,10 +857,66 @@ EdgeStep
 .xcin	move.w	$18dc.w,2(a7)		; the game's d3.w
 	addi.w	#$1fe,2(a7)
 	movea.w	2(a7),a6
+	IFNE	\1
+	adda.l	edgedelta(pc),a6
+	ENDC
 	subq.b	#1,d6
 	btst	#16,d2
 	bne.b	.xfnext
 	bra.b	.xenext
+	ENDM
+
+EdgeStep
+	EDGESTEP	0
+EdgeStepF
+	EDGESTEP	1
+edgedelta	dc.l	0		; the ExpMem's edge tables - $7b00
+under	dc.w	0
+
+; An unclipped edge ($18ea 0) of 0 rows ($18eb) steps 256 rows down from its
+; table: from the left table ($18dc $7b00) the game's code writes below it,
+; into $7900..$7aff (a right edge's lower rows are the left table). In that
+; case EdgeUnder copies those bytes to the ExpMem below its tables for
+; EdgeStepF, and EdgeOver back. The flags are kept.
+	MACHINE	68020
+EdgeUnder
+	move.w	ccr,-(a7)
+	tst.b	$18ea.w
+	bne.b	.no
+	tst.b	$18eb.w
+	bne.b	.no
+	cmpi.w	#$7d00,$18dc.w	; 256 rows down from the table base
+	bhs.b	.no			; stay in the tables
+	movem.l	d0/a0-a1,-(a7)
+	lea	($7900).w,a0
+	move.l	edgedelta(pc),a1
+	adda.l	a0,a1
+	lea	under(pc),a0
+	st	(a0)
+	lea	($7900).w,a0
+	bra.b	EdgeCopy
+.no	move.w	(a7)+,ccr
+	rts
+EdgeOver
+	move.w	ccr,-(a7)
+	tst.b	under(pc)
+	bne.b	.yes
+	move.w	(a7)+,ccr
+	rts
+.yes	movem.l	d0/a0-a1,-(a7)
+	lea	under(pc),a0
+	sf	(a0)
+	lea	($7900).w,a1
+	move.l	edgedelta(pc),a0
+	adda.l	a1,a0
+EdgeCopy
+	move.w	#$200/4-1,d0
+.copy	move.l	(a0)+,(a1)+
+	dbf	d0,.copy
+	movem.l	(a7)+,d0/a0-a1
+	move.w	(a7)+,ccr
+	rts
+	MACHINE	68000
 
 CheckKeys
 	move.b	d0,$58C6B

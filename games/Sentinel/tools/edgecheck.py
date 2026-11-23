@@ -4,7 +4,9 @@
     python3 tools/edgecheck.py [N]
 
 Runs the game's stepping code (program offsets $14BE..$165B, from tmp/game/Sentinel/Disk.1,
-self-modification and all) and the slave's EdgeStep (assembled from src/Sentinel.s) in
+self-modification and all), the slave's EdgeStep and EdgeStepF (the fast drawing option's,
+with its tables elsewhere: its tables are compared with the game's) (assembled from
+src/Sentinel.s) in
 Unicorn's 68000 on N random edges (default 20000): both tables, both x directions, x-major
 and y-major, clipped and not, rows 0 to 255 (0 wraps to 256), random registers. Compares
 d0-d7, a0-a7, N, Z, V and C and the low 64 KB (the edge tables at $7B00/$7D00 and the
@@ -25,7 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 UC_ARCH_M68K, UC_MODE_BIG_ENDIAN = 7, 1 << 30
-UC_CTL_CPU_MODEL, UC_CPU_M68K_M68000 = 7, 1
+UC_CTL_CPU_MODEL, UC_CPU_M68K_M68000, UC_CPU_M68K_M68020 = 7, 1, 2
 REG_A0, REG_D0, REG_SR, REG_PC = 1, 9, 17, 18
 BASE, OLD = 0x57fe4, 0x57fe4 + 0x14be
 MEM = 0x200000
@@ -56,8 +58,8 @@ def program():
 
 def assemble():
     src = (ROOT / 'src/Sentinel.s').read_text(encoding='latin-1')
-    start, end = src.index('\nEdgeStep\n'), src.index('\nCheckKeys\n')
-    text = f'\tORG\t${CODE_NEW:x}\n{src[start:end]}\n'
+    start, end = src.index('\nEDGESTEP\tMACRO\n'), src.index('\nCheckKeys\n')
+    text = f'\tORG\t${CODE_NEW:x}\n{src[start:end]}\n\tdc.l\tEdgeStepF,edgedelta\n'
     tmp = Path(tempfile.mkdtemp(dir=ROOT / 'tmp'))
     s, b = tmp / 'edge.s', tmp / 'edge.bin'
     s.write_text(text, encoding='latin-1')
@@ -72,13 +74,13 @@ def assemble():
 
 
 class Machine:
-    def __init__(self, uc, prog, new):
+    def __init__(self, uc, prog, new, model=UC_CPU_M68K_M68000):
         self.uc = uc
         h = ctypes.c_void_p()
         assert uc.uc_open(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, ctypes.byref(h)) == 0
         self.h = h
         assert uc.uc_ctl(h, UC_CTL_CPU_MODEL | (1 << 26) | (1 << 30),
-                         ctypes.c_int(UC_CPU_M68K_M68000)) == 0
+                         ctypes.c_int(model)) == 0
         assert uc.uc_mem_map(h, 0, MEM, 7) == 0
         self.write(BASE, prog)
         self.write(CODE_NEW, new)
@@ -136,37 +138,50 @@ def case(rng):
     return bytes(low), regs, rng.randrange(32)
 
 
+FAST_TABLES = 0x17b00     # EdgeStepF's tables in the check: edgedelta $10000
+TABLES = range(0x7b00, 0x7f00)
+
+
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 20000
     uc = load_unicorn()
     prog, new = program(), assemble()
+    fast_pc, delta_at = (int.from_bytes(new[-8 + 4 * i:len(new) - 4 + 4 * i], 'big') for i in range(2))
     old_m, new_m = Machine(uc, prog, new), Machine(uc, prog, new)
+    fast_m = Machine(uc, prog, new, UC_CPU_M68K_M68020)    # EdgeStepF runs on a 68020 or up
+    fast_m.write(delta_at, (FAST_TABLES - 0x7b00).to_bytes(4, 'big'))
     rng = random.Random(1)
     bad = xdiff = 0
     paths = {}
     for i in range(n):
         low, regs, ccr = case(rng)
         out = []
-        for m, pc in ((old_m, OLD), (new_m, CODE_NEW)):
+        for m, pc in ((old_m, OLD), (new_m, CODE_NEW), (fast_m, fast_pc)):
             m.write(0, low)
-            out.append((m.call(pc, regs, ccr), m.read(0, LOW)))
+            m.write(FAST_TABLES, low[TABLES.start:TABLES.stop])
+            r = m.call(pc, regs, ccr)
+            mem = m.read(0, LOW)
+            if m is fast_m:          # its tables in place of the game's
+                mem = mem[:TABLES.start] + m.read(FAST_TABLES, len(TABLES)) + mem[TABLES.stop:]
+            out.append((r, mem))
         dx = int.from_bytes(low[0x18ec:0x18ee], 'big', signed=True) - \
             int.from_bytes(low[0x18e8:0x18ea], 'big', signed=True)
         key = ('x' if abs(dx) >= int.from_bytes(low[0x18de:0x18e0], 'big') else 'y',
                'clip' if low[0x18ea] else 'plain', '+' if dx < 0 else '-')
         paths[key] = paths.get(key, 0) + 1
-        if out[0][0][16] & 0x10 != out[1][0][16] & 0x10:
+        if any(o[0][16] & 0x10 != out[0][0][16] & 0x10 for o in out[1:]):
             xdiff += 1
         out = [([*r[:16], r[16] & 0x0f], mem) for r, mem in out]
-        if out[0] != out[1]:
+        if out[0] != out[1] or out[0] != out[2]:
             bad += 1
             if bad <= 5:
-                (ro, mo), (rn, mn) = out
+                (ro, mo), (rn, mn) = out[0], (out[1] if out[0] != out[1] else out[2])
                 diff = [j for j in range(LOW) if mo[j] != mn[j]]
                 names = [f'd{j}' for j in range(8)] + [f'a{j}' for j in range(8)] + ['ccr']
                 print(f'case {i} {key}: regs differ {[(names[j], hex(ro[j]), hex(rn[j])) for j in range(17) if ro[j] != rn[j]]}'
                       f' memory differs at {[hex(a) for a in diff[:8]]}{"..." if len(diff) > 8 else ""}')
-    print(f'{n} edges, paths {dict(sorted(paths.items()))}: {bad} differ ({xdiff} in X only)')
+    print(f'{n} edges (EdgeStep and EdgeStepF), paths {dict(sorted(paths.items()))}: '
+          f'{bad} differ ({xdiff} in X only)')
     return 1 if bad else 0
 
 
