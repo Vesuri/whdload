@@ -15,6 +15,9 @@
 ; - loader patch recoded
 ; - version check added
 
+; 2.0b, Vesuri, 23.11.2026
+; - version and info text
+
 	INCDIR	SOURCES:Include/
 	INCLUDE	whdload.i
 
@@ -74,10 +77,11 @@ HEADER	SLAVE_HEADER
 .name	dc.b	"The Sentinel",0
 .copy	dc.b	"1988 Firebird",0
 .info	dc.b	"installed and fixed by Harry & StingRay",10
-	dc.b	"Version 1.01 (15.09.2017)",0
+	dc.b	"enhanced by Vesuri",10
+	dc.b	"Version 2.0b (23.11.2026)",0
 
 
-	DC.B	'$VER:Sentinel_Slave_1.01',0
+	DC.B	"$VER: Sentinel.slave 2.0b (23.11.2026)",0
 	CNOP	0,2
 
 slv_GameLoader

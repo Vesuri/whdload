@@ -20,9 +20,12 @@ The install package is not unpacked into `tmp/game/`; extract it by hand to read
 
 `src/Sentinel.s` is the package's `Source/Sentinel.s` (the import commit has it unchanged)
 with one commented edit: `cmp.w #$67e7,d0` written as `cmpi.w`, which StingRay's assembler
-emits and vasm would optimise to the Dn form. The build then equals the shipped slave in
-every byte but the last word of the code hunk, the padding to a longword after the final
-`rts`: vasm pads with `nop` (`$4E71`), the shipped slave has `$CF50`, never executed.
+emits and vasm would optimise to the Dn form. Without the 2.0b version strings (the info
+text and `$VER`) the build equals the shipped slave in every byte but the last word of the
+code hunk, the padding to a longword after the final `rts`: vasm pads with `nop` (`$4E71`),
+the shipped slave has `$CF50`, never executed. Release 2.0b adds "enhanced by Vesuri", its
+version line and `$VER: Sentinel.slave 2.0b (23.11.2026)` (replacing
+`$VER:Sentinel_Slave_1.01`); the code is V1.01's, moved by the longer strings.
 `release/slaves.sha256` records the vasm build.
 
 `-devpac` (no optimisation) matches: the source sizes its branches. StingRay's

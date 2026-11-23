@@ -1,14 +1,17 @@
 # Open work
 
-Set up from Harry's and StingRay's V1.01 slave. The build equals the shipped slave but for
-the code hunk's padding word ([development.md](development.md#the-build)). It boots to the
+Set up from Harry's and StingRay's V1.01 slave. Without the version strings the build
+equals the shipped slave but for the code hunk's padding word
+([development.md](development.md#the-build)). It boots to the
 title, landscape 0000's overview and into the landscape on the a500, the a1200 and the
 a1200-060.
 
 ## Release
 
-No improvement yet. A first release needs a dated `$VER` and info text in the slave, and a
-ReadMe entry above StingRay's.
+2.0b (23.11.2026): V1.01's code with `$VER` and the info text in the slave and the ReadMe
+entry above StingRay's; `make dist` builds `SentinelEnhanced-2.0b-20261123.lha`. No
+improvement yet: the ReadMe entry's one line ("no changes to the game yet") is replaced by
+the fixes' lines when they land. Not published.
 
 ## Rendering on fast machines
 
