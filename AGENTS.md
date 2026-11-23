@@ -111,6 +111,11 @@ there), never into the installed copy. This repository keeps what is specific to
   record mirror addresses for them.
 - Never `pkill fs-uae` or `pkill gdb`. Use the shared `fsuae_common.sh` and stop
   only verified project-owned process IDs.
+- Test runs and user-initiated runs never interfere. The `default` instance
+  (`tmp/run/default`) belongs to the user's `make run`: checks, harnesses and
+  agents always run with their own `INSTANCE=`, and never stop an emulator
+  they did not start in that run (a pidfile in a shared run directory is not
+  proof).
 - Document addresses as game code-hunk or file offsets, not runtime addresses.
   No performance claims without appropriate measurements.
 - Credit the original slave author in every game's docs and release ReadMe, and record
