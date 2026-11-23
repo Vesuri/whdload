@@ -34,6 +34,12 @@ Commands (each stops the CPU and leaves it stopped at a vsync, except `go`):
     front                    the SHA-256 prefix of the displayed buffer
     brk ADDR SECONDS         run to a breakpoint at ADDR, bounded in wall time: 'hit' or
                              'timeout', with the fields that passed
+    snap N FILE [ADDR:LEN ...]
+                             run N fields one at a time and append after each the bytes of
+                             each range (default the game's variables $1000:$1000 and the
+                             program BASE:$8000) to FILE: the per-field state
+                             (tools/gametime.sh takes $1700:$100, the field counter and
+                             the Sentinel's heading)
     go                       resume
 
 Addresses are the game's runtime ones: the program is loaded at BASE $57FE4 in base memory,
@@ -304,6 +310,23 @@ def brk(server, g, rest):
     return f"{'hit' if hit else 'timeout'} {(word(g, VBL) - v0) & 0xffff}"
 
 
+SNAP = ((0x1000, 0x1000), (BASE, 0x8000))
+
+
+def snap(server, g, rest):
+    w = rest.split()
+    n, path = int(w[0]), w[1]
+    ranges = [tuple(int(v, 16) for v in r.split(':')) for r in w[2:]] or SNAP
+    g.stop()
+    tmp = os.path.join(server.run_dir, 'snap.bin')
+    with open(path, 'ab') as f:
+        for _ in range(n):
+            g.cmd('monitor fields 1')
+            for a, k in ranges:
+                f.write(read_block(g, a, k, tmp))
+    return f'snap {n} fields, {sum(k for _, k in ranges)} bytes each'
+
+
 def go(server, g, rest):
     g.cont()
     return 'running'
@@ -312,7 +335,7 @@ def go(server, g, rest):
 server = game_server('sentinel', commands={
     'fields': fields, 'key': key, 'click': click, 'mouse': mouse, 'hold': hold, 'release': release, 'peek': peek_cmd,
     'swaps': swaps, 'strips': strips, 'route': route, 'census': census, 'pointer': pointer, 'front': front, 'waitfor': waitfor, 'brk': brk,
-    'go': go})
+    'snap': snap, 'go': go})
 
 if __name__ == '__main__':
     if sys.argv[1:2] == ['serve'] and os.environ.get('ENTRY') == '1':

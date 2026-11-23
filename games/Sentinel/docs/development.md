@@ -107,6 +107,18 @@ at module `$F2E`, and the boulder's effect trigger from the `jsr` to `$F36` last
 Not covered: completing a landscape, the Sentinel absorbing the player, entering a landscape
 code.
 
+## Game time
+
+`tools/gametime.sh [run options]` measures what [internals.md](internals.md#game-time)
+describes. It boots twice; each time it takes the route, makes a boulder (the enemies start
+with the player's first action) and records `$1700`..`$17FF`, the field counter and the
+Sentinel's heading every field (`snap`, 4000 fields by default, `FIELDS=`): first with no
+input, then with the pointer held at the right edge. `tools/gametime.py` prints the fields
+between the Sentinel's turns, how long its timer waited at 1 for the main loop, and the
+fields between energy units drained once the Sentinel sees the player (from about 2900
+fields after the boulder), until the player is absorbed. It is a measurement with no
+reference; a few minutes a machine.
+
 ## The matrix
 
 `tools/matrix.sh [FILTER]` runs the render check and the play check on the a500, the a1200,
@@ -127,5 +139,6 @@ the list's lines) runs part of it.
 - `tools/render_check.sh`, `tools/play_check.sh` and `tools/matrix.sh` above: minutes each,
   so not in `make check`; run the matrix (its minimal set) for any change to the slave, and
   `FULL=1` only when a question needs every option.
+- `tools/gametime.sh` above: the game's speed, for a change to the frame loop.
 - `tools/sentinel.py census N STATE` and `tools/smc_census.py STATE...`: executed bytes the
   CPU also wrote, from 68000 traces (`tmp/` holds the states: they contain game bytes).
