@@ -69,8 +69,13 @@ chip memory, and a pan is a 128-pixel strip render followed by an 8-frame scroll
      WHDLoad's vector handling with the MMU;
    - `movep`: 23 sites in the program (the span filler's are hot); the 68060 traps every one.
      Count them per strip on the 060 and measure the cost.
-7. **Matrix**: a500, a1200, a1200-030 with WHDLoad's `MMU`, a1200-040 (WHDLoad's defaults,
-   then `DCACHE`), a1200-060, and a 28 MHz 68020 with Zorro III memory (`EXTRA_ARGS`): the
+   - the data cache on chip memory: with the MMU, WHDLoad's `Cache` and `DCache` make chip
+     memory cacheable write-through, so a CPU read of chip memory the blitter or a disk load
+     wrote since the CPU last read it can see the old bytes (the buffer copy at `$4822` reads
+     a buffer the scroll blits wrote). Find every such read and invalidate the lines first.
+7. **Matrix**: a500, a1200, a1200-030 with WHDLoad's `MMU`, a1200-040 and a1200-060, each
+   with WHDLoad's defaults and with `NoCache`, `Cache` and `DCache` (and `ChipNoCache`, and
+   `BranchCache` on the 060), and a 28 MHz 68020 with Zorro III memory (`EXTRA_ARGS`): the
    render check, title to landscape to pans to F10. Then a fix-only 2.0b: one ReadMe line
    ("drawing fixed on 68040/060 with caches").
 
@@ -99,10 +104,13 @@ chip memory, and a pan is a 128-pixel strip render followed by an 8-frame scroll
     profile again on the 020 and decide what else moves. The program's code stays in chip
     memory (absolute addressing throughout and no relocation table); with the
     self-modification gone the 040/060 instruction cache holds it.
-13. **Cache policy** (the user's decision, playbook §8): the instruction cache, and the data
-    cache (copyback) for the allocated fast memory; base memory stays non-cacheable.
+13. **Caches stay WHDLoad's** (decided 23.11.2026): the slave adds no cache setting of its
+    own (the original's `resload_SetCACR` instruction cache stays as it is), and the game
+    must work with each of WHDLoad's options (step 7).
 
 ### E. Continuous 50 fps panning (the same option)
+
+The pipelined pan (step 15) is decided once B and D are done (23.11.2026).
 
 14. Measure the strip pause on the a1200-040 and a1200-060 after step 11. If it is under a
     field, the original sequential loop already pans continuously; otherwise:
