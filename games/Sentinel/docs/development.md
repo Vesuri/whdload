@@ -59,7 +59,10 @@ release RAW` (or `then mouse DX DY`) ends it when the K-th step's render is comm
 game takes K steps whether it reads the input after a scroll-in (the game's loop) or during
 it (the option); the render check pans that way. `STRIPS_TRACE=1` in the server's
 environment lists every stop, the input routine `$3336` among them, and 40 fields after.
-`steptime K` times K pan steps to a line: the strip render (from `$46E0` to the set-up at
+`beamat ADDR N` gives the raster line of N hits of an address; `beamat swap N` finds the
+option's buffer swap (the copper restart in the vertical-blank hook), and the render check
+ends with 60 swaps of a held pan, each of which must be within the vertical blank (line 25 at
+the latest). `steptime K` times K pan steps to a line: the strip render (from `$46E0` to the set-up at
 `$4740`) and the rest of each step.
 
 Two commands bound what the shared ones leave open: `waitfor ADDR HEX MAX` runs field by

@@ -103,14 +103,20 @@ one (the set-up of `$4740`..`$4794`: `$4822`'s status lines, the buffers, the co
 next, without blitter-nasty, so the CPU runs on beside them; the CPU then copies the step's
 column (`$488A`, or `ColumnH`) as the game does. Done in the interrupt with the blits waited
 for, the four plane blits took the vertical blank to line 221 (MEASURED, a1200-040), and the
-render beside them 6 to 7 fields instead of 2. The game time is as before (C8): the passes
+render beside them 6 to 7 fields instead of 2. A vertical blank swaps only if the last step's
+blits are done, and otherwise leaves the buffers for that field: waiting for them, it restarted
+the copper below the top of the display, and the rest of the field showed the new buffer from
+its top (MEASURED, a1200-030 with `CACHE`, D held: the first swaps of a step at lines 34 to 178,
+where a step's start in the interrupt, `$4822`'s status lines and the column, held up the
+blitter interrupts; now every swap at line 0 to 3 on the a1200, 030, 040 and 060). The game time is as before (C8): the passes
 run during the scroll-in, and the input is read 2 fields into it rather than after it. The
 main loop waits for the scroll-in only before what draws on the screen besides the pan.
 
-MEASURED (landscape 0000, D held for 500 fields, `swaps`): a swap every field on the
-a1200-040 (498 swaps, the first gap the pan's start) and the a1200-060 (500); the a1200-030
-493, the a1200 (no fast memory) 422. Pointer pans through the energy drain on the a1200-040:
-500 swaps in 500 fields. `tools/render_check.sh`: the ten key pan steps in 118 fields on the
+MEASURED (landscape 0000, D held for 500 fields, `swaps`, counted from the pan's first swap):
+a swap every field on the a1200-040 (472 swaps in 473 fields) and the a1200-060 (498 in 499);
+the a1200-030 462 in 470 (the same with `CACHE`), the a1200 (no fast memory) 377 in 462. Before
+the vertical blank skipped a late swap, pointer pans through the energy drain on the a1200-040
+gave 500 swaps in 500 fields. `tools/render_check.sh`: the ten key pan steps in 118 fields on the
 a1200-040 (167 without the option). `tools/gametime.sh` with the option: no input, the turns
 and the drain as without it; panning, a turn waited at most 7 fields for its slot on the
 a1200-040 and the a1200-060 (8 without the option on the a1200-040, 9 in C8) and the drain

@@ -171,7 +171,9 @@ across phases. Status in brackets.
 - **E16** (done) No blitter-nasty on the option's path (the scroll blits set `DMACON` `$8040`;
   `FastSetup` clears `BLTPRI`).
 - **E17** (done in emulation) Acceptance: a pan held for 10 s gives a swap every field on the
-  a1200-040 (498 swaps in 500 fields, the first gap the pan's start) and the a1200-060 (500);
+  a1200-040 (472 swaps in the 473 fields from the pan's first) and the a1200-060 (498 in 499),
+  every swap within the vertical blank (the render check fails a swap after line 25: the first
+  2.0b build tore on a 50 MHz 68030 with `CACHE`);
   the render and play checks pass on the minimal matrix and on the full matrix's option lines
   (the a500 among them: below a 68020 the option stays off); game speed: with no input the
   Sentinel turns every 504 or 505 fields with the option, and while panning a turn waited at
