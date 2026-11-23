@@ -17,5 +17,6 @@ Read `docs/open-work.md` first.
 | `docs/internals.md` | how it loads, memory, every slave patch, limitations |
 
 The slave source is `src/`; `tools/` is the harness: `sentinel.py` (the gdb-stub server and
-the route), `render_check.sh`, `edgecheck.py` and `smc_census.py`
+the route), `render_check.sh`, `play_check.sh`, `matrix.sh`, `edgecheck.py` and
+`smc_census.py`
 ([development.md](docs/development.md)).

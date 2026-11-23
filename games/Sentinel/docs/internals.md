@@ -109,10 +109,10 @@ MEASURED (a500, 60 fields traced while panning; share of CPU cycles): the span f
 `$356`) 17%, the edge scan converter (`$1440`) 14%, the field wait (`$358`) 8%, `$11D8` 5%,
 `$6BDA` 3%, `$17A2` 3%, the sound module at `$20000` 2%.
 
-MEASURED (2.0b with `EdgeStep`, `tools/render_check.sh`, the fields its ten pan steps take):
+MEASURED (2.0b with `EdgeStep`, `tools/render_check.sh`, the fields its ten key pan steps take):
 a500 360, a1200 197, a1200-030 with `MMU DCACHE` 164, a1200-040 166 (`CACHE` 166, `DCACHE` 127,
 `NOCACHE` 263), a1200-060 104 (`DCACHE` and `BRANCHCACHE DCACHE` 104).
 
 ## Limitations
 
-The other fast-CPU hazards in [open-work.md](open-work.md) step 6 are not yet checked.
+The blitter waits ([open-work.md](open-work.md) B6b) are not yet checked.

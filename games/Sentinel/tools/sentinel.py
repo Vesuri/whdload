@@ -26,8 +26,11 @@ Commands (each stops the CPU and leaves it stopped at a vsync, except `go`):
                              byte the CPU wrote, with the PCs that executed each instruction;
                              tools/smc_census.py reports the overlap
     pointer X Y              steer the mouse until the pointer ($5F84A x 0..2418, $5F84C y
-                             0..2996, up is larger) is at X, Y or stops at an edge (pointer mode)
-    waitfor ADDR HEX MAX     run fields until the bytes at ADDR equal HEX: 'at N' or 'timeout'
+                             0..2996, up is larger) is at X, Y to a mouse count, or stops at
+                             an edge (pointer mode)
+    waitfor ADDR HEX MAX     run fields until the bytes at ADDR equal HEX (!HEX: differ from
+                             it): 'at N (value)' or 'timeout'
+    front                    the SHA-256 prefix of the displayed buffer
     brk ADDR SECONDS         run to a breakpoint at ADDR, bounded in wall time: 'hit' or
                              'timeout', with the fields that passed
     go                       resume
@@ -167,6 +170,14 @@ def strips(server, g, rest):
     return '\n'.join(out)
 
 
+def front(server, g, rest):
+    g.stop()
+    b = long(g, BACK)
+    data = read_block(g, BUFFERS[1] if b == BUFFERS[0] else BUFFERS[0], BUFFER_SIZE,
+                      os.path.join(server.run_dir, 'front.bin'))
+    return hashlib.sha256(data).hexdigest()[:16]
+
+
 ROUTE = (('title', 400, '40'), ('number', 150, '44'), ('overview', 400, '44'))
 
 
@@ -233,18 +244,17 @@ POINTER = (0x5f84a, 0x5f84c)   # the pointer, x 0..2418 and y, in pointer mode
 
 
 def pointer(server, g, rest):
-    """Steer the mouse (native input, 2 fields a move) until the game's pointer is within 24
-    of X, Y, or stops moving (an edge)."""
+    """Steer the mouse (native input, 2 fields a move) until the game's pointer is within a
+    mouse count of X, Y (4 in x, 8 in y), or stops moving (an edge)."""
     tx, ty = (int(v, 0) for v in rest.split())
     g.stop()
     x, y = word(g, POINTER[0]), word(g, POINTER[1])
     for _ in range(80):
         dx, dy = tx - x, ty - y
-        if abs(dx) < 24 and abs(dy) < 24:
-            break
         # a mouse count moves x by +4 and y by -8 (y grows upwards on the screen)
-        mx = max(-60, min(60, round(dx / 4))) if abs(dx) >= 24 else 0
-        my = max(-60, min(60, round(-dy / 8))) if abs(dy) >= 24 else 0
+        mx, my = max(-60, min(60, round(dx / 4))), max(-60, min(60, round(-dy / 8)))
+        if mx == 0 and my == 0:
+            break
         g.cmd(f'monitor mouse {mx} {my}')
         g.cmd('monitor fields 2')
         nx, ny = word(g, POINTER[0]), word(g, POINTER[1])
@@ -255,13 +265,15 @@ def pointer(server, g, rest):
 
 
 def waitfor(server, g, rest):
-    """Run fields one at a time until the bytes at ADDR equal HEX, at most MAX fields."""
+    """Run fields one at a time until the bytes at ADDR equal HEX (or differ from it, !HEX),
+    at most MAX fields."""
     a, want, n = rest.split()
-    a, want, n = int(a, 0), bytes.fromhex(want), int(n)
+    neg = want.startswith('!')
+    a, want, n = int(a, 0), bytes.fromhex(want.lstrip('!')), int(n)
     g.stop()
     for i in range(n + 1):
-        if peek(g, a, len(want)) == want:
-            return f'at {i}'
+        if (peek(g, a, len(want)) == want) != neg:
+            return f'at {i} ({peek(g, a, len(want)).hex()})'
         g.cmd('monitor fields 1')
     return f'timeout {n} ({peek(g, a, len(want)).hex()})'
 
@@ -294,7 +306,7 @@ def go(server, g, rest):
 
 server = game_server('sentinel', commands={
     'fields': fields, 'key': key, 'click': click, 'mouse': mouse, 'hold': hold, 'release': release, 'peek': peek_cmd,
-    'swaps': swaps, 'strips': strips, 'route': route, 'census': census, 'pointer': pointer, 'waitfor': waitfor, 'brk': brk,
+    'swaps': swaps, 'strips': strips, 'route': route, 'census': census, 'pointer': pointer, 'front': front, 'waitfor': waitfor, 'brk': brk,
     'go': go})
 
 if __name__ == '__main__':
