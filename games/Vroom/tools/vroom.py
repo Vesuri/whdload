@@ -75,14 +75,16 @@ STEP = 0xDC60             # the player's last step (word), as added to POS at $C
 # With fast memory, Enhanced framerate runs the race block from a copy at an offset that
 # src/enhanced.i keeps at $1D6 (docs/internals.md, "Fast memory"): the reads and
 # breakpoints below take a block address there.
-BLOCK = (0xA924, 0x11FBA)
+BLOCK = (0xA924, 0x1B500)
 ENH_BLOCK = 0x1D6
+ENH_BOTTOM = 0x9800       # src/enhanced.i: the copy's lowest address (the trampolines)
 _block = {'off': 0, 'read': 0.0}
 
 
 def block_off(g):
-    """The race block's offset (0: in chip memory). A valid one is a multiple of $10000
-    above chip memory; once found it is kept (it is set before the program starts)."""
+    """The race block's offset (0: in chip memory). A valid one puts the copy's bottom
+    (ENH_BOTTOM) at the start of a fast ExpMem, a multiple of $1000, above chip memory; once
+    found it is kept (it is set before the program starts). On a 68000 nothing writes $1D6."""
     if _block['off'] or time.time() - _block['read'] < 2:
         return _block['off']
     out = g.cmd(f'x/1xw {ENH_BLOCK:#x}')
@@ -91,7 +93,7 @@ def block_off(g):
         v = int(out.rsplit(':', 1)[1].split()[0], 16)
     except (IndexError, ValueError):
         return 0
-    if v and v % 0x10000 == 0 and 0x200000 <= v < 0xFF000000:
+    if (v + ENH_BOTTOM) % 0x1000 == 0 and 0x200000 <= v < 0xFF000000:
         _block['off'] = v
     return _block['off']
 
@@ -546,8 +548,8 @@ def to_race(server, g, rest):
         for click in range(40):
             # Click only in the title's idle wait: a click during the menu's wipe (30 fields
             # with the slave's beam-timed delay) leaves the menu again.
-            if fields_until(g, lambda: menu_up(g) or TITLE_WAIT[0] <= pc(g) < TITLE_WAIT[1],
-                            4000, 10) is None:
+            wait = A(g, TITLE_WAIT[0]), A(g, TITLE_WAIT[1])
+            if fields_until(g, lambda: menu_up(g) or wait[0] <= pc(g) < wait[1], 4000, 10) is None:
                 raise TimeoutError('the title does not wait for a click')
             if menu_up(g):
                 break

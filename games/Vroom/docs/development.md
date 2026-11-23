@@ -72,8 +72,8 @@ change is the map's position marker, which the original draws there too (`intern
 | `tools/matrix.py [--full \| CELL ...]` | `bench` on the a500, a1200, a1200-030 (`MMU`) and a1200-040 (`CACHE`), then the a1200-030 with `MMU CUSTOM1=1 CUSTOM2=1` and the a1200-040 with `CACHE CUSTOM1=1`, one boot at a time with a deadline: the bench line, WHDLoad dumps and a screenshot per cell, in `tmp/matrix/<time>/`. The check after a finished change, not after every edit; `--full` adds the a1200-fast and the a1200-040 with `DCACHE`, for one-off decisions |
 | `tools/dmaregions.py TRACE [N]` | the CPU's chip memory accesses in a Barto trace of a 68000: instruction fetches, data reads and writes, and the data accesses by 4 KB block (the screens as one) |
 | `tools/eacensus.py TRACE LO HI [N]` | the executed instructions in a Barto trace with a memory operand or an immediate in [LO, HI): the census before a block moves to fast memory |
-| `tools/reloc.py [--write] [--no-seeds LO-HI] IMAGE PROFILE...` | the race block's relocation census (`internals.md`, "Fast memory"): IMAGE is chip memory from 0 at the program's entry (`BOOT_BREAK=0x3658`, `gdb dump binary memory`), the PROFILEs aprof profiles of whole sessions and Barto PC sets (.pkl). Prints the tables found, the immediates kept as numbers, the PC-relative edge crossings and the undecoded long words into the block to review; `--write` writes `src/reloc_<variant>.i` (the data disk with `--no-seeds 3600-4400`, its different init code). Run it again when a patch changes the program's memory |
-| `DEFINES_<build>=-DENH_PROTECT=1` (`BUILD=<build>`) | the race block left in chip memory, from $B000, protected between `Fix`es: any access by a missed reference ends in a WHDLoad dump. A 68030 with `MMU` (the 68040's 8 KB pages would cover the title's idle loop at $12F9E, which then crawls) |
+| `tools/reloc.py [--write [--out FILE]] [--no-seeds LO-HI] IMAGE PROFILE...` | the race block's relocation census (`internals.md`, "Fast memory"): IMAGE is chip memory from 0 at the program's entry (`BOOT_BREAK=0x3658`, `gdb dump binary memory`), the PROFILEs aprof profiles of whole sessions and Barto PC sets (.pkl). Prints the tables found, the immediates kept as numbers, the PC-relative edge crossings and the undecoded long words into the block to review; `--write` writes `src/reloc_<variant>.i` (the data disk with `--no-seeds 3600-4400`, its different init code). Run it again when a patch changes the program's memory |
+| `DEFINES_<build>=-DENH_PROTECT=1` (`BUILD=<build>`) | the race block left in chip memory, from $B000, protected between `Fix`es: any access by a missed reference ends in a WHDLoad dump. A 68030 with `MMU` (on the 68040, with 8 KB pages, the protection crawled through the title) |
 | `DEFINES_<build>=-DENH_NOBLOCK=1` | only the stack moves to fast memory: the A side of a measurement of the block's move |
 | `tools/smc.py TRACE.bin ...` | finds self-modifying code in Barto traces: CPU writes onto instructions executed anywhere in the traces |
 | `tools/smcscan.py MEMORY.bin [--exec TRACE.bin ...]` | a static scan of a memory dump for writes into code (absolute, PC-relative, or through a `lea` of a code address) |
@@ -106,7 +106,7 @@ python3 tools/vroom.py bench 500          # once tmp/run/default/.run/vroom.sock
 python3 tools/vroom.py quit
 ```
 
-With fast memory the race block ($A924-$11FBA) runs from its copy there: the commands'
+With fast memory the race block ($A924-$1B4FF) runs from its copy there: the commands'
 breakpoints and reads of block addresses go to the copy, at the offset the slave leaves at
 $1D6 (`internals.md`, "Fast memory").
 

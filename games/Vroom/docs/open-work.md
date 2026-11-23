@@ -196,20 +196,21 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     before the game's wait (loops; 0.8 fps more at most) and drawing the smallest blits with
     the CPU.
 19. **Fast memory for data and the race block** (done; `internals.md`, "Fast memory").
-    With an optional 100 KB fast ExpMem the stack and the race block ($A924-$11FBA: the
-    race's setup and loop, its state and the renderer) move there. At 25 Hz the a1200-fast
-    (68020) draws 24.18 fps against 17.87 with only the stack moved, the a1200-030 25.05
-    against 24.37; the a1200-040 is at 25 fps either way. Checked with `statelog`, `frames`,
-    an MMU-protected developer build through the menus, a driven race, its end and a second
-    race, the data disk, and the matrix. Without fast memory, or on a 68000, nothing moves.
-    What else in chip memory the CPU uses most (the a500's 100 race fields): the span table
-    ($34D00-$350FF, 43000 data accesses), the projection's variables ($3048E-$3049F,
-    22000), and read-only data in $2FC96-$36800 written before the race. The screens, copper
-    lists and anything the blitter reads or writes stay in chip memory.
-20. **Code in fast memory.** The 68040's 4 KB instruction cache holds the inner loops but not
-    a frame's code. Step 19 moved the race loop and the renderer; profile again (aprof on
-    the a1200-040, a traced 68020 with fast memory) for what else (the scaler at $18154,
-    the objects at $140C0, both outside the block) is worth moving.
+    With an optional 72 KB fast ExpMem the stack and the race block move there. Checked with
+    `statelog`, `frames`, an MMU-protected developer build through the menu and a driven
+    race, the data disk, and the matrix. Without fast memory, or on a
+    68000, nothing moves. What else in chip memory the CPU uses most (the a500's 100 race
+    fields): the span table ($34D00-$350FF, 43000 data accesses), the projection's variables
+    ($3048E-$3049F, 22000), and read-only data in $2FC96-$36800 written before the race. The
+    screens, copper lists and anything the blitter reads or writes stay in chip memory.
+20. **Code in fast memory** (done). The block now runs to $1B4FF: besides the race loop and
+    the renderer, the objects ($140C0), the scaler ($18154) and the bitmap scaler
+    ($19FB0-$1AF3F) with their variables. Any offset works, so the ExpMem is the block's
+    size. At 25 Hz the a1200-fast (68020) draws 25.05 fps (none undrawn), against 24.78 with
+    the step 19 block and 23.19 with the block in chip; on the a1200-040 aprof puts the
+    drawing at 39.0% of the time (47.0%) and the wait for the next tick at 52.1% (43.6%).
+    With fast memory every measured machine draws all but at most 1 of 500 ticks at 25 Hz,
+    so triple buffering could only help without fast memory (the a1200) or above 25 Hz.
 21. **The icon's cache tooltype.**
     - `Cache` turns on the instruction cache and turns the data cache off for the whole
       program, so data moved to ExpMem in step 19 would run uncached.

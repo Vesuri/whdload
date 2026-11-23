@@ -212,7 +212,7 @@ scale_Exe6	jmp	([_scale_slot6,pc])
 scale_Copy	move.l	(a3)+,(a4)+
 		dbf	d0,scale_Copy
 		bra.b	scale_Sync
-scale_SetEntry	move.l	$1A33C,(a0,d0.w)
+scale_SetEntry	move.l	([_blk_1A33C,pc]),(a0,d0.w)
 		move.w	ccr,-(a7)
 		bsr.b	scale_Sync
 		move.w	(a7)+,ccr
@@ -225,7 +225,7 @@ scale_SetEntry	move.l	$1A33C,(a0,d0.w)
 ; IN:	-
 ; OUT:	-	all registers preserved, CCR changed
 scale_Sync	movem.l	d0-d3/a0-a2,-(a7)
-		lea	$1A340,a0
+		move.l	_blk_1A340(pc),a0
 		lea	_scale_ptrs(pc),a1
 		moveq	#16-1,d3
 .entry		moveq	#0,d0

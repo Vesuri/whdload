@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""tools/reloc.py [--write] [--no-seeds LO-HI] IMAGE PROFILE...: the relocation census for moving the race block
-($A924-$11FBA: the race's setup and loop, the race state and the renderer) into fast memory
+"""tools/reloc.py [--write [--out FILE]] [--no-seeds LO-HI] IMAGE PROFILE...: the relocation census for moving the race block
+($A924-$1B4FF: the race's setup and loop, the race state, the renderer, the objects and the
+scalers) into fast memory
 (docs/internals.md, "Fast memory").
 
 IMAGE is the memory at the program's entry ($3658, patches applied: `BOOT_BREAK=0x3658`, then
 `gdb dump binary memory`). PROFILEs are aprof profiles (tools/vroom.py aprof, or a whole
 session's `monitor aprof start/stop`) and Barto traces' PC sets (a .pkl of a dict keyed by
-PC): their executed PCs seed a recursive disassembly of $3600-$1E000, with the code-pointer
-tables below. Every long absolute operand into the block is a relocation: in the block
+PC): their executed PCs seed a recursive disassembly of $3600-$1E000, with the code-pointer,
+offset and branch tables below. Every long absolute operand into the block is a relocation: in the block
 (IN, applied once to the copy) or outside it (OUT, applied in chip memory after every
 `Fix`, only where the site still holds its value). Long immediates count only when they are
 a decoded instruction's address or listed in DATA_ADDRS; the rest (constants such as
 $FFFF) are listed as kept. Prints the census and the PC-relative references across the
 block's edges, and the long words into the block outside decoded code that no table
-explains (to review). --write writes src/reloc_<variant>.i (variant from the image name).
+explains (to review). --write writes src/reloc_<variant>.i (variant from the image name;
+--out another file).
 """
 import argparse
 import collections
@@ -27,13 +29,19 @@ from amigaxdev.aprof import parse_profile  # noqa: E402
 from capstone import Cs, CS_ARCH_M68K, CS_MODE_M68K_000  # noqa: E402
 from capstone import m68k as M  # noqa: E402
 
-S, E = 0xA924, 0x11FBA
+S, E = 0xA924, 0x1B500
 LO, HI = 0x3600, 0x1E000
 # Tables of code addresses in the block (dispatch tables: lea table,a0 ... jsr (a1)).
 CODE_TABLES = [(0xB10E, 44), (0xCD90, 5), (0xCE3C, 5), (0xCEBC, 5), (0xE0BE, 4),
-               (0x7D5C, 6)]
+               (0x7D5C, 6), (0x7FC6, 6), (0x1803A, 16, 8)]
+# Tables of word offsets to code: (first entry, end, base); the scaler's blit routines
+# (move.w ($186DE,pc,d7.w),d7 / jsr ($186F6,pc,d7.w)). Zero entries are unused.
+OFFSET_TABLES = [(0x186F6, 0x1875C, 0x186F6)]
+# bra.w tables reached through an address register: the bitmap scaler's
+# (lea $1AEF0(pc),a6 / jsr (0,a6,d6.w)).
+BRANCH_TABLES = [0x1AEF0]
 # Tables of data addresses in the block.
-DATA_TABLES = [(0x11E36, 3), (0x11E42, 18), (0x11260, 2), (0x1069E, 1)]
+DATA_TABLES = [(0x11E36, 3), (0x11E42, 18), (0x11260, 2), (0x1069E, 1), (0x12390, 4)]
 # Code whose address only a long immediate or a computed branch holds: the crash sequence's
 # states (stored in $E0E4), the blitter queue's interrupt handlers (stored in the queue at
 # $11268), a return address pushed at $10E44, and code at $7FFE.
@@ -42,6 +50,17 @@ CODE_ADDRS = [0xD78E, 0xD862, 0xD92C, 0xD9EA, 0x110A8, 0x110D0, 0x110EC, 0x1110C
 # Data in the block whose address the code takes as a long immediate.
 DATA_ADDRS = {0x10AEE, 0x11260, 0x11268}
 ADDR_OPS = ('movea', 'adda', 'suba', 'cmpa', 'lea', 'pea')
+
+
+MID = ((S + E) // 2) & ~1
+
+
+def entries(tables):
+    """(address, count[, stride]) tables: the addresses of their long entries."""
+    for t in tables:
+        a, n, st = (t + (4,))[:3]
+        for k in range(n):
+            yield a + st * k
 
 
 def inb(a):
@@ -68,8 +87,13 @@ def disassemble(mem, seeds):
     md.detail = True
     code, bad = {}, set()
     todo = [x for x in seeds if LO <= x < HI]
-    for a, n in CODE_TABLES:
-        todo += [long_at(mem, a + 4 * k) for k in range(n)]
+    todo += [long_at(mem, x) for x in entries(CODE_TABLES)]
+    for t in BRANCH_TABLES:
+        while struct.unpack_from('>H', mem, t)[0] == 0x6000:
+            todo.append(t)
+            t += 4
+    for lo, hi, base in OFFSET_TABLES:
+        todo += [base + d for d in struct.unpack_from(f'>{(hi - lo) // 2}h', mem, lo) if d]
     todo += CODE_ADDRS
     while todo:
         pc = todo.pop()
@@ -95,7 +119,7 @@ def disassemble(mem, seeds):
                         todo.append(o.imm)
                     if o.type == M.M68K_OP_MEM and o.address_mode == M.M68K_AM_PCI_DISP:
                         todo.append(pc + 2 + o.mem.disp)
-            if m.startswith('jmp') and ops and ops[0].address_mode == M.M68K_AM_PCI_INDEX_8_BIT_DISP:
+            if m.startswith(('jmp', 'jsr')) and ops and ops[0].address_mode == M.M68K_AM_PCI_INDEX_8_BIT_DISP:
                 t = pc + 2 + ops[0].mem.disp           # a branch table: bra.w entries
                 while struct.unpack_from('>H', mem, t)[0] == 0x6000:
                     BRA_TABLES.add(pc)
@@ -175,17 +199,17 @@ def census(mem, code):
                 sys.exit(f'operand {v:#x} not found in {pc:#x}')
             rel.append((pc + j, v, f'{pc:05x}: {i.mnemonic} {i.op_str}'))
             off = j + 4
-    for a, n in CODE_TABLES + DATA_TABLES:
-        for k in range(n):
-            v = long_at(mem, a + 4 * k)
-            if inb(v):
-                rel.append((a + 4 * k, v, f'table ${a:05X}'))
+    for x in entries(CODE_TABLES + DATA_TABLES):
+        v = long_at(mem, x)
+        if inb(v):
+            rel.append((x, v, 'table'))
     return sorted(set(rel)), kept, cross
 
 
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument('--write', action='store_true')
+    ap.add_argument('--out', help='the file --write writes (default src/reloc_<variant>.i)')
     ap.add_argument('--no-seeds', metavar='LO-HI',
                     help='leave the profiles\' PCs in this range out (hex; where the variant '
                     'differs from the profiled one, as the data disk\'s init code $3600-$4400)')
@@ -200,7 +224,7 @@ def main(argv):
         lo, hi = (int(x, 16) for x in a.no_seeds.split('-'))
         seeds = {x for x in seeds if not lo <= x < hi} | {0x3658}
     code, bad = disassemble(mem, seeds)
-    known = {t for t, _n in CODE_TABLES + DATA_TABLES}
+    known = {t[0] for t in CODE_TABLES + DATA_TABLES}
     print('long tables found after lea/movea (not in CODE_TABLES or DATA_TABLES; review):')
     for t, (n, pc) in sorted(FOUND.items()):
         if t not in known:
@@ -211,8 +235,8 @@ def main(argv):
     for pc, i in code.items():
         covered.update(range(pc, pc + i.size))
     tabled = set()
-    for t, n in CODE_TABLES + DATA_TABLES:
-        tabled.update(range(t, t + 4 * n))
+    for x in entries(CODE_TABLES + DATA_TABLES):
+        tabled.update(range(x, x + 4))
     sites = {s for s, _v, _t in rel}
     review = [x for x in range(LO, HI - 3, 2)
               if inb(long_at(mem, x)) and x not in sites
@@ -233,15 +257,16 @@ def main(argv):
         print(f'  {x:05x} {long_at(mem, x):08x}')
     if a.write:
         variant = Path(a.image).stem.split('-')[-1]
-        out = Path(__file__).resolve().parents[1] / f'src/reloc_{variant}.i'
+        out = Path(a.out) if a.out else \
+            Path(__file__).resolve().parents[1] / f'src/reloc_{variant}.i'
         lines = [f'; generated by tools/reloc.py from the {variant} program: the race',
                  f'; block ${S:X}-${E:X} moved to fast memory (src/enhanced.i, enh_Move).',
-                 '; RELOC_IN: offsets into the block of long addresses into it',
-                 f'; RELOC_OUT: (site/2, value-${S:X}) of long addresses into it from outside',
+                 f'; RELOC_IN: (site-${MID:X})/2 of long addresses into the block in it',
+                 '; RELOC_OUT: site/2 (a word) and the long address into it it holds, from outside',
                  'RELOC_IN', ]
-        lines += [f'\t\tdc.w\t${s - S:04X}\t\t; {t}' for s, _v, t in ins]
-        lines += ['\t\tdc.w\t-1', 'RELOC_OUT']
-        lines += [f'\t\tdc.w\t${s >> 1:04X},${v - S:04X}\t; ${s:05X} {t}' for s, v, t in outs]
+        lines += [f'\t\tdc.w\t{(s - MID) // 2}\t\t; ${s:05X} {t}' for s, _v, t in ins]
+        lines += ['\t\tdc.w\t$8000', 'RELOC_OUT']
+        lines += [f'\t\tdc.w\t${s >> 1:04X}\n\t\tdc.l\t${v:05X}\t; ${s:05X} {t}' for s, v, t in outs]
         lines += ['\t\tdc.w\t0']
         out.write_text('\n'.join(lines) + '\n')
         print('wrote', out)
