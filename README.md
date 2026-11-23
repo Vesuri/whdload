@@ -38,7 +38,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Test Drive Enhanced | JOTD | [2.0b (13.11.2026)](https://github.com/Vesuri/whdload/releases/tag/TestDriveEnhanced-2.0b-20261113) |
 | Test Drive II Enhanced | JOTD | released upstream as JOTD's 2.1 (11.10.2026) |
 | TFX Enhanced | JOTD | [2.3b (19.11.2026)](https://github.com/Vesuri/whdload/releases/tag/TFXEnhanced-2.3b-20261119) |
-| The Sentinel Enhanced | Harry & StingRay | not yet released |
+| The Sentinel Enhanced | Harry & StingRay | [2.0b (23.11.2026)](https://github.com/Vesuri/whdload/releases/tag/SentinelEnhanced-2.0b-20261123) |
 | Their Finest Hour Enhanced | Psygore | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/TheirFinestHourEnhanced-2.0b-20261013) |
 | Virus Enhanced | John Selck | [2.0b (22.11.2026)](https://github.com/Vesuri/whdload/releases/tag/VirusEnhanced-2.0b-20261122) |
 | Vroom Enhanced | Mr.Larmer & CFou | not yet released |
