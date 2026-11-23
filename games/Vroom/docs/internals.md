@@ -51,7 +51,7 @@ slave's at $100-$129, `smc.i`'s at $130-$1A7 and `fixes.i`'s at $1B0.
 The blitter queue: the dispatcher is at $A092, the queue pointer at $11264 (idle = $11260),
 the queue at $11268, and the handlers at $110A8-$111E8.
 
-## CPU-timed delays (68020 and higher)
+## CPU-timed delays and the swap (68020 and higher)
 
 Five delays count `dbf` loops to themselves. On a 68000 (10 cycles a loop, 454 cycles a raster
 line) they last as below; on a 68040 next to nothing. On a 68020 or higher they become beam
@@ -64,6 +64,18 @@ waits of their 68000 length (`fix_WaitLines` counts changes of the beam's line).
 | $4986 | after a menu choice: 9 × 32001 `dbf` | 6344 lines, 20.3 fields |
 | $816C | a delay routine, called by the menu's item actions ($4CBC-$4E0A): 11 × 32001 | 7754 lines, 24.8 fields |
 | $153CA | the end of the routine at $15326: the same, d0 and d1 swapped | 7754 lines |
+
+The same patch list holds one more fix for fast CPUs, at $C968: the race loop's landscape
+(`jsr $E4F8`) starts the next frame in the buffer the frame end ($D51A) has just handed to the
+VBL through $A71C. That buffer stays on screen until the next VBL takes the new one. On a
+68040 (`CACHE`) the next frame starts drawing before that VBL in 34 of 40 demo-race frames, and
+a screenshot of the next field catches it half drawn: the flickering objects. The landscape
+now waits until the VBL has taken the buffer ($A71C = -1, at most 2 fields). That costs the
+68040 the rest of a field per frame: `bench 300` 29.8 fps before, 24.6 after (mostly 2 fields a
+frame), with the same distance. The a500 starts early in 37 of 40 frames as well, but draws so
+slowly that little reaches the screen, and the wait would slow its game speed (which follows
+the frame rate), so a 68000 keeps the original loop. A third screen (open-work, step 16)
+would recover the field.
 
 The sound player has no CPU-timed wait: it turns a channel's DMA off and back on at the next
 VBL ($A040, read at $9452).
@@ -134,10 +146,8 @@ From the green light of the first demo race, 1000 fields (`racelog`; `DETERMINIS
 | a1200-060 | `CACHE BRANCHCACHE` | 889 | 44.5 | 1 (807 of 889) | 333548 (4.2x) |
 
 These frames were counted from the buffer index (above, "The swap": not a frame count where
-the panel's pairs fall across a field boundary). `bench` counts $E258 instead; on the a500 to the
-a1200-040 it gives the same distance at equal frames on every machine. The a1200-060 row is not confirmed: there `bench` drove
-96505 in its first 300 frames against 90304 on every other machine, still unexplained
-(open-work.md).
+the panel's pairs fall across a field boundary). `bench` counts $E258 instead and reads the
+distance at the last frame's end: 90006 after 300 frames on every machine it has run on.
 
 With an MMU model, FS-UAE's `DCACHE` caches chip memory data, which no real board does
 (AmigaXDev `reference/headless-fsuae.md`, "Chip RAM and the data cache"). The `CACHE` row

@@ -84,22 +84,24 @@ The tools are in `docs/development.md` ("Tools"); the facts they rest on are in
    position. It crashes now and then and goes on. Served with `BOOT_BREAK=0x3658`, two boots
    drive identically. The controls are positions read once a frame (step 13).
 4. **Machine matrix** (done). `tools/matrix.py` boots each cell once with a deadline and
-   reports `bench`, dumps and a screenshot. `bench 300` from the demo's green light:
+   reports `bench`, dumps and a screenshot. `bench 300` from the demo's green light, with
+   phase B's fixes (the 68020 and up wait for each swap to be shown, step 7):
 
    | Machine | Options | Fields | fps | Fields per frame | Distance |
    |---|---|---|---|---|---|
-   | a500 | - | 1125 | 13.3 | 3-6, mostly 4 | 90304 |
-   | a1200 | - | 872 | 17.2 | 2-5, mostly 3 | 90304 |
-   | a1200-030 | `MMU` | 616 | 24.4 | 1-3, mostly 2 | 90304 |
-   | a1200-040 | `CACHE` | 504 | 29.8 | 1-3, mostly 2 | 90304 |
-   | a1200-fast (`--full`) | - | 816 | 18.4 | 2-4 | 90304 |
-   | a1200-040 (`--full`) | `DCACHE` | 413 | 36.3 | 1-3, mostly 1 | 90304 |
+   | a500 | - | 1124 | 13.3 | 3-6, mostly 4 | 90006 |
+   | a1200 | - | 968 | 15.5 | 2-5, mostly 3 | 90006 |
+   | a1200-030 | `MMU` | 731 | 20.5 | 1-4, mostly 2-3 | 90006 |
+   | a1200-040 | `CACHE` | 610 | 24.6 | 1-3, mostly 2 | 90006 |
 
-   No cell left a WHDLoad dump. The four default cells are the check after a finished change
-   (a few minutes); `--full` adds the two others for one-off decisions such as step 21.
-   The a1200-060 is left out for now: its `bench` drives 96505 in 300 frames, so frames are
-   being missed there or it runs differently, and under the `statelog` breakpoint it matches
-   the others. Work on the 68040 comes first; the 060 is checked again after it.
+   Before step 7 the 68020 and up ran 17.2, 24.4 and 29.8 fps; the `--full` cells then were
+   the a1200-fast at 18.4 and the a1200-040 with `DCACHE` at 36.3. No cell left a WHDLoad dump.
+   The four default cells are the check after a finished change (a few minutes); `--full` adds
+   the two others for one-off decisions such as step 21. The distance is read at the last
+   frame's end (a breakpoint at $D510). It used to be read at the next field boundary, where it
+   could include the next frame's step. That gave 90304 on most machines, 90006 on the a1200
+   after step 7, and probably the a1200-060's 96505 (it runs a frame per field), which also
+   matched the others under `statelog`. The 060 is left out until the 68040 work is done.
 
 ### B. Correct on the 68040 (bug fixes, always on)
 
@@ -110,12 +112,28 @@ The tools are in `docs/development.md` ("Tools"); the facts they rest on are in
    delays (the menu's wipes, pauses after menu choices) are beam waits of their 68000 length on
    a 68020 or higher. The sound player has no CPU-timed wait: it restarts audio DMA at the
    next VBL. The loader's drive delays were already removed by the original slave.
-7. **The flickering roadside objects.** Reproduce on the a500 and the a1200-040 (screenshots
-   at consecutive swaps in a real race). Candidates: the object list ($D23A onwards) built
-   for the wrong buffer, the scaler's slot state across frames, and a missing blitter wait
-   before a swap. Fix for every CPU.
-8. **Untested paths**: the second race start, which reloads part of the program to $439C
-   (`SMC_Decrunched`), the data disk's tracks, and the end of a race and the highscore save.
+7. **The flickering roadside objects** (fixed on 68020+; `internals.md`, "CPU-timed delays
+   and the swap"). The next frame drew into the buffer still on screen until the VBL took the
+   new one. The landscape now waits for that VBL: the 68040's frame rate drops from 29.8 to
+   24.6 fps until step 16's third screen. The a500 keeps the original loop.
+8. **Untested paths.**
+   - The end of a race and the second race start work on the a1200-040 (`CACHE`): an ARCADE
+     race driven until its time ran out, the scores table (it waits for the right button at
+     $5360), the menu, and a second race. That start reloads part of the program to $439C
+     ($817E), and `Fix_Decrunched` patched it again. No dump.
+   - The highscore save is still untested: the test driver's score stays under the table's
+     lowest entry (2000), and gdb cannot write memory to give it one.
+   - **The data disk crashes at its first demo race**, on every CPU and with CFou's v1.4
+     slave too, so the bug predates these slaves. After the title's "Insert VROOM disk then
+     click", the demo race loads its track archive ($F) into the small buffer at $3458. It then
+     asks for the large archive $15 while that buffer is still selected, and the load runs
+     over the program from $3658 on (an illegal instruction in the decruncher at $1D946, or
+     a crash in the stack area on the a500). The click
+     replaces the data disk's directory ($1D938, $1D950) with Vroom's, and from then on the
+     slave's `Load2` loads every track from `Disk.1`. It switches disks only on the first read
+     at offset $183C0 and on any read at $33614. So the data disk's own tracks are probably
+     never loaded where the real game swapped disks. Next: find where the data disk's program
+     asks for its own disk again and how it restores its directory, and switch `DiskNr` there.
 9. **Game speed.** On a fast machine the game runs 2.7-4.2x too fast. That is fixed by step C,
    which is therefore part of goal 1, not only of 50 fps.
 

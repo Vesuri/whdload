@@ -73,6 +73,10 @@ _fix_pl020	PL_START
 		PL_PSS	$4986,fix_Delay9,10	; after a menu choice: 9 x 32001 dbf
 		PL_PSS	$816C,fix_Delay11,10	; 11 x 32001 dbf
 		PL_PSS	$153CA,fix_Delay11,10	; the same, d0 and d1 swapped
+	; the race loop's landscape ($C968) draws into the buffer the frame end
+	; ($D51A) has just handed to the VBL's $A71C: until the next VBL shows it,
+	; that buffer is still on screen. Wait until the VBL has taken it
+		PL_PS	$C968,fix_Landscape	; jsr $E4F8
 		PL_END
 
 fix_Queue	jsr	$1123A			; uses a6
@@ -88,6 +92,18 @@ fix_KbdDelay	move.l	d0,-(a7)
 		bsr.b	fix_WaitLines		; the keyboard needs
 		move.l	(a7)+,d0
 		rts
+
+; at most 2 fields, in case no VBL takes the buffer
+fix_Landscape	movem.l	d0-d1,-(a7)
+		move.l	$A884,d1		; the field counter
+.wait		cmp.l	#-1,$A71C		; -1: the VBL has taken it
+		beq.b	.go
+		move.l	$A884,d0
+		sub.l	d1,d0
+		subq.l	#2,d0
+		bcs.b	.wait
+.go		movem.l	(a7)+,d0-d1
+		jmp	$E4F8
 
 ; dbf leaves the counters at -1 (their low words)
 fix_Wipe	move.l	d0,-(a7)

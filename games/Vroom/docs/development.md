@@ -60,7 +60,7 @@ button. Left alone, the title runs a demo race after about 20 s in warp.
 
 | Command | Does |
 |---|---|
-| `bench [N]` | from the next green light, the fields the first N frames take (default 500): fps, distance, fields per frame. Frames are counted from $E258, which changes once a frame (`internals.md`, "The swap"). Read-only, any CPU. In the first demo race after the boot, the same simulation on every machine, so the figure compares machines and builds |
+| `bench [N]` | from the next green light, the fields the first N frames take (default 500): fps, distance (at the last frame's end, through one breakpoint at $D510), fields per frame. Frames are counted from $E258, which changes once a frame (`internals.md`, "The swap"). Read-only, any CPU. In the first demo race after the boot, the same simulation on every machine, so the figure compares machines and builds |
 | `statelog N FILE` | from the next green light, the race state block ($DBC0-$E073) and the race clock at each of N frame ends (a breakpoint at $D510: exact per frame, any CPU) |
 | `racelog N FILE` | from the next green light, one line per field: field, frame, clock, distance |
 | `meter N` | frames, fields per frame, clock and distance over N fields from now |

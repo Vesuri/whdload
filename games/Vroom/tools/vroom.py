@@ -161,7 +161,8 @@ def bench(server, g, rest):
     from the green light, one field at a time (read-only, any CPU). In the first demo race,
     left alone after the boot, that is the same simulation on every machine (one step a
     frame), so the fps it gives compare between machines and builds. Also the distance driven
-    (the same on every machine at equal frames) and the fields-per-frame histogram."""
+    at the last frame's end (a breakpoint at $D510; the same on every machine) and the
+    fields-per-frame histogram."""
     n = int(rest.split()[0]) if rest.split() else 500
     g.stop()
     try:
@@ -169,7 +170,7 @@ def bench(server, g, rest):
             return 'no race start within 20000 fields'
         f0, last, _, p0, _ = sample(g)
         frames, fields, since, gaps = 0, 0, 0, {}
-        while frames < n:
+        while frames < n - 1:
             g.cmd('monitor fields 1')
             fields += 1
             since += 1
@@ -180,7 +181,18 @@ def bench(server, g, rest):
                 since = 0
             if fields > 50 * n:
                 return f'only {frames} frames in {fields} fields'
-        p = longs(g, POS, 1)[0]
+        # The last frame to its end ($D510, before $E258 is set): read at a field boundary,
+        # the position may already include the next frame's step.
+        at = longs(g, FIELDS, 1)[0]
+        g.cmd(f'break *{FRAME_END:#x}')
+        try:
+            g.cmd('continue', timeout=600)
+        finally:
+            g.cmd('delete')
+        p, now = longs(g, POS, 1)[0], longs(g, FIELDS, 1)[0]
+        last_gap = since + now - at
+        gaps[last_gap] = gaps.get(last_gap, 0) + 1
+        fields += now - at
     finally:
         g.cont()
     return (f'bench {n} frames {fields} fields fps {50.0 * n / fields:.2f} distance {p - p0} '
