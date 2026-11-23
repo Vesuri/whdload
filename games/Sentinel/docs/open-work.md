@@ -10,7 +10,8 @@ a1200-040 and the a1200-060, and since B5 the 68040 and 68060 draw correctly.
 
 2.0b (23.11.2026), not published: V1.01 with `$VER` and the info text in the slave, the
 ReadMe entry above StingRay's, the self-modification fix (B5), the effect trigger's wait
-(B6a), the pan step's blitter wait (B6b) and the PAL/NTSC test on AGA (C8); `make dist`
+(B6a), the pan step's blitter wait (B6b), the PAL/NTSC test on AGA (C8) and the CUSTOM2 fast
+drawing option (D10, D11); `make dist`
 builds `SentinelEnhanced-2.0b-20261123.lha`.
 
 ## The goals
@@ -127,32 +128,39 @@ across phases. Status in brackets.
   the scroll-in's blitter waits 40% and the field wait 20%. On the a1200-060 the pause is 3 to
   4 fields.
 
-### D. Fast strip rendering (68020 and up, a `CUSTOMn` option)
+### D. Fast strip rendering (68020 and up, CUSTOM2; done)
 
-- **D10** (to do) Fast memory. Allocate at install (exec `AllocMem`, MEMF_PUBLIC; skip the
-  option if it fails): the strip buffer, the edge tables and the span pattern tables
-  (`$56100`, `$56800`, `$56C00`, `$56E60`). The strip moves first and almost for free: the
-  scroll-in reads it only through `$5C848` (the column copy at `$493E`), and the filler
-  writes it through `$195A`; find every other reader and writer of `$70000` first.
-- **D11** (to do) Rewrite the edge scanner and the span filler in the slave for the option's
-  path, reading and writing fast memory, with no `movep` and no self-modification. Together
-  they are 45% of the A500's pan time and 9% of the a1200-040's (C9). Fixture: identical strip
-  bytes to the original's for the recorded polygons (Unicorn), and the render check.
-- **D12** (to do) The rest of the strip render (projection at `$11D8`, `$6BDA`, `$17A2` and
-  smaller): profile again on the 020 and decide what else moves. The program's code stays in
-  chip memory (absolute addressing throughout and no relocation table); with the
-  self-modification gone the 040/060 instruction cache holds it.
+- **D10** (done) Fast memory: an optional ExpMem of 36 KB (WHDLoad's allocation, the slave
+  has no buffers of its own) holds the render buffer and the edge tables; without it, or below
+  a 68020, the option is off. An access census over a traced a500 run found the buffer's users
+  ([internals.md](internals.md#slave-patches)): the row tables, the pan step's column
+  pointers, three absolute addresses and one blitter user, the pan step's horizontal column
+  copy, which the CPU now does. The span pattern tables stay at `$55000`..`$56FFF`: they are
+  loaded with data the game reads there, and `SpanFill` reads only the colour table
+  (`$56E60`, once a polygon) and keeps its masks in the slave.
+- **D11** (done) `SpanFill` (68020, no `movep`, 16 pixels of four planes as two longs) and
+  `EdgeStepF`, both on the fast tables. `tools/spancheck.py`: 30000 random polygons, 0 differ
+  from the game's filler under Unicorn (three deliberate faults caught); `tools/edgecheck.py`:
+  20000 edges, 0 differ for `EdgeStepF`; the render and play checks pass on the minimal
+  matrix's CUSTOM2 lines. MEASURED: the strip render on the a1200-040 from 3.27 fields to
+  1.53, the a1200-030 4.37 to 2.53, a 14 MHz 68020 with fast memory 5.18 to 3.74.
+- **D12** (done) Profiled again ([internals.md](internals.md#rendering-and-panning)): the
+  span filler is 2.2% of the 040's render (42.8% before), the rest the game's projection
+  (`$11D8`, 16.5%), `$6BDA` (13.6%) and smaller routines, all chip-resident code that cannot
+  move (absolute addressing, no relocation table). On a 14 MHz 68020 the slave's code is a
+  third of the render, so the 68020's render is bound by the CPU. Nothing else moves.
 - **D13** (decided 23.11.2026) Caches stay WHDLoad's: the slave adds no cache setting of its
   own (the original's `resload_SetCACR` instruction cache stays as it is), and the game must
   work with each of WHDLoad's options (B7).
 
 ### E. Continuous 50 fps panning (the same option)
 
-- **E14** (to do) Measure the strip pause on the a1200-040 and a1200-060 after D11. If it is
-  under a field, the original sequential loop already pans continuously; otherwise E15. Before
-  D it is 4 to 8 fields on the 040 and 3 to 4 on the 060 (C9), and the span filler and edge
-  scanner are 9% of the 040's pan time, so D11 alone is not expected to get it under a field
-  (DERIVED).
+- **E14** (answered by D) The original sequential loop can never pan continuously: after
+  each step's 8 scroll-in fields the next step's request waits for `$3764`, which the pass
+  loop sets to 2, so there are at least 2 fields between steps on every CPU (MEASURED: 9.7 to
+  10.6 fields from a scroll-in's start to the next step on the a500, 040 and 060), and the
+  040's render still takes 1.5 fields with CUSTOM2. E15 must bypass that wait as well as
+  overlap the render.
 - **E15** (to be decided once B and D are done, 23.11.2026) Pipeline the pan. Run the 8
   scroll-in steps (the plane blits, the column copy, the swap) from the vertical-blank
   interrupt while the main loop renders the next strip, in the direction still held, into a

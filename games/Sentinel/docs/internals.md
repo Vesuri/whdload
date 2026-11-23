@@ -3,7 +3,7 @@
 ## Loading
 
 A direct slave (`ws_Version` 17, `WHDLF_NoError|WHDLF_ClearMem|WHDLF_EmulTrap`): 512 KB
-base memory, no ExpMem, quit key F10, data from the RawDIC image `Disk.1`. It turns on the
+base memory, an optional ExpMem of 36 KB (for CUSTOM2, below), quit key F10, data from the RawDIC image `Disk.1`. It turns on the
 instruction cache (`resload_SetCACR` 1, 1; the data cache stays as WHDLoad sets it), loads
 the first `$B400` bytes of the image to `BASE` = `$57FE4` and identifies them by CRC16
 (`$67E7`, SPS 3025; anything else `TDREASON_WRONGVER`). The image has 10 sectors a track
@@ -39,6 +39,44 @@ Offsets are into the program as loaded, from `BASE` (so the file offset into the
 | module `$F2E` | `jsr SfxDmaWait` (2.0b), applied by `Loader` when it loads the sound module to `$20000` and the bytes match: the effect trigger's DMA-off wait, below | Vesuri |
 
 CUSTOM1 (`C1:B:Disable Blitter Waits`) drops both blitter waits, `$30C` and `$47AC`.
+
+CUSTOM2 (`C2:B:Fast Drawing (68020+)`) applies these too, when the CPU is a 68020 or better
+(`WHDLTAG_ATTNFLAGS_GET`) and WHDLoad allocated the ExpMem (`ws_ExpMem` is negative, so
+optional; it is fast memory where there is some). Otherwise the slave is as without it.
+`FastSetup` moves the render buffer (`$70000`, 32000 bytes) to the start of the ExpMem and
+the edge tables (`$7B00`..`$7EFF`, and `$7900`..`$7AFF` below them) to ExpMem+`$8000`:
+
+| Offset | Patch |
+|---|---|
+| `$39D4`, `$39F2`, `$502E`, `$5E8E`, the 5 longs at `$4854` | the render buffer's absolute addresses (the view's conversion to planes, the dissolve, the pan step's column pointers), set by `FastSetup` |
+| `$66F8` | jump to `Tables`: the game's copy of the data to `$55000`, then the row pointers into the buffer (`$56010`, entries 25 to 49; `$56100`, 200 to 399) relocated; `SpanTables` checks the span pattern tables against the colour table `$56E60` |
+| `$48E4` | jump to `ColumnH`: the pan step's horizontal column copy (four 1-word by 192-line blits) by the CPU, since the blitter cannot reach fast memory |
+| `$18B4` | jump to `SpanFill`, the span filler below |
+| `$14BE` | jump to `EdgeStepF`: `EdgeStep` writing the fast edge tables |
+| `$13D0` | `jsr EdgePoint`: a one-row polygon's two edge words, into the fast tables |
+
+Found by an access census (`tools/sentinel.py access`: every operand address in a traced
+a500 run, the route and pans in four directions): nothing else reads or writes the buffer, and
+the blitter touches it only at `$48E4`.
+
+`SpanFill` (68020 code, no `movep`) fills the rows from `$1680` down to `$167E`: each row's
+span runs from the left edge (`$7B00`+row*2) to the right (`$7D00`), clipped to the window
+`$18F0` (left), `$18F2` (width), `$18F4` (their sum); the end pixels get colour `$1693`>>4 and
+the inside `$1693`&15, through the colour table `$56E60`. It stops at a row whose right edge
+is left of its left one, and draws nothing if the middle row's is. It writes 16 pixels of all
+four planes as two longs, read-modify-write only at the span's ends, and leaves `$1946`,
+`$194E`, `$1952`, `$18EB`, d1, d2, a1, a2 and N, Z, V, C as the game's code does (nothing reads
+the other registers after it: a run with them poisoned passes the render and play checks). It
+hands over to the game's code (after copying the fast edge tables back to `$7B00`) when the
+pattern tables are not the plain ones, bit 7 of `$17F0` is set, or the window is not on 8-pixel
+bounds with `$18F4` its end; the game never sets such a window. `tools/spancheck.py`
+(`make check`) compares the two under Unicorn's 68020 on random polygons.
+
+An edge the scanner is given unclipped with no rows steps 256 rows, so from the left table it
+writes below `$7B00`, over `$7900`..`$7AFF` (20 times in a short run of pans; the game does not
+use those bytes after). `EdgeStepF` keeps that: when the scanner is about to write there
+(`$18EA` and `$18EB` 0, `$18DC` below `$7D00`) `EdgeUnder` copies the chip bytes to the ExpMem
+and `EdgeOver` copies them back.
 
 `EdgeStep` keeps the step (+1 or -1) in d3 instead of writing `addq.w`/`subq.w #1,d1` into
 the loops, and has a loop for each x-major mode instead of writing the `bcc.s` displacement.
@@ -197,7 +235,7 @@ by the nearest call target before the PC:
 | EdgeStep (the slave) and the edge scanner (`$1440`) | 13.3% | 5.8% | 1.8% | 1.4% |
 | the projection (`$11D8`) | 5.4% | 5.0% | 6.0% | 1.6% |
 | `$6BDA` | 3.3% | 5.3% | 6.7% | 1.5% |
-| `$17A2` | 3.0% | 3.2% | 4.2% | 8.0% |
+| the random number routine (`$17A2`, once a pass from `$237A`) | 3.0% | 3.2% | 4.2% | 8.0% |
 | `$2814` | 1.5% | 2.2% | 2.7% | 2.7% |
 | `$6240` | 1.4% | 2.1% | 2.6% | 0.6% |
 | the game pass (`$3630`, `$233E`) | 1.3% | 3.3% | 4.6% | 3.6% |
@@ -210,6 +248,37 @@ the a1200-040 the render is under a third of it, and the rest is the scroll-in: 
 for the blitter (its set-up, the CPU held, the waits) and 20% the field wait. DERIVED: the
 four plane blits are 14592 words read and written, about 29000 of a PAL field's 71000 colour
 clocks, so the blitter is busy for about 40% of each scroll-in field on every machine.
+
+MEASURED (2.0b, `tools/sentinel.py steptime`, landscape 0000, D held, 12 steps: the fields
+from a step's start, `$46E0`, to its scroll-in, `$4794`, so the strip render):
+
+| Machine | Without CUSTOM2 | CUSTOM2 |
+|---|---|---|
+| a1200-040 | 3.27 | 1.53 to 1.56 |
+| a1200-030 | 4.37 | 2.53 |
+| a 14 MHz 68020 with fast memory (`a1200-fast`) | 5.18 | 3.74 |
+
+The a1200 setup has no fast memory, so there the ExpMem is chip memory and CUSTOM2 measured no
+gain. Every step then takes 8 scroll-in fields and about 2 more: the pass loop `$3630` sets
+`$3764` to 2 when it starts and a held pan's next request waits for it, so even a render of no
+time leaves 2 fields between steps (a500, 040 and 060: 9.7 to 10.6 fields from the scroll-in's
+start to the next step).
+
+MEASURED (aprof over the windows of 10 strip renders, with CUSTOM2; the fields they took and
+the shares):
+
+| | a1200-040 without | a1200-040 | a1200-fast |
+|---|---|---|---|
+| fields | 32.81 | 17.73 | 44.82 |
+| the span filler (the game's, or `SpanFill`) | 42.8% | 2.2% | 21% |
+| `EdgeStepF` | | | 10.5% |
+| the projection (`$11D8`) | | 16.5% | 15.2% |
+| `$6BDA` | | 13.6% | 16.2% |
+| `$6240` | | | 6.2% |
+| the edge scanner (`$1440`) | | | 3.7% |
+
+What remains is the game's own code, which stays in chip memory: it addresses its variables
+absolutely and has no relocation table, and the 040's instruction cache already holds it.
 
 MEASURED (2.0b, `tools/render_check.sh`, the fields its ten key pan steps take): a500 361,
 a1200 198, a 28 MHz 68020 with Zorro III memory 192, a1200-030 185 (`MMU DCACHE` 165,

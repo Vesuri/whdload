@@ -51,7 +51,9 @@ limit; y 120 to 190, the view's bottom lines (not the status line below them). `
 reports the fields between buffer swaps: a pan step is 8 swaps a field apart, then the pause
 while the next strip is drawn. `strips K` counts steps by the pan loop's swap count `$17D3`,
 which is back at -1 when a step ends, not by groups of 8 swaps: a swap before it starts
-(the first view's draw, a pan already under way) would shift the groups.
+(the first view's draw, a pan already under way) would shift the groups. `steptime K` times
+K pan steps to a line: the strip render (from `$46E0` to the scroll-in at `$4794`) and the
+rest of each step.
 
 Two commands bound what the shared ones leave open: `waitfor ADDR HEX MAX` runs field by
 field until memory holds a value and says `timeout` after MAX fields; `brk ADDR SECONDS` is a
@@ -125,7 +127,9 @@ reference; a few minutes a machine.
 the a1200-030 and the a1200-040, two at a time: the check after a change to the slave.
 `FULL=1` runs the whole list, for a question that needs it (B7 was one): the machines and
 WHDLoad's cache options (`NoCache`, `Cache`, `DCache`, `ChipNoCache`, `BranchCache`; `MMU` on
-the 030), a 28 MHz 68020 with Zorro III memory and a 68060 that traps `movep`
+the 030), a 28 MHz 68020 with Zorro III memory, the CUSTOM2 option (`-c2` lines: the a1200,
+030 and 040 in the minimal set; the a500, the 68020 with Zorro III memory, the 040's cache
+options and the 060 in the whole list) and a 68060 that traps `movep`
 (`--uae_cpu_no_unimplemented=true`), two at a time; the list is in the script. Two controls
 must fail: V1.01's render check on the a1200-040, and V1.01's play check (the sound patch
 missing). A line whose result is not its expected one fails the run; `tmp/matrix/summary.txt`
@@ -134,11 +138,16 @@ the list's lines) runs part of it.
 
 ## Checks
 
-- `tools/edgecheck.py [N]`: `EdgeStep` against the game's edge scan converter under Unicorn
-  (`make check` runs it with 20000 edges; it reads the program from `tmp/game`).
+- `tools/edgecheck.py [N]`: `EdgeStep` and `EdgeStepF` (on tables elsewhere, Unicorn's 68020)
+  against the game's edge scan converter under Unicorn (`make check` runs it with 20000 edges;
+  it reads the program from `tmp/game`).
+- `tools/spancheck.py [N]`: `SpanFill` against the game's span filler under Unicorn's 68020,
+  on random polygons, windows, colours and pictures (`make check` runs 30000).
 - `tools/render_check.sh`, `tools/play_check.sh` and `tools/matrix.sh` above: minutes each,
   so not in `make check`; run the matrix (its minimal set) for any change to the slave, and
   `FULL=1` only when a question needs every option.
 - `tools/gametime.sh` above: the game's speed, for a change to the frame loop.
 - `tools/sentinel.py census N STATE` and `tools/smc_census.py STATE...`: executed bytes the
   CPU also wrote, from 68000 traces (`tmp/` holds the states: they contain game bytes).
+  `tools/sentinel.py access N STATE LO-HI...` records, from the same traces, every instruction
+  whose operands named an address in the ranges (how D10 found the render buffer's users).
