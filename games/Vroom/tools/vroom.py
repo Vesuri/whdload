@@ -3,6 +3,7 @@
 
   bench [<frames>]           fps over the first frames from the next green light
   statelog <frames> <file> [tick]  the race state at every frame end (or pass) from the next green light
+  aprof <fields> <file>      an instruction profile (FSUAE=$FSUAE_APROF) of fields from the next green light
   onscreen <passes>          landscape starts while the last frame is still on screen
   racelog <fields> <file>    field, frame, clock and distance per field from the next green light
   meter <fields>             frames, clock and distance over the next fields
@@ -248,6 +249,27 @@ def state_log(server, g, rest):
         Path(path).write_text(f'# frame field clock state {ranges} (at ${at:X})\n'
                               + '\n'.join(rows) + '\n')
     return f'{len(rows)} stops, fields {rows[0].split()[1]}..{rows[-1].split()[1]}' if rows else 'none'
+
+
+def aprof(server, g, rest):
+    """aprof <fields> <file>: from the next green light, the aprof FS-UAE's profile
+    (`monitor aprof start/stop`) of the next <fields> fields, written to <file> (APROF 1;
+    tools/aprof_report.py reads it). Needs the server started with FSUAE=$FSUAE_APROF on a
+    cycle-exact 68020-68060 without an MMU model (e.g. SETUP=a1200-040
+    EXTRA_ARGS=--cpu=68040-NOMMU). On a 68040/68060 it is an instruction count plus chip
+    time (AmigaXDev measurement-method)."""
+    args = rest.split()
+    n, path = int(args[0]), os.path.abspath(args[1])
+    g.stop()
+    try:
+        if not green_light(g):
+            return 'no race start within 20000 fields'
+        out = g.cmd('monitor aprof start')
+        g.cmd(f'monitor fields {n}', timeout=600)
+        out += g.cmd(f'monitor aprof stop {path}')
+    finally:
+        g.cont()
+    return out.strip() or 'written'
 
 
 LANDSCAPE = 0xE4F8         # the landscape: it draws into the draw buffer $86EA
@@ -510,6 +532,6 @@ def drive(server, g, rest):
 
 server = game_server('vroom', commands={
     'bench': bench, 'statelog': state_log, 'racelog': race_log, 'meter': meter, 'race': to_race,
-    'drive': drive, 'do': do, 'onscreen': onscreen, 'decrunch': decrunch})
+    'drive': drive, 'do': do, 'onscreen': onscreen, 'aprof': aprof, 'decrunch': decrunch})
 if __name__ == '__main__':
     server.main(sys.argv[1:])

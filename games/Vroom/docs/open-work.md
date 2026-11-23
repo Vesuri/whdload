@@ -171,10 +171,23 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
 
 ### E. Speed: a frame per field on the 68040 (Enhanced framerate, 68020 and up)
 
-17. **Ceiling first** (playbook §8, "Find the ceiling"). On the a1200-040 (`CACHE`) and
-    a1200-060, run matched builds with an instant blitter and with single bypasses (an
-    `rts` at the landscape spans, the road spans `$10CD2`, the scaler `$18154`). Add aprof
-    instruction counts on `68040-NOMMU`. These tell how far each part is from one field.
+17. **Ceiling first** (done). On the a1200-040 with the option off (the original loop, a frame
+    as fast as it draws), `bench 500` gives 24.75 fps (2 fields a frame), and 28.0 with an
+    instant blitter (`--uae_immediate_blits=true --uae_blitter_cycle_exact=false`); the
+    a1200-060 preset is not cycle-exact (50.1 fps, no ceiling). An aprof profile of 100 race
+    fields (`aprof`, `CPU=68040-NOMMU`, `tools/aprof_report.py`) splits a frame:
+    - chip memory accesses are 84% of the time (the program, its data and the screens are all
+      in chip memory; the emulated 68040 charges little else);
+    - about 20% waits for the VBL to take the last frame (`fix_Landscape`): with two screens
+      a frame takes whole fields, and the work is about 1.6 fields, so it must fall below one
+      field, by about 40%, before the frame rate moves;
+    - the scaler `$18154` 30.5%, the road spans `$10CD2` 11.6%, the landscape about 13%;
+    - waiting for the blitter about 22%: the objects' wait for the blitter queue ($1421E,
+      `jsr $1123A`, once a frame) 8%, the original slave's wait after each blit (`$10C`-`$124`,
+      about 13000 blits in 50 frames) about 10%, the rest the queue waits of step B.
+
+    The bypasses were left out: the profile gives each part's inclusive time directly, and a
+    bypass would only move the frame across a field boundary or not.
 18. **Blitter waits.** Each small blit is followed by the original slave's wait, so on a
     fast CPU the CPU idles through every blit. The waits stay as they are without the
     option. Move each wait to before the next blitter
