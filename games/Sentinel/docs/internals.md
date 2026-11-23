@@ -3,7 +3,7 @@
 ## Loading
 
 A direct slave (`ws_Version` 17, `WHDLF_NoError|WHDLF_ClearMem|WHDLF_EmulTrap`): 512 KB
-base memory, an optional ExpMem of 36 KB (for Enhanced framerate, below), quit key F10, data from the RawDIC image `Disk.1`. It turns on the
+base memory, an optional ExpMem of 96 KB (for Enhanced framerate, below), quit key F10, data from the RawDIC image `Disk.1`. It turns on the
 instruction cache (`resload_SetCACR` 1, 1; the data cache stays as WHDLoad sets it), loads
 the first `$B400` bytes of the image to `BASE` = `$57FE4` and identifies them by CRC16
 (`$67E7`, SPS 3025; anything else `TDREASON_WRONGVER`). The image has 10 sectors a track
@@ -43,11 +43,12 @@ Both blitter waits are always on: V1.01's CUSTOM1 dropped `$30C`'s (and 2.0b's f
 a blit ends (0.2% of a held pan on the a500 is the wait), and lets a faster CPU write the next
 blit's registers while the last one runs.
 
-CUSTOM1 (`C1:B:Enhanced framerate`, set in the installed icon) applies these too, when the CPU is a 68020 or better
-(`WHDLTAG_ATTNFLAGS_GET`) and WHDLoad allocated the ExpMem (`ws_ExpMem` is negative, so
-optional; it is fast memory where there is some). Otherwise the slave is as without it.
-`FastSetup` moves the render buffer (`$70000`, 32000 bytes) to the start of the ExpMem and
-the edge tables (`$7B00`..`$7EFF`, and `$7900`..`$7AFF` below them) to ExpMem+`$8000`:
+CUSTOM1 (`C1:B:Enhanced framerate`, set in the installed icon) applies these too, when the
+CPU is a 68020 or better (`WHDLTAG_ATTNFLAGS_GET`) and WHDLoad allocated the ExpMem
+(`ws_ExpMem` is negative, so optional; it is fast memory where there is some). Otherwise the
+slave is as without it. `FastSetup` moves the render buffer (`$70000`, 32000 bytes) to the
+start of the ExpMem and the edge tables (`$7B00`..`$7EFF`, and `$7900`..`$7AFF` below them)
+to ExpMem+`$8000`; two copies of a strip for the scroll-in follow at ExpMem+`$9000`:
 
 | Offset | Patch |
 |---|---|
@@ -57,6 +58,12 @@ the edge tables (`$7B00`..`$7EFF`, and `$7900`..`$7AFF` below them) to ExpMem+`$
 | `$18B4` | jump to `SpanFill`, the span filler below |
 | `$14BE` | jump to `EdgeStepF`: `EdgeStep` writing the fast edge tables |
 | `$13D0` | `jsr EdgePoint`: a one-row polygon's two edge words, into the fast tables |
+| `$4740` | jump to `StepQueue`: the pan step's set-up and scroll-in, queued for the vertical blank (below) |
+| `$574` | `jsr VblScroll`, in the level 3 interrupt: the scroll-in's swaps and steps, and the next plane blit on the blitter's interrupt |
+| `$6D4` | `jsr AckNoBlit` instead of StingRay's acknowledgement: the vertical blank and the copper, not the blitter, whose interrupt `VblScroll` serves |
+| `$48C` | `INTENA` `$8068`: the blitter's interrupt too |
+| `$68C` | `jsr PointerGate`: the pointer stays hidden while a scroll-in runs, as during the game's pan |
+| `$46D6`, `$3708`, `$369C`, `$2CE4`, `$2D10`, `$39CC` | `jsr`: wait for the scroll-in before the pass loop's full redraw, a command, an event, the status line's copies to the screen and a full view's copy |
 
 Found by an access census (`tools/sentinel.py access`: every operand address in a traced
 a500 run, the route and pans in four directions): nothing else reads or writes the buffer, and
@@ -80,6 +87,34 @@ writes below `$7B00`, over `$7900`..`$7AFF` (20 times in a short run of pans; th
 use those bytes after). `EdgeStepF` keeps that: when the scanner is about to write there
 (`$18EA` and `$18EB` 0, `$18DC` below `$7D00`) `EdgeUnder` copies the chip bytes to the ExpMem
 and `EdgeOver` copies them back.
+
+**The pan with Enhanced framerate** (E15, E16). The game's pan step renders a strip, scrolls it
+in over 8 fields with a swap each, then runs its passes (`$3630`) until the vertical blank
+reads the input 2 fields later (`$3764`) and the next step's render. With the option,
+`StepQueue` (after the render) copies the strip (the step's 128 pixels at the render buffer's
+top left: 64 bytes of 192 rows, or 64 rows) into the free strip copy, notes the step's
+direction, column pointer and swaps, and starts it at once if nothing scrolls, else leaves it
+queued; then the main loop goes on to its passes and the next render. `VblScroll` does, at each
+vertical blank, what the game's loop did after each field wait (`$47AC`..`$47F6`: the drawn
+buffer shown, the swap, the next scroll step), and after a step's last swap starts the queued
+one (the set-up of `$4740`..`$4794`: `$4822`'s status lines, the buffers, the column pointer,
+`$17D3`), so the swaps do not stop between steps. A scroll step (`ScrollStep`, the game's
+`$4868` and `$4976`) starts the first of its four plane blits and each blitter interrupt the
+next, without blitter-nasty, so the CPU runs on beside them; the CPU then copies the step's
+column (`$488A`, or `ColumnH`) as the game does. Done in the interrupt with the blits waited
+for, the four plane blits took the vertical blank to line 221 (MEASURED, a1200-040), and the
+render beside them 6 to 7 fields instead of 2. The game time is as before (C8): the passes
+run during the scroll-in, and the input is read 2 fields into it rather than after it. The
+main loop waits for the scroll-in only before what draws on the screen besides the pan.
+
+MEASURED (landscape 0000, D held for 500 fields, `swaps`): a swap every field on the
+a1200-040 (498 swaps, the first gap the pan's start) and the a1200-060 (500); the a1200-030
+493, the a1200 (no fast memory) 422. Pointer pans through the energy drain on the a1200-040:
+500 swaps in 500 fields. `tools/render_check.sh`: the ten key pan steps in 118 fields on the
+a1200-040 (167 without the option). `tools/gametime.sh` with the option: no input, the turns
+and the drain as without it; panning, a turn waited at most 7 fields for its slot on the
+a1200-040 and the a1200-060 (8 without the option on the a1200-040, 9 in C8) and the drain
+took 612 fields on the a1200-040 (659 without) and 568 on the a1200-060 (562 with no input).
 
 `EdgeStep` keeps the step (+1 or -1) in d3 instead of writing `addq.w`/`subq.w #1,d1` into
 the loops, and has a loop for each x-major mode instead of writing the `bcc.s` displacement.
@@ -252,8 +287,8 @@ for the blitter (its set-up, the CPU held, the waits) and 20% the field wait. DE
 four plane blits are 14592 words read and written, about 29000 of a PAL field's 71000 colour
 clocks, so the blitter is busy for about 40% of each scroll-in field on every machine.
 
-MEASURED (2.0b, `tools/sentinel.py steptime`, landscape 0000, D held, 12 steps: the fields
-from a step's start, `$46E0`, to its scroll-in, `$4794`, so the strip render):
+MEASURED (2.0b before E15, `tools/sentinel.py steptime`, landscape 0000, D held, 12 steps: the
+fields from a step's start, `$46E0`, to its scroll-in, `$4794`, so the strip render):
 
 | Machine | Without | Enhanced framerate |
 |---|---|---|
@@ -262,10 +297,10 @@ from a step's start, `$46E0`, to its scroll-in, `$4794`, so the strip render):
 | a 14 MHz 68020 with fast memory (`a1200-fast`) | 5.18 | 3.74 |
 
 The a1200 setup has no fast memory, so there the ExpMem is chip memory and the option measured no
-gain. Every step then takes 8 scroll-in fields and about 2 more: the pass loop `$3630` sets
-`$3764` to 2 when it starts and a held pan's next request waits for it, so even a render of no
-time leaves 2 fields between steps (a500, 040 and 060: 9.7 to 10.6 fields from the scroll-in's
-start to the next step).
+gain. In the game's loop every step then takes 8 scroll-in fields and about 2 more: the pass
+loop `$3630` sets `$3764` to 2 when it starts and a held pan's next request waits for it, so
+even a render of no time leaves 2 fields between steps (a500, 040 and 060: 9.7 to 10.6 fields
+from the scroll-in's start to the next step). E15 overlaps them with the scroll-in (above).
 
 MEASURED (aprof over the windows of 10 strip renders, with Enhanced framerate; the fields they took and
 the shares):

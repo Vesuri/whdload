@@ -49,11 +49,18 @@ emulator's mouse input until the game's pointer is there or stops at an edge. Th
 pans in a band at each edge (measured): x 2418, the right limit; x under 128; y 2996, the top
 limit; y 120 to 190, the view's bottom lines (not the status line below them). `swaps N`
 reports the fields between buffer swaps: a pan step is 8 swaps a field apart, then the pause
-while the next strip is drawn. `strips K` counts steps by the pan loop's swap count `$17D3`,
-which is back at -1 when a step ends, not by groups of 8 swaps: a swap before it starts
-(the first view's draw, a pan already under way) would shift the groups. `steptime K` times
-K pan steps to a line: the strip render (from `$46E0` to the scroll-in at `$4794`) and the
-rest of each step.
+while the next strip is drawn. `strips K` runs to breakpoints: a step's end (the game's loop
+after its last swap, `$47FE`, or with Enhanced framerate the slave's `VblEnd`,
+at the offset in the long before `StepQueue`) hashes the displayed buffer, and a render's end
+(`$4736`, `$184B` 8 for a pan) counts a committed step; groups of 8 swaps would be shifted by
+a swap before the pan (the first view's draw, a pan already under way). `strips K FILE with
+mouse DX DY` (or `with key RAW`) starts the pan once the breakpoints are armed, and `then
+release RAW` (or `then mouse DX DY`) ends it when the K-th step's render is committed, so the
+game takes K steps whether it reads the input after a scroll-in (the game's loop) or during
+it (the option); the render check pans that way. `STRIPS_TRACE=1` in the server's
+environment lists every stop, the input routine `$3336` among them, and 40 fields after.
+`steptime K` times K pan steps to a line: the strip render (from `$46E0` to the set-up at
+`$4740`) and the rest of each step.
 
 Two commands bound what the shared ones leave open: `waitfor ADDR HEX MAX` runs field by
 field until memory holds a value and says `timeout` after MAX fields; `brk ADDR SECONDS` is a
@@ -70,10 +77,12 @@ record`). A step's picture depends on the steps before it (the same view reached
 back has other bytes), not on the CPU or on keys against pointer: from the first view the
 pointer's steps equal D's. The pointer is steered to just outside the band, enters it with
 one mouse move and leaves it with one after the last step, as a key is pressed and
-released; steered into it in several moves, a fast CPU had begun a step before `strips`
-started (the a1200-060 and the a1200-040 with `DCACHE` differed). It prints the fields each
-half took. `INSTANCE=b` runs one beside another; start them a few seconds apart (several
-launched in the same second failed to boot).
+released, both given inside `strips`: given by a command before it (a mouse move takes 2
+fields), the a1200-060 and the a1200-040 with `DCACHE` committed the first render before
+`strips` counted, and took a step more. It prints the fields each half took. The checks run in their own instance (`render`, `play`, `gametime`; never
+`default`, the user's `make run`); `INSTANCE=b` runs one beside another. Start them a few
+seconds apart: several launched in the same second failed to boot (the build races). On a
+loaded host the check waits up to 5 minutes for the boot, and gives up when the server exits.
 
 The reference is V1.01's picture: V1.01 matches it on the a500 (`SLAVE=original`), and the
 control `SLAVE=original SETUP=a1200-040` must fail (it differs in 43 diff lines).

@@ -10,10 +10,9 @@ a1200-040 and the a1200-060, and since B5 the 68040 and 68060 draw correctly.
 
 2.0b (23.11.2026), not published: V1.01 with `$VER` and the info text in the slave, the
 ReadMe entry above StingRay's, the self-modification fix (B5), the effect trigger's wait
-(B6a), the pan step's blitter wait (B6b), the PAL/NTSC test on AGA (C8) Enhanced framerate
-(CUSTOM1, on in the installed icon: D10, D11) and the blitter waits always on (V1.01's CUSTOM1
-gone); `make dist`
-builds `SentinelEnhanced-2.0b-20261123.lha`.
+(B6a), the pan step's blitter wait (B6b), the PAL/NTSC test on AGA (C8), Enhanced framerate
+(CUSTOM1, on in the installed icon: D10, D11, E15, E16) and the blitter waits always on
+(V1.01's CUSTOM1 gone); `make dist` builds `SentinelEnhanced-2.0b-20261123.lha`.
 
 ## The goals
 
@@ -154,28 +153,28 @@ across phases. Status in brackets.
   own (the original's `resload_SetCACR` instruction cache stays as it is), and the game must
   work with each of WHDLoad's options (B7).
 
-### E. Continuous 50 fps panning (the same option)
+### E. Continuous 50 fps panning (the same option; done)
 
-- **E14** (answered by D) The original sequential loop can never pan continuously: after
-  each step's 8 scroll-in fields the next step's request waits for `$3764`, which the pass
-  loop sets to 2, so there are at least 2 fields between steps on every CPU (MEASURED: 9.7 to
-  10.6 fields from a scroll-in's start to the next step on the a500, 040 and 060), and the
-  040's render still takes 1.5 fields with the option. E15 must bypass that wait as well as
-  overlap the render.
-- **E15** (to be decided once B and D are done, 23.11.2026) Pipeline the pan. Run the 8
-  scroll-in steps (the plane blits, the column copy, the swap) from the vertical-blank
-  interrupt while the main loop renders the next strip, in the direction still held, into a
-  second fast strip buffer; drop it when the pan stops or turns. This needs the point where
-  the view angle is committed (`$1683` is a candidate; `$18C4` and `$18C6` follow the
-  pointer). Game time needs nothing from it (C8): the timers run in the vertical blank, and
-  the enemy update must stay in every pass of the main loop. A strip render under 7 fields then
-  gives a swap every field.
-- **E16** (to do) Chip bus. Drop blitter-nasty (`BLTPRI` in the `DMACON` write at `$342`) on
-  the option's path so the CPU's few chip accesses are not held behind the scroll blits. The
-  pan step then relies on B6b's wait on the 68000 too (always on since V1.01's CUSTOM1 went).
-- **E17** (to do) Acceptance: with a pan held for 10 s on the a1200-040 and a1200-060, the
-  pan meter shows a swap every field; the render and play checks pass; game speed is
-  unchanged (`tools/gametime.sh`: the Sentinel turns every 504 or 505 fields with no input, and
-  while panning a turn's wait and the drain are no longer than C8's); with the option off the
-  slave applies the original code paths, and the 68000 still works correctly with it on. FS-UAE's 040/060 timing is not hardware's (about an
-  instruction count), so the 50 fps figure is confirmed on a real accelerator.
+- **E14** (done) The game's sequential loop can never pan continuously: after each step's 8
+  scroll-in fields the next step's request waits for `$3764`, which the pass loop sets to 2,
+  so there are at least 2 fields between steps on every CPU (MEASURED: 9.7 to 10.6 fields from
+  a scroll-in's start to the next step on the a500, 040 and 060).
+- **E15** (done) The pan pipelined ([internals.md](internals.md#slave-patches)): after the
+  render the main loop queues the step (a copy of its strip, two copies alternating) and goes
+  on to its passes and the next render; the vertical blank does the swaps and scroll steps and
+  starts the queued step after a step's last swap, and the blitter's interrupt chains the
+  plane blits, so the CPU renders beside them. Nothing is dropped: a step is rendered only
+  after the game reads the pan from the input, as before, only 2 fields into the scroll-in
+  instead of after it. The render check therefore starts a pan once `strips` counts renders
+  and ends it once its last step is committed (`strips ... with ... then`), which gives the
+  reference on the a500 too.
+- **E16** (done) No blitter-nasty on the option's path (the scroll blits set `DMACON` `$8040`;
+  `FastSetup` clears `BLTPRI`).
+- **E17** (done in emulation) Acceptance: a pan held for 10 s gives a swap every field on the
+  a1200-040 (498 swaps in 500 fields, the first gap the pan's start) and the a1200-060 (500);
+  the render and play checks pass on the minimal matrix and on the full matrix's option lines
+  (the a500 among them: below a 68020 the option stays off); game speed: with no input the
+  Sentinel turns every 504 or 505 fields with the option, and while panning a turn waited at
+  most 7 fields for its slot (C8: 9) and the drain was 612 fields on the a1200-040 (659
+  without the option). FS-UAE's 040/060 timing is not hardware's (about an instruction count),
+  so the 50 fps figure is still to be confirmed on a real accelerator.
