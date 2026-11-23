@@ -46,7 +46,10 @@ def dumps():
 def run_cell(cell, frames, deadline, out):
     setup, _, args = cell.partition(':')
     name = cell.replace(':', '-').replace('+', '-')
-    env = dict(ENV, SETUP=setup, WHD_ARGS=args.replace('+', ' '), WARP='1', WINDOW='none',
+    # WHD_DEFAULTS as game.conf sets it, without the CACHE its run adds on 68020 and up: a
+    # cell runs exactly the options it names.
+    env = dict(ENV, SETUP=setup, WHD_DEFAULTS='PRELOAD SPLASHDELAY=0 NOREQ',
+               WHD_ARGS=args.replace('+', ' '), WARP='1', WINDOW='none',
                JOY0='none', DETERMINISTIC='1')
     SOCK.unlink(missing_ok=True)
     log = open(out / f'{name}.log', 'w')

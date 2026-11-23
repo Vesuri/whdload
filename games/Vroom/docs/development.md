@@ -46,6 +46,12 @@ slaves had no `$VER`.
 scroller) waits for the right mouse button; the menu is driven with the mouse and the left
 button. Left alone, the title runs a demo race after about 20 s in warp.
 
+On a 68020 and up, `make run` and `make serve` add `CACHE` to the WHDLoad options, as the
+installed icon will (`game_prepare` in `game.conf`). Without it the boot to the race takes
+2.4 times as long, mostly the loader unpacking in Chip RAM: on the a1200-030 2221 fields
+instead of 930. `WHD_DEFAULTS='PRELOAD SPLASHDELAY=0 NOREQ'` boots without it;
+`tools/matrix.py` does that, so a cell runs only the options it names.
+
 ## Tools
 
 | Tool | Does |
