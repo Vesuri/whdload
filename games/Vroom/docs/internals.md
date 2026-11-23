@@ -58,7 +58,7 @@ left in the drive, are not offered; the Vroom slave has them.
 
 Low memory holds `jmp` trampolines, so a 4-byte site can become `jsr $1xx.w`: the original
 slave's at $100-$129, `smc.i`'s at $130-$1A7 and `fixes.i`'s at $1B0. `enhanced.i` keeps its
-variables at $1C0-$1D5.
+variables at $1C0-$1D5 and its blitter-start trampolines at $1E0-$1FD.
 
 ## Fixes (every CPU)
 
@@ -197,6 +197,7 @@ rate, on every 68020 and up.
 | $D13C (`jsr $10F90`) | a pass that does not draw leaves out the sky and ground clear but keeps its state: the horizon's scroll (`$13F16`, its blits written into the idle queue, which is not started) and the clamp of the ground's top line $1136C |
 | $D142-$D14D (the wait for a new field) | a pass that does not draw goes on at $D1C2, leaving out the road spans `$10CD2`, the three objects `$140C0` and the scaler `$18154` |
 | $D510 (`move.l $A884,$E258`) | a pass that does not draw returns from `$D13C`, leaving out the swap ($E258, $A71C, `$12FA6`) |
+| 91 blitter starts in $11C20-$19B1C (`src/blitwait.i`) | `jsr $10C`-`$124.w` (the original slave's start-and-wait) become `jsr $1E0`-`$1F8.w`: start, one read of dmaconr, return (below) |
 
 At most 3 passes in a row leave out the drawing; behind by more than 50 fields (1 s), the
 debt past it is dropped and counted. Link play ($87BC not 0: the pass waits for the other
@@ -204,6 +205,23 @@ machine's data at $C4A0) keeps the original loop. The scheduler's variables are 
 $1C0-$1D5 (`ENH_VARS`), where the tools read them: the next tick's field, ticks, frames
 drawn, fields dropped, the period. `CUSTOM3=n` (for the checks, not in `ws_config`) leaves
 out the drawing in n of every n+1 passes, whatever the time.
+
+**Blitter waits.** The original slave made each blitter start in $11000-$19C00 wait for its
+blit (`move.w Dn,$58(a6)` became `jsr $10C`-`$124`, `WaitBlit0`-`6`), so the CPU idles
+through some 260 small blits a frame. The game waits itself before it programs the next blit
+(`btst #6,2(a6)` loops). `tools/blitsites.py` finds the starts followed, in straight-line
+code, by such a wait with no memory access in between but to the custom chips: 91 of 134
+(the same in both programs' memory images). Three more ($15A96, $15B02, $15B78) write the
+blit's edge words with the CPU before the game's wait and keep the full wait; the other 40
+reach a branch first. Those 91 now only start the blit and read dmaconr once (Agnus sets the
+busy bit a cycle late, as WHDLoad's `BLITWAIT` allows for). With the option off, on the
+a1200 (68020) `bench 500` gives 19.11 fps with these 91 sites against 15.76 without (19.89
+with all 134). With the option the 68020 draws 490 frames in 1200 fields at 25 Hz (486
+before): a drawn frame still takes about 3 fields once it waits for its swap, so the gain
+mostly lands below a field. The a1200-040 is unchanged (its frame is 2 fields either way).
+`frames 150` at the swap on the a1200-040 and the a1200, before and after: every frame the
+same in lines 0-30 and 36-174. Lines 31-35 are the race clock (real time) and lines 175-199
+of the cockpit differ between two runs of the same build as well.
 
 **What a pass that does not draw still runs.** The race loop's own code, the landscape
 `$E4F8` whole, and every part of `$D13C` but the ones above.

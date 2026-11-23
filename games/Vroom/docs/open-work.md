@@ -187,10 +187,14 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
 
     The bypasses were left out: the profile gives each part's inclusive time directly, and a
     bypass would only move the frame across a field boundary or not.
-18. **Blitter waits.** Each small blit is followed by the original slave's wait, so on a
-    fast CPU the CPU idles through every blit. The waits stay as they are without the
-    option. Move each wait to before the next blitter
-    access, or draw the 1-5 word blits with the CPU on 68020+. Measure both.
+18. **Blitter waits** (done; `internals.md`, "Enhanced framerate", "Blitter waits"). 91 of
+    the 134 blitter starts the original slave made wait are followed by the game's own wait
+    before its next blit: with the option they only start the blit. The 68020 draws 21%
+    faster (option off, `bench 500`: 19.11 fps against 15.76; every site 19.89), every frame
+    the same above the cockpit. At 25 Hz it shows little (490 frames in 1200 fields, 486
+    before): drawn frames still take whole fields. Left: the 40 starts that reach a branch
+    before the game's wait (loops; 0.8 fps more at most) and drawing the smallest blits with
+    the CPU.
 19. **Fast memory for data** (optional ExpMem, the patches skipped without it, as in
     BuggyBoy's 2.0b). Moves in order of CPU read share:
     - the landscape work buffers ($2F000-$32FFF);

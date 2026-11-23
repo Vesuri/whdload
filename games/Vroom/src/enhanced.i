@@ -27,6 +27,13 @@
 ; keep step through the serial link.
 ;
 ; The scheduler's variables are in low memory, where the tools can read them.
+;
+; Blitter waits: the original slave made every blitter start in $11000-$19C00
+; wait for its blit ($10C-$124). Where the game waits itself before its next
+; blit, with nothing in between that touches memory, the start only reads
+; dmaconr once (Agnus sets the busy bit a cycle late) and returns: the CPU
+; runs on while the blitter works. src/blitwait.i lists those sites
+; (tools/blitsites.py).
 ;---------------------------------------------------------------------------
 
 ENH_VARS	= $1C0			; low memory, after src/fixes.i's trampoline
@@ -39,6 +46,12 @@ ENH_SKIP	= ENH_VARS+18		; byte: this pass leaves out the drawing
 ENH_SKIPS	= ENH_VARS+19		; byte: passes in a row that have left it out
 ENH_FORCE	= ENH_VARS+20		; byte: CUSTOM3, for the checks (below)
 ENH_COUNT	= ENH_VARS+21		; byte: its pass count
+
+ENH_BLT0	= $1E0			; jmp trampolines for the blitter starts,
+ENH_BLT1	= ENH_BLT0+6		; as the original slave's $10C-$124
+ENH_BLT4	= ENH_BLT0+12
+ENH_BLT5	= ENH_BLT0+18
+ENH_BLT6	= ENH_BLT0+24
 
 ENH_LIMIT	= 50			; fields of debt kept: 1 s
 ENH_SKIPS_MAX	= 3			; passes in a row without drawing
@@ -83,6 +96,15 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		bsr.b	enh_Rebase
 .known		tst.b	(a2)
 		bmi.b	.done
+		lea	ENH_BLT0.w,a0		; jmp enh_Blt0 ... enh_Blt6
+		lea	_enh_blt(pc),a1
+		move.l	a1,a2
+		moveq	#5-1,d0
+.tramp		move.w	#$4EF9,(a0)+		; jmp xxx.l
+		move.w	(a1)+,d1
+		pea	(a2,d1.w)
+		move.l	(a7)+,(a0)+
+		dbf	d0,.tramp
 		lea	_enh_pl(pc),a0
 		sub.l	a1,a1
 		move.l	_resload(pc),a2
@@ -98,6 +120,7 @@ _enh_pl		PL_START
 		PL_PS	$D13C,enh_Clear		; jsr $10F90: the sky and ground clear
 		PL_PSS	$D142,enh_Objects,6	; move.l $E258(pc),d7; cmp.l $A884,d7; beq.s *-6
 		PL_PSS	$D510,enh_Swap,4	; move.l $A884,$E258
+	INCLUDE	blitwait.i
 		PL_END
 
 ; The tick clock starts again: the next tick is due now.
@@ -201,6 +224,22 @@ enh_Swap	tst.b	ENH_SKIP.w
 		move.l	$A884,$E258
 		rts
 .out		addq.l	#4,a7
+		rts
+
+; A blitter start the game waits after itself: start, let Agnus set the busy
+; bit (a dummy read, as WHDLoad's BLITWAIT), return.
+_enh_blt	dc.w	enh_Blt0-_enh_blt,enh_Blt1-_enh_blt,enh_Blt4-_enh_blt
+		dc.w	enh_Blt5-_enh_blt,enh_Blt6-_enh_blt
+enh_Blt0	move.w	d0,bltsize(a6)
+		bra.b	enh_Blt
+enh_Blt1	move.w	d1,bltsize(a6)
+		bra.b	enh_Blt
+enh_Blt4	move.w	d4,bltsize(a6)
+		bra.b	enh_Blt
+enh_Blt5	move.w	d5,bltsize(a6)
+		bra.b	enh_Blt
+enh_Blt6	move.w	d6,bltsize(a6)
+enh_Blt		tst.b	_custom+dmaconr
 		rts
 
 _enh_state	dc.b	0		; 0 unknown, -1 off, 1 on

@@ -4,6 +4,7 @@
   bench [<frames>]           fps over the first frames from the next green light
   statelog <frames> <file> [tick]  the race state at every frame end (or pass) from the next green light
   aprof <fields> <file>      an instruction profile (FSUAE=$FSUAE_APROF) of fields from the next green light
+  frames <frames> <file>     a hash of each drawn frame's lines, at the swap, from the next green light
   shown <frames>             frames whose shown screen changed between the swap and the VBL taking the next
   racelog <fields> <file>    field, frame, clock and distance per field from the next green light
   meter <fields>             frames, clock and distance over the next fields
@@ -292,6 +293,36 @@ def screen_diff(a, b):
     return f'planes {planes} lines {min(r for _, r in rows)}-{max(r for _, r in rows)}'
 
 
+def frames(server, g, rest):
+    """frames <frames> <file>: from the next green light, at each swap ($D522) for <frames>
+    frames, one line: the frame number, the tick (Enhanced framerate's pass count, else 0),
+    then a short hash of each of the 800 plane lines of the frame just handed to the VBL.
+    Two builds that draw the same ticks compare line for line (tools/framecmp.py), which
+    catches drawing faults such as a missing blitter wait."""
+    import hashlib
+    n, path = int(rest.split()[0]), rest.split()[1]
+    g.stop()
+    rows = []
+    try:
+        if not green_light(g):
+            return 'no race start within 20000 fields'
+        g.cmd(f'break *{SWAPPED:#x}')
+        for i in range(n):
+            out = g.cmd('continue', timeout=120)
+            if 'Breakpoint' not in out:
+                return f'no swap after {i}'
+            tick = longs(g, ENH_VARS + 4, 1)[0]
+            words = longs(g, longs(g, PENDING, 1)[0], SCREEN_BYTES // 4)
+            raw = b''.join(w.to_bytes(4, 'big') for w in words)
+            lines = [hashlib.sha1(raw[k:k + 40]).hexdigest()[:6] for k in range(0, SCREEN_BYTES, 40)]
+            rows.append(f'{i} {0 if tick == 0xCCCCCCCC else tick} ' + ' '.join(lines))
+    finally:
+        g.cmd('delete')
+        g.cont()
+        Path(path).write_text('\n'.join(rows) + '\n')
+    return f'{len(rows)} frames'
+
+
 def shown(server, g, rest):
     """shown <frames>: from the next green light, for <frames> frames: at each swap ($D522)
     checksum the screen still on display (the one not handed to the VBL), and again when the
@@ -556,6 +587,6 @@ def drive(server, g, rest):
 
 server = game_server('vroom', commands={
     'bench': bench, 'statelog': state_log, 'racelog': race_log, 'meter': meter, 'race': to_race,
-    'drive': drive, 'do': do, 'shown': shown, 'aprof': aprof, 'decrunch': decrunch})
+    'drive': drive, 'do': do, 'shown': shown, 'frames': frames, 'aprof': aprof, 'decrunch': decrunch})
 if __name__ == '__main__':
     server.main(sys.argv[1:])
