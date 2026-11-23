@@ -45,7 +45,7 @@ EXPMEM		=	FASTMEMSIZE
 
 _base
 		SLAVE_HEADER		;ws_Security + ws_ID
-		dc.w	13		;ws_Version
+		dc.w	16		;ws_Version (16: PL_PA, PL_PSS)
 		dc.w	WHDLF_NoError|WHDLF_EmulTrap	; |WHDLF_NoKbd	;ws_flags
 		dc.l	BASEMEM		;ws_BaseMemSize
 		dc.l	0		;ws_ExecInstall
@@ -58,6 +58,9 @@ _expmem		dc.l	EXPMEM		;ws_ExpMem
 		dc.w	_name-_base	;ws_name
 		dc.w	_copy-_base	;ws_copy
 		dc.w	_info-_base	;ws_info
+		dc.w	0		;ws_kickname (version 16 fields)
+		dc.l	0		;ws_kicksize
+		dc.w	0		;ws_kickcrc
 
 ;===========================================================================
 
@@ -194,6 +197,7 @@ Patch
 
 		move.w	#$6052,$1D3DE		; skip decode MFM
 		bsr	_InstKey
+		bsr	Fix
 		jmp	$3658.w
 
 ;--------------------------------
@@ -348,7 +352,8 @@ Decrunch	movem.l	d0-a6,-(a7)
 		bne.b	.skip
 
 		move.w	#$4E71,$6534.w		; skip protection
-.skip		move.w	#-1,$3A.w
+.skip		bsr	SMC_Decrunched
+		move.w	#-1,$3A.w
 		rts
 
 ;--------------------------------
@@ -441,6 +446,11 @@ _Key	move.b	$bfec01,d0
 	move.w	#$0,$dff180
 .f9:	move.l	(a7)+,d0
 	rts
+;--------------------------------
+; where the init code writes the VBL routine's vectors (src/smc.i), and the fixes
+SMC_VBLW1	= $3B54		; the address in move.l #x,$A572
+SMC_VBLW2	= $3B5E		; the address in move.l #x,$A56C
+	INCLUDE	fixes.i
 ;--------------------------------
 _resload	dc.l	0			;address of resident loader 
 ;--------------------------------

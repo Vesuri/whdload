@@ -5,6 +5,7 @@ the disk images (`Disk.1`, and `Disk.2` for the data disk) with `resload_DiskLoa
 the disk protection, add blitter waits and save the highscores. The original slaves are by
 Mr.Larmer (v1.0 and v1.3, 2000), updated to v1.4 by CFou (2006) (game.conf `AUTHOR`,
 `UPSTREAM`); the whdload.de install package ships their source.
+These slaves add the fixes for CPU caches and fast CPUs (`src/fixes.i`, `src/smc.i`).
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.
 

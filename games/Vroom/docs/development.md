@@ -19,8 +19,8 @@ are the same image.
 ## The build
 
 `src/Vroom_hd.asm` and `src/Vroom_Data_hd.asm` are the package's `.src/` files (the import
-commit has them unchanged, with the imager sources) with these commented edits, after which
-both build byte-identically to the shipped slaves:
+commit has them unchanged, with the imager sources). The setup commit made these commented
+edits, after which both built byte-identically to the shipped slaves:
 
 - Barfly's `BOPT`, `SUPER` and `INCDIR` are commented out;
 - the date Barfly's `WDate` wrote into the info text, `(03.06.2006)`, is a string;
@@ -33,8 +33,32 @@ both build byte-identically to the shipped slaves:
 `-opt-clr` turns `move #0` into `clr`, and `-hunkpad=0` pads the code hunk with zeros as
 Barfly did (vasm pads with `nop`).
 
+The fixes since then are in `src/fixes.i` and `src/smc.i`, which both sources include.
+`ws_Version` is 16, for `PL_PA` and `PL_PSS`.
+
 ## Driving it
 
 `make serve WARP=1 WINDOW=none &`, then `make server CMD=...`. The title (race car and
 scroller) waits for the right mouse button; the menu is driven with the mouse and the left
 button. Left alone, the title runs a demo race after about 20 s in warp.
+
+## Tools
+
+| Tool | Does |
+|---|---|
+| `tools/vroom.py` | the game server (`serve`, the shared commands) plus `decrunch <n> [<s>]`: stop after each file decrunch and report its destination and length |
+| `tools/smc.py TRACE.bin ...` | finds self-modifying code in Barto traces: CPU writes onto instructions executed anywhere in the traces |
+| `tools/smcscan.py MEMORY.bin [--exec TRACE.bin ...]` | a static scan of a memory dump for writes into code (absolute, PC-relative, or through a `lea` of a code address) |
+
+`smc.py` decodes only instructions in chip memory, so it misses writers in the slave. The
+original slave's scaler stores are one such case; they surfaced only as garbage graphics with
+`CACHE`. A memory dump comes from `make server CMD="gdb dump binary memory $PWD/tmp/mem.bin 0
+0x80000"`; with `BOOT_BREAK=0x3658` in `make serve`'s environment, the dump is taken as the
+program starts, with the patches applied.
+
+## Traps
+
+- WHDLoad's dump files are hidden (`.whdl_*`): list them with `ls -a`.
+- `make serve` takes a few seconds to open its socket; wait for
+  `tmp/run/default/.run/game.sock` before sending commands.
+- Between demo races the screen is black for a while; check at more than one time.
