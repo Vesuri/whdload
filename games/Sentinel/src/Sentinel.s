@@ -17,6 +17,8 @@
 
 ; 2.0b, Vesuri, 23.11.2026
 ; - version and info text
+; - the edge scan converter no longer modifies its own code (EdgeStep): with
+;   the instruction cache on, 68040 and 68060 drew faces wrongly
 
 	INCDIR	SOURCES:Include/
 	INCLUDE	whdload.i
@@ -163,6 +165,9 @@ PLGAME	PL_START
 	PL_ENDIF
 	
 	PL_PSS	$6d4,.ackVBI,2
+
+; Vesuri's patches (2.0b)
+	PL_P	$14be,EdgeStep		; the edge scan converter's stepping
 	PL_END
 
 .ackVBI	move.w	#1<<4|1<<5|1<<6,$dff09c
@@ -193,6 +198,160 @@ Loader	movem.l	d0-a6,-(a7)
 	rts
 
 resload	dc.l	0
+
+; The edge scan converter's stepping, program offsets $14be..$165b, without
+; self-modification. The game's code wrote the x step's opcode (addq.w or
+; subq.w #1,d1) into its loops at $1546, $15be, $15f6 and $1630, and the
+; x-major loop's bcc.s displacement at $15c3 (store x at every step, or only
+; at the first step of each row); the 68040/060 instruction cache kept the old
+; instructions. Here d3 holds the step (+1 or -1, the same cycles as addq), the
+; two x-major modes are two loops, and the mode is bit 16 of d2 (the loops
+; count in its low word). Registers, flags and memory end as the game's:
+; d3 is restored, or gets the low word the clipped paths left in it.
+; Variables (absolute short): $16f9 the count left, $18dc the table ($7b00
+; left edges, $7d00 right), $18de dy, $18e0 |dx|, $18e8/$18ec the x ends,
+; $18ea clipped, $18eb the rows.
+
+EdgeStep
+	move.l	d3,-(a7)
+	move.w	$18ec.w,d0
+	sub.w	$18e8.w,d0
+	bpl.b	.left
+	neg.w	d0
+	move.w	d0,$18e0.w
+	move.b	#$52,d1			; the game's addq.w opcode byte
+	moveq	#1,d3
+	bra.b	.dir
+.left	move.w	d0,$18e0.w
+	move.b	#$53,d1			; subq.w
+	moveq	#-1,d3
+.dir	move.w	$18e0.w,d4
+	move.w	$18de.w,d5
+	move.b	$18eb.w,d6
+	andi.l	#$ff,d6
+	asl.w	#1,d6
+	add.w	$18dc.w,d6
+	movea.l	d6,a6
+	move.b	$18eb.w,d6
+	cmp.w	d5,d4
+	bcc.w	.xmajor
+
+; y-major ($1516)
+	move.b	d5,d2
+	addq.b	#1,d2
+	move.b	d5,d0
+	lsr.b	#1,d0
+	eori.b	#$ff,d0
+	addq.w	#2,a6
+	move.b	$18ea.w,d1
+	bne.b	.yclip
+	move.w	$18ec.w,d1
+	bra.b	.ystore
+.yloop	add.b	d4,d0
+	bcc.b	.ystore
+	sub.b	d5,d0
+	add.w	d3,d1
+.ystore	move.w	d1,-(a6)
+	subq.b	#1,d6
+	beq.b	.done0
+.ynext	subq.b	#1,d2
+	bne.b	.yloop
+.store	move.b	d2,$16f9.w
+.exit	move.l	(a7)+,d3
+	clr.l	d1
+	clr.l	d2
+	rts
+.done0	move.b	#0,d2
+	bra.b	.store
+
+; y-major, clipped ($15d8): step without storing to the first row
+.yclip	addq.b	#1,d6
+	move.w	$18ec.w,d1
+	bra.b	.ycnext
+.ycloop	add.b	d4,d0
+	bcc.b	.ycnext
+	sub.b	d5,d0
+	add.w	d3,d1
+.ycnext	subq.b	#1,d6
+	beq.b	.ycin
+	subq.b	#1,d2
+	bne.b	.ycloop
+	bra.b	.exit
+.ycin	move.w	$18dc.w,2(a7)		; the game's d3.w
+	addi.w	#$200,2(a7)
+	movea.w	2(a7),a6
+	subq.b	#1,d6
+	bra.b	.ynext
+
+; x-major ($156a): mode "every" (the game's displacement 8) for left edges
+; stepping left and right edges stepping right, else "first" (10)
+.xmajor	bclr	#16,d2
+	cmpi.w	#$7b00,$18dc.w
+	beq.b	.xl
+	cmpi.b	#$53,d1
+	beq.b	.xfirst
+	bra.b	.xmode
+.xl	cmpi.b	#$53,d1
+	beq.b	.xmode
+.xfirst	bset	#16,d2
+.xmode	move.w	d4,d2
+	addq.w	#1,d2
+	move.w	d4,d0
+	lsr.w	#1,d0
+	eori.w	#$ffff,d0
+	move.b	$18ea.w,d1
+	bne.b	.xclip
+	move.w	$18ec.w,d1
+	btst	#16,d2
+	bne.b	.xfstore
+	bra.b	.xestore
+
+.xeloop	add.w	d3,d1
+	add.w	d5,d0
+	bcc.b	.xestore
+	sub.w	d4,d0
+	subq.w	#2,a6
+	subq.b	#1,d6
+	beq.b	.done0
+.xestore
+	move.w	d1,(a6)
+.xenext	subq.w	#1,d2
+	bne.b	.xeloop
+	bra.w	.store
+
+.xfloop	add.w	d3,d1
+	add.w	d5,d0
+	bcc.b	.xfnext
+	sub.w	d4,d0
+	subq.w	#2,a6
+	subq.b	#1,d6
+	beq.w	.done0
+.xfstore
+	move.w	d1,(a6)
+.xfnext	subq.w	#1,d2
+	bne.b	.xfloop
+	bra.w	.store
+
+; x-major, clipped ($161a)
+.xclip	addq.b	#1,d6
+	move.w	$18ec.w,d1
+	bra.b	.xcnext
+.xcloop	add.w	d3,d1
+	add.w	d5,d0
+	bcc.b	.xcnext
+	sub.w	d4,d0
+	subq.b	#1,d6
+	beq.b	.xcin
+.xcnext	subq.w	#1,d2
+	bne.b	.xcloop
+	bra.w	.exit
+.xcin	move.w	$18dc.w,2(a7)		; the game's d3.w
+	addi.w	#$1fe,2(a7)
+	movea.w	2(a7),a6
+	subq.b	#1,d6
+	btst	#16,d2
+	bne.b	.xfnext
+	bra.b	.xenext
 
 CheckKeys
 	move.b	d0,$58C6B

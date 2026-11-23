@@ -25,8 +25,8 @@ text and `$VER`) the build equals the shipped slave in every byte but the last w
 code hunk, the padding to a longword after the final `rts`: vasm pads with `nop` (`$4E71`),
 the shipped slave has `$CF50`, never executed. Release 2.0b adds "enhanced by Vesuri", its
 version line and `$VER: Sentinel.slave 2.0b (23.11.2026)` (replacing
-`$VER:Sentinel_Slave_1.01`); the code is V1.01's, moved by the longer strings.
-`release/slaves.sha256` records the vasm build.
+`$VER:Sentinel_Slave_1.01`), and the patches marked 2.0b in
+[internals.md](internals.md#slave-patches). `release/slaves.sha256` records the vasm build.
 
 `-devpac` (no optimisation) matches: the source sizes its branches. StingRay's
 `INCDIR SOURCES:Include/` stays; vasm finds `whdload.i` through `-I`. `DEBUG` stays
@@ -53,6 +53,13 @@ the pause while the next strip is drawn.
 up 2 and down 2, hashing the displayed buffer after each step; the hashes must equal
 `tools/render_check.txt`, recorded on the a500 (`tools/render_check.sh record`). A pan step's
 picture depends only on the steps taken, so the hashes hold on every CPU; it also prints the
-fields the pans took. `INSTANCE=b` runs one beside another. The a1200, and the a1200-040 and
-a1200-060 with `WHD_ARGS=NOCACHE`, match; the a1200-040 with WHDLoad's defaults does not
-(self-modifying code, [internals.md](internals.md#rendering-and-panning)).
+fields the pans took. `INSTANCE=b` runs one beside another; start them a few seconds apart (several
+launched in the same second failed to boot). V1.01 matched only with `WHD_ARGS=NOCACHE` on
+the 68040 and 68060.
+
+## Checks
+
+- `tools/edgecheck.py [N]`: `EdgeStep` against the game's edge scan converter under Unicorn
+  (`make check` runs it with 20000 edges; it reads the program from `tmp/game`).
+- `tools/sentinel.py census N STATE` and `tools/smc_census.py STATE...`: executed bytes the
+  CPU also wrote, from 68000 traces (`tmp/` holds the states: they contain game bytes).

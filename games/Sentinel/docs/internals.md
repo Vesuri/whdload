@@ -34,7 +34,14 @@ Offsets are into the program as loaded, from `BASE` (so the file offset into the
 | `$30C` | `jsr` a blitter wait before writing `BLTCON0` `$09F0` (not with CUSTOM1) | StingRay |
 | `$6D4` | `jsr`: acknowledge the vertical blank interrupt twice, for 68040/060 and fast chipsets | StingRay |
 
+| `$14BE` | jump to `EdgeStep` (2.0b): the edge scan converter's stepping (`$14BE`..`$165B`) without self-modification | Vesuri |
+
 CUSTOM1 (`C1:B:Disable Blitter Waits`) drops the `$30C` wait.
+
+`EdgeStep` keeps the step (+1 or -1) in d3 instead of writing `addq.w`/`subq.w #1,d1` into
+the loops, and has a loop for each x-major mode instead of writing the `bcc.s` displacement.
+It leaves registers, N, Z, V, C and memory as the game's code does; `tools/edgecheck.py`
+(`make check`) compares the two under Unicorn's 68000 on random edges.
 
 ## Rendering and panning
 
@@ -56,12 +63,15 @@ low-memory variables and tables.
   tables at `$7B00`/`$7D00`; the span filler (`$18B4`) fills each span with `movep.l`
   read-modify-writes, 8 pixels of each plane at a time, through pattern tables at `$56100`,
   `$56800`, `$56C00` and `$56E60`.
-- **Self-modifying code**: the edge scan converter rewrites its own `subq.w`/`addq.w #1,d1`
+- **Self-modifying code** (fixed in 2.0b, `EdgeStep`): the edge scan converter rewrote its own `subq.w`/`addq.w #1,d1`
   opcodes (`$1546`, `$15BE`, `$15F6`, `$1630`) and a `bcc.s` displacement (`$15C3`) for each
   edge. On a 68040/060 with the instruction cache on, the cache keeps the old instruction,
   so edges step the wrong way: faces go missing and white triangles appear. With WHDLoad's
-  `NOCACHE` the a1200-040 draws correctly, and turning off only the emulated data cache does
-  not help. The 68020's 256-byte cache rarely holds the patched loop, so it draws correctly.
+  `NOCACHE` the a1200-040 drew correctly, and turning off only the emulated data cache did
+  not help. The 68020's 256-byte cache rarely holds the patched loop, so it drew correctly.
+  A census over 4085 traced a500 fields (`tools/sentinel.py census`, `tools/smc_census.py`:
+  the route, pans in all four directions, boulder, robot, transfer, U-turn, hyperspace, pause,
+  the music and sound keys, ESC) found no other instruction the CPU wrote and executed.
 
 MEASURED (FS-UAE, landscape 0000, D held, 250 fields; fields between swaps):
 
@@ -77,6 +87,10 @@ MEASURED (a500, 60 fields traced while panning; share of CPU cycles): the span f
 `$356`) 17%, the edge scan converter (`$1440`) 14%, the field wait (`$358`) 8%, `$11D8` 5%,
 `$6BDA` 3%, `$17A2` 3%, the sound module at `$20000` 2%.
 
+MEASURED (2.0b with `EdgeStep`, `tools/render_check.sh`, the fields its ten pan steps take):
+a500 360, a1200 197, a1200-030 with `MMU DCACHE` 164, a1200-040 166 (`CACHE` 166, `DCACHE` 127,
+`NOCACHE` 263), a1200-060 104 (`DCACHE` and `BRANCHCACHE DCACHE` 104).
+
 ## Limitations
 
-The 68040 and 68060 draw wrongly with the instruction cache on ([open-work.md](open-work.md)).
+The other fast-CPU hazards in [open-work.md](open-work.md) step 6 are not yet checked.

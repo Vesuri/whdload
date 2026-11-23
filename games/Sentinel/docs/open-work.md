@@ -4,14 +4,13 @@ Set up from Harry's and StingRay's V1.01 slave. Without the version strings the 
 equals the shipped slave but for the code hunk's padding word
 ([development.md](development.md#the-build)). It boots to the
 title, landscape 0000's overview and into the landscape on the a500, the a1200, the
-a1200-040 and the a1200-060; the 68040 and 68060 draw wrongly.
+a1200-040 and the a1200-060, and since step 5 the 68040 and 68060 draw correctly.
 
 ## Release
 
-2.0b (23.11.2026): V1.01's code with `$VER` and the info text in the slave and the ReadMe
-entry above StingRay's; `make dist` builds `SentinelEnhanced-2.0b-20261123.lha`. No
-improvement yet: the ReadMe entry's one line ("no changes to the game yet") is replaced by
-the fixes' lines when they land. Not published.
+2.0b (23.11.2026), not published: V1.01 with `$VER` and the info text in the slave, the
+ReadMe entry above StingRay's, and the self-modification fix (step 5); `make dist` builds
+`SentinelEnhanced-2.0b-20261123.lha`.
 
 ## The goals
 
@@ -33,19 +32,13 @@ four directions against the a500's pictures), [development.md](development.md#dr
 
 ### B. Correct on the 68040 (bug fixes, always on)
 
-4. **Self-modifying code census.** Known: the edge scan converter (`$1440`..`$17EE`) writes
-   opcodes at `$1546`, `$15BE`, `$15F6`, `$1630` (`subq.w`/`addq.w #1,d1`) and a branch
-   displacement at `$15C3`, from `$1516`, `$156A`, `$1598`, `$15DA` and `$161C`. Complete the
-   list from a 68000 trace (every executed instruction's bytes against every CPU write in the
-   same trace) over the title, the overview, a landscape, pans in all four directions,
-   absorb/create/transfer, hyperspace and game over; check the sound module at `$20000` and
-   the title code too.
-5. **Remove it.** Replace each patched loop with fixed variants selected through a pointer
-   (no cache flushes: the stores run per polygon edge, and a flush on a 68040 with copyback
-   costs more than the edge). Prove equivalence on the 68000 path: run the original routine
-   and the replacement under Unicorn on random and recorded edges and compare the edge tables
-   at `$7B00`/`$7D00`. Done when `WHD_ARGS=NOCACHE` is no longer needed on the a1200-040
-   and a1200-060 for the render check.
+4. **Self-modifying code census** (done): only the edge scan converter's five stores, over
+   4085 traced a500 fields ([internals.md](internals.md#rendering-and-panning)). Not yet
+   traced: the Sentinel absorbing the player, a completed landscape, the landscape code entry.
+5. **Remove it** (done): `EdgeStep`, equal to the game's code under Unicorn
+   (`tools/edgecheck.py`, 200000 edges, and three deliberate faults caught). The render check
+   matches on the a500, a1200, a1200-030 (`MMU DCACHE`), a1200-040 (defaults, `NOCACHE`,
+   `CACHE`, `DCACHE`) and a1200-060 (defaults, `DCACHE`, `BRANCHCACHE DCACHE`).
 6. **Other fast-CPU hazards** found while reading, each checked and fixed if real:
    - the sound module's DMA-off, `dbf`, DMA-on wait (`$20110`..`$2012E`, file offset in the
      module), the CPU-timed audio wait that loses notes on 68040/060 (playbook §8); judge it

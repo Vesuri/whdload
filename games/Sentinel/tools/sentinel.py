@@ -21,6 +21,10 @@ Commands (each stops the CPU and leaves it stopped at a vsync, except `go`):
                              landscape number (150), return for 0000, its overview (400),
                              return: the landscape's first view is then being drawn. SHOTS
                              (a file stem) keeps a screenshot of each stage
+    census N STATE           trace N fields (68000/68020 without MMU only), 50 at a time, and
+                             add to STATE (a pickle) every base-memory byte executed and every
+                             byte the CPU wrote, with the PCs that executed each instruction;
+                             tools/smc_census.py reports the overlap
     go                       resume
 
 Addresses are the game's runtime ones: the program is loaded at BASE $57FE4 in base memory,
@@ -171,6 +175,50 @@ def route(server, g, rest):
     return 'landscape 0000'
 
 
+DMA_RECORD = 58          # the profiler's DMA record: reg u16 @0, addr u32 @12, type @29, data @31
+
+
+def census(server, g, rest):
+    import pickle
+    import struct
+    from amigaxdev import barto
+    import capstone
+    w = rest.split()
+    n, state = int(w[0]), w[1]
+    st = pickle.load(open(state, 'rb')) if os.path.exists(state) else \
+        {'exec': {}, 'write': set(), 'fields': 0}
+    md = capstone.Cs(capstone.CS_ARCH_M68K, capstone.CS_MODE_M68K_000 | capstone.CS_MODE_BIG_ENDIAN)
+    chunk = os.path.join(server.run_dir, 'census.bin')
+    left = n
+    while left > 0:
+        k = min(50, left)
+        server.capture(g, k, chunk)
+        t = barto.load(chunk)
+        mem = bytearray(t.chip)
+        sizes = {}
+        for f in t.fields:
+            d = bytes(f.dma)
+            for i in range(0, len(d), DMA_RECORD):
+                reg = d[i] | d[i + 1] << 8
+                if d[i + 29] == 2 and reg >> 8 == 0x11:
+                    a = struct.unpack_from('<I', d, i + 12)[0]
+                    if a < 0x80000:
+                        for b in range(reg & 7):
+                            st['write'].add(a + b)
+            for pc, cost, regs in t.instructions(f):
+                if pc is None or pc == 0x7fffffff or pc >= 0x80000:
+                    continue
+                if pc not in sizes:
+                    ins = next(md.disasm(bytes(mem[pc:pc + 10]), pc), None)
+                    sizes[pc] = ins.size if ins else 2
+                st['exec'].setdefault(pc, sizes[pc])
+        st['fields'] += len(t.fields)
+        os.unlink(chunk)
+        left -= k
+    pickle.dump(st, open(state, 'wb'))
+    return f"census: {st['fields']} fields, {len(st['exec'])} instructions, {len(st['write'])} bytes written"
+
+
 def go(server, g, rest):
     g.cont()
     return 'running'
@@ -178,7 +226,7 @@ def go(server, g, rest):
 
 server = game_server('sentinel', commands={
     'fields': fields, 'key': key, 'click': click, 'mouse': mouse, 'hold': hold, 'release': release, 'peek': peek_cmd,
-    'swaps': swaps, 'strips': strips, 'route': route, 'go': go})
+    'swaps': swaps, 'strips': strips, 'route': route, 'census': census, 'go': go})
 
 if __name__ == '__main__':
     if sys.argv[1:2] == ['serve'] and os.environ.get('ENTRY') == '1':
