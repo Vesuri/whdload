@@ -59,9 +59,9 @@ and the period word. `CUSTOM3=n` makes n of every n+1 race loop passes leave out
 drawing, for the per-pass check: `statelog N FILE tick` on the a500 and on a 68020+ with
 `CUSTOM1=1 CUSTOM3=2`, then `tools/statecmp.py A B --skip DBD8,DBDC --align 10` (the two
 long words are the map marker's position in each screen; the a500 logs one more pass at the
-green light). `onscreen 300` counts landscape starts before the VBL has taken the last frame
-(drawing into the screen on display): with the option it must be 0 (internals.md, "Enhanced
-framerate", lists the setups checked).
+green light). `shown 40` checks that nothing draws into the screen on display: with the option, the only
+change is the map's position marker, which the original draws there too (`internals.md`,
+"Enhanced framerate").
 
 ## Tools
 
@@ -80,7 +80,7 @@ framerate", lists the setups checked).
 | `bench [N]` | from the next green light, the fields the first N frames take (default 500): fps, distance (at the last frame's end, through one breakpoint at $D510), fields per frame. Frames are counted from $E258, which changes once a frame (`internals.md`, "The swap"): with Enhanced framerate the drawn frames, and the line adds ticks, undrawn passes and dropped fields. Read-only, any CPU. In the first demo race after the boot, the same simulation on every machine, so the figure compares machines and builds |
 | `aprof N FILE` | from the next green light, the aprof FS-UAE's instruction profile of N fields into FILE. Start the server with `FSUAE=$FSUAE_APROF SETUP=a1200-040 EXTRA_ARGS=--cpu=68040-NOMMU` (a cycle-exact CPU without an MMU model). On a 68040 it is an instruction count plus chip time (AmigaXDev's measurement method) |
 | `tools/aprof_report.py FILE [N]` | an `aprof` file: the chip and slave shares, the call targets with the most inclusive time, the flat time by 4 KB block |
-| `onscreen [N]` | from the next green light, stops at the landscape's start ($E4F8) N times (default 300) and counts the starts with $A71C not -1: the last frame not yet taken by the VBL, so the landscape draws into the screen on display. With Enhanced framerate, also how many were undrawn passes |
+| `shown [N]` | from the next green light, for N frames (default 40): at each swap ($D522) reads the screen still on display, and again when the VBL takes the new frame ($A404); reports the frames where it changed, with the planes and lines. Exact on any machine, slow (two 32000-byte reads a frame) |
 | `statelog N FILE [tick]` | from the next green light, the race state (the block $DBC0-$E073, the score $8370, the simulation's long words in the renderer's area) and the race clock at each of N frame ends (a breakpoint at $D510: exact per frame, any CPU), or with `tick` at every race loop pass ($CD0E, drawn or not) |
 | `racelog N FILE` | from the next green light, one line per field: field, frame, clock, distance |
 | `meter N` | frames, fields per frame, clock and distance over N fields from now |

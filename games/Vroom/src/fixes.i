@@ -94,8 +94,14 @@ fix_KbdDelay	move.l	d0,-(a7)
 		move.l	(a7)+,d0
 		rts
 
-; at most 2 fields, in case no VBL takes the buffer
-fix_Landscape	movem.l	d0-d1,-(a7)
+fix_Landscape	bsr.b	fix_WaitShown
+		jmp	$E4F8
+
+; Wait until the VBL has taken the last frame ($A71C = -1), so the buffer to
+; draw into is no longer on screen; at most 2 fields, in case no VBL takes it.
+; IN:	-
+; OUT:	-	all registers preserved
+fix_WaitShown	movem.l	d0-d1,-(a7)
 		move.l	$A884,d1		; the field counter
 .wait		cmp.l	#-1,$A71C		; -1: the VBL has taken it
 		beq.b	.go
@@ -104,7 +110,7 @@ fix_Landscape	movem.l	d0-d1,-(a7)
 		subq.l	#2,d0
 		bcs.b	.wait
 .go		movem.l	(a7)+,d0-d1
-		jmp	$E4F8
+		rts
 
 ; dbf leaves the counters at -1 (their low words)
 fix_Wipe	move.l	d0,-(a7)

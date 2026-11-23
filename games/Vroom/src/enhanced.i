@@ -12,11 +12,15 @@
 ;   scaler ($D142-$D1C1), and the swap ($D510-$D527).
 ; The landscape ($E4F8) runs in every pass: it follows the track for the
 ; simulation, and its projection decides whether the car is off the road
-; ($10AAA, from the nearest line's road edges at $FA62). It also draws into
-; the draw buffer, so in every pass it first waits for the VBL to take the
-; last frame (src/fixes.i's fix_Landscape, unchanged here). The rest of $D13C
-; runs in every pass too: it keeps time (the ARCADE score, the start lights,
-; the pit stop, the crash sequences, all counted in passes).
+; ($10AAA, from the nearest line's road edges at $FA62). It draws nothing, so
+; the wait for the VBL to take the last frame (src/fixes.i's fix_Landscape)
+; moves after it, before the race loop's panel updates ($CA10-$CCFA) and the
+; drawing in $D13C: the landscape's work overlaps the wait. A pass that does
+; not draw leaves out the sky and ground clear that $D13C queues ($10F90) but
+; keeps its state (the horizon's scroll, $13F16; the ground's top line
+; $1136C). The rest of $D13C runs in every pass: it keeps time (the ARCADE
+; score, the start lights, the pit stop, the crash sequences, all counted in
+; passes).
 ; Behind by more than ENH_LIMIT fields, the time past it is dropped. The race's
 ; start and the end of a pause start the tick clock again, with no catch-up.
 ; Link play (COMM, $87BC not 0) keeps the original loop: the two machines
@@ -90,6 +94,8 @@ _enh_pl		PL_START
 		PL_PS	$AF50,enh_Enter		; clr.w $DC30: the race loop's entry
 		PL_PS	$AF56,enh_Pass		; tst.w $DC34: a pass starts
 		PL_PS	$B724,enh_Unpause	; clr.w $8504: the end of a pause
+		PL_PS	$C968,enh_Landscape	; jsr $E4F8 (src/fixes.i's fix_Landscape)
+		PL_PS	$D13C,enh_Clear		; jsr $10F90: the sky and ground clear
 		PL_PSS	$D142,enh_Objects,6	; move.l $E258(pc),d7; cmp.l $A884,d7; beq.s *-6
 		PL_PSS	$D510,enh_Swap,4	; move.l $A884,$E258
 		PL_END
@@ -151,6 +157,30 @@ enh_Pass	movem.l	d0-d1,-(a7)
 .link		bsr.b	enh_Rebase
 		bra.b	.done
 
+
+; The landscape, then the wait for the VBL to take the last frame
+enh_Landscape	jsr	$E4F8
+		bra	fix_WaitShown
+
+; $D13C's first drawing: $10F90 waits for the blitter queue ($1B0, src/fixes.i's
+; fix_Queue), lets $13F16 scroll the horizon (its blits go into the queue),
+; queues the sky and ground clear, clamps the ground's top line $1136C and
+; starts the queue. A pass that does not draw keeps the state: the queue is
+; written as $10F90 would, but not started.
+enh_Clear	tst.b	ENH_SKIP.w
+		bne.b	.undrawn
+		jmp	$10F90
+.undrawn	jsr	FIX_TRAMP.w		; fix_Queue: a6 = the queue, now idle
+		move.w	$10C42,d7		; as $10F94
+		jsr	$13F16
+		move.l	#8000,d0		; as $11016-$11036
+		sub.l	$1136C,d0
+		ble.b	.done
+		divu.w	#40,d0
+		cmp.w	#132,d0
+		ble.b	.done
+		move.l	#2720,$1136C
+.done		rts
 
 ; $D13C's wait for a new field and its road spans, objects and scaler. A pass
 ; that does not draw goes on at $D1C2 (the start lights).

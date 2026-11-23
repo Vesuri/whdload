@@ -148,11 +148,10 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     catch-up. Gear changes act once. The a500 with `CUSTOM1=1` runs the original loop.
     Not covered: laps (no run went past a lap), link play, the data disk beyond its first
     demo race.
-    - The limit: an undrawn pass still runs the landscape and its projection, and waits
-      for the VBL to take the last frame (it draws into the draw buffer, which right after
-      a swap is still on screen). At 25 Hz the 68020 then draws 356 frames in 1200 fields
-      (14.8 fps), below its 15.8 without the option, and fewer in the heavier parts; at
-      16.7 Hz it draws 397 of 400. The plan had
+    - The cost: an undrawn pass still runs the landscape and its projection. With the
+      sky and ground clear left out of undrawn passes and the wait for the shown screen
+      after the landscape (phase E, step 22), the 68020 at 25 Hz draws 486 frames in 1200
+      fields (20.3 fps, 15.8 without the option); at 16.7 Hz 399 of 400. The plan had
       expected a catch-up tick to cost about 11% of a frame. Step 22 picks this up.
 
 ### D. Frames between ticks (Enhanced framerate, 68020 and up)
@@ -225,9 +224,17 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     one tooltype for the icon. The ReadMe describes both and how to remove them.
 22. **Then the hot routines.** Profile again (a traced 68020 with fast memory, aprof on the
     040). Candidates: the projection's `muls` ($F672, $F680), the road spans' whole-line
-    writes, the span filler ($10E72) and the scaler. Also the off-road flag ($10AAA, from
-    the nearest projected line at $FA62): worked out without the projection, a pass that
-    catches up could leave the projection out, which the 68020 at 25 Hz needs (step 14).
+    writes, the span filler ($10E72) and the scaler.
+    - The cost of catching up (done in part). An undrawn pass cost about 1.3 fields on the
+      a1200: the landscape 0.6, the wait at `$118D8` for the sky and ground clear 0.3, and
+      the wait for the shown screen before the landscape. Undrawn passes now leave out the
+      clear (keeping its state) and every pass waits after the landscape, which draws
+      nothing (`internals.md`, "Enhanced framerate"). At 25 Hz in 1200 fields: the a1200
+      486 frames (356 before), the a1200-030 582 (515), the a1200-040 599 (594); the
+      same state as the a500's in every pass, and `shown` finds no drawing into the shown
+      screen but the original map marker. Still open: the off-road flag ($10AAA, from the
+      nearest projected line at $FA62) worked out without the projection, so that a pass
+      that catches up could leave the projection out.
 23. **Loading time.** From the boot to a race's green light (`race`, field counter $A884)
     takes 930 fields on the a1200-030 with `CACHE` and 976 on the a1200-040, about 19 s.
     With `DCACHE` it is 691 and 578, and on the a1200-030 without caches 2221. PC samples

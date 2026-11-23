@@ -4,7 +4,7 @@
   bench [<frames>]           fps over the first frames from the next green light
   statelog <frames> <file> [tick]  the race state at every frame end (or pass) from the next green light
   aprof <fields> <file>      an instruction profile (FSUAE=$FSUAE_APROF) of fields from the next green light
-  onscreen <passes>          landscape starts while the last frame is still on screen
+  shown <frames>             frames whose shown screen changed between the swap and the VBL taking the next
   racelog <fields> <file>    field, frame, clock and distance per field from the next green light
   meter <fields>             frames, clock and distance over the next fields
   race [stay]                from the boot through the title and menu to a player race
@@ -212,10 +212,12 @@ TICK_END = 0xCD0E          # after the race loop's `bsr $D13C`: every pass, draw
 # The race state around the car table: globals from $DBC0, the 16 cars of 64 bytes at $DC4E,
 # the car order list at $E050. Then the ARCADE score ($8370) and the long words of the
 # renderer's area that hold simulation values: $10AAA (with the shake index $10AA8, which only
-# the projection writes), $10ABA, $10AC4, $10AD8-$10ADB, $10C46, $10C4E, $11786.
+# the projection writes), $10ABA, $10AC4, $10AD8-$10ADB, $10C46, $10C4E, $11786; and the
+# drawing state an undrawn pass keeps: the ground's top lines $11368/$1136C and the horizon's
+# scroll ($1407C-$14081, $13F16).
 STATE = ((0xDBC0, 0xE074), (0x8370, 0x8374), (0x10AA8, 0x10AAC), (0x10AB8, 0x10ABC),
          (0x10AC4, 0x10AC8), (0x10AD8, 0x10ADC), (0x10C44, 0x10C48), (0x10C4C, 0x10C50),
-         (0x11784, 0x11788))
+         (0x11784, 0x11788), (0x11368, 0x11370), (0x1407C, 0x14084))
 ENH_VARS = 0x1C0           # src/enhanced.i: due, ticks, frames drawn, fields dropped
 
 
@@ -272,36 +274,58 @@ def aprof(server, g, rest):
     return out.strip() or 'written'
 
 
-LANDSCAPE = 0xE4F8         # the landscape: it draws into the draw buffer $86EA
 PENDING = 0xA71C           # the buffer handed to the VBL; -1 once the VBL has taken it
+SWAPPED = 0xD522           # after `move.l $86EA,$A71C`: the frame is handed to the VBL
+VBL_TAKEN = 0xA404         # the race VBL ($A3A4) has taken it: `move.l #-1,$A71C`
+SCREENS = 0x86E2           # the two screens' addresses (longs)
+SCREEN_BYTES = 32000       # 4 planes of 8000 bytes
 
 
-def onscreen(server, g, rest):
-    """onscreen <passes>: from the next green light, stop at the landscape's start ($E4F8)
-    <passes> times and count the starts with $A71C not -1: the last frame's buffer not yet
-    taken by the VBL, so the landscape draws into the screen on display (flicker). With
-    Enhanced framerate, also how many of those passes leave out the drawing."""
-    n = int(rest.split()[0]) if rest.split() else 300
+def screen_sum(g, addr):
+    return longs(g, addr, SCREEN_BYTES // 4)
+
+
+def screen_diff(a, b):
+    """Where two screen reads differ: plane, first and last line."""
+    rows = sorted({(i * 4 // 8000, i * 4 % 8000 // 40) for i in range(len(a)) if a[i] != b[i]})
+    planes = sorted({p for p, _ in rows})
+    return f'planes {planes} lines {min(r for _, r in rows)}-{max(r for _, r in rows)}'
+
+
+def shown(server, g, rest):
+    """shown <frames>: from the next green light, for <frames> frames: at each swap ($D522)
+    checksum the screen still on display (the one not handed to the VBL), and again when the
+    VBL takes the new one ($A404). A difference means the game drew into the screen on
+    display (flicker). Exact on any machine; slow (two 32000-byte reads a frame)."""
+    n = int(rest.split()[0]) if rest.split() else 40
     g.stop()
-    early = early_undrawn = undrawn = 0
+    changed, bad = 0, []
     try:
         if not green_light(g):
             return 'no race start within 20000 fields'
-        g.cmd(f'break *{LANDSCAPE:#x}')
         for i in range(n):
+            g.cmd(f'break *{SWAPPED:#x}')
             out = g.cmd('continue', timeout=120)
+            g.cmd('delete')
             if 'Breakpoint' not in out:
-                return f'no stop after {i}: {out.strip().splitlines()[-1]}'
-            skip = longs(g, ENH_VARS + 16, 1)[0] >> 8 & 0xFF   # ENH_SKIP, the byte at $1D2
-            skip = skip != 0 and skip != 0xCC
-            undrawn += skip
-            if longs(g, PENDING, 1)[0] != 0xFFFFFFFF:
-                early += 1
-                early_undrawn += skip
+                return f'no swap after {i}'
+            new = longs(g, PENDING, 1)[0]
+            a, b = longs(g, SCREENS, 2)
+            old = b if new == a else a
+            before = screen_sum(g, old)
+            g.cmd(f'break *{VBL_TAKEN:#x}')
+            out = g.cmd('continue', timeout=120)
+            g.cmd('delete')
+            if 'Breakpoint' not in out:
+                return f'no VBL after {i}'
+            after = screen_sum(g, old)
+            if after != before:
+                changed += 1
+                bad.append(f'{i}: {screen_diff(before, after)}')
     finally:
         g.cmd('delete')
         g.cont()
-    return f'{n} landscape starts, {early} with the last frame on screen ({early_undrawn} of them undrawn passes); {undrawn} undrawn passes'
+    return f'{n} frames, {changed} with the shown screen changed' + (''.join(f'\n  {b}' for b in bad[:20]))
 
 
 # While WHDLoad has the OS in (a disk load) chip memory reads back as $FFFFFFFF.
@@ -532,6 +556,6 @@ def drive(server, g, rest):
 
 server = game_server('vroom', commands={
     'bench': bench, 'statelog': state_log, 'racelog': race_log, 'meter': meter, 'race': to_race,
-    'drive': drive, 'do': do, 'onscreen': onscreen, 'aprof': aprof, 'decrunch': decrunch})
+    'drive': drive, 'do': do, 'shown': shown, 'aprof': aprof, 'decrunch': decrunch})
 if __name__ == '__main__':
     server.main(sys.argv[1:])

@@ -193,6 +193,8 @@ rate, on every 68020 and up.
 | $AF50 (`clr.w $DC30`) | the loop's entry: the tick clock starts now |
 | $AF56 (`tst.w $DC34`) | a pass starts: it waits while its tick is early; if the next tick is due already, it is a pass that does not draw |
 | $B724 (`clr.w $8504`) | the end of a pause (the pause loops at $B676-$B6C8 inside a pass): the tick clock starts again |
+| $C968 (`jsr $E4F8`) | the landscape first, then the wait for the VBL to take the last frame (`fix_WaitShown`; without the option `fix_Landscape` waits before it) |
+| $D13C (`jsr $10F90`) | a pass that does not draw leaves out the sky and ground clear but keeps its state: the horizon's scroll (`$13F16`, its blits written into the idle queue, which is not started) and the clamp of the ground's top line $1136C |
 | $D142-$D14D (the wait for a new field) | a pass that does not draw goes on at $D1C2, leaving out the road spans `$10CD2`, the three objects `$140C0` and the scaler `$18154` |
 | $D510 (`move.l $A884,$E258`) | a pass that does not draw returns from `$D13C`, leaving out the swap ($E258, $A71C, `$12FA6`) |
 
@@ -204,13 +206,20 @@ drawn, fields dropped, the period. `CUSTOM3=n` (for the checks, not in `ws_confi
 out the drawing in n of every n+1 passes, whatever the time.
 
 **What a pass that does not draw still runs.** The race loop's own code, the landscape
-`$E4F8` whole, and every part of `$D13C` but the ones above. The landscape draws into the
-draw buffer, so it waits for the VBL to take the last frame (`fix_Landscape`, "Fixes") in
-every pass: right after a swap the draw buffer is still the screen on display. A first build
-left that wait out of undrawn passes, and they drew into the shown screen (flicker on the
-a1200-030 at 25 Hz: `onscreen 300` found 41 of its 43 undrawn passes starting the landscape
-before the VBL had taken the last frame; none since, there and on the a1200 at 25 Hz and the
-a1200-040 with `CUSTOM3=2`).
+`$E4F8` whole, and every part of `$D13C` but the ones above.
+
+**The wait for the shown screen.** Right after a swap the draw buffer is still on screen
+until the next VBL takes the new frame ($A71C = -1). The landscape draws nothing (no
+reference to the screens or the blitter in $E4F8-$10CD1; its one outside call, `$9D94`, is
+the car order), so with the option the wait comes after it, before the race loop's panel
+updates ($CA10-$CCFA) and `$D13C`: the landscape's work overlaps the wait, in every pass.
+`shown 40` checks it: at each swap it reads the screen still on display, and again when the
+VBL takes the new frame. On the a1200-030 at 25 Hz and on the a1200 with `CUSTOM3=2` the only
+change is the map's position marker (line 22, planes 1-2, in 2-3 of 40 frames), which the
+race loop draws at $C8F8-$C95A, before the landscape, as the original does. A first build
+left the wait out of undrawn passes: they drew into the shown screen (flicker on the
+a1200-030 at 25 Hz, in 41 of its first 43 undrawn passes). One with the wait before
+`$D13C` instead let the panel updates through (lines 55-59 in 2 of 40 frames).
 - `$E4F8` is not only drawing. Before its projection ($E4F8-$F417) it follows the track
   for the simulation: the curve under the car ($10AD9/$10ADB), the lateral force $10AC4,
   the view angle $DBEC, the car's height $10C4E, a bounce state machine ($E0D8-$E0E0),
@@ -241,8 +250,9 @@ pass ($DC26), that is one a tick.
 - *The same ticks.* `statelog 600 FILE tick` (the state at $CD0E, after the loop's
   `bsr $D13C`, in every pass) on the a500, on the a1200-040 with `CUSTOM1=1 CUSTOM3=2` (two
   of every three passes undrawn) and on the a1200 with `CUSTOM1=1 CUSTOM2=1` (193 of 668
-  passes undrawn, as it falls behind 25 Hz). The two 68020+ logs agree in all 600 passes,
-  and with the a500's in all 599 compared (`statecmp --align`: the a500 logs one more pass at
+  passes undrawn, as it falls behind 25 Hz). The state includes the drawing state an undrawn
+  pass keeps (the ground's top lines $11368/$1136C, the horizon's scroll at $1407C). The two
+  68020+ logs agree with the a500's in all 600 and 599 compared (`statecmp --align`: the a500 logs one more pass at
   the green light). Left out: $DBD8/$DBDC, the map marker's position in each screen ($C8FE,
   indexed by the draw buffer), which follow the screen order.
 - *The same speed at equal fields.* `racelog 1200`: the distance at field 600 and at field
@@ -252,8 +262,8 @@ pass ($DC26), that is one a tick.
 
   | Speed | a1200 (68020) | a1200-030 | a1200-040 |
   |---|---|---|---|
-  | 16.7 Hz | 396 (4 passes undrawn) | 400 | 400 |
-  | 25 Hz | 356 | 515 | 594 |
+  | 16.7 Hz | 399 | 400 | 400 |
+  | 25 Hz | 486 | 582 | 599 |
 
 - *Pause.* On the a1200-040, 300 fields of pause ran no ticks; the 105 fields after it ran
   36 (one tick every 3 fields from the unpause), none dropped.
@@ -265,14 +275,13 @@ pass ($DC26), that is one a tick.
 - *The data disk.* Its first demo race (Hockenheim) with the option: the a1200 at 25 Hz drew
   546 frames in 1200 fields, the a1200-040 at 16.7 Hz 400; no dump.
 
-**The limit: catching up costs most of a pass.** An undrawn pass still runs the
-landscape and its projection, and waits for the VBL to take the last frame. On the a1200
-(68020) at 25 Hz, `racelog 1200` from the green light (600 ticks) drew 356 frames, 14.8 a
-second, no fields dropped: fewer than the 15.8 it draws without the option (the build that
-drew into the shown screen drew 429). A 2-field tick barely repays an undrawn pass there,
-and `bench 500` showed about 10 frames a second in the race's heavier parts before the wait
-was added. At 16.7 Hz the same machine draws 397 of 400 passes. Working out the
-off-road flag without the projection (open-work, step 22) would make undrawn passes cheap.
+**The cost of catching up.** An undrawn pass still runs the landscape and its projection.
+Profiled on the a1200 (68020, aprof) with nearly every pass undrawn, one cost about 1.3
+fields: 0.6 in the landscape, 0.3 waiting at `$118D8` for the blitter queue to finish the sky
+and ground clear, and the wait for the VBL before the landscape. Without the clear and with
+the wait after the landscape, the a1200 at 25 Hz draws 486 frames in 1200 fields (20.3 a
+second, 15.8 without the option); it drew 356 before. Working out the off-road flag without
+the projection (open-work, step 22) would make undrawn passes cheaper still.
 
 The a500's own speed, for comparison: the first three demo races (three circuits) run at
 13.8, 17.5 and 13.9 fps (`meter 1500` from each green light; mostly 3-4 fields a frame), so
