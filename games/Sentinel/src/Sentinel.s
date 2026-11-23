@@ -34,7 +34,32 @@ QUITKEY		= $59		; F10
 ;DEBUG
 
 BASE		= $57fe4	; destination address for binary
+STRIP		= $70000	; the game's render buffer: 320x200, 4 word-interleaved planes
+STRIPSIZE	= $7d00
+FASTSIZE	= $8000		; ExpMem: the render buffer
 SOUND		= $20000	; the sound module, loaded by the game
+
+; one 16-pixel group of the span (a2, 4 plane words, advanced past it):
+; the pixels in mask d2 get colour d4/d5, those also in d3 the edge colour
+; (d6/d7 hold colour ^ edge colour); d0, d1 scratch
+GROUP	MACRO
+	move.l	d6,d0
+	and.l	d3,d0
+	eor.l	d4,d0
+	move.l	(a2),d1
+	eor.l	d1,d0
+	and.l	d2,d0
+	eor.l	d1,d0
+	move.l	d0,(a2)+
+	move.l	d7,d0
+	and.l	d3,d0
+	eor.l	d5,d0
+	move.l	(a2),d1
+	eor.l	d1,d0
+	and.l	d2,d0
+	eor.l	d1,d0
+	move.l	d0,(a2)+
+	ENDM
 
 ; absolute skip
 PL_SA	MACRO
@@ -61,7 +86,7 @@ HEADER	SLAVE_HEADER
 	dc.w	0			; ws_DontCache
 	dc.b	0			; ws_keydebug
 	dc.b	QUITKEY			; ws_keyexit
-	dc.l	0			; ws_ExpMem
+EXPMEM	dc.l	-FASTSIZE		; ws_ExpMem: optional, WHDLoad writes its address here
 	dc.w	.name-HEADER		; ws_name
 	dc.w	.copy-HEADER		; ws_copy
 	dc.w	.info-HEADER		; ws_info
@@ -75,7 +100,8 @@ HEADER	SLAVE_HEADER
 	dc.w	.config-HEADER		; ws_config
 
 
-.config	dc.b	"C1:B:Disable Blitter Waits"
+.config	dc.b	"C1:B:Disable Blitter Waits;"
+	dc.b	"C2:B:Fast Drawing (68020+)"
 	dc.b	0
 
 	IFD	DEBUG
@@ -140,9 +166,18 @@ slv_GameLoader
 
 
 
+	bsr.w	FastSetup
+
 	lea	PLGAME(pc),a0
 	lea	BASE,a1
 	jsr	resload_Patch(a2)
+
+	move.l	fast(pc),d0
+	beq.b	.go
+	lea	PLFAST(pc),a0
+	lea	BASE,a1
+	jsr	resload_Patch(a2)
+.go
 
 
 	jmp	$10d4(a5)
@@ -252,6 +287,380 @@ SfxDmaWait
 	rts
 
 resload	dc.l	0
+
+; The fast drawing option (CUSTOM2, a 68020 or better, the ExpMem allocated):
+; the game's render buffer at $70000 moves to the ExpMem, fast memory where
+; there is some. The CPU reaches it through the row tables at $56010 and
+; $56100 (loaded with the data at $55000, relocated by Tables), the pan
+; step's column pointers at $4854 and three absolute addresses; the blitter
+; only in the pan step's horizontal column copy, which ColumnH does instead.
+FastSetup
+	lea	tags(pc),a0
+	jsr	resload_Control(a2)
+	move.l	custom2(pc),d0
+	beq.b	.off
+	move.l	attn(pc),d0
+	btst	#AFB_68020,d0
+	beq.b	.off
+	move.l	EXPMEM(pc),d0
+	beq.b	.off
+	lea	fast(pc),a0
+	move.l	d0,(a0)
+	lea	BASE,a0
+	move.l	d0,$39d4(a0)		; lea $70000,a0: the copy for the view's
+	sub.l	#STRIP,d0		; conversion to planes
+	add.l	d0,$39f2(a0)		; lea $77d00,a1
+	moveq	#5-1,d1
+	lea	$4854(a0),a1		; the pan step's column pointers
+.col	add.l	d0,(a1)+
+	dbf	d1,.col
+	add.l	d0,$502e(a0)		; movea.l #$70000: the dissolve
+	add.l	d0,$5e8e(a0)		; movea.l #$70000
+.off	rts
+
+fast	dc.l	0			; the render buffer in ExpMem, or 0
+tags	dc.l	WHDLTAG_CUSTOM2_GET
+custom2	dc.l	0
+	dc.l	WHDLTAG_ATTNFLAGS_GET
+attn	dc.l	0
+	dc.l	TAG_DONE
+
+PLFAST	PL_START
+	PL_P	$66f8,Tables		; the data at $55000 with the row tables
+	PL_P	$48e4,ColumnH		; the pan step's horizontal column copy
+	PL_P	$18b4,SpanFill		; the span filler
+	PL_END
+
+; the game's copy of the loaded data to $55000..$56fff, then the row pointers
+; into the render buffer (the text rows at $56010, the span rows at $56100)
+Tables	lea	$10000,a1
+	lea	$55000,a0
+	move.w	#2047,d7
+.copy	move.l	(a1)+,(a0)+
+	dbf	d7,.copy
+	movem.l	d0-d2/a0,-(a7)
+	move.l	fast(pc),d1
+	sub.l	#STRIP,d1
+	lea	$56010,a0
+	move.w	#($56740-$56010)/4-1,d2
+.rel	move.l	(a0),d0
+	cmp.l	#STRIP,d0
+	blo.b	.next
+	cmp.l	#STRIP+STRIPSIZE,d0
+	bhs.b	.next
+	add.l	d1,d0
+	move.l	d0,(a0)
+.next	addq.l	#4,a0
+	dbf	d2,.rel
+	movem.l	(a7)+,d0-d2/a0
+	bra.w	SpanTables
+
+; Whether the span filler's tables (loaded with the data at $55000) are what
+; SpanFill computes instead: for colour c and pixel i of a byte (0 the left),
+; with S the colour's four plane bytes at $56e60+c*4 (each byte 0 or $ff per
+; plane), the left edge's keep mask $56e00 (pixels < i) and pattern
+; $56800+c*32 (S, pixels > i), the right edge's keep mask $56e20 (pixels > i)
+; and pattern $56a00+c*32 (S, pixels < i), the edge pixel $56c00+c*32 (S,
+; pixel i) and $56e40 (pixels <= i), each byte the same in the four planes.
+; spanok is set if every long matches.
+	MACHINE	68020
+SpanTables
+	movem.l	d0-d7/a0-a2,-(a7)
+	lea	spanok(pc),a1
+	sf	(a1)
+	lea	$56800,a0
+	lea	$56e60,a2
+	moveq	#0,d7			; c
+.c	move.l	(a2)+,d6		; S
+	moveq	#0,d5			; i
+.i	move.w	#$ff00,d0		; pixels < i
+	lsr.w	d5,d0
+	move.b	d0,d1			; ~
+	not.b	d1			; d1: pixels >= i; d0.b: pixels < i
+	move.b	#$80,d2
+	lsr.b	d5,d2			; pixel i
+	move.b	d1,d3
+	eor.b	d2,d3			; pixels > i
+	lea	cmp4(pc),a1
+	move.b	d3,(a1)			; A0: S & pixels > i
+	bsr.w	.rep4
+	and.l	d6,d4
+	cmp.l	(a0,d5.w*4),d4
+	bne.w	.bad
+	move.b	d0,(a1)			; A: S & pixels < i
+	bsr.w	.rep4
+	and.l	d6,d4
+	cmp.l	$200(a0,d5.w*4),d4
+	bne.w	.bad
+	move.b	d2,(a1)			; B: S & pixel i
+	bsr.w	.rep4
+	and.l	d6,d4
+	cmp.l	$400(a0,d5.w*4),d4
+	bne.w	.bad
+	tst.w	d7
+	bne.b	.inext
+	move.b	d0,(a1)			; the masks, once
+	bsr.w	.rep4
+	cmp.l	$56e00-$56800(a0,d5.w*4),d4
+	bne.w	.bad
+	move.b	d3,(a1)
+	bsr.w	.rep4
+	cmp.l	$56e20-$56800(a0,d5.w*4),d4
+	bne.w	.bad
+	move.b	d2,d3
+	or.b	d0,d3			; pixels <= i
+	move.b	d3,(a1)
+	bsr.w	.rep4
+	cmp.l	$56e40-$56800(a0,d5.w*4),d4
+	bne.w	.bad
+.inext	addq.w	#1,d5
+	cmp.w	#8,d5
+	bne.w	.i
+	moveq	#4-1,d1			; S: each byte 0 or $ff
+	move.l	d6,d4
+.s	tst.b	d4
+	beq.b	.snext
+	cmp.b	#$ff,d4
+	bne.w	.bad
+.snext	lsr.l	#8,d4
+	dbf	d1,.s
+	lea	32(a0),a0
+	addq.w	#1,d7
+	cmp.w	#16,d7
+	bne.w	.c
+	lea	spanok(pc),a1
+	st	(a1)
+.bad	movem.l	(a7)+,d0-d7/a0-a2
+	rts
+; d4: the byte at cmp4 in all four bytes
+.rep4	moveq	#0,d4
+	move.b	(a1),d4
+	move.w	d4,-(a7)
+	lsl.w	#8,d4
+	or.w	(a7)+,d4
+	move.w	d4,-(a7)
+	swap	d4
+	move.w	(a7)+,d4
+	rts
+	MACHINE	68000
+
+; The span filler ($18b4..$1b17) on the fast drawing path, without movep:
+; for each row from $1680 down to $167e (the row at $56100+($ef-row)*4+
+; [$18ba], plus [$195a]; 160 bytes a row, 16 pixels in 4 plane words), the
+; span from the left edge ($7b00+row*2) to the right one ($7d00), clipped to
+; the window $18f0 (left) and $18f2 (width): the edge pixels in colour
+; [$1693]>>4, the others in [$1693]&15. It stops at a row whose right edge is
+; left of its left edge, and returns at once if the middle row's is. Memory
+; and d1, d2, a1, a2 and the flags end as the game's code leaves them, but for
+; $191a, the game's scratch for one row; the other registers are left as
+; they fall. The game's code runs instead when its tables are not the plain
+; ones (SpanTables), with bit 7 of $17f0 (its edge pattern pointer would leave
+; base memory), and with a window not in whole bytes.
+	MACHINE	68020
+SpanFill
+	move.b	spanok(pc),d0
+	beq.w	.orig
+	btst	#7,$17f0.w
+	bne.w	.orig
+	move.w	$18f0.w,d0
+	moveq	#7,d1
+	and.w	d0,d1
+	bne.w	.orig
+	move.w	$18f2.w,d1
+	moveq	#7,d2
+	and.w	d1,d2
+	bne.w	.orig
+	add.w	d1,d0
+	cmp.w	$18f4.w,d0
+	bne.w	.orig
+	lea	clipl(pc),a0
+	move.w	$18f0.w,(a0)+
+	move.w	d1,(a0)
+	moveq	#0,d0			; the middle row
+	move.b	$1680.w,d0
+	moveq	#0,d1
+	move.b	$167e.w,d1
+	add.w	d1,d0
+	lsr.w	#1,d0
+	add.w	d0,d0
+	movea.w	d0,a0
+	move.w	$7d00(a0),d0
+	sub.w	$7b00(a0),d0
+	bmi.w	.exit
+	moveq	#0,d0			; the colours
+	move.b	$1693.w,d0
+	moveq	#15,d1
+	and.w	d0,d1
+	lsr.w	#4,d0
+	lea	$56e60,a0
+	move.l	(a0,d0.w*4),d2
+	bsr.w	.double
+	move.l	d4,d6
+	move.l	d5,d7
+	move.l	(a0,d1.w*4),d2
+	move.l	d2,$1946.w
+	bsr.w	.double
+	move.l	d4,$194e.w
+	move.l	d5,$1952.w
+	eor.l	d4,d6			; colour ^ edge colour, planes 0 and 1
+	eor.l	d5,d7			; planes 2 and 3
+	move.b	$1680.w,d0		; the top row
+	move.b	d0,$18eb.w
+	cmp.b	$167e.w,d0
+	bcs.w	.exit
+	moveq	#-17,d1			; $ef
+	sub.b	d0,d1
+	andi.w	#$ff,d1
+	lsl.w	#2,d1
+	add.w	$18ba.w,d1
+	lea	$56100,a6
+	movea.l	(a6,d1.w),a6
+	adda.l	$195a.w,a6
+	moveq	#0,d1
+	move.b	d0,d1
+	sub.b	$167e.w,d0
+	andi.w	#$ff,d0
+	lea	rows(pc),a0
+	move.w	d0,(a0)			; the rows after this one
+	add.w	d1,d1
+	lea	($7b00).w,a5
+	adda.w	d1,a5
+
+.row	move.w	$200(a5),d1		; R
+	move.w	(a5),d0			; L
+	cmp.w	d0,d1
+	bmi.w	.stop
+	sub.w	clipl(pc),d1
+	bmi.w	.next
+	sub.w	clipl(pc),d0
+	cmp.w	clipw(pc),d1
+	bpl.b	.rclamp
+	moveq	#15,d2
+	and.w	d1,d2
+	movea.l	(bits,pc,d2.w*4),a4	; the right edge pixel
+	bra.b	.left
+.rclamp	move.w	clipw(pc),d1		; to the window's right end, no edge
+	subq.w	#1,d1
+	suba.l	a4,a4
+.left	cmp.w	clipw(pc),d0
+	bpl.w	.next
+	tst.w	d0
+	bmi.b	.lclamp
+	moveq	#15,d2
+	and.w	d0,d2
+	movea.l	(bits,pc,d2.w*4),a3	; the left edge pixel
+	bra.b	.span
+.lclamp	moveq	#0,d0			; from the window's left end, no edge
+	suba.l	a3,a3
+.span	moveq	#15,d2
+	and.w	d0,d2
+	move.l	(fmask,pc,d2.w*4),d2
+	moveq	#15,d3
+	and.w	d1,d3
+	movea.l	(lmask,pc,d3.w*4),a0
+	lsr.w	#4,d0
+	lsr.w	#4,d1
+	lea	(a6,d0.w*8),a2
+	sub.w	d0,d1			; the groups after the first
+	bne.b	.multi
+	move.l	a0,d3			; one group: both ends, both edges
+	and.l	d3,d2
+	move.l	a3,d3
+	move.l	a4,d0
+	or.l	d0,d3
+	GROUP
+	bra.b	.next
+.multi	movea.w	d1,a1
+	move.l	a3,d3
+	GROUP
+	move.w	a1,d3
+	subq.w	#1,d3
+	bra.b	.midt
+.mid	move.l	d4,(a2)+
+	move.l	d5,(a2)+
+.midt	dbf	d3,.mid
+	move.l	a0,d2
+	move.l	a4,d3
+	GROUP
+.next	lea	160(a6),a6
+	subq.l	#2,a5
+	lea	rows(pc),a0
+	subq.w	#1,(a0)
+	bcc.w	.row
+	move.b	$167e.w,$18eb.w
+	bra.b	.exit
+.stop	move.w	rows(pc),d0		; stopped at row $167e+rows
+	add.b	$167e.w,d0
+	move.b	d0,$18eb.w
+.exit	moveq	#0,d1
+	movea.l	d1,a1
+	move.l	d1,d2
+	movea.l	d2,a2
+	rts
+.orig	move.b	$1680.w,d0
+	jmp	BASE+$18ba
+
+; d2 (bytes b3 b2 b1 b0): d4 = b3 b3 b2 b2, d5 = b1 b1 b0 b0; d2 kept
+.double	rol.l	#8,d2
+	move.b	d2,d4
+	lsl.w	#8,d4
+	move.b	d2,d4
+	swap	d4
+	rol.l	#8,d2
+	move.b	d2,d4
+	lsl.w	#8,d4
+	move.b	d2,d4
+	rol.l	#8,d2
+	move.b	d2,d5
+	lsl.w	#8,d5
+	move.b	d2,d5
+	swap	d5
+	rol.l	#8,d2
+	move.b	d2,d5
+	lsl.w	#8,d5
+	move.b	d2,d5
+	rts
+	MACHINE	68000
+
+fmask
+	dc.l	$ffffffff,$7fff7fff,$3fff3fff,$1fff1fff
+	dc.l	$0fff0fff,$07ff07ff,$03ff03ff,$01ff01ff
+	dc.l	$00ff00ff,$007f007f,$003f003f,$001f001f
+	dc.l	$000f000f,$00070007,$00030003,$00010001
+lmask
+	dc.l	$80008000,$c000c000,$e000e000,$f000f000
+	dc.l	$f800f800,$fc00fc00,$fe00fe00,$ff00ff00
+	dc.l	$ff80ff80,$ffc0ffc0,$ffe0ffe0,$fff0fff0
+	dc.l	$fff8fff8,$fffcfffc,$fffefffe,$ffffffff
+bits
+	dc.l	$80008000,$40004000,$20002000,$10001000
+	dc.l	$08000800,$04000400,$02000200,$01000100
+	dc.l	$00800080,$00400040,$00200020,$00100010
+	dc.l	$00080008,$00040004,$00020002,$00010001
+
+spanok	dc.b	0			; SpanTables: the tables are the plain ones
+cmp4	dc.b	0
+clipl	dc.w	0			; $18f0
+clipw	dc.w	0			; $18f2
+rows	dc.w	0
+
+; The pan step's column for a horizontal step: one word of each plane from
+; 192 rows of the render buffer (a1, 160 bytes a row) into the back buffer's
+; planes (a0, a2, a3, a4, 40 bytes a row), as the game's four blits did.
+; The plane blits still running write other words.
+ColumnH	move.w	#192-1,d7
+.row	move.w	(a1),(a0)
+	move.w	2(a1),(a2)
+	move.w	4(a1),(a3)
+	move.w	6(a1),(a4)
+	lea	160(a1),a1
+	moveq	#40,d0
+	add.l	d0,a0
+	add.l	d0,a2
+	add.l	d0,a3
+	add.l	d0,a4
+	dbf	d7,.row
+	jmp	BASE+$4970		; movem.l (sp)+,d0-a6; rts
 
 ; The edge scan converter's stepping, program offsets $14be..$165b, without
 ; self-modification. The game's code wrote the x step's opcode (addq.w or

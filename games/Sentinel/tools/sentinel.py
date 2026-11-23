@@ -26,6 +26,10 @@ Commands (each stops the CPU and leaves it stopped at a vsync, except `go`):
                              add to STATE (a pickle) every base-memory byte executed and every
                              byte the CPU wrote, with the PCs that executed each instruction;
                              tools/smc_census.py reports the overlap
+    access N STATE LO-HI...  trace N fields as census does, and add to STATE (a pickle) each
+                             instruction's operand addresses (memory operands from the traced
+                             registers, absolute addresses, immediates) that fall in the
+                             ranges (hex), as min, max and count per operand
     pointer X Y              steer the mouse until the pointer ($5F84A x 0..2418, $5F84C y
                              0..2996, up is larger) is at X, Y to a mouse count, or stops at
                              an edge (pointer mode)
@@ -247,6 +251,78 @@ def census(server, g, rest):
     return f"census: {st['fields']} fields, {len(st['exec'])} instructions, {len(st['write'])} bytes written"
 
 
+EA = re.compile(r'(-?\$[0-9a-f]+|-?\d+)?\((a[0-7]|sp)(?:, ?([ad][0-7])\.([wl]))?\)(\+)?|'
+                r'-\((a[0-7]|sp)\)|\$([0-9a-f]+)\.([wl])\b|#\$([0-9a-f]+)')
+
+
+def operand_addresses(ins, r):
+    """The addresses an instruction's operands name, from the registers before it: memory
+    operands, absolute addresses and immediates (pc-relative ones are left out)."""
+    reg = lambda n: r[15] if n == 'sp' else r[int(n[1]) + (8 if n[0] == 'a' else 0)]
+    size = {'b': 1, 'w': 2, 'l': 4}.get(ins.mnemonic.rsplit('.', 1)[-1], 2)
+    out = []
+    for i, op in enumerate(ins.op_str.split(', ') if '(' not in ins.op_str else
+                           re.split(r',\s*(?![^()]*\))', ins.op_str)):
+        m = EA.search(op)
+        if not m or 'pc' in op:
+            continue
+        d, base, idx, isz, post, pre, ab, absz, imm = m.groups()
+        if base:
+            a = reg(base) + (int(d.replace('$', '0x'), 0) if d else 0)
+            if idx:
+                v = reg(idx)
+                a += (v & 0xffff) - (0x10000 if isz == 'w' and v & 0x8000 else 0) if isz == 'w' else v
+        elif pre:
+            a = reg(pre) - size
+        elif ab:
+            a = int(ab, 16)
+            if absz == 'w' and a & 0x8000:
+                a -= 0x10000
+        else:
+            a = int(imm, 16)
+        out.append((i, a & 0xffffffff))
+    return out
+
+
+def access(server, g, rest):
+    """access N STATE LO-HI...: per instruction, the addresses its operands named in the
+    given ranges (hex): STATE['access'][pc] = {operand: [min, max, count]}."""
+    import pickle
+    from amigaxdev import barto
+    import capstone
+    w = rest.split()
+    n, state = int(w[0]), w[1]
+    ranges = [tuple(int(x, 16) for x in r.split('-')) for r in w[2:]]
+    st = pickle.load(open(state, 'rb')) if os.path.exists(state) else {'access': {}, 'fields': 0}
+    md = capstone.Cs(capstone.CS_ARCH_M68K, capstone.CS_MODE_M68K_000 | capstone.CS_MODE_BIG_ENDIAN)
+    chunk = os.path.join(server.run_dir, 'access.bin')
+    left = n
+    while left > 0:
+        k = min(50, left)
+        server.capture(g, k, chunk)
+        t = barto.load(chunk)
+        mem = bytes(t.chip)
+        dec = {}
+        for f in t.fields:
+            for pc, cost, regs in t.instructions(f):
+                if pc is None or pc == 0x7fffffff or pc >= 0x80000:
+                    continue
+                if pc not in dec:
+                    dec[pc] = next(md.disasm(mem[pc:pc + 10], pc), None)
+                ins = dec[pc]
+                if ins is None:
+                    continue
+                for i, a in operand_addresses(ins, regs):
+                    if any(lo <= a < hi for lo, hi in ranges):
+                        e = st['access'].setdefault(pc, {}).setdefault(i, [a, a, 0])
+                        e[0], e[1], e[2] = min(e[0], a), max(e[1], a), e[2] + 1
+        st['fields'] += len(t.fields)
+        os.unlink(chunk)
+        left -= k
+    pickle.dump(st, open(state, 'wb'))
+    return f"access: {st['fields']} fields, {len(st['access'])} instructions"
+
+
 def word(g, addr):
     return int.from_bytes(peek(g, addr, 2), 'big')
 
@@ -310,6 +386,36 @@ def brk(server, g, rest):
     return f"{'hit' if hit else 'timeout'} {(word(g, VBL) - v0) & 0xffff}"
 
 
+PAN_START = BASE + 0x46e0   # the main loop leaves for a pan step
+SCROLL_START = BASE + 0x4794   # the strip is drawn: the first scroll-in step
+
+
+def steptime(server, g, rest):
+    """steptime K: for K pan steps, the time (fields, to a line) from the main loop leaving
+    for the step to the scroll-in's start (the strip render), and from that start to the next
+    step's leaving (the scroll-in and the main loop's passes until the next step)."""
+    k = int(rest)
+    g.stop()
+
+    def at(addr):
+        g.cmd(f'break *{addr:#x}')
+        out = g.cmd('continue', timeout=60)
+        g.cmd('delete')
+        if 'Breakpoint' not in out:
+            raise RuntimeError(f'steptime: no stop at {addr:#x}')
+        line = int.from_bytes(peek(g, 0xdff004, 4), 'big') >> 8 & 0x1ff
+        return word(g, VBL) + line / 313
+
+    out, last = [], None
+    for _ in range(k + 1):
+        a = at(PAN_START)
+        b = at(SCROLL_START)
+        if last is not None:
+            out.append(f'{b - a:.2f} {a - last:.2f}')
+        last = b
+    return 'render, then scroll-in and passes (fields)\n' + '\n'.join(out)
+
+
 SNAP = ((0x1000, 0x1000), (BASE, 0x8000))
 
 
@@ -334,8 +440,8 @@ def go(server, g, rest):
 
 server = game_server('sentinel', commands={
     'fields': fields, 'key': key, 'click': click, 'mouse': mouse, 'hold': hold, 'release': release, 'peek': peek_cmd,
-    'swaps': swaps, 'strips': strips, 'route': route, 'census': census, 'pointer': pointer, 'front': front, 'waitfor': waitfor, 'brk': brk,
-    'snap': snap, 'go': go})
+    'swaps': swaps, 'strips': strips, 'route': route, 'census': census, 'access': access, 'pointer': pointer, 'front': front, 'waitfor': waitfor, 'brk': brk,
+    'snap': snap, 'steptime': steptime, 'go': go})
 
 if __name__ == '__main__':
     if sys.argv[1:2] == ['serve'] and os.environ.get('ENTRY') == '1':
