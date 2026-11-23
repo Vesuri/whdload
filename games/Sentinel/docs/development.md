@@ -38,4 +38,5 @@ commented out (it would set `ws_CurrentDir` to his development drawer).
 `CMD='gdb monitor key 40 1'` then `... 40 0` (raw codes: space `$40`, return `$44`, F10 `$59`).
 From boot, 20 s in warp reaches "Press any key" on the title; space asks for the landscape
 number; return with nothing typed gives landscape 0000's overview and "Press any key";
-return again starts the landscape, which draws the first view about 10 s later.
+return again starts the landscape, which draws the first view about 10 s later. Holding D
+(raw `$22`) then pans right; the pointer pans only in the pointer input mode (`$1853` set).

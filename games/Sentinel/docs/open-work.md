@@ -3,8 +3,8 @@
 Set up from Harry's and StingRay's V1.01 slave. Without the version strings the build
 equals the shipped slave but for the code hunk's padding word
 ([development.md](development.md#the-build)). It boots to the
-title, landscape 0000's overview and into the landscape on the a500, the a1200 and the
-a1200-060.
+title, landscape 0000's overview and into the landscape on the a500, the a1200, the
+a1200-040 and the a1200-060; the 68040 and 68060 draw wrongly.
 
 ## Release
 
@@ -13,12 +13,109 @@ entry above StingRay's; `make dist` builds `SentinelEnhanced-2.0b-20261123.lha`.
 improvement yet: the ReadMe entry's one line ("no changes to the game yet") is replaced by
 the fixes' lines when they land. Not published.
 
-## Rendering on fast machines
+## The goals
 
-The goal: correct drawing on fast machines with the MMU, the data cache and Zorro III fast
-memory. On the a1200-060 (`make run SETUP=a1200-060`) landscape 0000's overview loses
-faces and shows white triangles, and the landscape view misses most of its filled
-polygons; the a500 and a1200 (68020) draw both correctly. Not yet looked into. Candidates:
-the data cache on chip memory the blitter or CPU then reads (the slave sets only the
-instruction cache), missing blitter waits other than `$30C`, self-modifying code, and
-CPU-timed delays.
+1. Correct drawing on the a1200-040 (68040, MMU, Zorro III fast memory, instruction and data
+   caches), and so on every fast machine, with the 68000 unchanged.
+2. Holding a pan (the pointer at the screen edge, or the ReadMe's S, D, L and comma keys; D, raw `$22`, pans right) scrolls the view
+   continuously at 50 fps on capable machines (68040 and 68060), with game speed unchanged.
+
+What is known so far is in [internals.md](internals.md#rendering-and-panning): the drawing
+fault is self-modifying code in the edge scan converter, every pixel is drawn by the CPU into
+chip memory, and a pan is a 128-pixel strip render followed by an 8-frame scroll-in.
+
+## Step by step
+
+### A. Harness (first, no slave change)
+
+1. `tools/sentinel.py`, a `game_server` with the commands this work used from `tmp/`:
+   `route` (title, landscape 0000, the first view), `pan KEY FIELDS` (holds a key, steps one
+   field at a time and reports the fields between buffer swaps, `$58C76`), `hold`/`release`,
+   `dump`. Runs with `WARP=1 DETERMINISTIC=1 JOY0=none`. Find the key that switches to pointer
+   mode (`$1853`, game key `$39` at `$3356`) so the pointer-at-the-edge pan can be driven too
+   (`monitor mouse`; the edge test is at `$7870`).
+2. A render check: after the first view and after 8, 16 and 24 pan steps in each direction,
+   the two display buffers (`$60000`, `$78000`) and the strip buffer (`$70000`) equal the
+   A500's. Pan steps are discrete, so the picture depends on the step count, not on timing:
+   the check holds across CPUs. A500 hashes recorded (not the bytes), every machine compared.
+3. A frame and pan meter from the same swap counter: fields per strip pause and swaps per
+   second while a pan is held, on any CPU (no trace needed on the 040/060).
+
+### B. Correct on the 68040 (bug fixes, always on)
+
+4. **Self-modifying code census.** Known: the edge scan converter (`$1440`..`$17EE`) writes
+   opcodes at `$1546`, `$15BE`, `$15F6`, `$1630` (`subq.w`/`addq.w #1,d1`) and a branch
+   displacement at `$15C3`, from `$1516`, `$156A`, `$1598`, `$15DA` and `$161C`. Complete the
+   list from a 68000 trace (every executed instruction's bytes against every CPU write in the
+   same trace) over the title, the overview, a landscape, pans in all four directions,
+   absorb/create/transfer, hyperspace and game over; check the sound module at `$20000` and
+   the title code too.
+5. **Remove it.** Replace each patched loop with fixed variants selected through a pointer
+   (no cache flushes: the stores run per polygon edge, and a flush on a 68040 with copyback
+   costs more than the edge). Prove equivalence on the 68000 path: run the original routine
+   and the replacement under Unicorn on random and recorded edges and compare the edge tables
+   at `$7B00`/`$7D00`. Done when `WHD_ARGS=NOCACHE` is no longer needed on the a1200-040
+   and a1200-060 for the render check (step 2).
+6. **Other fast-CPU hazards** found while reading, each checked and fixed if real:
+   - the sound module's DMA-off, `dbf`, DMA-on wait (`$20110`..`$2012E`, file offset in the
+     module), the CPU-timed audio wait that loses notes on 68040/060 (playbook §8); judge it
+     with FS-UAE's audio workaround off;
+   - blitter waits: StingRay's wait at `$30C` covers the start of each plane's blit, but
+     nothing waits for the last plane before the swap or before the CPU next writes that
+     buffer; with code in the instruction cache the 68040 is no longer held by blitter-nasty
+     (`BLTPRI`) as the 68000 is;
+   - CPU-timed delays: the `dbf`-to-self and count-down loops (playbook §8);
+   - `jmp ($10)` at `$1ED6` (the illegal-instruction vector used as a pointer) under
+     WHDLoad's vector handling with the MMU;
+   - `movep`: 23 sites in the program (the span filler's are hot); the 68060 traps every one.
+     Count them per strip on the 060 and measure the cost.
+7. **Matrix**: a500, a1200, a1200-030 with WHDLoad's `MMU`, a1200-040 (WHDLoad's defaults,
+   then `DCACHE`), a1200-060, and a 28 MHz 68020 with Zorro III memory (`EXTRA_ARGS`): the
+   render check, title to landscape to pans to F10. Then a fix-only 2.0b: one ReadMe line
+   ("drawing fixed on 68040/060 with caches").
+
+### C. Measure before optimising
+
+8. Game time (playbook §9): what moves the Sentinel, the sentries and the energy, and at
+   what rate. The VBL handler (`$570`) runs game code (`$6D0` calls into `$2D36`); the
+   field counter is `$58C6E`; CIA-A timer B is `$3900`, CIA-B timer B `$008E`. Establish
+   whether faster drawing changes game speed before changing the frame loop.
+9. Profiles: the A500 per-routine split is in [internals.md](internals.md#rendering-and-panning);
+   repeat it on the a1200 and a 68020 with fast memory (traced), and take strip-pause fields on
+   the 040/060 from the pan meter, plus aprof instruction counts on `68040-NOMMU`.
+
+### D. Fast strip rendering (68020 and up, a `CUSTOMn` option)
+
+10. **Fast memory.** Allocate at install (exec `AllocMem`, MEMF_PUBLIC; skip the option if it
+    fails): the strip buffer, the edge tables and the span pattern tables (`$56100`, `$56800`,
+    `$56C00`, `$56E60`). The strip moves first and almost for free: the scroll-in reads it
+    only through `$5C848` (the column copy at `$493E`), and the filler writes it through
+    `$195A`; find every other reader and writer of `$70000` first.
+11. **Rewrite the edge scanner and the span filler** in the slave for the option's path,
+    reading and writing fast memory, with no `movep` and no self-modification. Together
+    they are 45% of the A500's pan time. Fixture: identical strip bytes to the original's for
+    the recorded polygons (Unicorn), and the render check.
+12. **The rest of the strip render** (projection at `$11D8`, `$6BDA`, `$17A2` and smaller):
+    profile again on the 020 and decide what else moves. The program's code stays in chip
+    memory (absolute addressing throughout and no relocation table); with the
+    self-modification gone the 040/060 instruction cache holds it.
+13. **Cache policy** (the user's decision, playbook §8): the instruction cache, and the data
+    cache (copyback) for the allocated fast memory; base memory stays non-cacheable.
+
+### E. Continuous 50 fps panning (the same option)
+
+14. Measure the strip pause on the a1200-040 and a1200-060 after step 11. If it is under a
+    field, the original sequential loop already pans continuously; otherwise:
+15. **Pipeline the pan.** Run the 8 scroll-in steps (the plane blits, the column copy, the
+    swap) from the vertical-blank interrupt while the main loop renders the next strip, in the
+    direction still held, into a second fast strip buffer; drop it when the pan stops or turns.
+    This needs the point where the view angle (`$18C4`, `$18C6`, `$1683`) is committed, and it
+    must not let game time run ahead (step 8). A strip render under 7 fields then gives a
+    swap every field.
+16. **Chip bus.** Drop blitter-nasty (`BLTPRI` in the `DMACON` write at `$342`) on the option's
+    path so the CPU's few chip accesses are not held behind the scroll blits.
+17. **Acceptance**: with a pan held for 10 s on the a1200-040 and a1200-060, the pan meter
+    shows a swap every field; the render check matches the A500's; game speed is unchanged
+    (step 8); with the option off the slave applies the original code paths, and the
+    68000 still works correctly with it on. FS-UAE's 040/060 timing is not hardware's (about
+    an instruction count), so the 50 fps figure is confirmed on a real accelerator.
