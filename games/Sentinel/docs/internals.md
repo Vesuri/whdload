@@ -34,9 +34,10 @@ Offsets are into the program as loaded, from `BASE` (so the file offset into the
 | `$30C` | `jsr` a blitter wait before writing `BLTCON0` `$09F0` (not with CUSTOM1) | StingRay |
 | `$6D4` | `jsr`: acknowledge the vertical blank interrupt twice, for 68040/060 and fast chipsets | StingRay |
 | `$14BE` | jump to `EdgeStep` (2.0b): the edge scan converter's stepping (`$14BE`..`$165B`) without self-modification | Vesuri |
+| `$47AC` | `jsr` a blitter wait before the pan step clears the field flag (2.0b, not with CUSTOM1): below | Vesuri |
 | module `$F2E` | `jsr SfxDmaWait` (2.0b), applied by `Loader` when it loads the sound module to `$20000` and the bytes match: the effect trigger's DMA-off wait, below | Vesuri |
 
-CUSTOM1 (`C1:B:Disable Blitter Waits`) drops the `$30C` wait.
+CUSTOM1 (`C1:B:Disable Blitter Waits`) drops both blitter waits, `$30C` and `$47AC`.
 
 `EdgeStep` keeps the step (+1 or -1) in d3 instead of writing `addq.w`/`subq.w #1,d1` into
 the loops, and has a loop for each x-major mode instead of writing the `bcc.s` displacement.
@@ -75,7 +76,25 @@ low-memory variables and tables.
   frames. The view is 192 lines.
 - **The blitter** is used only for the scroll step at `$2E2`: four A-to-D plane copies (19
   words by 192 lines, or 20 by 184 for a vertical step), with blitter-nasty set (`DMACON`
-  `$8440` at `$342`). Everything else is drawn by the CPU.
+  `$8440` at `$342`). Everything else is drawn by the CPU. The pan step (`$4868`) starts the
+  four plane blits, then copies the strip's column into the words they leave out: with four
+  more blits (1 word by 192 lines) for a horizontal step, with the CPU (`$493E`, 8 lines of
+  20 words) for a vertical one. Then the loop clears the field flag (`$47AC`), waits for the
+  field (`$358`) and restarts the copper on the new buffer (`$7C0`). StingRay's wait at `$30C`
+  covers the start of each blit; nothing in the game waits for the end of the last one. On a
+  68000 none is needed: blitter-nasty holds the CPU until a blit ends, so DMACONR's BBUSY never
+  reads set after a `BLTSIZE` write (0 of 4032 reads on the a500). On the a1200-030 and
+  a1200-040 the CPU reads it set (all of 6208 on the 040), so it runs alongside the blit; the
+  last blit is over by the copper restart only if the CPU's chip accesses after it are held
+  behind it, which depends on the bus, the caches and write buffers (FS-UAE's arbitration for
+  these CPUs is not the hardware's). 2.0b waits for the blitter at `$47AC`, so the field
+  the new buffer is shown in starts after its last blit, as on the 68000. MEASURED before the wait
+  was added (a probe slave's counters at `$3F0`, all four pan directions, 250 or 500 fields
+  each): the blitter was idle at every swap on the a500 (656 swaps) and at every field wait
+  and swap on the a1200-040 (944), the a1200-040 with `DCACHE` (1016) and the a1200-030 with
+  `MMU DCACHE` (568). FS-UAE's 68060 setup is not cycle-exact and finishes each blit at once
+  (BBUSY never read set). The blits' destinations and the CPU's column never overlap, and no
+  blit writes a buffer's first 8 lines, which `$4822` copies.
 - **A pan step** renders a 128-pixel strip into the strip buffer at `$70000` (160 bytes a
   row, word-interleaved planes), then scrolls it in over 8 frames: each blits the front
   buffer into the back buffer shifted by one word (or 8 lines), copies one word column from
@@ -109,10 +128,14 @@ MEASURED (a500, 60 fields traced while panning; share of CPU cycles): the span f
 `$356`) 17%, the edge scan converter (`$1440`) 14%, the field wait (`$358`) 8%, `$11D8` 5%,
 `$6BDA` 3%, `$17A2` 3%, the sound module at `$20000` 2%.
 
-MEASURED (2.0b with `EdgeStep`, `tools/render_check.sh`, the fields its ten key pan steps take):
-a500 360, a1200 197, a1200-030 with `MMU DCACHE` 164, a1200-040 166 (`CACHE` 166, `DCACHE` 127,
-`NOCACHE` 263), a1200-060 104 (`DCACHE` and `BRANCHCACHE DCACHE` 104).
+MEASURED (2.0b, `tools/render_check.sh`, the fields its ten key pan steps take): a500 361,
+a1200 198, a 28 MHz 68020 with Zorro III memory 192, a1200-030 185 (`MMU DCACHE` 165,
+`MMU NOCACHE` 230), a1200-040 167 (`CACHE` 167, `DCACHE` 128, `NOCACHE` 264), a1200-060 105
+(with every cache option; 110 when it traps `movep`). FS-UAE's 68060 setup is not
+cycle-exact, so its figures do not follow the caches.
 
 ## Limitations
 
-The blitter waits ([open-work.md](open-work.md) B6b) are not yet checked.
+Self-modification outside the traced paths ([open-work.md](open-work.md) B4a): the static
+code map finds no store into executed code but the edge scan converter's, but a store
+through a computed pointer is found only by tracing it.

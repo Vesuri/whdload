@@ -10,7 +10,7 @@ a1200-040 and the a1200-060, and since B5 the 68040 and 68060 draw correctly.
 
 2.0b (23.11.2026), not published: V1.01 with `$VER` and the info text in the slave, the
 ReadMe entry above StingRay's, the self-modification fix (B5) and the effect trigger's
-wait (B6a); `make dist` builds
+wait (B6a) and the pan step's blitter wait (B6b); `make dist` builds
 `SentinelEnhanced-2.0b-20261123.lha`.
 
 ## The goals
@@ -50,15 +50,24 @@ across phases. Status in brackets.
   effect trigger's wait (at least 12 lines; 13 on the a500, 040 and 060). V1.01 is its
   control.
 - **A5** The edge differential `tools/edgecheck.py`, in `make check` (done).
-- **A6** The matrix `tools/matrix.sh` (done): every machine and cache option, the two
-  controls, two runs at a time; checked on the a500 and the controls.
+- **A6** The matrix `tools/matrix.sh` (done): the render and play checks on the a500,
+  a1200, a1200-030 and a1200-040 after a change; `FULL=1` adds every cache option, the
+  68020 with Zorro III memory, the 68060 lines and the two controls.
 - **A7** The harness docs (done).
 
-### B. Correct on the 68040 (bug fixes, always on)
+### B. Correct on the 68040 (bug fixes, always on; done)
 
 - **B4** Self-modifying code census (done): only the edge scan converter's five stores, over
   4085 traced a500 fields ([internals.md](internals.md#rendering-and-panning)).
-  - **B4a** (open) Not traced: the paths of A3e.
+  - **B4a** (done, statically) The paths of A3e are not traced. The static code map
+    (`tmp/an/flow.py`, recursive descent from the entry and the interrupt vectors: 7121
+    instructions, 2155 of them never traced) finds no absolute-address store into an executed
+    instruction but the edge scan converter's (`$4194`, written at `$4196`, is a data byte
+    after a `bra.w`), and the only address registers loaded with code addresses in untraced
+    code are the vector setup (`$3FE`..`$452`) and a table read (`$309C`). A store through a
+    computed pointer in those paths would still be found only by tracing it; left alone in
+    landscape 0000 for 10000 fields (a500) the player keeps 10 energy, so tracing the
+    Sentinel's absorption needs a scripted route to a square it sees.
 - **B5** Remove it (done): `EdgeStep`, equal to the game's code under Unicorn
   (`tools/edgecheck.py`, 200000 edges, and three deliberate faults caught).
 - **B6** Other fast-CPU hazards, each checked and fixed if real:
@@ -67,25 +76,35 @@ across phases. Status in brackets.
     CPU ([internals.md](internals.md#sound)); the music and the player's resume are as on the
     68000. Not judged by ear: FS-UAE's audio hack did not fire for the trigger in the runs
     (its DMA-on is usually a later field).
-  - **B6b** (open) Blitter waits: StingRay's wait at `$30C` covers the start of each plane's
-    blit, but nothing waits for the last plane before the swap or before the CPU next writes
-    that buffer; with code in the instruction cache the 68040 is no longer held by
-    blitter-nasty (`BLTPRI`) as the 68000 is.
+  - **B6b** (done) Blitter waits: StingRay's wait at `$30C` covers the start of each blit;
+    nothing waited for the last one before the pan step's swap. On a 68000 blitter-nasty
+    holds the CPU until it ends; on the 030 and 040 the CPU runs alongside it. No late blit
+    showed in emulation (every swap and field wait measured), but whether one is over then
+    rests on bus arbitration and write buffers, so 2.0b waits for the blitter before the
+    field flag is cleared (`$47AC`), as the 68000 in effect does
+    ([internals.md](internals.md#rendering-and-panning)). The blits never overlap the
+    CPU's column copy, and the CPU next writes a blitted buffer only in a later step, after
+    `$30C`'s wait.
   - **B6c** (done) CPU-timed delays: the other `dbf` and count-down loops in the program read
     as benign (none times hardware).
   - **B6d** (done) `jmp ($10)` at `$1ED6` is never reached.
   - **B6e** (done in emulation) `movep`: 23 sites in the program (the span filler's are hot);
     the 68060 traps every one. FS-UAE's 68060 executes `movep` unless
-    `--uae_cpu_no_unimplemented=true`; with it the render check matches (109 fields in pans
-    against 104). The cost on a real 68060 is not measured.
+    `--uae_cpu_no_unimplemented=true`; with it the render check matches (110 fields in pans
+    against 105). The cost on a real 68060 is not measured.
   - **B6f** (done in emulation) The data cache on chip memory: with the MMU, WHDLoad's `Cache`
     and `DCache` make chip memory cacheable write-through, so a CPU read of chip memory the
     blitter or a disk load wrote since the CPU last read it can see the old bytes (the buffer
-    copy at `$4822` reads a buffer the scroll blits wrote). FS-UAE's MMU model caches chip
-    data (real boards' chip memory is usually not cached); no stale read showed in the render
-    check with `DCACHE` on the 030, 040 and 060.
-- **B7** (to do) The matrix (`tools/matrix.sh`, A6), all of it; then the ReadMe line if
-  anything changes.
+    copy at `$4822` is not one: it reads only a buffer's first 8 lines, which no blit
+    writes). FS-UAE's MMU model caches chip data (real boards' chip memory is usually not
+    cached); no stale read showed in the render check with `DCACHE` on the 030, 040 and 060.
+- **B7** (done 23.11.2026) The full matrix (`FULL=1`, A6) with B6b's wait: every line as
+  expected, the render check on all 20 machine and cache lines, the play check on the 9, and
+  both controls failing. The first run found the pointer half of the render check depending
+  on the CPU's speed (the 060 lines and the 040 with `DCACHE`); with the pointer entering and
+  leaving the pan band in one move and `strips` counting the game's steps, the render lines
+  were run again and the reference's first three lines re-recorded (frames from the middle
+  of a step before); V1.01 still matches it on the a500.
 
 ### C. Measure before optimising
 
@@ -129,7 +148,9 @@ across phases. Status in brackets.
   pointer), and it must not let game time run ahead (C8). A strip render under 7 fields then
   gives a swap every field.
 - **E16** (to do) Chip bus. Drop blitter-nasty (`BLTPRI` in the `DMACON` write at `$342`) on
-  the option's path so the CPU's few chip accesses are not held behind the scroll blits.
+  the option's path so the CPU's few chip accesses are not held behind the scroll blits. The
+  pan step then relies on B6b's wait on the 68000 too, and the CUSTOM1 option, which drops
+  it, must not apply on that path.
 - **E17** (to do) Acceptance: with a pan held for 10 s on the a1200-040 and a1200-060, the
   pan meter shows a swap every field; the render and play checks pass; game speed is
   unchanged (C8); with the option off the slave applies the original code paths, and the

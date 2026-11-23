@@ -21,6 +21,8 @@
 ;   the instruction cache on, 68040 and 68060 drew faces wrongly
 ; - the sound effect trigger's CPU-timed DMA-off wait is beam-timed
 ;   (SfxDmaWait), at least the 68000's length on every CPU
+; - the pan step waits for its last blit before the field it shows it in (not
+;   with CUSTOM1, like the wait at $30c)
 
 	INCDIR	SOURCES:Include/
 	INCLUDE	whdload.i
@@ -171,6 +173,10 @@ PLGAME	PL_START
 
 ; Vesuri's patches (2.0b)
 	PL_P	$14be,EdgeStep		; the edge scan converter's stepping
+	PL_IFC1
+	PL_ELSE
+	PL_PS	$47ac,.wblit2		; the pan step: wait for the last blit
+	PL_ENDIF
 	; and in the sound module: PLSOUND, applied by Loader
 	PL_END
 
@@ -180,6 +186,15 @@ PLGAME	PL_START
 
 .wblit1	bsr.b	WaitBlit
 	move.w	#$09f0,$dff040
+	rts
+
+; The pan step starts its plane blits (the wait at $30c covers each start,
+; not the last one's end), clears the field flag, waits for it and restarts
+; the copper on the buffer they wrote. On a 68000 blitter-nasty holds the
+; CPU until the blit ends, so the field it waits for starts after it; a
+; 68040 or 68060 running from its caches is not held.
+.wblit2	bsr.b	WaitBlit
+	clr.w	BASE+$c8c		; clr.w $58c70: the field flag
 	rts
 
 WaitBlit
