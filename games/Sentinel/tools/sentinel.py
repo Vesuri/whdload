@@ -25,6 +25,11 @@ Commands (each stops the CPU and leaves it stopped at a vsync, except `go`):
                              add to STATE (a pickle) every base-memory byte executed and every
                              byte the CPU wrote, with the PCs that executed each instruction;
                              tools/smc_census.py reports the overlap
+    pointer X Y              steer the mouse until the pointer ($5F84A x 0..2418, $5F84C y
+                             0..2996, up is larger) is at X, Y or stops at an edge (pointer mode)
+    waitfor ADDR HEX MAX     run fields until the bytes at ADDR equal HEX: 'at N' or 'timeout'
+    brk ADDR SECONDS         run to a breakpoint at ADDR, bounded in wall time: 'hit' or
+                             'timeout', with the fields that passed
     go                       resume
 
 Addresses are the game's runtime ones: the program is loaded at BASE $57FE4 in base memory,
@@ -33,6 +38,7 @@ whatever the machine. See docs/development.md for the route and the checks built
 import hashlib
 import os
 import re
+import signal
 import sys
 from pathlib import Path
 
@@ -219,6 +225,68 @@ def census(server, g, rest):
     return f"census: {st['fields']} fields, {len(st['exec'])} instructions, {len(st['write'])} bytes written"
 
 
+def word(g, addr):
+    return int.from_bytes(peek(g, addr, 2), 'big')
+
+
+POINTER = (0x5f84a, 0x5f84c)   # the pointer, x 0..2418 and y, in pointer mode
+
+
+def pointer(server, g, rest):
+    """Steer the mouse (native input, 2 fields a move) until the game's pointer is within 24
+    of X, Y, or stops moving (an edge)."""
+    tx, ty = (int(v, 0) for v in rest.split())
+    g.stop()
+    x, y = word(g, POINTER[0]), word(g, POINTER[1])
+    for _ in range(80):
+        dx, dy = tx - x, ty - y
+        if abs(dx) < 24 and abs(dy) < 24:
+            break
+        # a mouse count moves x by +4 and y by -8 (y grows upwards on the screen)
+        mx = max(-60, min(60, round(dx / 4))) if abs(dx) >= 24 else 0
+        my = max(-60, min(60, round(-dy / 8))) if abs(dy) >= 24 else 0
+        g.cmd(f'monitor mouse {mx} {my}')
+        g.cmd('monitor fields 2')
+        nx, ny = word(g, POINTER[0]), word(g, POINTER[1])
+        if (nx, ny) == (x, y):
+            break
+        x, y = nx, ny
+    return f'pointer {x} {y}'
+
+
+def waitfor(server, g, rest):
+    """Run fields one at a time until the bytes at ADDR equal HEX, at most MAX fields."""
+    a, want, n = rest.split()
+    a, want, n = int(a, 0), bytes.fromhex(want), int(n)
+    g.stop()
+    for i in range(n + 1):
+        if peek(g, a, len(want)) == want:
+            return f'at {i}'
+        g.cmd('monitor fields 1')
+    return f'timeout {n} ({peek(g, a, len(want)).hex()})'
+
+
+VBL = 0x58c6e                  # the game's field counter
+
+
+def brk(server, g, rest):
+    """Run to a breakpoint at ADDR for at most SECONDS of wall time; stays stopped there (or
+    wherever the time ran out). Prints hit or timeout and the fields that passed."""
+    a, secs = rest.split()
+    g.stop()
+    v0 = word(g, VBL)
+    g.cmd(f'break *{a}')
+    try:
+        out = g.cmd('continue', timeout=float(secs))
+        hit = 'Breakpoint' in out
+    except TimeoutError:
+        os.kill(g.p.pid, signal.SIGINT)     # a synchronous continue reads no stdin
+        g.read_until(g.sent, 30)            # then gdb runs the echo queued after it
+        hit = False
+    g.cmd('delete')
+    return f"{'hit' if hit else 'timeout'} {(word(g, VBL) - v0) & 0xffff}"
+
+
 def go(server, g, rest):
     g.cont()
     return 'running'
@@ -226,7 +294,8 @@ def go(server, g, rest):
 
 server = game_server('sentinel', commands={
     'fields': fields, 'key': key, 'click': click, 'mouse': mouse, 'hold': hold, 'release': release, 'peek': peek_cmd,
-    'swaps': swaps, 'strips': strips, 'route': route, 'census': census, 'go': go})
+    'swaps': swaps, 'strips': strips, 'route': route, 'census': census, 'pointer': pointer, 'waitfor': waitfor, 'brk': brk,
+    'go': go})
 
 if __name__ == '__main__':
     if sys.argv[1:2] == ['serve'] and os.environ.get('ENTRY') == '1':

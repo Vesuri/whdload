@@ -43,19 +43,32 @@ fields on the a500.
 
 The keys: D (raw `$22`) pans right, S (`$21`) left, L (`$28`) up, comma (`$38`) down. The left
 mouse button enters pointer mode (`$1853` set); there the pointer at an edge pans (`$5F84A`
-0..2418 and `$5F84C` 0..2996, edges tested at `$7870`), and space returns to key mode.
+x 0..2418 and `$5F84C` y 0..2996, larger is up; edges tested at `$7870`), and space returns
+to key mode. A mouse count moves x by 4 and y by -8; `pointer X Y` steers through the
+emulator's mouse input until the game's pointer is there or stops at an edge, so a pan with
+the pointer is `pointer 9999 1536` (right), `0 1536`, `1280 9999` (up) or `1280 0`.
 `swaps N` reports the fields between buffer swaps: a pan step is 8 swaps a field apart, then
 the pause while the next strip is drawn.
+
+Two commands bound what the shared ones leave open: `waitfor ADDR HEX MAX` runs field by
+field until memory holds a value and says `timeout` after MAX fields; `brk ADDR SECONDS` is a
+breakpoint with a wall-time limit (`monitor fields` ignores breakpoints, and the shared
+`until` waits up to 30 minutes), stopping there or interrupting gdb.
 
 ## The render check
 
 `tools/render_check.sh [run options]` boots, takes the route and pans right 3 steps, left 3,
-up 2 and down 2, hashing the displayed buffer after each step; the hashes must equal
-`tools/render_check.txt`, recorded on the a500 (`tools/render_check.sh record`). A pan step's
-picture depends only on the steps taken, so the hashes hold on every CPU; it also prints the
-fields the pans took. `INSTANCE=b` runs one beside another; start them a few seconds apart (several
-launched in the same second failed to boot). V1.01 matched only with `WHD_ARGS=NOCACHE` on
-the 68040 and 68060.
+up 2 and down 2 with the keys, then the same with the pointer at each screen edge, hashing
+the displayed buffer after each step; the hashes must equal `tools/render_check.txt` (lines
+`22 1 ...` for keys, `p22 1 ...` for the pointer), recorded on the a500 (`tools/render_check.sh
+record`). A step's picture depends on the steps before it (the same view reached on the way
+back has other bytes), not on the CPU or on keys against pointer: from the first view the
+pointer's steps equal D's. It prints the fields each half took. `INSTANCE=b` runs one beside
+another; start them a few seconds apart (several launched in the same second failed to
+boot).
+
+The reference is V1.01's picture: V1.01 matches it on the a500 (`SLAVE=original`), and the
+control `SLAVE=original SETUP=a1200-040` must fail (it differs in 43 diff lines).
 
 ## Checks
 
