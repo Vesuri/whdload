@@ -8,7 +8,7 @@ a1200-040 and the a1200-060, and since B5 the 68040 and 68060 draw correctly.
 
 ## Release
 
-2.0b (23.11.2026), not published: V1.01 with `$VER` and the info text in the slave, the
+2.0b (23.11.2026), published (tag `SentinelEnhanced-2.0b-20261123`): V1.01 with `$VER` and the info text in the slave, the
 ReadMe entry above StingRay's, the self-modification fix (B5), the effect trigger's wait
 (B6a), the pan step's blitter wait (B6b), the PAL/NTSC test on AGA (C8), Enhanced framerate
 (CUSTOM1, on in the installed icon: D10, D11, E15, E16), the data cache in the icon
