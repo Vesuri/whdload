@@ -350,7 +350,7 @@ Decrunch	movem.l	d0-a6,-(a7)
 		bne.b	.skip
 
 		move.w	#$4E71,$6534.w		; skip protection
-.skip		bsr	SMC_Decrunched
+.skip		bsr	Fix_Decrunched
 		move.w	#-1,$3A.w
 		rts
 

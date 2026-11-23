@@ -69,12 +69,16 @@ STEP = 0xDC60             # the player's last step (word), as added to POS at $C
 
 
 def longs(g, addr, n):
+    """n longs from addr; UNREADABLE for what gdb cannot read."""
     out = g.cmd(f'x/{n}xw {addr:#x}')
     vals = []
     for line in out.splitlines():
         if ':' in line:
-            vals += [int(v, 16) for v in line.split(':', 1)[1].split()]
-    return vals[:n]
+            try:
+                vals += [int(v, 16) for v in line.split(':', 1)[1].split()]
+            except ValueError:
+                break
+    return (vals + [UNREADABLE] * n)[:n]
 
 
 def sample(g):
@@ -235,10 +239,11 @@ def shot(server, g, path):
 def do(server, g, rest):
     """do <action> ...: run actions with the CPU stopped, then let it run again. Actions:
     f<N> run N fields; L1/L0, R1/R0 press/release the left/right mouse button; m<dx>,<dy>
-    move the mouse (then run fields so the game reads it); x<addr>[,<n>] read n longs (hex);
+    move the mouse (then run fields so the game reads it); x<addr>[,<n>] read n longs (hex; addr `sp` reads at the stack pointer);
     u<addr>=<hex>,<max> (or != or >=, unsigned) run fields until the long at addr
     compares so with hex, at most max (>= skips $FFFFFFFF, read during disk loads);
-    pc the stopped PC; shot=<png> screenshot of the next field. A last action `stay` leaves
+    b<addr> run to a breakpoint at addr (hex); r<reg>[,<reg>...] read registers; pc the
+    stopped PC; shot=<png> screenshot of the next field. A last action `stay` leaves
     the CPU stopped, so the next `do` goes on from the same field. Replies with one line per
     read."""
     g.stop()
@@ -255,7 +260,12 @@ def do(server, g, rest):
                 g.cmd(f'monitor mouse {int(dx)} {int(dy)}')
             elif a[0] == 'x':
                 addr, _, n = a[1:].partition(',')
-                vals = longs(g, int(addr, 16), int(n or 1))
+                if addr == 'sp':
+                    g.cmd('maintenance flush register-cache')
+                    at = int(g.cmd('info registers sp').split()[1], 16)
+                else:
+                    at = int(addr, 16)
+                vals = longs(g, at, int(n or 1))
                 lines.append(f'{addr} ' + ' '.join(f'{v:08x}' for v in vals))
             elif a[0] == 'u':
                 cond, _, most = a[1:].partition(',')
@@ -270,12 +280,25 @@ def do(server, g, rest):
                     g.cmd('monitor fields 5')
                     waited += 5
                 lines.append(f'{a} after {waited} fields')
+            elif a[0] == 'b':
+                g.cmd(f'break *{int(a[1:], 16):#x}')
+                try:
+                    g.cmd('continue', timeout=600)
+                finally:
+                    g.cmd('delete')
+            elif a[0] == 'r':
+                g.cmd('maintenance flush register-cache')
+                out = g.cmd(f'info registers {" ".join(a[1:].split(","))}')
+                lines.append(' '.join(f'{w[0]}={int(w[1], 16):08x}' for w in
+                                      (l.split() for l in out.splitlines()) if len(w) > 1))
             elif a == 'pc':
                 lines.append(f'{pc(g):#x}')
             elif a.startswith('shot='):
                 shot(server, g, os.path.abspath(a[5:]))
             else:
                 raise ValueError(f'unknown action {a}')
+    except Exception as e:      # keep what was read before the failing action
+        lines.append(f'ERROR {type(e).__name__}: {e}'.splitlines()[0])
     finally:
         if not stay:
             g.cont()
@@ -287,6 +310,25 @@ def sword(v):
 
 
 TITLE_VBL, RACE_VBL = 0xA2EC, 0xA3A4   # what the VBL calls through $A56C
+
+
+def vbl_hook(g):
+    """What the VBL calls through $A56C. On a 68020 or higher src/smc.i has made $A56A a
+    `jsr smc_VblA`, which is `jmp ([_smc_vecA,pc])`: the hook is then the slave's variable."""
+    v, = longs(g, 0xA56C, 1)
+    if v < 0x80000 or v == UNREADABLE:
+        return v
+    op, = longs(g, v, 1)                  # 4EFB, then the extension word
+    if op >> 16 != 0x4EFB:
+        return v
+    ext = op & 0xFFFF
+    if (ext >> 4) & 3 == 3:
+        bd, = longs(g, v + 4, 1)
+    else:
+        bd = longs(g, v + 4, 1)[0] >> 16
+        bd -= 0x10000 if bd & 0x8000 else 0
+    return longs(g, (v + 2 + bd) & 0xFFFFFFFF, 1)[0]
+TITLE_WAIT = (0x12F90, 0x12FB0)   # the title's idle loop, where it takes the click
 MENU_ITEM = 0x86EE        # the menu's highlighted item
 MENU_ITEMS = (0x86F2, 0x88C6)   # START (the first highlight) to MANUAL
 MENU_CODE = ((0x4800, 0x4E80), (0x8DC0, 0x8E80))   # the menu's loop and its wait
@@ -310,13 +352,20 @@ def to_race(server, g, rest):
     g.stop()
     log = []
     try:
-        w = fields_until(g, lambda: longs(g, 0xA56C, 1)[0] == TITLE_VBL, 8000)
+        w = fields_until(g, lambda: vbl_hook(g) == TITLE_VBL, 8000)
         if w is None:
             raise TimeoutError('no title')
         log.append(f'title after {w}')
         # The title takes the click while it is still loading the menu in the background and
         # shows the menu once the load is done; a click is repeated every 250 fields.
         for click in range(40):
+            # Click only in the title's idle wait: a click during the menu's wipe (30 fields
+            # with the slave's beam-timed delay) leaves the menu again.
+            if fields_until(g, lambda: menu_up(g) or TITLE_WAIT[0] <= pc(g) < TITLE_WAIT[1],
+                            4000, 10) is None:
+                raise TimeoutError('the title does not wait for a click')
+            if menu_up(g):
+                break
             g.cmd('monitor input JOY1_2ND_BUTTON 1')
             g.cmd('monitor fields 20')
             g.cmd('monitor input JOY1_2ND_BUTTON 0')
@@ -331,7 +380,7 @@ def to_race(server, g, rest):
         if held is None:
             raise TimeoutError('START did not leave the menu')
         log.append(f'START held {held} fields')
-        w = fields_until(g, lambda: longs(g, 0xA56C, 1)[0] == RACE_VBL, 6000)
+        w = fields_until(g, lambda: vbl_hook(g) == RACE_VBL, 6000)
         log.append(f'race after {w}')
         w = fields_until(g, lambda: 0 < longs(g, CLOCK, 1)[0] <= 0x100, 6000, 1)
         if w is None:

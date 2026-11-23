@@ -26,8 +26,8 @@
 
 SMC_TRAMP	= $130			; JMP trampolines for the 4-byte sites,
 					; after the original slave's ($100-$129)
-SMC_LO		= SMC_VBLW1		; lowest and highest+1 patched address,
-SMC_HI		= $1065A		; for reloads over the program
+SMC_LO		= SMC_VBLW1		; lowest and highest+1 patched address
+SMC_HI		= $1A26E		; (Fix_Decrunched in src/fixes.i)
 
 ; IN:	-
 ; OUT:	-	all registers preserved
@@ -88,17 +88,6 @@ smc_Init	move.l	$A56C,_smc_vecA-_smc_state(a2)
 ; reloads part of itself from $439C) gets the patches again.
 ; IN:	-
 ; OUT:	-	all registers preserved
-SMC_Decrunched	move.l	d0,-(a7)
-		move.l	$1D90E,d0		; destination
-		cmp.l	#SMC_HI,d0
-		bhs.b	.no
-		add.l	$34F32,d0		; + decrunched length
-		cmp.l	#SMC_LO,d0
-		bls.b	.no
-		bsr	FixSMC
-.no		move.l	(a7)+,d0
-		rts
-
 	MACHINE	MC68020
 
 ;--- the VBL routine: jsr <vector> at $A56A and $A570, the vectors written by

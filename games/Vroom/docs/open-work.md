@@ -103,15 +103,13 @@ The tools are in `docs/development.md` ("Tools"); the facts they rest on are in
 
 ### B. Correct on the 68040 (bug fixes, always on)
 
-5. **SNOOP run.** `SNOOPAGA CHKBLTWAIT` with `DCACHE` on the a1200-040 for several demo
-   races and a player race. Fix every hit, as with the drive-motor and blitter-queue fixes.
-6. **CPU-timed waits** (playbook §8):
-   - the sound player ($9432) for audio DMA off, `dbf`, DMA on, which loses notes on a
-     68040/060 (judge with FS-UAE's audio workaround off);
-   - the keyboard interrupt ($A04A) for its handshake delay;
-   - `dbf`-to-self and countdown loops in the program and the loader.
-
-   Replace each with a beam-timed wait of its a500 length.
+5. **SNOOP run** (done). `SNOOPAGA CHKBLTWAIT DCACHE` on the a1200-040: five demo races and
+   a player race (`race`, then `drive` for 6000 fields) without a fault.
+6. **CPU-timed waits** (done; `internals.md`, "Fixes" and "CPU-timed delays"). The keyboard
+   handshake ($A2AC) was too short on every CPU and is now a 3-line beam wait. Five `dbf`
+   delays (the menu's wipes, pauses after menu choices) are beam waits of their 68000 length on
+   a 68020 or higher. The sound player has no CPU-timed wait: it restarts audio DMA at the
+   next VBL. The loader's drive delays were already removed by the original slave.
 7. **The flickering roadside objects.** Reproduce on the a500 and the a1200-040 (screenshots
    at consecutive swaps in a real race). Candidates: the object list ($D23A onwards) built
    for the wrong buffer, the scaler's slot state across frames, and a missing blitter wait

@@ -46,8 +46,27 @@ slave's at $100-$129, `smc.i`'s at $130-$1A7 and `fixes.i`'s at $1B0.
 | $A094 | the blitter-done interrupt's dispatcher acknowledges, then waits for the blitter before it starts the next queued blit |
 | $10F90, $11BE6, $11CA8 | the blitter queue: before writing a new queue ($10F90) or programming the blitter ($11BE4, $11CA6), the CPU waited only for the current blit ($11202). A fast CPU then overwrote a queue the interrupt was still working through, and the interrupt jumped to a field as its next handler (a 68060 crash at PC $4 with a6 = 0, with the original slave too, caches off). These now wait in $1123A for the queue to drain, as the game's other blitter users do |
 
+| $A2AC | the keyboard handshake waited $C8 loops of `nop`/`dbf`: the boot loader would have calibrated $C8 with a CIA timer, the original slave sets it to 0. It is now a wait for 3 raster lines (over the 75 µs the keyboard needs) |
+
 The blitter queue: the dispatcher is at $A092, the queue pointer at $11264 (idle = $11260),
 the queue at $11268, and the handlers at $110A8-$111E8.
+
+## CPU-timed delays (68020 and higher)
+
+Five delays count `dbf` loops to themselves. On a 68000 (10 cycles a loop, 454 cycles a raster
+line) they last as below; on a 68040 next to nothing. On a 68020 or higher they become beam
+waits of their 68000 length (`fix_WaitLines` counts changes of the beam's line). A 68000 or
+68010 runs the game's loops.
+
+| Where | What | 68000 length |
+|---|---|---|
+| $481A, $534A | the menu's two wipes ($47FE: 140 lines, $532E: 200), after each copied line: `move.w #3000,d2; dbf d2,*` | 66 raster lines a line, about 30 and 42 fields a wipe |
+| $4986 | after a menu choice: 9 × 32001 `dbf` | 6344 lines, 20.3 fields |
+| $816C | a delay routine, called by the menu's item actions ($4CBC-$4E0A): 11 × 32001 | 7754 lines, 24.8 fields |
+| $153CA | the end of the routine at $15326: the same, d0 and d1 swapped | 7754 lines |
+
+The sound player has no CPU-timed wait: it turns a channel's DMA off and back on at the next
+VBL ($A040, read at $9452).
 
 ## Self-modifying code (68020 and higher)
 
@@ -68,8 +87,9 @@ condition codes as the replaced instructions did.
 | $EC84 | `nop` or `asr.w #n,d4` copied to $ECA0 | the same write, then a flush |
 | $19EBE-$1A26A (12 sites); $19CAE, $1A074, $1A09E | the scaler stores one of 16 instruction pairs from the table at $1A340 into six 4-byte slots in its loop, every 4 pixels; the table is rebuilt by two copies and a single-entry write | the stores select one of 20 precompiled pairs per slot (decoded from the table each time it is written) and each slot calls its selection |
 
-A decrunch that lands on patched code (the program reloads part of itself to $439C) gets the
-patches again (`SMC_Decrunched`). The variables keep their state across a reload.
+A decrunch that lands on patched code (the program reloads part of itself to $439C) gets all
+of these patches and the fixes again (`Fix_Decrunched`, over $3B54-$1A26E). The variables keep
+their state across a reload.
 
 ## Frames and game time
 
@@ -183,3 +203,4 @@ The demo race renders correctly and no WHDLoad dump appears on these setups:
 | a1200 (68020) | `CACHE` | demo race |
 | a1200-040 | `CACHE`; `DCACHE` | demo race |
 | a1200-060 | `DCACHE BRANCHCACHE STOREBUFFER SUPERSCALAR` | 150 s, several demo races |
+| a1200-040 | `SNOOPAGA CHKBLTWAIT DCACHE` | five demo races; a player race (`race`, `drive` 6000 fields) |

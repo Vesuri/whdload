@@ -64,9 +64,9 @@ button. Left alone, the title runs a demo race after about 20 s in warp.
 | `statelog N FILE` | from the next green light, the race state block ($DBC0-$E073) and the race clock at each of N frame ends (a breakpoint at $D510: exact per frame, any CPU) |
 | `racelog N FILE` | from the next green light, one line per field: field, frame, clock, distance |
 | `meter N` | frames, fields per frame, clock and distance over N fields from now |
-| `race [stay]` | from the boot, through the title (right button) and the menu (left button on START) to the green light of a player race with the menu's settings as they are (ARCADE, MOUSE, MANUAL): see `internals.md`, "Input, the menu and the race controls" |
+| `race [stay]` | from the boot, through the title (right button, given only while the title idles at $12F9E: a click during the menu's wipe leaves the menu again) and the menu (left button on START) to the green light of a player race with the menu's settings as they are (ARCADE, MOUSE, MANUAL): see `internals.md`, "Input, the menu and the race controls" |
 | `drive N [GAIN] [FILE]` | a test driver for N fields: full throttle, shifting up when the speed stops rising, steering against the lateral position. FILE gets field, gear, speed, lateral, x, y every 2 fields |
-| `do ACTION ...` | low-level steps with the CPU stopped: `f<N>` fields, `L1`/`L0`/`R1`/`R0` mouse buttons, `m<dx>,<dy>`, `x<addr>[,<n>]` reads, `u<addr>=<hex>,<max>` waits, `pc`, `shot=<png>`; a last `stay` leaves the CPU stopped for the next command |
+| `do ACTION ...` | low-level steps with the CPU stopped: `f<N>` fields, `L1`/`L0`/`R1`/`R0` mouse buttons, `m<dx>,<dy>`, `x<addr>[,<n>]` reads (`xsp` at the stack pointer), `u<addr>=<hex>,<max>` waits, `b<addr>` runs to a breakpoint, `r<reg>[,<reg>...]` registers, `pc`, `shot=<png>`; a last `stay` leaves the CPU stopped for the next command. A failing action ends the list, and the reply keeps what came before it |
 | `decrunch N [S]` | stop after each of the next N file decrunches and report the destination and length |
 
 Run it as its own server, after `. ../../common/env.sh`:
@@ -98,5 +98,11 @@ program starts, with the patches applied.
 - `make serve` takes a few seconds to open its socket; wait for
   `tmp/run/default/.run/game.sock` before sending commands.
 - Between demo races the screen is black for a while; check at more than one time.
+- On a 68020 or higher the VBL hook at $A56C is the slave's variable (`src/smc.i`); `race`
+  follows it there.
+- The gdb stub cannot read the slave's memory (it reads $FF); read a register at a breakpoint
+  in the slave instead.
+- Breakpoints sometimes never fire while WHDLoad's MMU is on (Snoop, or the a1200-040); the
+  same trace on the a500 works.
 - During the slave's disk loads the gdb stub reads chip memory as $FFFFFFFF (and the
   field counter stops): a wait on a value must not take that for the value.

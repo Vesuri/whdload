@@ -355,7 +355,7 @@ Decrunch
 
 		move.w	#$4E71,$6534.w		; skip protection
 .skip
-		bsr	SMC_Decrunched
+		bsr	Fix_Decrunched
 		move.w	#-1,$3A.w
 		rts
 

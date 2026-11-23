@@ -16,8 +16,33 @@ Fix		movem.l	d0-d1/a0-a2,-(a7)
 		sub.l	a1,a1
 		move.l	_resload(pc),a2
 		jsr	resload_Patch(a2)
-		movem.l	(a7)+,d0-d1/a0-a2
-		bra	FixSMC
+		bsr	FixSMC			; sets _smc_state from the CPU
+		lea	_smc_state(pc),a0
+		tst.b	(a0)
+		ble.b	.done			; a 68000 or 68010 runs the game's delays
+		lea	_fix_pl020(pc),a0
+		sub.l	a1,a1
+		jsr	resload_Patch(a2)
+.done		movem.l	(a7)+,d0-d1/a0-a2
+		rts
+
+; A decrunch over the program (it reloads part of itself to $439C) lands on
+; patched code: patch it again. src/smc.i's variables keep their state.
+; IN:	-
+; OUT:	-	all registers preserved
+FIX_LO		= SMC_LO		; lowest and highest+1 patched address
+FIX_HI		= SMC_HI
+
+Fix_Decrunched	move.l	d0,-(a7)
+		move.l	$1D90E,d0		; destination
+		cmp.l	#FIX_HI,d0
+		bhs.b	.no
+		add.l	$34F32,d0		; + decrunched length
+		cmp.l	#FIX_LO,d0
+		bls.b	.no
+		bsr	Fix
+.no		move.l	(a7)+,d0
+		rts
 
 _fix_pl		PL_START
 	; the VBL routine's drive motor off ($A50E: or/and/or on ciab.prb):
@@ -35,6 +60,19 @@ _fix_pl		PL_START
 		PL_L	$10F90,$4EB80000+FIX_TRAMP	; lea $11268(pc),a6
 		PL_L	$11BE6,$1123A		; jsr $11202
 		PL_L	$11CA8,$1123A		; jsr $11202
+	; the keyboard handshake: $C8 loops of nop/dbf, a count the boot loader
+	; would have calibrated and the original slave set to 0
+		PL_PSS	$A2AC,fix_KbdDelay,4	; move.w $C8.w,d0; nop; dbf d0,*-2
+		PL_END
+
+	; CPU-timed delays (dbf to itself), on a 68020 or higher: beam waits
+	; of their length on a 68000 (10 cycles a dbf, 454 cycles a line)
+_fix_pl020	PL_START
+		PL_PSS	$481A,fix_Wipe,2	; the menu's two wipes, after each
+		PL_PSS	$534A,fix_Wipe,2	; line: move.w #3000,d2; dbf d2,*
+		PL_PSS	$4986,fix_Delay9,10	; after a menu choice: 9 x 32001 dbf
+		PL_PSS	$816C,fix_Delay11,10	; 11 x 32001 dbf
+		PL_PSS	$153CA,fix_Delay11,10	; the same, d0 and d1 swapped
 		PL_END
 
 fix_Queue	jsr	$1123A			; uses a6
@@ -43,6 +81,39 @@ fix_Queue	jsr	$1123A			; uses a6
 
 fix_BlitInt	move.w	#INTF_BLIT,_custom+intreq
 		BLITWAIT
+		rts
+
+fix_KbdDelay	move.l	d0,-(a7)
+		moveq	#3,d0			; at least 2 lines: over the 75 us
+		bsr.b	fix_WaitLines		; the keyboard needs
+		move.l	(a7)+,d0
+		rts
+
+; dbf leaves the counters at -1 (their low words)
+fix_Wipe	move.l	d0,-(a7)
+		moveq	#66,d0			; 30022 cycles
+		bsr.b	fix_WaitLines
+		move.l	(a7)+,d0
+		move.w	#-1,d2
+		rts
+
+fix_Delay9	move.w	#6344,d0		; 2880296 cycles, 20.3 fields
+		bra.b	fix_Delay
+fix_Delay11	move.w	#7754,d0		; 3520360 cycles, 24.8 fields
+fix_Delay	bsr.b	fix_WaitLines
+		move.w	#-1,d0
+		move.w	d0,d1
+		rts
+
+; IN:	d0.w = raster lines to wait (1 or more): changes of the beam's line
+; OUT:	-	all registers preserved
+fix_WaitLines	movem.l	d0-d1,-(a7)
+.line		move.b	_custom+vhposr,d1
+.same		cmp.b	_custom+vhposr,d1
+		beq.b	.same
+		subq.w	#1,d0
+		bne.b	.line
+		movem.l	(a7)+,d0-d1
 		rts
 
 	INCLUDE	smc.i
