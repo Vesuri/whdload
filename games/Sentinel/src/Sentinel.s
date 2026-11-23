@@ -858,22 +858,12 @@ BlitNext
 .none	move.l	(a7)+,a0
 	rts
 
-; the step's blits finished, in the vertical blank (no blitter interrupt
-; comes while it runs)
-BlitsDone
-	bsr.w	WaitBlit
-	move.w	#1<<6,$dff09c
-	move.w	#1<<6,$dff09c
-	tst.b	blitsleft(pc)
-	beq.b	.done
-	bsr.b	BlitNext
-	bra.b	BlitsDone
-.done	rts
-
 ; $574 in the level 3 interrupt (move.w $dff01e,d0): at a vertical blank
 ; during a scroll-in, what the game's loop does after each field wait
 ; ($47ac..$47f6): show the buffer the last step drew, swap, the next step;
-; after the last, the queued step
+; after the last, the queued step. Only if the last step's blits are done:
+; otherwise the buffer stays as it is for this field (waiting here, the
+; copper restarted on the new buffer below the top of the display)
 VblScroll
 	move.w	$dff01e,d0
 	btst	#6,d0			; the blitter's interrupt: the next blit
@@ -886,7 +876,11 @@ VblVbl	move.w	$dff01e,d0
 	beq.b	VblOut
 	move.b	scrolling(pc),d0
 	beq.b	VblDone
-	bsr.b	BlitsDone
+	tst.b	blitsleft(pc)		; blits still to start or running:
+	bne.b	VblDone			; not this field
+	tst.b	$dff002
+	btst	#6,$dff002
+	bne.b	VblDone
 	movea.l	BASE+$c8e,a1		; the drawn buffer's copper list
 	jsr	BASE+$7c0
 	lea	$78000,a1

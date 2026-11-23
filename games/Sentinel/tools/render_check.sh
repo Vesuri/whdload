@@ -45,9 +45,19 @@ for p in ${PANS:-22:3 21:3 28:2 38:2}; do
   t pointer 1280 1536 > /dev/null
   t fields 100 > /dev/null
 done > "$out/pointer.txt"
+# with Enhanced framerate the vertical blank swaps the buffers: a held pan's swaps must all
+# restart the copper within the vertical blank (PAL lines 0 to 25); later, the rest of the
+# field shows the new buffer from its top (2.0b's first pipelined pan tore on the a1200-030)
+t hold 22 > /dev/null
+t beamat swap 60 > "$out/swaplines.txt"
+t release 22 > /dev/null
 t shot "$PWD/$out/end.png" > /dev/null
 t quit > /dev/null
+late=$(awk 'NF == 2 && $2 >= 26' "$out/swaplines.txt" | wc -l | tr -d ' ')
 { awk '{print $1, $2, $4}' "$out/hashes.txt"; awk '{print "p" $1, $2, $4}' "$out/pointer.txt"; } > "$out/steps.txt"
+if [ "$late" != 0 ]; then
+  echo "render check: ${SETUP:-a500} ${WHD_ARGS-} TEARS ($late of 60 swaps after line 25, see $out/swaplines.txt)"; exit 1
+fi
 if [ $mode = record ]; then cp "$out/steps.txt" tools/render_check.txt; cat "$out/hashes.txt" "$out/pointer.txt"; exit 0; fi
 fields() { awk '{s+=$3} END {print s}' "$1"; }
 if diff -u tools/render_check.txt "$out/steps.txt" > "$out/diff.txt"; then

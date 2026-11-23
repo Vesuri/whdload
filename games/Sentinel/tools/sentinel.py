@@ -21,6 +21,8 @@ Commands (each stops the CPU and leaves it stopped at a vsync, except `go`):
                              FILE.<n>.bin keeps them. 'with' starts the pan once the
                              breakpoints are armed; 'then' ends it when the K-th step's render
                              is committed
+    beamat ADDR N            run to ADDR N times: each hit's field and raster line; 'swap'
+                             is Enhanced framerate's buffer swap (the copper restart)
     route [SHOTS]            from the entry (ENTRY=1): the title (400 fields), space, the
                              landscape number (150), return for 0000, its overview (400),
                              return: the landscape's first view is then being drawn. SHOTS
@@ -466,6 +468,34 @@ def steptime(server, g, rest):
     return 'render, then to the next render (fields)\n' + '\n'.join(out)
 
 
+def beamat(server, g, rest):
+    """beamat ADDR N: run to ADDR (hex) N times; each hit's field and raster line. ADDR 'swap'
+    is the copper restart (jsr $7C0) in the slave's vertical-blank hook (the jsr at $574), with
+    Enhanced framerate the pan's buffer swap."""
+    w = rest.split()
+    g.stop()
+    if w[0] == 'swap':
+        hook = int.from_bytes(peek(g, BASE + 0x576, 4), 'big')
+        code = peek(g, hook, 256)
+        i = code.find(b'\x4e\xb9' + (BASE + 0x7c0).to_bytes(4, 'big'))
+        if peek(g, BASE + 0x574, 2) != b'\x4e\xb9' or i < 0:
+            return 'no swap in the vertical blank (Enhanced framerate off)'
+        a = hook + i
+    else:
+        a = int(w[0], 16)
+    g.cmd(f'break *{a:#x}')
+    out = []
+    try:
+        for _ in range(int(w[1])):
+            if 'Breakpoint' not in g.cmd('continue', timeout=60):
+                out.append('no stop'); break
+            v = int.from_bytes(peek(g, 0xdff004, 4), 'big')
+            out.append(f'{word(g, VBL)} {v >> 8 & 0x1ff}')
+    finally:
+        g.cmd('delete')
+    return '\n'.join(out)
+
+
 SNAP = ((0x1000, 0x1000), (BASE, 0x8000))
 
 
@@ -491,7 +521,7 @@ def go(server, g, rest):
 server = game_server('sentinel', commands={
     'fields': fields, 'key': key, 'click': click, 'mouse': mouse, 'hold': hold, 'release': release, 'peek': peek_cmd,
     'swaps': swaps, 'strips': strips, 'route': route, 'census': census, 'access': access, 'pointer': pointer, 'front': front, 'waitfor': waitfor, 'brk': brk,
-    'snap': snap, 'steptime': steptime, 'go': go})
+    'snap': snap, 'steptime': steptime, 'beamat': beamat, 'go': go})
 
 if __name__ == '__main__':
     if sys.argv[1:2] == ['serve'] and os.environ.get('ENTRY') == '1':
