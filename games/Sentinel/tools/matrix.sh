@@ -1,7 +1,7 @@
 #!/bin/bash
 # tools/matrix.sh [FILTER]: the render check and the play check on the a500, a1200,
-# a1200-030 and a1200-040, and with Enhanced framerate (CUSTOM1, the -ef lines) on the
-# last three, the check after a change (docs/development.md#the-matrix).
+# a1200-030 and a1200-040, and as the installed icon runs it (CUSTOM1=1 DCACHE, the -icon
+# lines) on the last three, the check after a change (docs/development.md#the-matrix).
 # FULL=1: every machine and WHDLoad cache option and the controls that must fail, for a
 # question that needs them (an hour). Two runs at a time, started a few seconds apart.
 # FILTER (a grep pattern) picks lines of the list below. Results go to tmp/matrix/: one log
@@ -16,15 +16,17 @@ LIST='
 a500-ef              |render|pass|SETUP=a500 WHD_ARGS=CUSTOM1=1
 *a1200               |render|pass|SETUP=a1200
 *a1200               |play  |pass|SETUP=a1200
-*a1200-ef            |render|pass|SETUP=a1200 WHD_ARGS=CUSTOM1=1
-*a1200-ef            |play  |pass|SETUP=a1200 WHD_ARGS=CUSTOM1=1
+a1200-ef             |render|pass|SETUP=a1200 WHD_ARGS=CUSTOM1=1
+*a1200-icon          |render|pass|SETUP=a1200 "WHD_ARGS=CUSTOM1=1 DCACHE"
+*a1200-icon          |play  |pass|SETUP=a1200 "WHD_ARGS=CUSTOM1=1 DCACHE"
 020-z3               |render|pass|SETUP=a1200 FAST_KB=0 "EXTRA_ARGS=--cpu=68020 --uae_cpu_frequency=28375160 --fast_memory=0 --zorro_iii_memory=32768"
 020-z3               |play  |pass|SETUP=a1200 FAST_KB=0 "EXTRA_ARGS=--cpu=68020 --uae_cpu_frequency=28375160 --fast_memory=0 --zorro_iii_memory=32768"
 020-z3-ef            |render|pass|SETUP=a1200 FAST_KB=0 WHD_ARGS=CUSTOM1=1 "EXTRA_ARGS=--cpu=68020 --uae_cpu_frequency=28375160 --fast_memory=0 --zorro_iii_memory=32768"
 *030                 |render|pass|SETUP=a1200-030
 *030                 |play  |pass|SETUP=a1200-030
-*030-ef              |render|pass|SETUP=a1200-030 WHD_ARGS=CUSTOM1=1
-*030-ef              |play  |pass|SETUP=a1200-030 WHD_ARGS=CUSTOM1=1
+030-ef               |render|pass|SETUP=a1200-030 WHD_ARGS=CUSTOM1=1
+*030-icon            |render|pass|SETUP=a1200-030 "WHD_ARGS=CUSTOM1=1 DCACHE"
+*030-icon            |play  |pass|SETUP=a1200-030 "WHD_ARGS=CUSTOM1=1 DCACHE"
 030-mmu              |render|pass|SETUP=a1200-030 "WHD_ARGS=MMU"
 030-mmu-nocache      |render|pass|SETUP=a1200-030 "WHD_ARGS=MMU NOCACHE"
 030-mmu-cache        |render|pass|SETUP=a1200-030 "WHD_ARGS=MMU CACHE"
@@ -32,10 +34,11 @@ a500-ef              |render|pass|SETUP=a500 WHD_ARGS=CUSTOM1=1
 030-mmu-dcache       |play  |pass|SETUP=a1200-030 "WHD_ARGS=MMU DCACHE"
 *040                 |render|pass|SETUP=a1200-040
 *040                 |play  |pass|SETUP=a1200-040
-*040-ef              |render|pass|SETUP=a1200-040 WHD_ARGS=CUSTOM1=1
-*040-ef              |play  |pass|SETUP=a1200-040 WHD_ARGS=CUSTOM1=1
+040-ef               |render|pass|SETUP=a1200-040 WHD_ARGS=CUSTOM1=1
+040-ef               |play  |pass|SETUP=a1200-040 WHD_ARGS=CUSTOM1=1
+*040-icon            |render|pass|SETUP=a1200-040 "WHD_ARGS=CUSTOM1=1 DCACHE"
+*040-icon            |play  |pass|SETUP=a1200-040 "WHD_ARGS=CUSTOM1=1 DCACHE"
 040-ef-nocache       |render|pass|SETUP=a1200-040 "WHD_ARGS=CUSTOM1=1 NOCACHE"
-040-ef-dcache        |render|pass|SETUP=a1200-040 "WHD_ARGS=CUSTOM1=1 DCACHE"
 040-nocache          |render|pass|SETUP=a1200-040 WHD_ARGS=NOCACHE
 040-cache            |render|pass|SETUP=a1200-040 WHD_ARGS=CACHE
 040-dcache           |render|pass|SETUP=a1200-040 WHD_ARGS=DCACHE
@@ -45,6 +48,7 @@ a500-ef              |render|pass|SETUP=a500 WHD_ARGS=CUSTOM1=1
 060                  |play  |pass|SETUP=a1200-060
 060-ef               |render|pass|SETUP=a1200-060 WHD_ARGS=CUSTOM1=1
 060-ef               |play  |pass|SETUP=a1200-060 WHD_ARGS=CUSTOM1=1
+060-icon             |render|pass|SETUP=a1200-060 "WHD_ARGS=CUSTOM1=1 DCACHE"
 060-ef-movep-trap    |render|pass|SETUP=a1200-060 WHD_ARGS=CUSTOM1=1 "EXTRA_ARGS=--uae_cpu_no_unimplemented=true"
 060-nocache          |render|pass|SETUP=a1200-060 WHD_ARGS=NOCACHE
 060-cache            |render|pass|SETUP=a1200-060 WHD_ARGS=CACHE

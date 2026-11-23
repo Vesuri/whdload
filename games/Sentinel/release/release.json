@@ -11,7 +11,8 @@
       "remove": [],
       "tooltypes": {
         "Sentinel/Sentinel.inf": [
-          "CUSTOM1=1"
+          "CUSTOM1=1",
+          "DCACHE"
         ]
       },
       "source": {

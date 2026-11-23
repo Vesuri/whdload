@@ -43,7 +43,7 @@ Both blitter waits are always on: V1.01's CUSTOM1 dropped `$30C`'s (and 2.0b's f
 a blit ends (0.2% of a held pan on the a500 is the wait), and lets a faster CPU write the next
 blit's registers while the last one runs.
 
-CUSTOM1 (`C1:B:Enhanced framerate`, set in the installed icon) applies these too, when the
+CUSTOM1 (`C1:B:Enhanced framerate`, set in the installed icon with `DCACHE`, open-work D13) applies these too, when the
 CPU is a 68020 or better (`WHDLTAG_ATTNFLAGS_GET`) and WHDLoad allocated the ExpMem
 (`ws_ExpMem` is negative, so optional; it is fast memory where there is some). Otherwise the
 slave is as without it. `FastSetup` moves the render buffer (`$70000`, 32000 bytes) to the

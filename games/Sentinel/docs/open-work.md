@@ -11,7 +11,8 @@ a1200-040 and the a1200-060, and since B5 the 68040 and 68060 draw correctly.
 2.0b (23.11.2026), not published: V1.01 with `$VER` and the info text in the slave, the
 ReadMe entry above StingRay's, the self-modification fix (B5), the effect trigger's wait
 (B6a), the pan step's blitter wait (B6b), the PAL/NTSC test on AGA (C8), Enhanced framerate
-(CUSTOM1, on in the installed icon: D10, D11, E15, E16) and the blitter waits always on
+(CUSTOM1, on in the installed icon: D10, D11, E15, E16), the data cache in the icon
+(`DCACHE`, D13) and the blitter waits always on
 (V1.01's CUSTOM1 gone); `make dist` builds `SentinelEnhanced-2.0b-20261123.lha`.
 
 ## The goals
@@ -151,7 +152,18 @@ across phases. Status in brackets.
   third of the render, so the 68020's render is bound by the CPU. Nothing else moves.
 - **D13** (decided 23.11.2026) Caches stay WHDLoad's: the slave adds no cache setting of its
   own (the original's `resload_SetCACR` instruction cache stays as it is), and the game must
-  work with each of WHDLoad's options (B7).
+  work with each of WHDLoad's options (B7). The installed icon sets `DCACHE` beside
+  `CUSTOM1=1`: with the option the render buffer and edge tables are in fast memory, which
+  the data cache covers. MEASURED with `CUSTOM1=1 DCACHE`: the render and play checks match on
+  the a500, a1200, a1200-030, 040 and 060 (the tear check included); D held for 500 fields
+  (`swaps`, from the pan's first swap), the a1200-030 476 swaps in 478 fields (462 in 470
+  without `DCACHE`), the a1200-040 489 in 490 (472 in 473), the a1200-060 498 in 499 (the
+  same); the render check's key pans in 118 fields on the 030 (131), 96 on the 040 (118), 84
+  on the 060 (84). On real boards chip memory is not cacheable whatever WHDLoad sets, so no
+  stale chip read can come of it (B6f); on a 68060 the CPU then retries each rejected
+  cacheable chip access (WHDLoad's `cache.html`), which emulation does not show and is not
+  measured. `ChipNoCache` is not set: it also stops the instruction cache in chip memory,
+  where the game's code runs (the 040's key pans 264 fields).
 
 ### E. Continuous 50 fps panning (the same option; done)
 
