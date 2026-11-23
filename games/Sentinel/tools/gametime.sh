@@ -14,8 +14,8 @@ inst=$INSTANCE
 out=tmp/gametime/${SETUP:-a500}-$inst; rm -rf "$out"; mkdir -p "$out"
 t() { python3 tools/sentinel.py "$@"; }
 for mode in idle pan; do
-  t serve > "$out/serve-$mode.log" 2>&1 &
-  for i in $(seq 1 120); do t peek 0x58c6e 2 >/dev/null 2>&1 && break; sleep 0.5; done
+  t serve > "$out/serve-$mode.log" 2>&1 & spid=$!
+  for i in $(seq 1 600); do t peek 0x58c6e 2 >/dev/null 2>&1 && break; kill -0 $spid 2>/dev/null || break; sleep 0.5; done
   t route > /dev/null; t fields 300 > /dev/null
   t click > /dev/null; t fields 10 > /dev/null; t pointer 1984 272 > /dev/null
   t key 35 > /dev/null                                  # B: a boulder, the first action

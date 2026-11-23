@@ -27,7 +27,8 @@
 ;   an NTSC A1200 run the game's PAL clock, 20% fast
 ; - CUSTOM1, Enhanced framerate (a 68020 or better, the optional ExpMem): the
 ;   render buffer and the edge tables in the ExpMem, a span filler without
-;   movep (SpanFill)
+;   movep (SpanFill), and the pan's scroll-in from the vertical blank, its
+;   blits chained by the blitter's interrupt, beside the next step's render
 
 	INCDIR	SOURCES:Include/
 	INCLUDE	whdload.i
@@ -39,8 +40,9 @@ QUITKEY		= $59		; F10
 BASE		= $57fe4	; destination address for binary
 STRIP		= $70000	; the game's render buffer: 320x200, 4 word-interleaved planes
 STRIPSIZE	= $7d00
-EDGES		= $8000		; ExpMem: the render buffer, then the edge tables
-FASTSIZE	= $9000
+EDGES		= $8000		; ExpMem: the render buffer, then the edge tables,
+SCROLLBUF	= $9000		; then two copies of the strip for the scroll-in
+FASTSIZE	= (SCROLLBUF+2*192*160+$fff)&~$fff	; whole 4 KB pages, as WHDLoad needs
 SOUND		= $20000	; the sound module, loaded by the game
 
 ; one 16-pixel group of the span (a2, 4 plane words, advanced past it):
@@ -311,6 +313,7 @@ FastSetup
 	dbf	d1,.col
 	add.l	d0,$502e(a0)		; movea.l #$70000: the dissolve
 	add.l	d0,$5e8e(a0)		; movea.l #$70000
+	move.w	#$0400,$dff096		; no blitter-nasty (E16)
 	add.l	#STRIP+EDGES-$7b00,d0	; the edge tables
 	lea	edgedelta(pc),a0
 	move.l	d0,(a0)
@@ -329,6 +332,18 @@ PLFAST	PL_START
 	PL_P	$18b4,SpanFill		; the span filler
 	PL_P	$14be,EdgeStepF		; the edge scan converter's stepping
 	PL_PSS	$13d0,EdgePoint,10	; a one-row polygon's edges
+; the scroll-in from the vertical blank (E15) and the chip bus (E16)
+	PL_P	$4740,StepQueue		; the pan step's set-up and scroll-in
+	PL_PS	$574,VblScroll		; the level 3 interrupt
+	PL_PS	$46d6,PassExit		; the pass loop asking for a full redraw
+	PL_PS	$3708,PassCmd		; a command from the pass loop
+	PL_PSS	$369c,PassEvent,2	; an event from the pass loop
+	PL_PS	$68c,PointerGate	; the pointer during the passes
+	PL_PS	$2ce4,StatusWait	; the status line's copies to the screen
+	PL_PS	$2d10,StatusWait
+	PL_PS	$39cc,ViewWait		; a full view's copy
+	PL_W	$48c,$8068		; INTENA: the blitter's interrupt too
+	PL_PSS	$6d4,AckNoBlit,2	; the level 3 interrupt's end
 	PL_END
 
 ; move.w $18fa,$7b00(a4); move.w $18fc,$7d00(a4) into the ExpMem's tables
@@ -667,6 +682,7 @@ rows	dc.w	0
 ; 192 rows of the render buffer (a1, 160 bytes a row) into the back buffer's
 ; planes (a0, a2, a3, a4, 40 bytes a row), as the game's four blits did.
 ; The plane blits still running write other words.
+
 ColumnH	move.w	#192-1,d7
 .row	move.w	(a1),(a0)
 	move.w	2(a1),(a2)
@@ -680,6 +696,295 @@ ColumnH	move.w	#192-1,d7
 	add.l	d0,a4
 	dbf	d7,.row
 	jmp	BASE+$4970		; movem.l (sp)+,d0-a6; rts
+
+	MACHINE	68020
+; Enhanced framerate: the pan's scroll-in from the vertical blank (E15).
+; The game renders a strip (the step's 128 pixels at the top left of the
+; render buffer), scrolls it in over 8 fields, a swap a field, then runs its
+; passes until the next pan request. Here the main loop queues the step, a
+; copy of its strip, and goes on at once: the vertical blank does each swap
+; and scroll step, and starts the queued step after a step's last swap, while
+; the main loop runs the passes and renders the next strip. The main loop
+; waits for the scroll-in before anything else that draws on the screen.
+
+; $4740, after the step's render: the set-up ($4740..$4794: $17d4, the
+; pointer hidden, $17d3, the status lines, the buffers, the column pointer),
+; the step queued, then what the game does after the scroll-in ($47fe: $17d9
+; as it was, the pointer)
+	dc.l	VblEnd-StepQueue	; where a step ends, from here (tools/sentinel.py reads it)
+StepQueue
+	move.b	$1682.w,$17d4.w
+	jsr	BASE+$2fd2
+	movem.l	d0-d1/a0-a2,-(a7)
+	lea	queued(pc),a2
+.wait	tst.b	(a2)			; a step already queued: wait for it
+	bne.b	.wait			; to start
+	move.l	fast(pc),a0		; the render buffer
+	move.l	#SCROLLBUF,d1		; the copy not in use
+	not.b	nextbuf-queued(a2)
+	beq.b	.buf
+	add.l	#192*160,d1
+.buf	moveq	#0,d0
+	move.b	BASE+$49c0,d0		; the step's direction: 0, 1 horizontal
+	move.b	d0,qdir-queued(a2)
+	lea	BASE+$4854,a1		; the column pointer, into the copy
+	move.l	(a1,d0.w*4),a1		; (the render buffer's)
+	adda.l	d1,a1
+	move.l	a1,qcol-queued(a2)
+	lea	(a0,d1.l),a1
+	move.b	$184b.w,d1
+	subq.b	#1,d1
+	move.b	d1,qsteps-queued(a2)
+	cmp.b	#2,d0
+	bcc.b	.rows
+	move.w	#192-1,d0		; 192 rows of 8 groups (64 bytes)
+.h	REPT	16
+	move.l	(a0)+,(a1)+
+	ENDR
+	lea	160-64(a0),a0
+	lea	160-64(a1),a1
+	dbf	d0,.h
+	bra.b	.go
+.rows	move.w	#64*160/16-1,d0		; 64 rows
+.v	move.l	(a0)+,(a1)+
+	move.l	(a0)+,(a1)+
+	move.l	(a0)+,(a1)+
+	move.l	(a0)+,(a1)+
+	dbf	d0,.v
+.go	move.w	sr,-(a7)
+	or.w	#$0700,sr
+	tst.b	scrolling-queued(a2)
+	beq.b	.now
+	st	(a2)			; the vertical blank starts it
+	move.w	(a7)+,sr
+	bra.b	.after
+.now	move.w	(a7)+,sr
+	bsr.b	StepStart
+.after	movem.l	(a7)+,d0-d1/a0-a2
+	move.b	$17d9.w,BASE+$5eb8
+	bpl.b	.loop
+	jsr	BASE+$2fd8
+.loop	jmp	BASE+$46c4
+
+; the queued step's set-up and first scroll step; the front buffer is $78000
+StepStart
+	movem.l	d0-d1/a0-a1,-(a7)
+	jsr	BASE+$4822		; the status lines to the back buffer
+	move.l	#$60000,BASE+$c92	; the back buffer and its copper list
+	move.l	#BASE+$23e,BASE+$c8e
+	move.l	qcol(pc),BASE+$4864
+	move.b	qsteps(pc),$17d3.w
+	lea	scrolldir(pc),a0
+	move.b	qdir(pc),(a0)
+	bsr.w	ScrollStep
+	lea	scrolling(pc),a0
+	st	(a0)
+	movem.l	(a7)+,d0-d1/a0-a1
+	rts
+
+; one scroll step ($4868, $4976) in the scrolling step's direction: the four
+; plane blits, the front buffer into the back one shifted a word or 8 lines,
+; each started by the last one's blitter interrupt (BlitNext), so the CPU runs
+; on beside them; then the strip's column by the CPU, as the game does it
+ScrollStep
+	movem.l	d0-d7/a0-a2,-(a7)
+	lea	$78140,a1
+	lea	$60140,a0
+	cmp.l	#$60000,BASE+$c92	; from the front buffer into the back one
+	beq.b	.dir
+	exg	a0,a1
+.dir	addq.l	#2,a1
+	moveq	#2,d2			; the modulos
+	moveq	#2,d3
+	moveq	#19,d0			; words and lines
+	move.w	#192,d1
+	move.b	scrolldir(pc),d7
+	beq.b	.go
+	subq.l	#2,a1
+	addq.l	#2,a0
+	subq.b	#1,d7
+	beq.b	.go
+	subq.l	#2,a0
+	moveq	#20,d0
+	move.w	#184,d1
+	moveq	#0,d2
+	moveq	#0,d3
+	lea	320(a0),a0
+	subq.b	#1,d7
+	beq.b	.go
+	lea	-320(a0),a0
+	lea	320(a1),a1
+.go	lsl.w	#6,d1
+	add.w	d0,d1
+	bsr.w	WaitBlit
+	lea	blitsrc(pc),a2
+	move.l	a1,(a2)
+	add.l	#8000,(a2)
+	move.l	a0,blitdst-blitsrc(a2)
+	add.l	#8000,blitdst-blitsrc(a2)
+	move.w	d1,blitsize-blitsrc(a2)
+	move.b	#3,blitsleft-blitsrc(a2)
+	lea	$dff000,a2
+	move.w	#$09f0,$40(a2)		; A to D
+	move.w	#0,$42(a2)
+	move.l	#-1,$44(a2)
+	move.w	d2,$64(a2)
+	move.w	d3,$66(a2)
+	move.l	a1,$50(a2)
+	move.l	a0,$54(a2)
+	move.w	#$8040,$96(a2)		; blitter DMA, no blitter-nasty (E16)
+	move.w	d1,$58(a2)
+	move.b	BASE+$49c0,d1		; the column, in the scrolling step's
+	move.b	scrolldir(pc),BASE+$49c0	; direction: the main loop may
+	bsr.b	.column			; have set the next step's
+	move.b	d1,BASE+$49c0
+	movem.l	(a7)+,d0-d7/a0-a2
+	rts
+.column	movem.l	d0-a6,-(a7)		; $4868 after its blits
+	jmp	BASE+$488a
+
+; the next plane blit; a blitter interrupt, or the vertical blank waiting
+BlitNext
+	move.l	a0,-(a7)
+	lea	blitsrc(pc),a0
+	tst.b	blitsleft-blitsrc(a0)
+	beq.b	.none
+	subq.b	#1,blitsleft-blitsrc(a0)
+	move.l	(a0),$dff050
+	move.l	blitdst-blitsrc(a0),$dff054
+	add.l	#8000,(a0)
+	add.l	#8000,blitdst-blitsrc(a0)
+	move.w	blitsize-blitsrc(a0),$dff058
+.none	move.l	(a7)+,a0
+	rts
+
+; the step's blits finished, in the vertical blank (no blitter interrupt
+; comes while it runs)
+BlitsDone
+	bsr.w	WaitBlit
+	move.w	#1<<6,$dff09c
+	move.w	#1<<6,$dff09c
+	tst.b	blitsleft(pc)
+	beq.b	.done
+	bsr.b	BlitNext
+	bra.b	BlitsDone
+.done	rts
+
+; $574 in the level 3 interrupt (move.w $dff01e,d0): at a vertical blank
+; during a scroll-in, what the game's loop does after each field wait
+; ($47ac..$47f6): show the buffer the last step drew, swap, the next step;
+; after the last, the queued step
+VblScroll
+	move.w	$dff01e,d0
+	btst	#6,d0			; the blitter's interrupt: the next blit
+	beq.b	VblVbl
+	move.w	#1<<6,$dff09c
+	move.w	#1<<6,$dff09c
+	bsr.b	BlitNext
+VblVbl	move.w	$dff01e,d0
+	btst	#5,d0
+	beq.b	VblOut
+	move.b	scrolling(pc),d0
+	beq.b	VblDone
+	bsr.b	BlitsDone
+	movea.l	BASE+$c8e,a1		; the drawn buffer's copper list
+	jsr	BASE+$7c0
+	lea	$78000,a1
+	lea	BASE+$1da,a2
+	move.l	BASE+$c92,d0
+	cmp.l	a1,d0
+	bne.b	VblSwap
+	lea	$60000,a1
+	lea	BASE+$23e,a2
+VblSwap	move.l	a1,BASE+$c92
+	move.l	a2,BASE+$c8e
+	subq.b	#1,$17d3.w
+	bmi.b	VblEnd
+	bsr.w	ScrollStep
+	bra.b	VblDone
+VblEnd	lea	queued(pc),a0		; a step's last swap
+	tst.b	(a0)
+	beq.b	VblIdle
+	sf	(a0)
+	bsr.w	StepStart
+	bra.b	VblDone
+VblIdle	lea	scrolling(pc),a0
+	sf	(a0)
+VblDone	move.w	$dff01e,d0
+VblOut	rts
+
+; the main loop waits for the scroll-in; from an interrupt it does not
+WaitScroll
+	move.l	d0,-(a7)
+	move.w	sr,d0
+	and.w	#$0700,d0
+	bne.b	.ret
+.wait	tst.b	scrolling(pc)
+	bne.b	.wait
+.ret	move.l	(a7)+,d0
+	rts
+
+; $46d6: st $5a2e4, the pass loop asking for a full redraw
+PassExit
+	bsr.w	WaitScroll
+	st	BASE+$2300
+	rts
+
+; $3708: move.b d0,$17db, a command from the pass loop
+PassCmd
+	bsr.w	WaitScroll
+	move.b	d0,$17db.w
+	rts
+
+; $369c: move.b #30,d0; bsr $515e
+PassEvent
+	bsr.w	WaitScroll
+	move.b	#30,d0
+	jmp	BASE+$515e
+
+; $6d4: the level 3 interrupt acknowledged but for the blitter's, which
+; VblScroll serves: a blit ending late in the interrupt is not lost
+AckNoBlit
+	move.w	#1<<4|1<<5,$dff09c
+	move.w	#1<<4|1<<5,$dff09c
+	rts
+
+; $68c in the level 3 interrupt: tst.b $58c6c, the pointer shown during the
+; passes; not while a scroll-in runs (the game hides it during a pan)
+PointerGate
+	tst.b	scrolling(pc)
+	bne.b	.no
+	tst.b	BASE+$c88
+	rts
+.no	cmp.b	d0,d0
+	rts
+
+; $2ce4, $2d10: movea.l #$50300,a0, the status line's copies to the screen
+StatusWait
+	bsr.w	WaitScroll
+	movea.l	#$50300,a0
+	rts
+
+; $39cc: lea $78000,a1, a full view's copy
+ViewWait
+	bsr.w	WaitScroll
+	lea	$78000,a1
+	rts
+
+blitsrc	dc.l	0			; the next plane blit: source,
+blitdst	dc.l	0			; destination,
+blitsize	dc.w	0			; size
+blitsleft	dc.b	0			; the plane blits still to start
+	even
+qcol	dc.l	0			; the queued step: its column pointer,
+queued	dc.b	0			; set while it waits
+qdir	dc.b	0			; its direction
+qsteps	dc.b	0			; its swaps less one
+nextbuf	dc.b	0			; the strip copy for the next step
+scrolling	dc.b	0			; set while a scroll-in runs
+scrolldir	dc.b	0			; its direction
+	even
+	MACHINE	68000
 
 ; The edge scan converter's stepping, program offsets $14be..$165b, without
 ; self-modification. The game's code wrote the x step's opcode (addq.w or

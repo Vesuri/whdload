@@ -15,15 +15,14 @@ export INSTANCE=${INSTANCE:-render}   # never the default instance: that is the 
 inst=$INSTANCE
 out=tmp/render_check/${SETUP:-a500}-$inst; rm -rf "$out"; mkdir -p "$out"
 t() { python3 tools/sentinel.py "$@"; }
-t serve > "$out/serve.log" 2>&1 &
-for i in $(seq 1 120); do t peek 0x58c6e 2 >/dev/null 2>&1 && break; sleep 0.5; done
+t serve > "$out/serve.log" 2>&1 & spid=$!
+for i in $(seq 1 600); do t peek 0x58c6e 2 >/dev/null 2>&1 && break; kill -0 $spid 2>/dev/null || break; sleep 0.5; done
 t route "$PWD/$out/route" > /dev/null || { t quit >/dev/null 2>&1; echo "no server" >&2; exit 1; }
 # key (raw) and pan steps: D right, S left, L up, comma down
 for p in ${PANS:-22:3 21:3 28:2 38:2}; do
   k=${p%:*} n=${p#*:}
   t hold "$k" > /dev/null
-  t strips "$n" "$PWD/$out/$k" | sed "s/^/$k /"
-  t release "$k" > /dev/null
+  t strips "$n" "$PWD/$out/$k" then release "$k" | sed "s/^/$k /"
   t fields 100 > /dev/null
 done > "$out/hashes.txt"
 # the same pans with the pointer at the screen edge (the left button enters pointer mode);
@@ -31,8 +30,9 @@ done > "$out/hashes.txt"
 # A pan runs only with the pointer in a band at the edge (measured: x 2418, the right limit;
 # x under 128; y 2996, the top limit; y 120 to 190, the view's bottom lines, not the status
 # line below), so it is steered to just outside the band, enters with one mouse move and
-# leaves with one after the last step, as a key is pressed and released: the steps then do
-# not depend on the CPU's speed
+# leaves with one once the last step is committed (both given inside strips, which
+# counts the renders), as a key is pressed and released: the steps then do not depend on
+# the CPU's speed, nor on when the loop reads the input
 t click > /dev/null; t fields 10 > /dev/null
 for p in ${PANS:-22:3 21:3 28:2 38:2}; do
   k=${p%:*} n=${p#*:}
@@ -41,9 +41,7 @@ for p in ${PANS:-22:3 21:3 28:2 38:2}; do
     28) e="1280 2956" mx=0 my=-10;; 38) e="1280 216" mx=0 my=5;;
   esac
   t pointer $e > /dev/null
-  t mouse $mx $my > /dev/null
-  t strips "$n" "$PWD/$out/p$k" | sed "s/^/$k /"
-  t mouse $((-3 * mx)) $((-3 * my)) > /dev/null
+  t strips "$n" "$PWD/$out/p$k" with mouse $mx $my then mouse $((-3 * mx)) $((-3 * my)) | sed "s/^/$k /"
   t pointer 1280 1536 > /dev/null
   t fields 100 > /dev/null
 done > "$out/pointer.txt"

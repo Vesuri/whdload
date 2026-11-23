@@ -37,8 +37,8 @@ settle() { t fields 200 > /dev/null; }
 hx() { printf '%02x' $(($1 & 255)); }
 line() { local b; b=$(t peek 0xdff004 4); echo $(( ((0x${b:0:4} & 1) << 8) | 0x${b:4:2} )); }
 
-t serve > "$out/serve.log" 2>&1 &
-for i in $(seq 1 120); do t peek 0x58c6e 2 >/dev/null 2>&1 && break; sleep 0.5; done
+t serve > "$out/serve.log" 2>&1 & spid=$!
+for i in $(seq 1 600); do t peek 0x58c6e 2 >/dev/null 2>&1 && break; kill -0 $spid 2>/dev/null || break; sleep 0.5; done
 t route > /dev/null || fail route "no server"
 t fields 300 > /dev/null
 expect "landscape 0000: energy 10" $ENERGY 0a 0

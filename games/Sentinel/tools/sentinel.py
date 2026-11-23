@@ -14,10 +14,13 @@ Commands (each stops the CPU and leaves it stopped at a vsync, except `go`):
     peek ADDR N              N bytes at ADDR, hex
     swaps N                  run N fields one at a time; the fields between buffer swaps
                              (changes of the back-buffer pointer $58C76)
-    strips K [FILE]          run until K more pan steps have been shown (a step ends when the
-                             pan loop's swap count $17D3 is back at -1 after a swap), at most
-                             480 fields in all; after each, the SHA-256 of the front buffer
-                             (the 32000 bytes of the displayed buffer); FILE.<n>.bin keeps them
+    strips K [FILE] [with mouse DX DY | with key RAW] [then release RAW | then mouse DX DY]
+                             run until K more pan steps have been shown (breakpoints at the
+                             step's end), at most 480 fields a step; after each, the SHA-256 of
+                             the front buffer (the 32000 bytes of the displayed buffer);
+                             FILE.<n>.bin keeps them. 'with' starts the pan once the
+                             breakpoints are armed; 'then' ends it when the K-th step's render
+                             is committed
     route [SHOTS]            from the entry (ENTRY=1): the title (400 fields), space, the
                              landscape number (150), return for 0000, its overview (400),
                              return: the landscape's first view is then being drawn. SHOTS
@@ -62,9 +65,11 @@ from game_server import game_server  # noqa: E402
 BASE = 0x57fe4
 ENTRY = BASE + 0x10d4
 BACK = 0x58c76            # the back buffer, $60000 or $78000
+PAN_START = BASE + 0x46e0   # the main loop leaves its passes for a pan step's render
+RENDER_END = BASE + 0x4736  # the render done: $184B is 8 for a pan
 BUFFERS = (0x60000, 0x78000)
 BUFFER_SIZE = 4 * 8000
-STEPS = 0x17d3            # the pan step's swaps left, -1 between steps
+PAN_STEPS = 0x184b        # a pan's steps (8), set by the step's render
 
 
 def peek(g, addr, n):
@@ -156,33 +161,79 @@ def swaps(server, g, rest):
 
 
 def strips(server, g, rest):
+    """strips K [FILE] [with mouse DX DY | with key RAW] [then release RAW | then mouse DX DY]:
+    run until K more pan steps have
+    been shown, stopping at breakpoints: the step's end (the game's loop after its last swap,
+    $47FE, or with Enhanced framerate the slave's VblEnd, at the offset the long before
+    StepQueue holds) and each render's end ($4736, where $184B is 8 for a pan). With 'then',
+    the input that ends the pan is given when the K-th step's render is committed; with
+    'with', the input that starts it is given once the breakpoints are armed (a fast CPU can
+    commit a render within the fields a separate command takes).
+    STRIPS_TRACE=1 in the server's environment appends each stop ($46E0, $4736, the step's
+    end, the input routine $3336) with the fields since the last step, $184B and $18C4."""
     w = rest.split()
+    then = w[w.index('then') + 1:] if 'then' in w else None
+    w = w[:w.index('then')] if 'then' in w else w
+    first = w[w.index('with') + 1:] if 'with' in w else None
+    w = w[:w.index('with')] if 'with' in w else w
     k, stem = int(w[0]), (w[1] if len(w) > 1 else None)
     g.stop()
+    jump = peek(g, BASE + 0x4740, 6)
+    if jump[:2] == b'\x4e\xf9':          # Enhanced framerate: the long before StepQueue
+        queue = int.from_bytes(jump[2:], 'big')  # is the offset from it to VblEnd
+        end_pc = queue + int.from_bytes(peek(g, queue - 4, 4), 'big', signed=True)
+    else:
+        end_pc = BASE + 0x47fe
     tmp = os.path.join(server.run_dir, 'front.bin')
-    last, count, out, since, swapped = long(g, BACK), 0, [], 0, False
-    while len(out) < k:
-        g.cmd('monitor fields 1')
-        since += 1
-        b = long(g, BACK)
-        if b != last:
-            count += 1
-            last = b
-            swapped = True
-        # a step ends when the pan loop leaves with its swap count $17D3 at -1
-        if swapped and peek(g, STEPS, 1)[0] == 0xff:
-            swapped = False
-            front = BUFFERS[1] if b == BUFFERS[0] else BUFFERS[0]
-            data = read_block(g, front, BUFFER_SIZE, tmp)
-            n = len(out) + 1
-            if stem:
-                Path(f'{stem}.{n}.bin').write_bytes(data)
-            out.append(f'{n} {since} {hashlib.sha256(data).hexdigest()[:16]}')
-            since = 0
-        if since > 60 * 8:
-            out.append(f'stalled after {count} swaps')
-            break
-    return '\n'.join(out)
+    out, commits, v_last = [], 0, word(g, VBL)
+    trace = [] if os.environ.get('STRIPS_TRACE') else None
+    for a in (RENDER_END, end_pc) + ((PAN_START, BASE + 0x3336) if trace is not None else ()):
+        g.cmd(f'break *{a:#x}')
+    if first is not None:                # the pan's input, once the breakpoints are armed
+        g.cmd(f'monitor mouse {first[1]} {first[2]}' if first[0] == 'mouse'
+              else f'monitor key {first[1]} 1')
+    try:
+        while len(out) < k:
+            try:
+                g.cmd('continue', timeout=120)
+            except TimeoutError:
+                os.kill(g.p.pid, signal.SIGINT)
+                g.read_until(g.sent, 30)
+                out.append(f'stalled after {len(out)} steps')
+                break
+            pc = int(g.cmd('p/x $pc').split()[-1], 16)
+            since = (word(g, VBL) - v_last) & 0xffff
+            if trace is not None:
+                trace.append(f'{since:3} {pc - BASE:#06x} c{commits} 184b={peek(g, PAN_STEPS, 1)[0]}'
+                             f' 18c4={word(g, 0x18c4):#06x}')
+            if pc == RENDER_END and peek(g, PAN_STEPS, 1)[0] == 8:
+                commits += 1
+                if then is not None and commits == k:
+                    if then[0] == 'release':
+                        g.cmd(f'monitor key {then[1]} 0')
+                    else:
+                        g.cmd(f'monitor mouse {then[1]} {then[2]}')
+                    then = None
+            elif pc == end_pc:
+                b = long(g, BACK)
+                front = BUFFERS[1] if b == BUFFERS[0] else BUFFERS[0]
+                data = read_block(g, front, BUFFER_SIZE, tmp)
+                n = len(out) + 1
+                if stem:
+                    Path(f'{stem}.{n}.bin').write_bytes(data)
+                out.append(f'{n} {since} {hashlib.sha256(data).hexdigest()[:16]}')
+                v_last = word(g, VBL)
+            if since > 60 * 8:
+                out.append(f'stalled after {len(out)} steps')
+                break
+        while trace is not None and (word(g, VBL) - v_last) & 0xffff < 40:
+            g.cmd('continue', timeout=120)       # what follows the last step
+            pc = int(g.cmd('p/x $pc').split()[-1], 16)
+            trace.append(f'+{(word(g, VBL) - v_last) & 0xffff:3} {pc - BASE:#06x}'
+                         f' 184b={peek(g, PAN_STEPS, 1)[0]} 18c4={word(g, 0x18c4):#06x}')
+    finally:
+        g.cmd('delete')
+    return '\n'.join(out + (trace or []))
 
 
 def front(server, g, rest):
@@ -386,14 +437,13 @@ def brk(server, g, rest):
     return f"{'hit' if hit else 'timeout'} {(word(g, VBL) - v0) & 0xffff}"
 
 
-PAN_START = BASE + 0x46e0   # the main loop leaves for a pan step
-SCROLL_START = BASE + 0x4794   # the strip is drawn: the first scroll-in step
+RENDERED = BASE + 0x4740   # the strip is drawn: the step's set-up (or StepQueue)
 
 
 def steptime(server, g, rest):
     """steptime K: for K pan steps, the time (fields, to a line) from the main loop leaving
-    for the step to the scroll-in's start (the strip render), and from that start to the next
-    step's leaving (the scroll-in and the main loop's passes until the next step)."""
+    for the step to its set-up (the strip render), and from there to the next step's leaving
+    (the scroll-in and the passes; with Enhanced framerate the passes during the scroll-in)."""
     k = int(rest)
     g.stop()
 
@@ -409,11 +459,11 @@ def steptime(server, g, rest):
     out, last = [], None
     for _ in range(k + 1):
         a = at(PAN_START)
-        b = at(SCROLL_START)
+        b = at(RENDERED)
         if last is not None:
             out.append(f'{b - a:.2f} {a - last:.2f}')
         last = b
-    return 'render, then scroll-in and passes (fields)\n' + '\n'.join(out)
+    return 'render, then to the next render (fields)\n' + '\n'.join(out)
 
 
 SNAP = ((0x1000, 0x1000), (BASE, 0x8000))
