@@ -34,9 +34,25 @@ commented out (it would set `ws_CurrentDir` to his development drawer).
 
 ## Driving it
 
-`make serve WARP=1 WINDOW=none &`, then `make server CMD=...`; keys go through the stub,
-`CMD='gdb monitor key 40 1'` then `... 40 0` (raw codes: space `$40`, return `$44`, F10 `$59`).
-From boot, 20 s in warp reaches "Press any key" on the title; space asks for the landscape
-number; return with nothing typed gives landscape 0000's overview and "Press any key";
-return again starts the landscape, which draws the first view about 10 s later. Holding D
-(raw `$22`) then pans right; the pointer pans only in the pointer input mode (`$1853` set).
+`tools/sentinel.py` is the gdb-stub server with the game's commands (its docstring lists
+them); `python3 tools/sentinel.py serve` takes `common/run.sh`'s options. With `WARP=1
+DETERMINISTIC=1 JOY0=none ENTRY=1` it stops at the game's entry (`BASE+$10D4`) and every run
+repeats exactly: `route` then takes the title (field 300 on), space, return for landscape
+0000, its overview and return, all by field counts. The first view is drawn in about 120
+fields on the a500.
+
+The keys: D (raw `$22`) pans right, S (`$21`) left, L (`$28`) up, comma (`$38`) down. The left
+mouse button enters pointer mode (`$1853` set); there the pointer at an edge pans (`$5F84A`
+0..2418 and `$5F84C` 0..2996, edges tested at `$7870`), and space returns to key mode.
+`swaps N` reports the fields between buffer swaps: a pan step is 8 swaps a field apart, then
+the pause while the next strip is drawn.
+
+## The render check
+
+`tools/render_check.sh [run options]` boots, takes the route and pans right 3 steps, left 3,
+up 2 and down 2, hashing the displayed buffer after each step; the hashes must equal
+`tools/render_check.txt`, recorded on the a500 (`tools/render_check.sh record`). A pan step's
+picture depends only on the steps taken, so the hashes hold on every CPU; it also prints the
+fields the pans took. `INSTANCE=b` runs one beside another. The a1200, and the a1200-040 and
+a1200-060 with `WHD_ARGS=NOCACHE`, match; the a1200-040 with WHDLoad's defaults does not
+(self-modifying code, [internals.md](internals.md#rendering-and-panning)).

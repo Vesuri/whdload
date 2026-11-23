@@ -16,4 +16,5 @@ Read `docs/open-work.md` first.
 | `docs/development.md` | what differs from the shared workflow: inputs, the build, driving it |
 | `docs/internals.md` | how it loads, memory, every slave patch, limitations |
 
-The slave source is `src/`. There is no `tools/` yet: `make serve` drives it.
+The slave source is `src/`; `tools/` is the harness: `sentinel.py` (the gdb-stub server and
+the route) and `render_check.sh` ([development.md](docs/development.md)).

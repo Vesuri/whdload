@@ -26,20 +26,10 @@ chip memory, and a pan is a 128-pixel strip render followed by an 8-frame scroll
 
 ## Step by step
 
-### A. Harness (first, no slave change)
+### A. Harness (done)
 
-1. `tools/sentinel.py`, a `game_server` with the commands this work used from `tmp/`:
-   `route` (title, landscape 0000, the first view), `pan KEY FIELDS` (holds a key, steps one
-   field at a time and reports the fields between buffer swaps, `$58C76`), `hold`/`release`,
-   `dump`. Runs with `WARP=1 DETERMINISTIC=1 JOY0=none`. Find the key that switches to pointer
-   mode (`$1853`, game key `$39` at `$3356`) so the pointer-at-the-edge pan can be driven too
-   (`monitor mouse`; the edge test is at `$7870`).
-2. A render check: after the first view and after 8, 16 and 24 pan steps in each direction,
-   the two display buffers (`$60000`, `$78000`) and the strip buffer (`$70000`) equal the
-   A500's. Pan steps are discrete, so the picture depends on the step count, not on timing:
-   the check holds across CPUs. A500 hashes recorded (not the bytes), every machine compared.
-3. A frame and pan meter from the same swap counter: fields per strip pause and swaps per
-   second while a pan is held, on any CPU (no trace needed on the 040/060).
+`tools/sentinel.py` (the route, pans, the swap meter) and `tools/render_check.sh` (pans in all
+four directions against the a500's pictures), [development.md](development.md#driving-it).
 
 ### B. Correct on the 68040 (bug fixes, always on)
 
@@ -55,7 +45,7 @@ chip memory, and a pan is a 128-pixel strip render followed by an 8-frame scroll
    costs more than the edge). Prove equivalence on the 68000 path: run the original routine
    and the replacement under Unicorn on random and recorded edges and compare the edge tables
    at `$7B00`/`$7D00`. Done when `WHD_ARGS=NOCACHE` is no longer needed on the a1200-040
-   and a1200-060 for the render check (step 2).
+   and a1200-060 for the render check.
 6. **Other fast-CPU hazards** found while reading, each checked and fixed if real:
    - the sound module's DMA-off, `dbf`, DMA-on wait (`$20110`..`$2012E`, file offset in the
      module), the CPU-timed audio wait that loses notes on 68040/060 (playbook §8); judge it
@@ -87,7 +77,7 @@ chip memory, and a pan is a 128-pixel strip render followed by an 8-frame scroll
    whether faster drawing changes game speed before changing the frame loop.
 9. Profiles: the A500 per-routine split is in [internals.md](internals.md#rendering-and-panning);
    repeat it on the a1200 and a 68020 with fast memory (traced), and take strip-pause fields on
-   the 040/060 from the pan meter, plus aprof instruction counts on `68040-NOMMU`.
+   the 040/060 from `swaps`, plus aprof instruction counts on `68040-NOMMU`.
 
 ### D. Fast strip rendering (68020 and up, a `CUSTOMn` option)
 

@@ -1,0 +1,186 @@
+"""The Sentinel gdb-stub server: the shared commands (common/tools/game_server.py) and these.
+
+    python3 tools/sentinel.py serve          boot with DEBUG=1 (common/run.sh options apply);
+                                             stops at the game's entry when ENTRY=1
+    python3 tools/sentinel.py CMD ...        one command to the running server
+
+Commands (each stops the CPU and leaves it stopped at a vsync, except `go`):
+
+    fields N                 run N fields
+    key RAW                  press and release raw key RAW (hex), a field apart, then 2 fields
+    hold RAW | release RAW   press or release a raw key, then one field
+    click                    the left mouse button, pressed for 3 fields (enters pointer mode)
+    mouse DX DY [N]          move the mouse N times (default 1) by DX, DY counts, 2 fields each
+    peek ADDR N              N bytes at ADDR, hex
+    swaps N                  run N fields one at a time; the fields between buffer swaps
+                             (changes of the back-buffer pointer $58C76)
+    strips K [FILE]          run until K more pan steps (8 swaps each) have been shown, at most
+                             60 fields a step; after each, the SHA-256 of the front buffer
+                             (the 32000 bytes of the displayed buffer); FILE.<n>.bin keeps them
+    route [SHOTS]            from the entry (ENTRY=1): the title (400 fields), space, the
+                             landscape number (150), return for 0000, its overview (400),
+                             return: the landscape's first view is then being drawn. SHOTS
+                             (a file stem) keeps a screenshot of each stage
+    go                       resume
+
+Addresses are the game's runtime ones: the program is loaded at BASE $57FE4 in base memory,
+whatever the machine. See docs/development.md for the route and the checks built on these.
+"""
+import hashlib
+import os
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
+from game_server import game_server  # noqa: E402
+
+BASE = 0x57fe4
+ENTRY = BASE + 0x10d4
+BACK = 0x58c76            # the back buffer, $60000 or $78000
+BUFFERS = (0x60000, 0x78000)
+BUFFER_SIZE = 4 * 8000
+
+
+def peek(g, addr, n):
+    out = g.cmd(f'x/{n}xb {addr:#x}')
+    vals = []
+    for line in out.splitlines():
+        if ':' in line:
+            vals += [int(v, 16) for v in line.split(':', 1)[1].split()]
+    if len(vals) < n:
+        raise RuntimeError(f'peek {addr:#x} {n}: {out!r}')
+    return bytes(vals[:n])
+
+
+def long(g, addr):
+    return int.from_bytes(peek(g, addr, 4), 'big')
+
+
+def read_block(g, addr, n, path):
+    g.cmd(f'dump binary memory {path} {addr:#x} {addr + n:#x}')
+    return Path(path).read_bytes()
+
+
+def fields(server, g, rest):
+    g.stop()
+    g.cmd(f'monitor fields {int(rest)}', timeout=600)
+    return 'ok'
+
+
+def key(server, g, rest):
+    g.stop()
+    g.cmd(f'monitor key {rest} 1')
+    g.cmd('monitor fields 1')
+    g.cmd(f'monitor key {rest} 0')
+    g.cmd('monitor fields 2')
+    return 'ok'
+
+
+def hold(server, g, rest):
+    g.stop()
+    g.cmd(f'monitor key {rest} 1')
+    g.cmd('monitor fields 1')
+    return 'held'
+
+
+def release(server, g, rest):
+    g.stop()
+    g.cmd(f'monitor key {rest} 0')
+    g.cmd('monitor fields 1')
+    return 'released'
+
+
+def click(server, g, rest):
+    g.stop()
+    g.cmd('monitor input JOY1_FIRE_BUTTON 1')
+    g.cmd('monitor fields 3')
+    g.cmd('monitor input JOY1_FIRE_BUTTON 0')
+    g.cmd('monitor fields 3')
+    return 'ok'
+
+
+def mouse(server, g, rest):
+    w = rest.split()
+    dx, dy, n = int(w[0]), int(w[1]), int(w[2]) if len(w) > 2 else 1
+    g.stop()
+    for _ in range(n):
+        g.cmd(f'monitor mouse {dx} {dy}')
+        g.cmd('monitor fields 2')
+    return 'ok'
+
+
+def peek_cmd(server, g, rest):
+    g.stop()
+    a, n = rest.split()
+    return peek(g, int(a, 0), int(n, 0)).hex()
+
+
+def swaps(server, g, rest):
+    n = int(rest)
+    g.stop()
+    last, seen = long(g, BACK), []
+    for i in range(n):
+        g.cmd('monitor fields 1')
+        b = long(g, BACK)
+        if b != last:
+            seen.append(i)
+            last = b
+    gaps = [b - a for a, b in zip(seen, seen[1:])]
+    return f'fields {n} swaps {len(seen)} first {seen[:1]} gaps {gaps}'
+
+
+def strips(server, g, rest):
+    w = rest.split()
+    k, stem = int(w[0]), (w[1] if len(w) > 1 else None)
+    g.stop()
+    tmp = os.path.join(server.run_dir, 'front.bin')
+    last, count, out, since = long(g, BACK), 0, [], 0
+    while len(out) < k:
+        g.cmd('monitor fields 1')
+        since += 1
+        b = long(g, BACK)
+        if b != last:
+            count += 1
+            last = b
+            if count % 8 == 0:
+                front = BUFFERS[1] if b == BUFFERS[0] else BUFFERS[0]
+                data = read_block(g, front, BUFFER_SIZE, tmp)
+                n = len(out) + 1
+                if stem:
+                    Path(f'{stem}.{n}.bin').write_bytes(data)
+                out.append(f'{n} {since} {hashlib.sha256(data).hexdigest()[:16]}')
+                since = 0
+        if since > 60 * 8:
+            out.append(f'stalled after {count} swaps')
+            break
+    return '\n'.join(out)
+
+
+ROUTE = (('title', 400, '40'), ('number', 150, '44'), ('overview', 400, '44'))
+
+
+def route(server, g, rest):
+    stem = rest.strip()
+    g.stop()
+    for name, n, raw in ROUTE:
+        g.cmd(f'monitor fields {n}', timeout=600)
+        if stem:
+            server.handle(g, f'shot {stem}-{name}.png')
+        key(server, g, raw)
+    return 'landscape 0000'
+
+
+def go(server, g, rest):
+    g.cont()
+    return 'running'
+
+
+server = game_server('sentinel', commands={
+    'fields': fields, 'key': key, 'click': click, 'mouse': mouse, 'hold': hold, 'release': release, 'peek': peek_cmd,
+    'swaps': swaps, 'strips': strips, 'route': route, 'go': go})
+
+if __name__ == '__main__':
+    if sys.argv[1:2] == ['serve'] and os.environ.get('ENTRY') == '1':
+        os.environ['BOOT_BREAK'] = hex(ENTRY)
+    server.main(sys.argv[1:])
