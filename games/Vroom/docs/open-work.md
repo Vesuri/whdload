@@ -10,33 +10,12 @@ on the a1200-040 (`CACHE`), and its demo race on the a500.
 
 ## Release
 
-2.0b (23.11.2026): `$VER` and info text in both slaves, the ReadMe entry above CFou's;
-`make dist` builds `VroomEnhanced-2.0b-20261123.lha` (`lha t` passes). The 2.0b slave
-runs the demo race on the a1200-040 with `DCACHE`. Not published.
-
-## The goals
-
-1. **Correct on the a1200-040** (68040, MMU, Zorro III fast memory, instruction and data
-   caches), and so on every fast machine, with the 68000 unchanged. That includes game
-   speed: today a fast machine plays the game too fast (below).
-2. **50 fps on capable machines** (68040 and 68060) with Enhanced framerate: the
-   simulation at one fixed rate on every 68020 or better, separate from rendering.
-
-What the measurements say ([internals.md](internals.md#frames-and-game-time)):
-
-- The simulation takes one fixed step per rendered frame, with no elapsed-time factor. Game
-  speed follows the frame rate: after 1000 fields from the green light the a1200-040
-  (`CACHE`) has driven 2.7x and the a1200-060 4.2x as far as the a500. The race clock is real
-  time, so lap times shrink on fast machines. On the a500 itself the speed changes with the
-  scene (3-6 fields a frame at the start, 2-3 later). So simulation and rendering are not
-  separated yet.
-- The renderer is 89% of an a500 frame and nearly all CPU work: landscape projection and
-  polygon spans, whole-line road spans and the object scaler, all writing chip memory. The
-  blitter does about 20 small blits a field, each followed by a wait.
-- Everything is in chip memory: code, data, tables, both screens. The a1200-040 with
-  `CACHE` (instruction cache only, closest to real hardware) draws 31.8 fps at the race
-  start, and the a1200-060 44.5. FS-UAE's `DCACHE` figure (39.3) comes from caching chip
-  data, which no board does.
+2.0b (23.11.2026), the fix-only release: phase B's fixes, with a ReadMe line for each.
+`$VER` and info text in both slaves, the ReadMe entry above CFou's. `make dist` builds
+`VroomEnhanced-2.0b-20261123.lha` (`lha t` passes; its slaves match
+`release/slaves.sha256`). Vroom's slave passed the four-machine matrix. The data disk's slave
+ran its demo race on the a500 and the a1200, and the menu, a player race and a second race on
+the a1200-040. Not published.
 
 ## Decisions (the user's, 23.11.2026)
 
