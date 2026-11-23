@@ -127,7 +127,7 @@ reference; a few minutes a machine.
 the a1200-030 and the a1200-040, two at a time: the check after a change to the slave.
 `FULL=1` runs the whole list, for a question that needs it (B7 was one): the machines and
 WHDLoad's cache options (`NoCache`, `Cache`, `DCache`, `ChipNoCache`, `BranchCache`; `MMU` on
-the 030), a 28 MHz 68020 with Zorro III memory, the CUSTOM2 option (`-c2` lines: the a1200,
+the 030), a 28 MHz 68020 with Zorro III memory, Enhanced framerate (`-ef` lines: the a1200,
 030 and 040 in the minimal set; the a500, the 68020 with Zorro III memory, the 040's cache
 options and the 060 in the whole list) and a 68060 that traps `movep`
 (`--uae_cpu_no_unimplemented=true`), two at a time; the list is in the script. Two controls

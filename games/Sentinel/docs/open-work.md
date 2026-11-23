@@ -10,8 +10,9 @@ a1200-040 and the a1200-060, and since B5 the 68040 and 68060 draw correctly.
 
 2.0b (23.11.2026), not published: V1.01 with `$VER` and the info text in the slave, the
 ReadMe entry above StingRay's, the self-modification fix (B5), the effect trigger's wait
-(B6a), the pan step's blitter wait (B6b), the PAL/NTSC test on AGA (C8) and the CUSTOM2 fast
-drawing option (D10, D11); `make dist`
+(B6a), the pan step's blitter wait (B6b), the PAL/NTSC test on AGA (C8) Enhanced framerate
+(CUSTOM1, on in the installed icon: D10, D11) and the blitter waits always on (V1.01's CUSTOM1
+gone); `make dist`
 builds `SentinelEnhanced-2.0b-20261123.lha`.
 
 ## The goals
@@ -128,7 +129,7 @@ across phases. Status in brackets.
   the scroll-in's blitter waits 40% and the field wait 20%. On the a1200-060 the pause is 3 to
   4 fields.
 
-### D. Fast strip rendering (68020 and up, CUSTOM2; done)
+### D. Fast strip rendering (68020 and up, Enhanced framerate; done)
 
 - **D10** (done) Fast memory: an optional ExpMem of 36 KB (WHDLoad's allocation, the slave
   has no buffers of its own) holds the render buffer and the edge tables; without it, or below
@@ -142,7 +143,7 @@ across phases. Status in brackets.
   `EdgeStepF`, both on the fast tables. `tools/spancheck.py`: 30000 random polygons, 0 differ
   from the game's filler under Unicorn (three deliberate faults caught); `tools/edgecheck.py`:
   20000 edges, 0 differ for `EdgeStepF`; the render and play checks pass on the minimal
-  matrix's CUSTOM2 lines. MEASURED: the strip render on the a1200-040 from 3.27 fields to
+  matrix's Enhanced framerate lines. MEASURED: the strip render on the a1200-040 from 3.27 fields to
   1.53, the a1200-030 4.37 to 2.53, a 14 MHz 68020 with fast memory 5.18 to 3.74.
 - **D12** (done) Profiled again ([internals.md](internals.md#rendering-and-panning)): the
   span filler is 2.2% of the 040's render (42.8% before), the rest the game's projection
@@ -159,7 +160,7 @@ across phases. Status in brackets.
   each step's 8 scroll-in fields the next step's request waits for `$3764`, which the pass
   loop sets to 2, so there are at least 2 fields between steps on every CPU (MEASURED: 9.7 to
   10.6 fields from a scroll-in's start to the next step on the a500, 040 and 060), and the
-  040's render still takes 1.5 fields with CUSTOM2. E15 must bypass that wait as well as
+  040's render still takes 1.5 fields with the option. E15 must bypass that wait as well as
   overlap the render.
 - **E15** (to be decided once B and D are done, 23.11.2026) Pipeline the pan. Run the 8
   scroll-in steps (the plane blits, the column copy, the swap) from the vertical-blank
@@ -171,8 +172,7 @@ across phases. Status in brackets.
   gives a swap every field.
 - **E16** (to do) Chip bus. Drop blitter-nasty (`BLTPRI` in the `DMACON` write at `$342`) on
   the option's path so the CPU's few chip accesses are not held behind the scroll blits. The
-  pan step then relies on B6b's wait on the 68000 too, and the CUSTOM1 option, which drops
-  it, must not apply on that path.
+  pan step then relies on B6b's wait on the 68000 too (always on since V1.01's CUSTOM1 went).
 - **E17** (to do) Acceptance: with a pan held for 10 s on the a1200-040 and a1200-060, the
   pan meter shows a swap every field; the render and play checks pass; game speed is
   unchanged (`tools/gametime.sh`: the Sentinel turns every 504 or 505 fields with no input, and

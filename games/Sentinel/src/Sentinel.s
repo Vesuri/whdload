@@ -22,11 +22,12 @@
 ; - the sound effect trigger's CPU-timed DMA-off wait is beam-timed
 ;   (SfxDmaWait), at least the 68000's length on every CPU
 ; - the pan step waits for its last blit before the field it shows it in (not
-;   with CUSTOM1, like the wait at $30c)
+;   and StingRay's wait at $30c are always on: CUSTOM1 no longer drops them
 ; - the PAL/NTSC test reads only the beam's line: AGA's chip ID in VPOSR made
 ;   an NTSC A1200 run the game's PAL clock, 20% fast
-; - CUSTOM2 (a 68020 or better, the optional ExpMem): the render buffer and
-;   the edge tables in the ExpMem, a span filler without movep (SpanFill)
+; - CUSTOM1, Enhanced framerate (a 68020 or better, the optional ExpMem): the
+;   render buffer and the edge tables in the ExpMem, a span filler without
+;   movep (SpanFill)
 
 	INCDIR	SOURCES:Include/
 	INCLUDE	whdload.i
@@ -103,8 +104,7 @@ EXPMEM	dc.l	-FASTSIZE		; ws_ExpMem: optional, WHDLoad writes its address here
 	dc.w	.config-HEADER		; ws_config
 
 
-.config	dc.b	"C1:B:Disable Blitter Waits;"
-	dc.b	"C2:B:Fast Drawing (68020+)"
+.config	dc.b	"C1:B:Enhanced framerate"
 	dc.b	0
 
 	IFD	DEBUG
@@ -202,21 +202,13 @@ PLGAME	PL_START
 ; StingRay's patches (V1.01)
 	PL_SA	$c0a,$c6c		; check protection track
 
-	PL_IFC1
-; if CUSTOM 1 is used => do nothing
-
-	PL_ELSE
 	PL_PSS	$30c,.wblit1,2
-	PL_ENDIF
 	
 	PL_PSS	$6d4,.ackVBI,2
 
 ; Vesuri's patches (2.0b)
 	PL_P	$14be,EdgeStep		; the edge scan converter's stepping
-	PL_IFC1
-	PL_ELSE
 	PL_PS	$47ac,.wblit2		; the pan step: wait for the last blit
-	PL_ENDIF
 	PL_L	$3c9a,$1ff		; PAL/NTSC test: the line, not AGA's chip ID
 	; and in the sound module: PLSOUND, applied by Loader
 	PL_END
@@ -291,7 +283,7 @@ SfxDmaWait
 
 resload	dc.l	0
 
-; The fast drawing option (CUSTOM2, a 68020 or better, the ExpMem allocated):
+; Enhanced framerate (CUSTOM1, a 68020 or better, the ExpMem allocated):
 ; the game's render buffer at $70000 moves to the ExpMem, fast memory where
 ; there is some. The CPU reaches it through the row tables at $56010 and
 ; $56100 (loaded with the data at $55000, relocated by Tables), the pan
@@ -300,7 +292,7 @@ resload	dc.l	0
 FastSetup
 	lea	tags(pc),a0
 	jsr	resload_Control(a2)
-	move.l	custom2(pc),d0
+	move.l	custom1(pc),d0
 	beq.b	.off
 	move.l	attn(pc),d0
 	btst	#AFB_68020,d0
@@ -325,8 +317,8 @@ FastSetup
 .off	rts
 
 fast	dc.l	0			; the render buffer in ExpMem, or 0
-tags	dc.l	WHDLTAG_CUSTOM2_GET
-custom2	dc.l	0
+tags	dc.l	WHDLTAG_CUSTOM1_GET
+custom1	dc.l	0
 	dc.l	WHDLTAG_ATTNFLAGS_GET
 attn	dc.l	0
 	dc.l	TAG_DONE

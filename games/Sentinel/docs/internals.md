@@ -3,7 +3,7 @@
 ## Loading
 
 A direct slave (`ws_Version` 17, `WHDLF_NoError|WHDLF_ClearMem|WHDLF_EmulTrap`): 512 KB
-base memory, an optional ExpMem of 36 KB (for CUSTOM2, below), quit key F10, data from the RawDIC image `Disk.1`. It turns on the
+base memory, an optional ExpMem of 36 KB (for Enhanced framerate, below), quit key F10, data from the RawDIC image `Disk.1`. It turns on the
 instruction cache (`resload_SetCACR` 1, 1; the data cache stays as WHDLoad sets it), loads
 the first `$B400` bytes of the image to `BASE` = `$57FE4` and identifies them by CRC16
 (`$67E7`, SPS 3025; anything else `TDREASON_WRONGVER`). The image has 10 sectors a track
@@ -31,16 +31,19 @@ Offsets are into the program as loaded, from `BASE` (so the file offset into the
 | `$4B2` | `jsr CheckKeys`: stores the key at `$58C6B`, handshakes the keyboard with a 3-line delay, and quits on the quit key | Harry |
 | `$51C` | `rts`: the game's CPU-timed keyboard delay | Harry |
 | `$C0A` | skip to `$C6C`: the protection track check | StingRay |
-| `$30C` | `jsr` a blitter wait before writing `BLTCON0` `$09F0` (not with CUSTOM1) | StingRay |
+| `$30C` | `jsr` a blitter wait before writing `BLTCON0` `$09F0` | StingRay |
 | `$6D4` | `jsr`: acknowledge the vertical blank interrupt twice, for 68040/060 and fast chipsets | StingRay |
 | `$14BE` | jump to `EdgeStep` (2.0b): the edge scan converter's stepping (`$14BE`..`$165B`) without self-modification | Vesuri |
-| `$47AC` | `jsr` a blitter wait before the pan step clears the field flag (2.0b, not with CUSTOM1): below | Vesuri |
+| `$47AC` | `jsr` a blitter wait before the pan step clears the field flag (2.0b): below | Vesuri |
 | `$3C9A` | the PAL/NTSC test's mask `$1FFFF` written as `$1FF` (2.0b): [game time](#game-time) | Vesuri |
 | module `$F2E` | `jsr SfxDmaWait` (2.0b), applied by `Loader` when it loads the sound module to `$20000` and the bytes match: the effect trigger's DMA-off wait, below | Vesuri |
 
-CUSTOM1 (`C1:B:Disable Blitter Waits`) drops both blitter waits, `$30C` and `$47AC`.
+Both blitter waits are always on: V1.01's CUSTOM1 dropped `$30C`'s (and 2.0b's first builds
+`$47AC`'s too), which gains nothing on a 68000, where blitter-nasty already holds the CPU until
+a blit ends (0.2% of a held pan on the a500 is the wait), and lets a faster CPU write the next
+blit's registers while the last one runs.
 
-CUSTOM2 (`C2:B:Fast Drawing (68020+)`) applies these too, when the CPU is a 68020 or better
+CUSTOM1 (`C1:B:Enhanced framerate`, set in the installed icon) applies these too, when the CPU is a 68020 or better
 (`WHDLTAG_ATTNFLAGS_GET`) and WHDLoad allocated the ExpMem (`ws_ExpMem` is negative, so
 optional; it is fast memory where there is some). Otherwise the slave is as without it.
 `FastSetup` moves the render buffer (`$70000`, 32000 bytes) to the start of the ExpMem and
@@ -252,19 +255,19 @@ clocks, so the blitter is busy for about 40% of each scroll-in field on every ma
 MEASURED (2.0b, `tools/sentinel.py steptime`, landscape 0000, D held, 12 steps: the fields
 from a step's start, `$46E0`, to its scroll-in, `$4794`, so the strip render):
 
-| Machine | Without CUSTOM2 | CUSTOM2 |
+| Machine | Without | Enhanced framerate |
 |---|---|---|
 | a1200-040 | 3.27 | 1.53 to 1.56 |
 | a1200-030 | 4.37 | 2.53 |
 | a 14 MHz 68020 with fast memory (`a1200-fast`) | 5.18 | 3.74 |
 
-The a1200 setup has no fast memory, so there the ExpMem is chip memory and CUSTOM2 measured no
+The a1200 setup has no fast memory, so there the ExpMem is chip memory and the option measured no
 gain. Every step then takes 8 scroll-in fields and about 2 more: the pass loop `$3630` sets
 `$3764` to 2 when it starts and a held pan's next request waits for it, so even a render of no
 time leaves 2 fields between steps (a500, 040 and 060: 9.7 to 10.6 fields from the scroll-in's
 start to the next step).
 
-MEASURED (aprof over the windows of 10 strip renders, with CUSTOM2; the fields they took and
+MEASURED (aprof over the windows of 10 strip renders, with Enhanced framerate; the fields they took and
 the shares):
 
 | | a1200-040 without | a1200-040 | a1200-fast |
