@@ -8,7 +8,7 @@ a500, the a1200 with `CACHE`, the a1200-040 with `DCACHE`, and the a1200-060 wit
 cache option on. The data disk runs its title, a player race, the scores and a second race
 on the a1200-040 (`CACHE`), and its demo race on the a500. With Enhanced framerate
 (`CUSTOM1=1`) the race runs on a fixed tick on a 68020 and up (step C): 16.7 Hz, or 25 Hz with
-`CUSTOM2=1`.
+`CUSTOM2=1`, and with fast memory draws frames between the ticks (step 15).
 
 ## Release
 
@@ -156,13 +156,18 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
 
 ### D. Frames between ticks (Enhanced framerate, 68020 and up)
 
-15. **Interpolation.** At the end of each tick, keep what the renderer reads: the player's
-    distance $DC50, the view's angle and offset (probably $DBEC and $DBF0; step 11 settles it), and each car's
-    distance and lateral position. Each frame, write interpolated copies with
-    alpha = fields since the tick / fields per tick, render, then put the tick's values back.
-    Wrap distances at the track length ($DBD4), take angles by the shorter way, and snap at
-    the start, restarts and crashes. The demo cameras and the player's view may prepare the
-    camera differently: validate in a real race, not only the demo.
+15. **Interpolation (done).** The ticks draw nothing; frames are drawn between them, each
+    showing the last two ticks' states mixed by the time since the newer tick was due
+    (`internals.md`, "Frames between ticks"). The snapshot is the race state and the
+    landscape's variables; a frame re-runs the landscape with alpha of the tick's step
+    (it integrates by the step, so it is not mixed), mixes the other cars, and stops short
+    of the line. Needs fast ExpMem (now 80 KB); the a1200 without fast memory keeps drawing
+    in the ticks. On the way the landscape got a wait for the blitter queue in every mode:
+    a crash in a player race on the a1200-030 was a frame's landscape writing $11368 inside
+    a queued blit. At 16.7 Hz (`bench 500`): the a1200-fast 24.4 fps, the a1200-030 36.9, the
+    a1200-040 34.3 (each 16.7 before). The ticks match the a500 (`statelog`). Still to
+    look at: a frame by frame visual check of a player race (restarts, crashes, the pit
+    stop), and the demo cameras.
 16. **Pacing.** The loop already allows a frame per field ($D142) and swaps at the VBL. Check
     for tearing at 1 field a frame. If frames end up just over a field (25 fps by
     quantisation), consider a third screen: 32000 bytes of chip memory inside BaseMem,
@@ -268,7 +273,7 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     `internals.md`, "Where the load's time goes") put the program's unpacker first among
     the game's own work (164 of its 772 fields, and 54 for its table setup). That was its
     reads of its own Huffman tables in chip memory, not the track reads or its code, so the
-    slave moves the tables and the unpacker's variables to a page of the ExpMem (now 76 KB)
+    slave moves the tables and the unpacker's variables to a page of the ExpMem (then 76 KB, now 80 KB)
     and rewrites the loader's 24 addresses of them (`enh_Move`, with the block; behind
     `CUSTOM1` with fast memory). Reading whole archives into fast memory and a copy of the
     unpacker were not needed. The game's field counter at the green light (`race`, two runs

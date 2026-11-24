@@ -5,7 +5,7 @@ hunk or file), current measurements and known limitations.
 
 ## Loading and memory
 
-A direct slave in 512 KB of chip memory (`ws_BaseMemSize` $80000), with an optional 76 KB
+A direct slave in 512 KB of chip memory (`ws_BaseMemSize` $80000), with an optional 80 KB
 ExpMem for Enhanced framerate's fast memory (below, "Enhanced framerate"). The slave
 loads the boot block's loader from disk offset 0 to $60000, patches it and jumps to $6000C;
 the loader loads the main program (about $3658-$1E000) and calls the slave's `Patch`, which
@@ -194,7 +194,7 @@ rate, on every 68020 and up.
 | $AF50 (`clr.w $DC30`) | the loop's entry: the tick clock starts now |
 | $AF56 (`tst.w $DC34`) | a pass starts: it waits while its tick is early; if the next tick is due already, it is a pass that does not draw |
 | $B724 (`clr.w $8504`) | the end of a pause (the pause loops at $B676-$B6C8 inside a pass): the tick clock starts again |
-| $C968 (`jsr $E4F8`) | the landscape first, then the wait for the VBL to take the last frame (`fix_WaitShown`; without the option `fix_Landscape` waits before it) |
+| $C968 (`jsr $E4F8`) | the wait for the blitter queue, the landscape, then the wait for the VBL to take the last frame (`fix_WaitShown`; without the option `fix_Landscape` waits before it; with frames between ticks only while a tick draws, below) |
 | $D13C (`jsr $10F90`) | a pass that does not draw leaves out the sky and ground clear but keeps its state: the horizon's scroll (`$13F16`, its blits written into the idle queue, which is not started) and the clamp of the ground's top line $1136C |
 | $D142-$D14D (the wait for a new field) | a pass that does not draw goes on at $D1C2, leaving out the road spans `$10CD2`, the three objects `$140C0` and the scaler `$18154` |
 | $D510 (`move.l $A884,$E258`) | a pass that does not draw returns from `$D13C`, leaving out the swap ($E258, $A71C, `$12FA6`) |
@@ -226,7 +226,7 @@ mostly lands below a field. The a1200-040 is unchanged (its frame is 2 fields ei
 same in lines 0-30 and 36-174. Lines 31-35 are the race clock (real time) and lines 175-199
 of the cockpit differ between two runs of the same build as well.
 
-**Fast memory.** The slave asks for a 76 KB ExpMem, optional (`ws_ExpMem` negative): the
+**Fast memory.** The slave asks for an 80 KB ExpMem, optional (`ws_ExpMem` negative): the
 1 MB a500 (512 KB of slow memory), where WHDLoad also allocates it, must still load
 WHDLoad's overlays (at 136 KB it no longer did). When WHDLoad finds it in fast memory (not
 below $200000, chip memory, nor in $C00000-$DFFFFF, slow memory on the chip bus), the stack
@@ -385,6 +385,76 @@ passes as well would gain about 2% at most (open-work, step 22).
 The a500's own speed, for comparison: the first three demo races (three circuits) run at
 13.8, 17.5 and 13.9 fps (`meter 1500` from each green light; mostly 3-4 fields a frame), so
 16.7 Hz is about 1.2 times its speed on two of them and the same on the third.
+
+### Frames between ticks
+
+With fast ExpMem (not on the a1200 without fast memory, which keeps the drawing in the
+ticks, as above), the ticks draw nothing and the frames are drawn between them, as often as
+the machine manages, each at its own time. A frame shows the last two ticks' states mixed:
+with S(n-1) and S(n) the states after the last two ticks and alpha the fields since S(n)'s
+tick was due over the period, a frame shows S(n-1) moved alpha of the way to S(n). The
+picture is a tick late, as in any interpolation.
+
+- **The snapshot.** At the end of every tick (`enh_Snap`, from the pass's start) the slave
+  keeps a copy of the race state the drawing reads (`_enh_r`, 2244 bytes in the ExpMem
+  after the unpacker's page): $DBE8-$E253 (the race state but the map marker's position in
+  each screen $DBD8-$DBE7, the landscape's result $E254 and the swap field $E258),
+  $10A90-$10C53 (the landscape's variables), and a few words the drawing reads elsewhere
+  ($DBC0-$DBD7, $C46E, $1067C, $11784, $11C84, $12150, $133DC, $1407C, $1B28C, $1B3D4,
+  $8370, $9CD0, $4988A). It keeps two, the tick before and this one, and swaps them.
+  Left out: the screens, the blitter queue $11268-$11527 (with the ground's top lines
+  $11368/$1136C: the steering wheel `$11C88` rebuilds the queue past them), the sound and
+  the VBL's variables.
+- **A frame** (`enh_Frame`) loads the tick before, moves it, runs the drawing, and loads
+  this tick back. The player's distance $DC50 moves by alpha of this tick's step ($10C30),
+  and the landscape `$E4F8` runs again with that step: it integrates the lateral position,
+  the steering and its ring buffers by the step, so it is re-run rather than mixed. It stops
+  a step short of the line ($DBD4, the track's length: at the line $C7F8 takes the length
+  off every car's distance). The speed and controls ($DC60, $10C46, $DBF8) are this tick's.
+  The other 15 cars' distances (+2) and lateral positions (+8) are mixed; a car that jumps
+  more than 4096 or crosses the line stays. Then the map marker (as $C8F2-$C91C), the
+  landscape's result into $E254 and $DBEE/$DBF0 (as $C960-$C984), the wait for the shown
+  screen and `$D13C`, which swaps.
+- **What a frame must not do twice.** While a frame runs, the race clock's gate $8504
+  ($D530, $D602) and the bump sound $A03C ($E6A6, $E93C) are not written. A tick leaves out
+  what only the frames draw: the map marker ($C8F8), the HUD (`$120A6`; $D21C-$D3BB: the
+  cockpit, mirrors, gear, speed and wheel, after the pit stop `$D5FC`, which keeps time) and
+  the score's or time's digits ($D414, $D43E). The rest of the per-screen bookkeeping is
+  the frames'.
+- **Pacing** (`enh_PassI`). Early for the next tick, it draws a frame each time the field
+  counter has moved past the last swap's field ($E258); once the tick is due it runs the
+  tick. Three ticks in a row without a frame force one, of the newest state (alpha 1).
+  `CUSTOM3=n` draws n frames a tick at alpha 0, 1/n, ... whatever the time (for the checks).
+  `-DENH_NOINTERP` builds the earlier mode.
+- **The landscape and the blitter queue.** Every landscape run (a tick's or a frame's) now
+  first waits for the blitter queue to be idle (`enh_QueueIdle`, `fix_Queue`): the landscape
+  writes the ground's top line $11368 at $F9E2, inside the queue the steering wheel's blits
+  still run from. Without the wait a frame on the a1200-030 could corrupt a queued blit
+  (a WHDLoad dump in a player race). The wait for the shown screen after the
+  landscape stays only while the start lights ($DC36), the pit stop ($DC38) or a crash
+  ($E0DC, $E0D6) run: then the tick draws into the screens.
+
+Checks (16.7 Hz, the first demo race; `CUSTOM1=1`):
+- *The same ticks.* `statelog N FILE tick` against the a500 (`statecmp --align 1 --skip
+  DBD8,DBDC,11368,1136C`): the a1200-030 (`MMU CACHE`, `CUSTOM3=2`) agreed in all 1500
+  passes but for $DEFC, a number that falls in the copy's range and is translated
+  (development, `statelog`), and the a1200-040 (`CACHE`, paced) in all 600 compared.
+- *A driven race.* The a1200-030 (`CACHE`) through 4000 fields of a player race: 1431 ticks, 3546
+  frames, none dropped, no dump.
+- *The data disk.* Its first demo race, `bench 300`: the a1200-040 48.08 fps (2.88 frames
+  a tick), the a1200-030 47.62 (2.85); no dump.
+- *The a500* with the 80 KB ExpMem boots and runs the original loop (`bench 150`: 12.10 fps).
+
+Measurements (`bench 500`, `CUSTOM1=1`, 16.7 Hz; before, every machine drew 16.7 fps):
+
+| Machine | fps | frames a tick |
+|---|---|---|
+| a1200-fast (68020, Zorro II) | 24.44 | 1.46 |
+| a1200-030 (`MMU CACHE`) | 36.87 | 2.21 |
+| a1200-040 (`CACHE`) | 34.25 (`bench 300`) | 2.05 |
+
+On the a1200-040 a frame costs about 1.03 fields (aprof), most of it `$D13C`'s drawing, so
+most frames take 2 fields: 50 fps needs a frame under a field (open-work, step 16).
 
 ## Input, the menu and the race controls
 

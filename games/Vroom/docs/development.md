@@ -57,8 +57,9 @@ With Enhanced framerate the scheduler's counters are at $1C0 (`internals.md`, "E
 framerate"): `do x1c0,6` reads the next tick's field, ticks, frames drawn, fields dropped,
 and the period word. `CUSTOM3=n` makes n of every n+1 race loop passes leave out the
 drawing, for the per-pass check: `statelog N FILE tick` on the a500 and on a 68020+ with
-`CUSTOM1=1 CUSTOM3=2`, then `tools/statecmp.py A B --skip DBD8,DBDC --align 10` (the two
-long words are the map marker's position in each screen; the a500 logs one more pass at the
+`CUSTOM1=1 CUSTOM3=2`, then `tools/statecmp.py A B --skip DBD8,DBDC,11368,1136C --align 10` (the map
+marker's position in each screen, and the ground's top lines, which frames between ticks
+do not snapshot; the a500 logs one more pass at the
 green light). `shown 40` checks that nothing draws into the screen on display: with the option, the only
 change is the map's position marker, which the original draws there too (`internals.md`,
 "Enhanced framerate").
@@ -82,7 +83,7 @@ change is the map's position marker, which the original draws there too (`intern
 
 | Command | Does |
 |---|---|
-| `bench [N]` | from the next green light, the fields the first N frames take (default 500): fps, distance (at the last frame's end, through one breakpoint at $D510), fields per frame. Frames are counted from $E258, which changes once a frame (`internals.md`, "The swap"): with Enhanced framerate the drawn frames, and the line adds ticks, undrawn passes and dropped fields. Read-only, any CPU. In the first demo race after the boot, the same simulation on every machine, so the figure compares machines and builds |
+| `bench [N]` | from the next green light, the fields the first N frames take (default 500): fps, distance (at the last frame's end, through one breakpoint at $D510), fields per frame. Frames are counted from $E258, which changes once a frame (`internals.md`, "The swap"): with Enhanced framerate the drawn frames, and the line adds ticks, undrawn passes (or, with frames between ticks, frames a tick) and dropped fields. Read-only, any CPU. In the first demo race after the boot, the same simulation on every machine, so the figure compares machines and builds |
 | `aprof N FILE`, `aprof race FILE` | from the next green light, the aprof FS-UAE's instruction profile of N fields into FILE; `race` profiles a fresh boot through `race` to the green light instead (the load). Start the server with `FSUAE=$FSUAE_APROF SETUP=a1200-040 EXTRA_ARGS=--cpu=68040-NOMMU` (a cycle-exact CPU without an MMU model). On a 68040 it is an instruction count plus chip time (AmigaXDev's measurement method) |
 | `tools/aprof_report.py FILE [N]` | an `aprof` file: the chip and slave shares, the call targets with the most inclusive time, the flat time by 4 KB block |
 | `frames N FILE` | from the next green light, at each of N swaps: the frame number, the tick and a hash of each of the frame's 800 plane lines |
@@ -94,7 +95,7 @@ change is the map's position marker, which the original draws there too (`intern
 | `meter N` | frames, fields per frame, clock and distance over N fields from now |
 | `race [stay]` | from the boot, through the title (right button, given only while the title idles at $12F9E: a click during the menu's wipe leaves the menu again) and the menu (left button on START) to the green light of a player race with the menu's settings as they are (ARCADE, MOUSE, MANUAL): see `internals.md`, "Input, the menu and the race controls" |
 | `drive N [GAIN] [FILE]` | a test driver for N fields: full throttle, shifting up when the speed stops rising, steering against the lateral position. A shift holds the button 4 fields and the release 4 (the race reads the controls once a tick: a shorter release can fall between two reads, and the gear never engages). FILE gets field, gear, speed, lateral, x, y every 2 fields |
-| `do ACTION ...` | low-level steps with the CPU stopped: `f<N>` fields, `L1`/`L0`/`R1`/`R0` mouse buttons, `m<dx>,<dy>`, `x<addr>[,<n>]` reads (`xsp` at the stack pointer; an address in the race block reads its fast memory copy, `X` the address itself), `u<addr>=<hex>,<max>` waits, `b<addr>` runs to a breakpoint, `r<reg>[,<reg>...]` registers, `pc`, `shot=<png>`; a last `stay` leaves the CPU stopped for the next command. A failing action ends the list, and the reply keeps what came before it |
+| `do ACTION ...` | low-level steps with the CPU stopped: `f<N>` fields, `L1`/`L0`/`R1`/`R0` mouse buttons, `m<dx>,<dy>`, `x<addr>[,<n>]` reads (`xsp` at the stack pointer; an address in the race block reads its fast memory copy, `X` the address itself), `u<addr>=<hex>,<max>` waits, `b<addr>` runs to a breakpoint, `r<reg>[,<reg>...]` registers, `pc`, `shot=<png>`, `d<addr>,<len>=<file>` dumps memory (hex, the addresses themselves); a last `stay` leaves the CPU stopped for the next command. A failing action ends the list, and the reply keeps what came before it |
 | `decrunch N [S]` | stop after each of the next N file decrunches and report the destination and length |
 
 Run it as its own server, after `. ../../common/env.sh`:

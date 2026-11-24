@@ -244,7 +244,11 @@ def bench(server, g, rest):
         g.cont()
     enh = ''
     if e1[1] != e0[1] and UNREADABLE not in e0 + e1:   # Enhanced framerate's counters move
-        enh = f' ticks {e1[1] - e0[1]} undrawn {e1[1] - e0[1] - (e1[2] - e0[2])} dropped {e1[3] - e0[3]}'
+        ticks, drawn = e1[1] - e0[1], e1[2] - e0[2]
+        # with frames between ticks no tick draws: frames per tick instead of undrawn ticks
+        enh = (f' ticks {ticks} ' + (f'undrawn {ticks - drawn}' if drawn <= ticks else
+                                     f'frames/tick {drawn / ticks:.2f}') +
+               f' dropped {e1[3] - e0[3]}')
     return (f'bench {n} frames {fields} fields fps {50.0 * n / fields:.2f} distance {p - p0} '
             f'fields/frame {dict(sorted(gaps.items()))}{enh}')
 
@@ -431,7 +435,8 @@ def do(server, g, rest):
     u<addr>=<hex>,<max> (or != or >=, unsigned) run fields until the long at addr
     compares so with hex, at most max (>= skips $FFFFFFFF, read during disk loads);
     b<addr> run to a breakpoint at addr (hex); r<reg>[,<reg>...] read registers; pc the
-    stopped PC; shot=<png> screenshot of the next field. A last action `stay` leaves
+    stopped PC; shot=<png> screenshot of the next field; d<addr>,<len>=<file> dump memory
+    (hex, the addresses themselves) to a file. A last action `stay` leaves
     the CPU stopped, so the next `do` goes on from the same field. Replies with one line per
     read."""
     g.stop()
@@ -487,6 +492,11 @@ def do(server, g, rest):
                                       (l.split() for l in out.splitlines()) if len(w) > 1))
             elif a == 'pc':
                 lines.append(f'{pc(g):#x}')
+            elif a[0] == 'd' and '=' in a:
+                where, _, path = a[1:].partition('=')
+                lo, n = (int(v, 16) for v in where.split(','))
+                g.cmd(f'dump binary memory {os.path.abspath(path)} {lo:#x} {lo + n:#x}',
+                      timeout=600)
             elif a.startswith('shot='):
                 shot(server, g, os.path.abspath(a[5:]))
             else:
