@@ -467,7 +467,10 @@ picture is a tick late, as in any interpolation.
   from the step's change at $F282, the shake off the road) integrate once a pass, so a
   frame re-running it got a whole pass of them and a tilt from its own part step: at
   $F396 a frame takes the mix of the two ticks' $10ACA and $10C4E instead (`enh_Pitch`),
-  which then make the horizon $10B32. The horizon's scroll (`$13F16`) and the three sky
+  which then make the horizon $10B32, and writes the mix back to $10ACA: on a flat road
+  ($10AD8 zero) the road's slope reads it again at $F436, and with the frame's own
+  re-run of the jump there the road and the ground's top line moved a tick at a time
+  while the mountain glided. The horizon's scroll (`$13F16`) and the three sky
   objects ($4988A, moved at $C9C0-$C9FA; the mountain's top is one) move by $10C42, which
   in a tick the race loop sets after the landscape ($C99A, the steering's turn $DC3E); a
   frame moves both by alpha of this tick's $10C42 (`enh_Sky`), so the mountain's top and

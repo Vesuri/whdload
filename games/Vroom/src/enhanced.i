@@ -830,7 +830,9 @@ enh_Sky		move.l	_enh_bufs+4(pc),a1	; this tick
 ; off the road), which feed the horizon $10B32 and the projection. Each runs
 ; once a pass and integrates by the pass, so a frame re-running it from the
 ; tick before gets a whole pass of it (and a tilt from its own part step):
-; a frame takes alpha of the way between the two ticks' values instead.
+; a frame takes alpha of the way between the two ticks' values instead. The
+; mixed pitch goes back to $10ACA too: the flat road ($10AD8 zero) reads it
+; again at $F436.
 ; IN:	d3.w = the height; OUT: d1.w = the pitch, d3, and the flags of
 ;	cmpi.w #21000,d1 (the replaced instructions)
 enh_Pitch	tst.b	_enh_frame(pc)
@@ -850,6 +852,8 @@ enh_Pitch	tst.b	_enh_frame(pc)
 		move.w	(ENH_O2+$10ACA-ENH_R2,a0),d0
 		move.w	(ENH_O2+$10ACA-ENH_R2,a1),d1
 		bsr	enh_Mix
+		move.l	ENH_BLOCK.w,a0		; for the flat road's $F436 too
+		move.w	d1,($10ACA,a0)
 		movem.l	(a7)+,d0/a0-a1
 		cmp.w	#21000,d1
 		rts
