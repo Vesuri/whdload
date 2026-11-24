@@ -152,7 +152,7 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
       sky and ground clear left out of undrawn passes and the wait for the shown screen
       after the landscape (phase E, step 22), the 68020 at 25 Hz draws 486 frames in 1200
       fields (20.3 fps, 15.8 without the option); at 16.7 Hz 399 of 400. The plan had
-      expected a catch-up tick to cost about 11% of a frame. Step 22 picks this up.
+      expected a catch-up tick to cost about 11% of a frame. Step 22 measured what is left.
 
 ### D. Frames between ticks (Enhanced framerate, 68020 and up)
 
@@ -234,19 +234,36 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     `CACHE` it is: all but 1 of 500 ticks drawn at 25 Hz on the 68030, 68040 and 68060, no
     chip-access restarts on a 68060, and correct in emulation with or without an MMU model. The ReadMe
     (step 25) names `DCache` as the alternative for boards, not for emulators.
-22. **Then the hot routines.** Profile again (a traced 68020 with fast memory, aprof on the
-    040). Candidates: the projection's `muls` ($F672, $F680), the road spans' whole-line
-    writes, the span filler ($10E72) and the scaler.
-    - The cost of catching up (done in part). An undrawn pass cost about 1.3 fields on the
-      a1200: the landscape 0.6, the wait at `$118D8` for the sky and ground clear 0.3, and
-      the wait for the shown screen before the landscape. Undrawn passes now leave out the
-      clear (keeping its state) and every pass waits after the landscape, which draws
-      nothing (`internals.md`, "Enhanced framerate"). At 25 Hz in 1200 fields: the a1200
-      486 frames (356 before), the a1200-030 582 (515), the a1200-040 599 (594); the
-      same state as the a500's in every pass, and `shown` finds no drawing into the shown
-      screen but the original map marker. Still open: the off-road flag ($10AAA, from the
-      nearest projected line at $FA62) worked out without the projection, so that a pass
-      that catches up could leave the projection out.
+22. **The hot routines** (done, no change: nothing measured is worth rewriting). aprof,
+    `CUSTOM1=1 CUSTOM2=1`, 200 fields of the first demo race (`internals.md`, "Where the
+    time goes (68020)"). With fast memory every measured machine already draws all but at
+    most 1 of 500 ticks at 25 Hz (step 20), and the a1200-fast (68020) still waits 16% of
+    its time for the next tick, so only the a1200 without fast memory falls behind (20.7 fps
+    at 25 Hz; at 16.7 Hz it keeps up). There 89% of the time is chip memory accesses, spread thin:
+    no instruction of the landscape takes more than 0.5%.
+    - The candidates: the projection's `muls` ($F672, $F680, their mirrors $F6E4/$F6F4 and
+      $F74C/$F752) take 1.1% together; the road spans (`$10CD2`, 9.7% inclusive) and the
+      span filler (`$10E72`, 3.3%) are whole-line writes to the screen, already long words
+      and `movem`; the scaler (`$18154`, 29.4%) draws into the screen too.
+    - The cache flushes. Two of the landscape's self-modifying shift-count sites
+      (src/smc.i's `smc_Sh1_10`, `smc_Sh1_12`) run about 5 times a pass, each followed by
+      `resload_FlushCache`: 3.2% of the a1200's time (1.3% on the a1200-fast). A scratch
+      build replaced the four routines with precompiled variants chosen through a pointer, as the bitmap scaler's
+      pairs are (no code written, no flush; checked word for word against the game's
+      routines and tables; `statelog 600 tick` the same as the a500's on the a1200 and the
+      a1200-040). The stubs fell to 0.16%, but the landscape's own time rose (31.4% to
+      33.3%, the indirect jumps and their fetches from chip memory) and `bench 500` gave
+      20.63 fps against 20.68 and 20.71: not kept. Clearing the instruction cache in the
+      CACR directly instead crashed every machine where WHDLoad moves the VBR to fast
+      memory (a1200-fast, a1200-4m, a1200-030; it ran with `NOVBRMOVE` and without fast
+      memory), and WHDLoad allows cache changes only through its calls (`howto.html`).
+    - Leaving the projection out of undrawn passes (the open item from step 14): a
+      measurement build that skips it whole drew 21.11 fps on the a1200 against 20.68 and
+      20.71, about 2%: the ceiling for working out the flag without the projection (the
+      flag diverges in that build, so the race does too; a second run raced differently
+      and drew 18.75). Not worth an exact copy of the projection's first line.
+
+    Left for the a1200 at 25 Hz: a third screen (step 16), not measured.
 23. **Loading time.** From the boot to a race's green light (`race`, field counter $A884)
     takes 930 fields on the a1200-030 with `CACHE` and 976 on the a1200-040, about 19 s.
     With `DCACHE` it is 691 and 578 (the MMU model caches chip data, which boards do not, and

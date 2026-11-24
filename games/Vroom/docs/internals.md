@@ -361,8 +361,8 @@ Profiled on the a1200 (68020, aprof) with nearly every pass undrawn, one cost ab
 fields: 0.6 in the landscape, 0.3 waiting at `$118D8` for the blitter queue to finish the sky
 and ground clear, and the wait for the VBL before the landscape. Without the clear and with
 the wait after the landscape, the a1200 at 25 Hz draws 486 frames in 1200 fields (20.3 a
-second, 15.8 without the option); it drew 356 before. Working out the off-road flag without
-the projection (open-work, step 22) would make undrawn passes cheaper still.
+second, 15.8 without the option); it drew 356 before. Leaving the projection out of undrawn
+passes as well would gain about 2% at most (open-work, step 22).
 
 The a500's own speed, for comparison: the first three demo races (three circuits) run at
 13.8, 17.5 and 13.9 fps (`meter 1500` from each green light; mostly 3-4 fields a frame), so
@@ -415,6 +415,28 @@ A cycle trace of 100 fields of the second demo race (Austria, 19.2 fps there;
   $D000-$EFFF 10% (the car table, game state), $11000-$11FFF 7%, the object graphics
   $49000-$58FFF about 6%. Writes go mostly to the screens, to the tables at $30000 and
   $34000, and to the custom chips.
+
+## Where the time goes (68020)
+
+aprof, `CUSTOM1=1 CUSTOM2=1` (25 Hz), 200 fields from the first demo race's green light
+(`tools/vroom.py aprof` with `FSUAE=$FSUAE_APROF`, `SETUP=a1200` or `a1200-fast`; the inclusive
+time of each call target, `tools/aprof_report.py`).
+
+| | a1200 (no fast memory) | a1200-fast (the block in fast memory) |
+|---|---|---|
+| chip memory accesses | 89% | 48% |
+| waiting for the next tick | 0 | 16% |
+| `$D13C`, the drawing | 50% | 58% |
+| `$E4F8`, the landscape (its own code) | 40% (31%) | 20% (17%) |
+| `$18154`, the scaler (`$18330`, an object) | 29% (18%) | 31% (19%) |
+| `$10CD2`, the road spans (`$10E72`, the span filler) | 9.7% (3.3%) | 11.5% (4.2%) |
+| `$1123A`, the wait for the blitter queue | 1.8% | 8.2% |
+| `smc_Sh1_10`/`smc_Sh1_12` with `resload_FlushCache` | 3.2% | 1.3% |
+
+On the a1200 the landscape's time is spread thin (no instruction above 0.5%) and almost all
+of it is fetches and data in chip memory; the projection's `muls` take 1.1% together. About
+8 times a field a WHDLoad routine runs from wherever the CPU is (5% on the a1200; most likely
+its interrupt entry), not from the game's calls.
 
 ## Verification
 
