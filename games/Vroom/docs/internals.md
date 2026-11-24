@@ -184,8 +184,9 @@ predict an accelerator's frame rate.
 `src/enhanced.i`, applied from `Fix` after the 68020 fixes, when `CUSTOM1` is set and the CPU
 is a 68020 or higher. A 68000 or 68010, or `CUSTOM1=0`, runs the original loop.
 
-**Every race loop pass is a tick**, due every 3 fields (16.7 Hz) or with `CUSTOM2=1` every
-2 (25 Hz), counted by the game's own field counter $A884. The simulation is the original
+**Every race loop pass is a tick**, due every 3 fields (16.7 Hz), counted by the game's own
+field counter $A884. (A 25 Hz option, `CUSTOM2=1`, was removed for 2.0b; the 25 Hz
+measurements below were taken with it.) The simulation is the original
 one step per pass, so the game runs at the speed of a machine that draws at exactly that
 rate, on every 68020 and up.
 

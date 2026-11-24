@@ -29,10 +29,10 @@ SOCK = RUN / 'vroom.sock'
 
 # The check after a change: one machine of each CPU class, the 68040 as a real board runs it
 # (instruction cache only), with Enhanced framerate off; then Enhanced framerate where it
-# sometimes catches up (the 68030 at 25 Hz) and where it waits (the 68040 at 16.7 Hz). The full list is
+# runs with the MMU (the 68030) and with the data cache off (the 68040). The full list is
 # for one-off decisions (open-work.md, step 21).
 CELLS = ['a500', 'a1200', 'a1200-030:MMU', 'a1200-040:CACHE',
-         'a1200-030:MMU+CUSTOM1=1+CUSTOM2=1', 'a1200-040:CACHE+CUSTOM1=1']
+         'a1200-030:MMU+CUSTOM1=1', 'a1200-040:CACHE+CUSTOM1=1']
 FULL = CELLS + ['a1200-fast', 'a1200-040:DCACHE']
 
 

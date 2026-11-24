@@ -4,7 +4,7 @@
 ;  :Author.	Mr.Larmer of Wanted Team
 ;  :History.	02.02.2000
 ;		03.06.2006 updated by cfou
-;		23.11.2026 2.0b by Vesuri: CPU caches, fast CPUs
+;		24.11.2026 2.0b by Vesuri: CPU caches, fast CPUs, Enhanced framerate
 ;  :Requires.	-
 ;  :Copyright.	Public Domain
 ;  :Language.	68000 Assembler
@@ -68,17 +68,16 @@ _expmem		dc.l	-ENH_EXPSIZE	;ws_ExpMem (optional: src/enhanced.i)
 	DOSCMD	"WDate	>T:date"
 	ENDC
 
-_config	dc.b	"C1:B:Enhanced framerate;"
-	dc.b	"C2:L:Game speed:16.7 Hz,25 Hz",0
+_config	dc.b	"C1:B:Enhanced framerate",0
 _data	dc.b	0
 _name	dc.b	"Vroom (Data Disk)",0
 _copy	dc.b	"1992 Lankhor ",0
 _info	dc.b	"Done by Mr.Larmer updated by CFou!",10
 	dc.b	"enhanced by Vesuri",10
-	dc.b	"Version 2.0b (23.11.2026)"
+	dc.b	"Version 2.0b (24.11.2026)"
 	dc.b	10,"Greeting to Adrian Simpson"
 	dc.b	0
-	dc.b	"$VER: VroomData.slave 2.0b (23.11.2026)",0
+	dc.b	"$VER: VroomData.slave 2.0b (24.11.2026)",0
 ;====================================================================== 
 	even
 ;======================================================================

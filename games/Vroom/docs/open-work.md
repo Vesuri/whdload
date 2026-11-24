@@ -7,18 +7,15 @@ and the blitter queue no longer overruns on fast CPUs (`docs/internals.md`, "Fix
 a500, the a1200 with `CACHE`, the a1200-040 with `DCACHE`, and the a1200-060 with every
 cache option on. The data disk runs its title, a player race, the scores and a second race
 on the a1200-040 (`CACHE`), and its demo race on the a500. With Enhanced framerate
-(`CUSTOM1=1`) the race runs on a fixed tick on a 68020 and up (step C): 16.7 Hz, or 25 Hz with
-`CUSTOM2=1`, and with fast memory draws frames between the ticks (step 15).
+(`CUSTOM1=1`) the race runs on a fixed tick on a 68020 and up (step C), 16.7 Hz, and with
+fast memory draws frames between the ticks (step 15).
 
 ## Release
 
-2.0b (23.11.2026), the fix-only release: phase B's fixes, with a ReadMe line for each.
-`$VER` and info text in both slaves, the ReadMe entry above CFou's. `make dist` builds
-`VroomEnhanced-2.0b-20261123.lha` (`lha t` passes; its slaves match
-`release/slaves.sha256`). Vroom's slave passed the four-machine matrix. The data disk's slave
-ran its demo race on the a500 and the a1200, and the menu, a player race and a second race on
-the a1200-040. Not published. Its archive was built at commit 494c65a1; the slaves since
-then carry step C (`ws_Version` 17), which the 2.0b ReadMe does not describe.
+2.0b (24.11.2026): phase B's fixes and Enhanced framerate (`CUSTOM1=1`), with the ReadMe
+entry above CFou's, `$VER` and info text in both slaves. Not published. Left before it: the
+icon's tooltypes and the ReadMe's description of the option (step 26), and the acceptance
+runs (step 25). `make dist` builds `VroomEnhanced-2.0b-20261124.lha`.
 
 ## Decisions (the user's, 23.11.2026)
 
@@ -26,9 +23,9 @@ then carry step C (`ws_Version` 17), which the 2.0b ReadMe does not describe.
   tick, the frames between ticks and every performance change (step E). It applies on a
   68020 or better (`WHDLTAG_ATTNFLAGS_GET`, as `src/smc.i` gates already). Bug fixes
   (step B) stay on for every CPU and every setting.
-- **Game speed** (`CUSTOM2`), as in Virus: 0 is 16.7 Hz (a tick every 3 fields, the
-  default), 1 is 25 Hz (every 2 fields). The slaves get WHDLoad's config splash with
-  `ws_config` `"C1:B:Enhanced framerate;C2:L:Game speed:16.7 Hz,25 Hz;"` (`ws_Version` 17,
+- **Game speed** is 16.7 Hz (a tick every 3 fields); the 25 Hz option (`CUSTOM2`) was
+  removed (24.11.2026). The slaves get WHDLoad's config splash with
+  `ws_config` `"C1:B:Enhanced framerate"` (`ws_Version` 17,
   so the ReadMe's requirement becomes WHDLoad 17).
 - **The 68000 and 68010 keep the original loop**, with the option on or off: one step per
   frame, as today.
@@ -36,9 +33,7 @@ then carry step C (`ws_Version` 17), which the 2.0b ReadMe does not describe.
   installed icon carries `CACHE` beside `CUSTOM1=1` (step 21).
 
 What this means per machine, from the race-start figures:
-- A 14 MHz 68020 with chip memory only (17.5 fps today) gets a steady game speed; at 25 Hz
-  it runs catch-up ticks instead of extra frames (a tick is about 11% of an a500 frame).
-  Frames between ticks appear only where frames are shorter than a tick.
+- A 14 MHz 68020 with chip memory only (17.5 fps today) gets a steady game speed. Frames between ticks appear only where frames are shorter than a tick.
 - The 68040 and 68060 get a steady speed from step C. The frames between ticks come with
   step D, and reach 50 a second as step E brings their frame time under a field (31.8 and
   44.5 fps today).
@@ -119,7 +114,7 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
 
 `src/enhanced.i`; `internals.md`, "Enhanced framerate", has the design and the checks.
 
-10. **The option's plumbing** (done). `CUSTOM1`, `CUSTOM2` (and `CUSTOM3`, a test knob for
+10. **The option's plumbing** (done). `CUSTOM1` (and `CUSTOM3`, a test knob for
     step 14) read at install, applied on a 68020 or higher only. Both slaves have
     `ws_config` (`ws_Version` 17). `game.conf` adds `CUSTOM1=1` to `make run`/`serve` unless
     `ENHANCED=0` or `WHD_ARGS` sets `CUSTOM1`. The a500 runs its first three demo races
@@ -362,8 +357,8 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
 ### F. Acceptance
 
 25. With the installed icon's tooltypes, on the a1200-040 and the a1200-060, the `bench`
-    window and a real race show a swap every field. Game speed is within 1% of the chosen
-    tick on every machine. The render and state checks (steps 2 and 14) pass. With the
+    window and a real race show a swap every field. Game speed is within 1% of 16.7 Hz
+    on every machine. The render and state checks (steps 2 and 14) pass. With the
     option off, the original code paths run. The 68000 works correctly with the option on
     and off. FS-UAE's 040/060 timing is not hardware's, so the 50 fps figure needs a real
     accelerator to confirm.
@@ -373,4 +368,4 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
       Instead, add two `settooltype` lines to the Install script's `P_SelectIcon` block,
       beside its `Slave` and `PreLoad` (a replaced `release/Install` in `release.json`).
       That covers every icon variant, Vroom's and the data disk's.
-    - The ReadMe describes CUSTOM1, CUSTOM2 and the cache tooltype.
+    - The ReadMe describes CUSTOM1 and the cache tooltype.

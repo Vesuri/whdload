@@ -4,8 +4,8 @@
 ;
 ; The original race loop ($AF56-$CD20) takes one simulation step per pass and
 ; draws a frame in every pass, so the game's speed follows the frame rate.
-; Here every pass is one tick, due every ENH_PERIOD fields (3: 16.7 Hz, or 2:
-; 25 Hz with CUSTOM2=1), counted by the game's VBL ($A884). A pass waits while
+; Here every pass is one tick, due every ENH_PERIOD fields (3: 16.7 Hz),
+; counted by the game's VBL ($A884). A pass waits while
 ; it is early. When the next tick is already due as well, the pass leaves out
 ; what only draws (at most ENH_SKIPS_MAX passes in a row):
 ;   in $D13C, the wait for a new field, the road spans, the objects and the
@@ -106,27 +106,20 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		clr.l	-(a7)
 		pea	WHDLTAG_CUSTOM3_GET
 		clr.l	-(a7)
-		pea	WHDLTAG_CUSTOM2_GET
-		clr.l	-(a7)
 		pea	WHDLTAG_CUSTOM1_GET
 		move.l	a7,a0
 		move.l	_resload(pc),a1
 		jsr	resload_Control(a1)
 		move.l	4(a7),d0		; CUSTOM1
-		move.l	12(a7),d1		; CUSTOM2
-		move.b	20+3(a7),ENH_FORCE.w	; CUSTOM3
-		lea	28(a7),a7
+		move.b	12+3(a7),ENH_FORCE.w	; CUSTOM3
+		lea	20(a7),a7
 		st	(a2)			; -1: off
 		clr.l	ENH_BLOCK.w
 		tst.l	d0
 		beq.b	.done
 		move.b	#1,(a2)			; 1: on
 		bsr	enh_FmodeInit
-		moveq	#3,d0			; 16.7 Hz
-		tst.l	d1
-		beq.b	.period
-		moveq	#2,d0			; 25 Hz
-.period		move.w	d0,ENH_PERIOD.w
+		move.w	#3,ENH_PERIOD.w	; 16.7 Hz
 		clr.l	ENH_TICKS.w
 		clr.l	ENH_FRAMES.w
 		clr.l	ENH_DROPPED.w
