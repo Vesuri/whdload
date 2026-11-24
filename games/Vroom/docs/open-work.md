@@ -13,9 +13,9 @@ fast memory draws frames between the ticks (step 15).
 ## Release
 
 2.0b (24.11.2026): phase B's fixes and Enhanced framerate (`CUSTOM1=1`), with the ReadMe
-entry above CFou's, `$VER` and info text in both slaves. Not published. Left before it: the
-icon's tooltypes and the ReadMe's description of the option (step 26), and the acceptance
-runs (step 25). `make dist` builds `VroomEnhanced-2.0b-20261124.lha`.
+entry above CFou's, `$VER` and info text in both slaves, the option described in the ReadMe
+and set in the installed icon (step 26). `make dist` builds `VroomEnhanced-2.0b-20261124.lha`.
+Not published: the user tests it on real hardware (step 25).
 
 ## Decisions (the user's, 23.11.2026)
 
@@ -352,7 +352,8 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
         hardly wait.
 
       Left for 50 fps: 1 frame in 25 takes 2 fields on the a1200-040; the scaler (31%) and
-      the landscape (21%) are the most of a frame now.
+      the landscape (21%) are the most of a frame now. Accepted as it is (the user,
+      24.11.2026).
 
 ### F. Acceptance
 
@@ -362,10 +363,8 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     option off, the original code paths run. The 68000 works correctly with the option on
     and off. FS-UAE's 040/060 timing is not hardware's, so the 50 fps figure needs a real
     accelerator to confirm.
-26. **Release.**
-    - The installed icon gets `CUSTOM1=1` and the cache tooltype. `Vroom.inf` and
-      `Vroom.colicon` ship with no tooltypes, so the packager's `tooltypes` cannot add them.
-      Instead, add two `settooltype` lines to the Install script's `P_SelectIcon` block,
-      beside its `Slave` and `PreLoad` (a replaced `release/Install` in `release.json`).
-      That covers every icon variant, Vroom's and the data disk's.
-    - The ReadMe describes CUSTOM1 and the cache tooltype.
+26. **Release** (done but publishing). The installed icon gets `CUSTOM1=1` and `CACHE`:
+    `Vroom.inf` and `Vroom.colicon` ship with no tooltypes, so the packager's `tooltypes`
+    cannot add them; `release/Install` (the shipped script) sets both after `P_SelectIcon`
+    in `P_MakeIcons`, which makes Vroom's and the data disk's icon alike. The ReadMe's
+    Options paragraph describes CUSTOM1 and CACHE.

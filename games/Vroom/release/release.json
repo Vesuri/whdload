@@ -6,7 +6,8 @@
       "replace": {
         "VroomHd/Vroom.slave": "build:Vroom",
         "VroomHd/VroomData.slave": "build:VroomData",
-        "VroomHd/ReadMe": "release/ReadMe"
+        "VroomHd/ReadMe": "release/ReadMe",
+        "VroomHd/Install": "release/Install"
       },
       "add": {},
       "remove": [],

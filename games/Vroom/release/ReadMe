@@ -20,6 +20,13 @@
  The installed program requires 0.5 MB ChipMem and 0.5 MB OtherMem.
  It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
 
+ Options:
+ CUSTOM1=1: Enhanced framerate, set in the installed icon together with CACHE.
+ 0 or unset keeps the original timing. On a 68020 or later the races run at a
+ steady 16.7 game updates a second, whatever the CPU's speed. With 80 KB of
+ free fast memory the picture is also drawn between the updates, up to one
+ frame per video frame, for smoother motion. A 68000 or 68010 ignores it.
+
  If you have problems with this installation please try and get a newer
  version of this package from the WHDLoad WWW-Page. If that doesn't help try
  some Tooltypes like NOCACHE, NOAUTOVEC, EXPCHIP, NOMMU, PAL or NTSC. If
@@ -32,8 +39,9 @@
  and	aminet:game/patch/
 
  version 2.0b (24.11.2026) done by Vesuri
- - Enhanced framerate (Custom1=1) on 68020 and later: races run at a steady game
-   speed on every CPU and, with fast memory, much more smoothly
+ - Enhanced framerate (Custom1=1) on 68020 and later, set in the installed icon:
+   races run at a steady game speed on every CPU and, with fast memory, much
+   more smoothly
  - fixed the black screen and crash with CPU caches on (68020-68060)
  - fixed crashes in races on fast CPUs, and the data disk's crash at its first race
  - fixed flickering roadside objects and too fast menu wipes on fast CPUs
