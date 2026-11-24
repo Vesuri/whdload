@@ -41,7 +41,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | The Sentinel Enhanced | Harry & StingRay | [2.0b (23.11.2026)](https://github.com/Vesuri/whdload/releases/tag/SentinelEnhanced-2.0b-20261123) |
 | Their Finest Hour Enhanced | Psygore | [2.0b (13.10.2026)](https://github.com/Vesuri/whdload/releases/tag/TheirFinestHourEnhanced-2.0b-20261013) |
 | Virus Enhanced | John Selck | [2.0b (22.11.2026)](https://github.com/Vesuri/whdload/releases/tag/VirusEnhanced-2.0b-20261122) |
-| Vroom Enhanced | Mr.Larmer & CFou | not yet released |
+| Vroom Enhanced | Mr.Larmer & CFou | [2.0b (24.11.2026)](https://github.com/Vesuri/whdload/releases/tag/VroomEnhanced-2.0b-20261124) |
 | Wing Commander Enhanced | Psygore | [2.0b (19.11.2026)](https://github.com/Vesuri/whdload/releases/tag/WingCommanderEnhanced-2.0b-20261119) |
 | Zany Golf Enhanced | Bored Seal | [2.0b (17.11.2026)](https://github.com/Vesuri/whdload/releases/tag/ZanyGolfEnhanced-2.0b-20261117) |
 
