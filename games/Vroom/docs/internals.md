@@ -412,49 +412,69 @@ picture is a tick late, as in any interpolation.
   a step short of the line ($DBD4, the track's length: at the line $C7F8 takes the length
   off every car's distance). The speed and controls ($DC60, $10C46, $DBF8) are this tick's.
   The other 15 cars' distances (+2) and lateral positions (+8) are mixed; a car that jumps
-  more than 4096 or crosses the line stays. Then the map marker (as $C8F2-$C91C), the
-  landscape's result into $E254 and $DBEE/$DBF0 (as $C960-$C984), the wait for the shown
-  screen and `$D13C`, which swaps.
+  more than 4096 or crosses the line stays. Alpha is kept within 0..1: outside it the
+  step turns huge, the camera jumps to the line, and the cars' sort by distance at
+  $ED88-$EDA6 runs off its list into the landscape's code at $10A42 (a Line 1111
+  exception on the a1200-fast in a first build of step 16). Then the landscape's result
+  into $E254 and $DBEE/$DBF0 (as $C960-$C984), the wait for the shown screen, the map
+  marker (as $C8F2-$C91C, after the wait: the CPU draws it into the screen) and `$D13C`,
+  which swaps.
 - **What a frame must not do twice.** While a frame runs, the race clock's gate $8504
   ($D530, $D602) and the bump sound $A03C ($E6A6, $E93C) are not written. A tick leaves out
-  what only the frames draw: the map marker ($C8F8), the HUD (`$120A6`; $D21C-$D3BB: the
-  cockpit, mirrors, gear, speed and wheel, after the pit stop `$D5FC`, which keeps time) and
-  the score's or time's digits ($D414, $D43E). The rest of the per-screen bookkeeping is
+  what only the frames draw: the map marker ($C8F8), the HUD (`$120A6`; the wheel's lower
+  part `$118D8`, from $D20A, patched at $118DE where the site holds no block address;
+  $D21C-$D3BB: the cockpit, mirrors, gear, speed and wheel, after the pit stop `$D5FC`,
+  which keeps time) and the score's or time's digits ($D414, $D43E). The rest of the per-screen bookkeeping is
   the frames'.
-- **Pacing** (`enh_PassI`). Early for the next tick, it draws a frame each time the field
-  counter has moved past the last swap's field ($E258); once the tick is due it runs the
-  tick. Three ticks in a row without a frame force one, of the newest state (alpha 1).
+- **Pacing** (`enh_PassI`). A frame starts as soon as the last one has swapped: its
+  landscape runs while the last frame waits for the VBL, then it waits for the shown screen
+  and draws. Its alpha is for the field it will be shown in if it draws within a field:
+  the next field, or the one after if a frame still waits for the VBL. When the next tick
+  is due by that field, the tick runs first (up to 2 fields early; it reads the mouse that
+  much earlier). Three ticks in a row without a frame force one, of the newest state
+  (alpha 1). A first version waited for the field to change before each frame
+  ($A884 against $E258), so the landscape never overlapped the wait: on the a1200-040, 28.8%
+  of the time went idle there (aprof, 200 fields).
   `CUSTOM3=n` draws n frames a tick at alpha 0, 1/n, ... whatever the time (for the checks).
   `-DENH_NOINTERP` builds the earlier mode.
 - **The landscape and the blitter queue.** Every landscape run (a tick's or a frame's) now
   first waits for the blitter queue to be idle (`enh_QueueIdle`, `fix_Queue`): the landscape
   writes the ground's top line $11368 at $F9E2, inside the queue the steering wheel's blits
   still run from. Without the wait a frame on the a1200-030 could corrupt a queued blit
-  (a WHDLoad dump in a player race). The wait for the shown screen after the
-  landscape stays only while the start lights ($DC36), the pit stop ($DC38) or a crash
-  ($E0DC, $E0D6) run: then the tick draws into the screens.
+  (a WHDLoad dump in a player race). A tick then waits for the shown screen, as before
+  frames between ticks: the race loop's panel updates after the landscape ($CA10-$CCFA)
+  draw into the screens, and a tick often runs while the last frame still waits for the
+  VBL (`shown 80` on the a1200-030: lines 55-59 changed in the shown screen in 2 of 80
+  frames, and the wheel's lines 191-194 in every tick, before both were fixed). Waiting
+  every tick costs about 3% (`bench 300`: the a1200-040 41.32 fps against 42.49).
 
 Checks (16.7 Hz, the first demo race; `CUSTOM1=1`):
 - *The same ticks.* `statelog N FILE tick` against the a500 (`statecmp --align 1 --skip
   DBD8,DBDC,11368,1136C`): the a1200-030 (`MMU CACHE`, `CUSTOM3=2`) agreed in all 1500
   passes but for $DEFC, a number that falls in the copy's range and is translated
-  (development, `statelog`), and the a1200-040 (`CACHE`, paced) in all 600 compared.
-- *A driven race.* The a1200-030 (`CACHE`) through 4000 fields of a player race: 1431 ticks, 3546
-  frames, none dropped, no dump.
-- *The data disk.* Its first demo race, `bench 300`: the a1200-040 48.08 fps (2.88 frames
-  a tick), the a1200-030 47.62 (2.85); no dump.
+  (development, `statelog`), and the a1200-040 (`CACHE`, paced) in all 600 compared; with
+  step 16's pacing, all 300 compared on the a1200-040.
+- *Nothing drawn into the screen on display.* `shown 80`: none of 80 frames on the
+  a1200-030 (`MMU CACHE`) and on the a1200-040 (`CACHE`).
+- *A driven race.* The a1200-030 (`CACHE`) through 4000 fields of a player race: 1421
+  ticks, 3991 frames, none dropped, no dump (1431 and 3546 before step 16's pacing).
+- *The data disk.* Its first demo race, `bench 300` on the a1200-040: 49.34 fps (2.96
+  frames a tick); no dump.
 - *The a500* with the 80 KB ExpMem boots and runs the original loop (`bench 150`: 12.10 fps).
 
-Measurements (`bench 500`, `CUSTOM1=1`, 16.7 Hz; before, every machine drew 16.7 fps):
+Measurements (`CUSTOM1=1`, 16.7 Hz, the first demo race; without frames between ticks every
+machine drew 16.7 fps):
 
-| Machine | fps | frames a tick |
-|---|---|---|
-| a1200-fast (68020, Zorro II) | 24.44 | 1.46 |
-| a1200-030 (`MMU CACHE`) | 36.87 | 2.21 |
-| a1200-040 (`CACHE`) | 34.25 (`bench 300`) | 2.05 |
+| Machine | step 15 | step 16 (`bench 300`) | frames a tick |
+|---|---|---|---|
+| a1200-fast (68020, Zorro II) | 24.44 (`bench 500`) | 26.50 | 1.59 |
+| a1200-030 (`MMU CACHE`) | 36.87 (`bench 500`) | 41.67 | 2.49 |
+| a1200-040 (`CACHE`) | 34.25 (`bench 300`) | 41.67 | 2.49 |
 
-On the a1200-040 a frame costs about 1.03 fields (aprof), most of it `$D13C`'s drawing, so
-most frames take 2 fields: 50 fps needs a frame under a field (open-work, step 16).
+The a1200-030 and the a1200-040 give the same fields frame for frame here (239 frames of 1
+field, 59 of 2, 1 of 3). On the a1200-040 a frame costs about 1.03 fields of work (aprof),
+most of it `$D13C`'s drawing; the landscape now overlaps the wait for the VBL, so most
+frames fit a field and the rest take 2. 50 fps needs every frame under a field.
 
 ## Input, the menu and the race controls
 

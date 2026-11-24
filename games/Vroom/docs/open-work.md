@@ -168,10 +168,18 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     a1200-040 34.3 (each 16.7 before). The ticks match the a500 (`statelog`). Still to
     look at: a frame by frame visual check of a player race (restarts, crashes, the pit
     stop), and the demo cameras.
-16. **Pacing.** The loop already allows a frame per field ($D142) and swaps at the VBL. Check
-    for tearing at 1 field a frame. If frames end up just over a field (25 fps by
-    quantisation), consider a third screen: 32000 bytes of chip memory inside BaseMem,
-    not yet found.
+16. **Pacing (done; `internals.md`, "Frames between ticks").** A frame now starts as soon
+    as the last one has swapped, so its landscape runs while the last frame waits for the
+    VBL; its alpha is for the field it will be shown in, and a tick due by then runs first.
+    `bench 300` at 16.7 Hz: the a1200-040 and the a1200-030 41.67 fps (34.25 and 36.87),
+    the a1200-fast 26.50 (24.44), the data disk on the a1200-040 49.34. On the way: alpha
+    could go negative (an early tick, then the VBL took the frame), which crashed the
+    a1200-fast; the map marker drew before the wait for the shown screen; a tick drew the
+    wheel's lower part and the panel updates into the screen on display (`shown`: none of 80
+    frames now). Ticks wait for the shown screen again (about 3%). No tearing: the swap is
+    the copper list's at the VBL. Left for 50 fps: most frames fit a field on the a1200-040,
+    about 1 in 5 takes 2. A third screen would let a frame that runs over draw on instead
+    of waiting: not tried (32000 bytes of chip memory, not yet found inside BaseMem).
 
 ### E. Speed: a frame per field on the 68040 (Enhanced framerate, 68020 and up)
 

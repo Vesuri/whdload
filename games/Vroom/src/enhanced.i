@@ -183,6 +183,7 @@ _enh_pl		PL_START
 	PL_PS	$C8F8,enh_Marker	; move.l $86DE,d5: the map marker
 	PL_PS	$120A6,enh_Hud0		; move.w $12150(pc),d0; addq.w #1,d0
 	PL_PS	$D216,enh_Hud		; blt.s; bsr.w $D5FC: the pit stop, then the cockpit
+	PL_PS	$118DE,enh_Wheel	; movea.l #$DFF000,a6: the wheel ($D20A)
 	PL_PS	$D414,enh_Score		; lea $8374,a0: the score's digits
 	PL_PS	$D43E,enh_Time		; lea $850E,a0: the time's digits
 	INCLUDE	blitwait.i
@@ -603,13 +604,18 @@ enh_PassI	move.l	d2,-(a7)
 .wait		move.l	$A884,d1
 		sub.l	ENH_DUE.w,d1		; fields since this tick was due
 		bpl.b	.late
-		move.l	$A884,d0		; early: a frame, once a field
-		cmp.l	([_blk_E258,pc]),d0
-		beq.b	.wait
+		move.l	d1,d0			; early: the field the next frame
+		addq.l	#1,d0			; shows in, if it draws within a
+		cmp.l	#-1,$A71C		; field: the next, or the one after
+		beq.b	.shown			; if a frame waits for the VBL
+		addq.l	#1,d0
+.shown		tst.l	d0
+		bpl.b	.tick			; the tick is due by then: run it now
 		move.w	ENH_PERIOD.w,d2
-		move.w	d2,d0
-		add.w	d1,d0			; fields since the last tick was due
-		bsr	enh_Frame
+		add.w	d2,d0			; fields since the last tick was due
+		bpl.b	.alpha			; (an early tick, then the VBL took
+		moveq	#0,d0			; the frame: one field less to wait)
+.alpha		bsr	enh_Frame		; (its landscape runs before the wait)
 		bra.b	.wait
 .late		cmp.l	#ENH_LIMIT,d1
 		bls.b	.behind
@@ -646,6 +652,13 @@ enh_PassI	move.l	d2,-(a7)
 enh_Frame	movem.l	d0-a6,-(a7)
 		ext.l	d0
 		ext.l	d2
+		cmp.l	d2,d0			; 0 <= alpha <= 1 (outside it the
+		bls.b	.alpha			; camera's step would turn huge)
+		moveq	#0,d0
+		tst.w	2(a7)			; the caller's d0
+		bmi.b	.alpha
+		move.l	d2,d0
+.alpha
 		lea	_enh_bufs(pc),a2
 		st	_enh_frame-_enh_bufs(a2)
 		move.l	(a2),a0			; the tick before
@@ -689,17 +702,6 @@ enh_Frame	movem.l	d0-a6,-(a7)
 		lea	64(a4),a4
 		lea	64(a5),a5
 		dbf	d4,.car
-		movea.l	#$4A90A,a1		; the map marker, as $C8F2-$C91C
-		move.l	$86DE,d5
-		lea	($DBD8,a3),a4
-		move.w	(a4,d5.w),d4
-		jsr	($1284C,a3)
-		move.l	ENH_BLOCK.w,a3
-		move.l	($DC50,a3),d4
-		lea	($DBD2,a3),a0
-		divu.w	(a0),d4
-		move.w	d4,(a4,d5.w)
-		jsr	($12808,a3)
 		bsr	enh_QueueIdle
 		move.l	ENH_BLOCK.w,a3		; the landscape, as $C960-$C984
 		move.w	($DBEC,a3),($DBEE,a3)
@@ -711,7 +713,20 @@ enh_Frame	movem.l	d0-a6,-(a7)
 		neg.w	d7
 		sub.w	#66,d7
 		move.w	d7,($DBF0,a3)
-		bsr	fix_WaitShown
+		bsr	fix_WaitShown		; the map marker, as $C8F2-$C91C,
+		move.l	ENH_BLOCK.w,a3		; after it: the CPU draws it into
+		movea.l	#$4A90A,a1		; the screen
+		move.l	$86DE,d5
+		lea	($DBD8,a3),a4
+		move.w	(a4,d5.w),d4
+		jsr	($1284C,a3)
+		move.l	ENH_BLOCK.w,a3
+		move.l	($DC50,a3),d4
+		lea	($DBD2,a3),a0
+		divu.w	(a0),d4
+		move.w	d4,(a4,d5.w)
+		jsr	($12808,a3)
+		move.l	ENH_BLOCK.w,a3
 		sf	ENH_SKIP.w		; and the drawing
 		jsr	($D13C,a3)
 		lea	_enh_bufs(pc),a2
@@ -762,32 +777,19 @@ _enh_interp	dc.b	0		; frames between ticks (an ExpMem)
 		even
 
 
-; The landscape, then the wait for the VBL to take the last frame. A tick
-; with frames between ticks draws nothing but the start lights, the pit stop
-; and the crash sequences, so it waits only while one of them runs.
+; The landscape, then the wait for the VBL to take the last frame: the race
+; loop's panel updates ($CA10-$CCFA) after it draw into the screens, and with
+; frames between ticks a tick often runs while the last frame still waits.
 enh_Landscape	bsr	enh_QueueIdle
 		jsr	([_blk_E4F8,pc])
-		tst.b	_enh_interp(pc)
-		beq.b	.wait
-		move.l	a0,-(a7)
-		move.l	ENH_BLOCK.w,a0
-		tst.w	($DC36,a0)		; the start lights
-		bpl.b	.draws
-		tst.w	($DC38,a0)		; the pit stop
-		bpl.b	.draws
-		tst.w	($E0DC,a0)		; the crash sequences
-		bpl.b	.draws
-		tst.w	($E0D6,a0)
-		bpl.b	.draws
-		move.l	(a7)+,a0
-		rts
-.draws		move.l	(a7)+,a0
-.wait		bra	fix_WaitShown
+		bra	fix_WaitShown
 
 ; A tick with frames between ticks leaves out what the frames draw: the map
-; marker ($C8F8-$C95F), the HUD in $D13C ($120A6; $D21C-$D3BB: the cockpit,
-; the mirrors, the gear, the speed, the wheel; the score's or the time's
-; digits). Each goes on where the drawing ends.
+; marker ($C8F8-$C95F), the HUD in $D13C ($120A6; the wheel's lower part
+; $118D8, from $D20A; $D21C-$D3BB: the cockpit, the mirrors, the gear, the
+; speed, the wheel; the score's or the time's digits). Each goes on where the
+; drawing ends. A tick may run while the last frame waits for the VBL, so
+; whatever it drew would land in the screen on display.
 ENH_TICK	MACRO			; to \1 unless this pass is such a tick
 		tst.b	_enh_interp(pc)
 		beq.b	\1
@@ -818,6 +820,11 @@ enh_Hud		tst.w	d0			; $DC38
 .nopit		ENH_TICK .draw
 		ENH_GOTO $D3BC
 .draw		rts
+enh_Wheel	ENH_TICK .draw
+		addq.l	#4,a7			; out of $118D8
+		rts
+.draw		movea.l	#$DFF000,a6
+		rts
 enh_Score	ENH_TICK .draw
 		ENH_GOTO $D48A
 .draw		lea	$8374,a0
