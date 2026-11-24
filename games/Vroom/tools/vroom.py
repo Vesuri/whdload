@@ -3,7 +3,8 @@
 
   bench [<frames>]           fps over the first frames from the next green light
   statelog <frames> <file> [tick]  the race state at every frame end (or pass) from the next green light
-  aprof <fields> <file>      an instruction profile (FSUAE=$FSUAE_APROF) of fields from the next green light
+  aprof <fields>|race <file> an instruction profile (FSUAE=$FSUAE_APROF) of fields from the next green
+                             light, or of the load from the boot to it
   frames <frames> <file>     a hash of each drawn frame's lines, at the swap, from the next green light
   shown <frames>             frames whose shown screen changed between the swap and the VBL taking the next
   racelog <fields> <file>    field, frame, clock and distance per field from the next green light
@@ -299,18 +300,24 @@ def state_log(server, g, rest):
 def aprof(server, g, rest):
     """aprof <fields> <file>: from the next green light, the aprof FS-UAE's profile
     (`monitor aprof start/stop`) of the next <fields> fields, written to <file> (APROF 1;
+    `aprof race <file>` profiles a fresh boot instead, through `race` to the green light;
     tools/aprof_report.py reads it). Needs the server started with FSUAE=$FSUAE_APROF on a
     cycle-exact 68020-68060 without an MMU model (e.g. SETUP=a1200-040
     EXTRA_ARGS=--cpu=68040-NOMMU). On a 68040/68060 it is an instruction count plus chip
     time (AmigaXDev measurement-method)."""
     args = rest.split()
-    n, path = int(args[0]), os.path.abspath(args[1])
+    path = os.path.abspath(args[1])
     g.stop()
     try:
+        if args[0] == 'race':
+            out = g.cmd('monitor aprof start')
+            out += to_race(server, g, 'stay') + '\n'
+            out += g.cmd(f'monitor aprof stop {path}')
+            return out.strip()
         if not green_light(g):
             return 'no race start within 20000 fields'
         out = g.cmd('monitor aprof start')
-        g.cmd(f'monitor fields {n}', timeout=600)
+        g.cmd(f'monitor fields {int(args[0])}', timeout=600)
         out += g.cmd(f'monitor aprof stop {path}')
     finally:
         g.cont()
