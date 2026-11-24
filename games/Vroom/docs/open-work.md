@@ -183,6 +183,11 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     the copper list's at the VBL. Left for 50 fps: most frames fit a field on the a1200-040,
     about 1 in 5 takes 2 (step 24). A third screen would let a frame that runs over draw on instead
     of waiting: not tried (32000 bytes of chip memory, not yet found inside BaseMem).
+    Later, from a player race on video: the camera's and the player's lateral positions,
+    the pitch and height (hills, jumps, the crash), the sky objects against the horizon
+    (the mountain's top) and the crash's flying wheel still moved once a tick, and the
+    frames wrote the engine's pitch from the tick before's revs; each is now mixed, or left
+    to the ticks (`internals.md`, "Frames between ticks").
 
 ### E. Speed: a frame per field on the 68040 (Enhanced framerate, 68020 and up)
 

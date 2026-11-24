@@ -199,6 +199,7 @@ rate, on every 68020 and up.
 | $1103A-$11077 (the queue's ground entries) | left out: after `$10F90` the CPU fills the ground's planes 2 and 3 (`enh_Ground`) while the blitter runs the horizon and the sky |
 | $D142-$D14D (the wait for a new field) | a pass that does not draw goes on at $D1C2, leaving out the road spans `$10CD2`, the three objects `$140C0` and the scaler `$18154` |
 | $D510 (`move.l $A884,$E258`) | a pass that does not draw returns from `$D13C`, leaving out the swap ($E258, $A71C, `$12FA6`) |
+| $E6A0, $E936 (`move.w d5,$9FC4`), $F396-$F39D, $D800-$D809 | with frames between ticks: the engine's pitch is the ticks'; a frame's pitch and height, and the crash wheel's position, are mixed (below, "Frames between ticks") |
 | $366E (`movea.l #$2FC96,a7`, at the program's start) | with fast ExpMem, the stack moves there, below the race block's copy (below, "Fast memory") |
 | $A924-$1B4FF (the race block) | with fast ExpMem, copied there at the first `Fix` and run from there; its 12 PC-relative reads out and its branch out become `bsr.w` to trampolines below the stack's copy (`_enh_edges`) |
 | 91 blitter starts in $11C20-$19B1C (`src/blitwait.i`) | `jsr $10C`-`$124.w` (the original slave's start-and-wait) become `jsr $1E0`-`$1F8.w`: start, one read of dmaconr, return (below) |
@@ -456,8 +457,32 @@ picture is a tick late, as in any interpolation.
   into $E254 and $DBEE/$DBF0 (as $C960-$C984), the wait for the shown screen, the map
   marker (as $C8F2-$C91C, after the wait: the CPU draws it into the screen) and `$D13C`,
   which swaps.
+- **What a frame mixes besides.** Not everything the picture follows moves with the
+  step. The race loop's steering ($BC9E-$BDAA) moves the camera's lateral position $DBEC
+  once a tick, before the landscape: a frame takes it alpha of the way from the tick
+  before to its value as this tick's landscape started (`_enh_lat`, kept at $C968), and the
+  landscape adds the curve's part by the step. The player's lateral position $DC56 (the
+  race loop's copy of $DBF0, $C55C; the mirrors and the crash read it) is mixed like the
+  other cars'. The landscape's pitch and height ($F396: the bounce, the jump, the tilt
+  from the step's change at $F282, the shake off the road) integrate once a pass, so a
+  frame re-running it got a whole pass of them and a tilt from its own part step: at
+  $F396 a frame takes the mix of the two ticks' $10ACA and $10C4E instead (`enh_Pitch`),
+  which then make the horizon $10B32. The horizon's scroll (`$13F16`) and the three sky
+  objects ($4988A, moved at $C9C0-$C9FA; the mountain's top is one) move by $10C42, which
+  in a tick the race loop sets after the landscape ($C99A, the steering's turn $DC3E); a
+  frame moves both by alpha of this tick's $10C42 (`enh_Sky`), so the mountain's top and
+  foot move together. The crash's flying wheel ($D7BE-$D814) takes its position from a
+  table at $E134 by the pass count $E0DC (x at +4, the line's offset at +8): a frame draws
+  alpha of the way from the step before (`enh_WheelXY`, at $D800). Before these, all of
+  them moved once a tick (a player race at 16.7 Hz: the census of the race state at every
+  frame and tick, `CUSTOM3=3`; field by field screenshots of a crash).
 - **What a frame must not do twice.** While a frame runs, the race clock's gate $8504
-  ($D530, $D602) and the bump sound $A03C ($E6A6, $E93C) are not written. A tick leaves out
+  ($D530, $D602), the bump sound $A03C ($E6A6, $E93C) and the engine's pitch $9FC4 ($E6A0,
+  $E936, from the revs $DC00) are not written. A frame's engine pitch came from the tick
+  before's revs, so $9FC4 held the value a tick behind between the ticks' writes; the
+  sound routine latches it in some of its states ($999A, from the VBL's sound code), glides
+  to it, and switches the engine's sample at 138 ($9A0C, through the audio interrupt,
+  $A044). A tick leaves out
   what only the frames draw: the map marker ($C8F8), the HUD (`$120A6`; the wheel's lower
   part `$118D8`, from $D20A, patched at $118DE where the site holds no block address;
   $D21C-$D3BB: the cockpit, mirrors, gear, speed and wheel, after the pit stop `$D5FC`,

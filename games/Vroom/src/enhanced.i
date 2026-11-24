@@ -181,8 +181,12 @@ _enh_pl		PL_START
 		PL_PSS	$D510,enh_Swap,4	; move.l $A884,$E258
 	PL_PS	$D530,enh_Clock		; clr.w $8504: the start lights
 	PL_PS	$D602,enh_Clock		; clr.w $8504: the pit stop
+	PL_PS	$E6A0,enh_Engine	; move.w d5,$9FC4: the engine's pitch
 	PL_PS	$E6A6,enh_Bump		; move.w d0,$A03C: the bump's sound
+	PL_PS	$E936,enh_Engine
 	PL_PS	$E93C,enh_Bump
+	PL_PSS	$F396,enh_Pitch,2	; move.w $10ACA(pc),d1; cmpi.w #21000,d1
+	PL_PSS	$D800,enh_WheelXY,4	; move.l d6,(10,a5,d5.w); move.l (8,a3,d3.w),(0,a5,d5.w)
 	PL_PS	$C8F8,enh_Marker	; move.l $86DE,d5: the map marker
 	PL_PS	$120A6,enh_Hud0		; move.w $12150(pc),d0; addq.w #1,d0
 	PL_PS	$D216,enh_Hud		; blt.s; bsr.w $D5FC: the pit stop, then the cockpit
@@ -591,6 +595,9 @@ enh_Snap	movem.l	a0-a1,-(a7)
 		bne.b	.swap
 		st	_enh_snapped-_enh_bufs(a1)
 		bsr.b	enh_Save
+		move.l	ENH_BLOCK.w,a0		; (CUSTOM3's frames may come first)
+		move.w	($DBEC,a0),_enh_lat-_enh_bufs(a1)
+		move.l	(a1),a0
 		bra.b	.cur
 .swap		move.l	4(a1),(a1)		; exchange
 		move.l	a0,4(a1)
@@ -663,6 +670,9 @@ enh_Frame	movem.l	d0-a6,-(a7)
 		bmi.b	.alpha
 		move.l	d2,d0
 .alpha
+		lea	_enh_an(pc),a2		; for enh_Mix
+		move.l	d0,(a2)+
+		move.l	d2,(a2)
 		lea	_enh_bufs(pc),a2
 		st	_enh_frame-_enh_bufs(a2)
 		move.l	(a2),a0			; the tick before
@@ -706,11 +716,20 @@ enh_Frame	movem.l	d0-a6,-(a7)
 		lea	64(a4),a4
 		lea	64(a5),a5
 		dbf	d4,.car
+		move.w	($DBEC,a3),d0		; the camera's lateral position:
+		move.w	_enh_lat(pc),d1		; the race loop's steering ($BC9E-
+		bsr	enh_Mix			; $BDAA) moves it before the
+		move.w	d1,($DBEC,a3)		; landscape, once a tick
+		move.w	($DC56,a3),d0		; the player's (the race loop's copy
+		move.w	($DC56-ENH_R1,a1),d1	; of $DBF0, $C55C): the mirrors, the
+		bsr	enh_Mix			; crash
+		move.w	d1,($DC56,a3)
 		bsr	enh_QueueIdle
 		move.l	ENH_BLOCK.w,a3		; the landscape, as $C960-$C984
 		move.w	($DBEC,a3),($DBEE,a3)
 		jsr	($E4F8,a3)
 		move.l	ENH_BLOCK.w,a3
+		bsr	enh_Sky
 		move.l	a6,($E254,a3)
 		move.w	($DBEC,a3),d7
 		sub.w	d7,($DBEE,a3)
@@ -752,6 +771,124 @@ enh_Frame	movem.l	d0-a6,-(a7)
 .jump		moveq	#0,d5
 		rts
 
+; d1 = d0 + alpha of the way to d1 (words; d0 and d1 extended).
+enh_Mix		ext.l	d0
+		ext.l	d1
+		sub.l	d0,d1
+		muls.l	_enh_an(pc),d1
+		divs.l	_enh_ad(pc),d1
+		add.l	d0,d1
+		rts
+
+; A frame's horizon and sky objects. The horizon's scroll ($13F16, from
+; $10F90) and the three sky objects ($4988A, $C9C0-$C9FA) move by $10C42,
+; which in a tick the race loop sets after the landscape ($C99A: the
+; steering's turn $DC3E with the landscape's remainder) and in a frame only
+; the landscape sets (the curve's part). A frame moves both by alpha of this
+; tick's $10C42 from the tick before: the objects (the mountain's top) and
+; the horizon (its foot) together.
+; IN:	a3 = the block's offset
+; OUT:	-	d0-d1, d4, a0-a1, a4-a5 used
+enh_Sky		move.l	_enh_bufs+4(pc),a1	; this tick
+		moveq	#0,d0
+		move.w	(ENH_O2+$10C42-ENH_R2,a1),d1
+		bsr	enh_Mix
+		move.w	d1,($10C42,a3)
+		move.l	_enh_bufs(pc),a4	; the tick before's objects
+		lea	(ENH_RSIZE-$12,a4),a4	; (the snapshot's last range)
+		lea	(ENH_RSIZE-$12,a1),a5
+		lea	$4988A,a0
+		moveq	#3-1,d4
+.obj		tst.w	(a4)
+		bmi.b	.out
+		move.w	2(a4),d0
+		move.w	2(a5),d1
+		sub.w	d0,d1			; the shorter way round the 1264
+		cmp.w	#632,d1
+		ble.b	.lo
+		sub.w	#1264,d1
+.lo		cmp.w	#-632,d1
+		bge.b	.hi
+		add.w	#1264,d1
+.hi		add.w	d0,d1
+		bsr	enh_Mix
+		tst.w	d1
+		bpl.b	.pos
+		add.w	#1264,d1
+.pos		cmp.w	#1264,d1
+		blt.b	.in
+		sub.w	#1264,d1
+.in		move.w	d1,2(a0)
+		addq.l	#6,a0
+		addq.l	#6,a4
+		addq.l	#6,a5
+		dbf	d4,.obj
+.out		rts
+
+; The landscape's pitch and height ($F396, after its simulation part: the
+; bounce, the jump, the acceleration's tilt from the step's change, the shake
+; off the road), which feed the horizon $10B32 and the projection. Each runs
+; once a pass and integrates by the pass, so a frame re-running it from the
+; tick before gets a whole pass of it (and a tilt from its own part step):
+; a frame takes alpha of the way between the two ticks' values instead.
+; IN:	d3.w = the height; OUT: d1.w = the pitch, d3, and the flags of
+;	cmpi.w #21000,d1 (the replaced instructions)
+enh_Pitch	tst.b	_enh_frame(pc)
+		bne.b	.frame
+		move.l	a0,-(a7)
+		move.l	ENH_BLOCK.w,a0
+		move.w	($10ACA,a0),d1
+		move.l	(a7)+,a0
+		cmp.w	#21000,d1
+		rts
+.frame		movem.l	d0/a0-a1,-(a7)
+		movem.l	_enh_bufs(pc),a0-a1	; the tick before, this tick
+		move.w	(ENH_O2+$10C4E-ENH_R2,a0),d0
+		move.w	(ENH_O2+$10C4E-ENH_R2,a1),d1
+		bsr	enh_Mix
+		move.w	d1,d3
+		move.w	(ENH_O2+$10ACA-ENH_R2,a0),d0
+		move.w	(ENH_O2+$10ACA-ENH_R2,a1),d1
+		bsr	enh_Mix
+		movem.l	(a7)+,d0/a0-a1
+		cmp.w	#21000,d1
+		rts
+
+; The crash's flying wheel ($D7BE-$D814): its step $E0DC indexes a table of
+; positions ($E134: x at +4, the line's offset at +8), one step a pass. A
+; frame draws the tick before's step: it takes alpha of the way from the
+; step before it.
+; IN:	d3.w = step*16, a3 = the table, d4.w = the side (-1 mirrored), d6 =
+;	the x, a5, d5 = the object and the screen's offset
+; OUT:	(10,a5,d5.w) = x, (0,a5,d5.w) = the line's offset
+enh_WheelXY	tst.b	_enh_frame(pc)
+		beq.b	.set
+		tst.w	d3
+		beq.b	.set			; the first step
+		movem.l	d0-d2/d6,-(a7)
+		move.l	(4-16,a3,d3.w),d0	; x: from the step before
+		sub.l	(4,a3,d3.w),d0
+		tst.w	d4
+		bpl.b	.side
+		neg.l	d0
+.side		add.w	d6,d0
+		move.w	d6,d1
+		bsr	enh_Mix
+		ext.l	d1
+		move.l	d1,(10,a5,d5.w)
+		move.l	(8-16,a3,d3.w),d0	; the line
+		divu.w	#40,d0
+		move.l	(8,a3,d3.w),d1
+		divu.w	#40,d1
+		bsr	enh_Mix
+		mulu.w	#40,d1
+		move.l	d1,(0,a5,d5.w)
+		movem.l	(a7)+,d0-d2/d6
+		rts
+.set		move.l	d6,(10,a5,d5.w)
+		move.l	(8,a3,d3.w),(0,a5,d5.w)
+		rts
+
 ; The landscape writes the sky's line $11368, which lies in the blitter queue
 ; ($11268-$11527): the queue the last frame left running (its last entries,
 ; the wheel's, $11C88, reach past $11368) must be done first. The original
@@ -773,7 +910,19 @@ enh_Bump	tst.b	_enh_frame(pc)
 		bne.b	.out
 		move.w	d0,$A03C
 .out		rts
+; The engine's pitch from the revs: the ticks' too. A frame's comes from the
+; tick before's revs, so the target went back and forth every tick, and the
+; sound's glide ($999A) and its sample switch at 138 ($9A0C, through the
+; audio interrupt) with it: a glitch mid-way up the revs, and at times the
+; wrong sample's pitch.
+enh_Engine	tst.b	_enh_frame(pc)
+		bne.b	.out
+		move.w	d5,$9FC4
+.out		rts
 
+_enh_an		dc.l	0		; a frame's alpha: _enh_an/_enh_ad
+_enh_ad		dc.l	1
+_enh_lat	dc.w	0		; $DBEC as the tick's landscape started
 _enh_bufs	dc.l	0,0		; the snapshots: the tick before, this tick
 _enh_snapped	dc.b	0		; they hold a tick
 _enh_frame	dc.b	0		; a frame between ticks is drawing
@@ -784,7 +933,12 @@ _enh_interp	dc.b	0		; frames between ticks (an ExpMem)
 ; The landscape, then the wait for the VBL to take the last frame: the race
 ; loop's panel updates ($CA10-$CCFA) after it draw into the screens, and with
 ; frames between ticks a tick often runs while the last frame still waits.
-enh_Landscape	bsr	enh_QueueIdle
+enh_Landscape	movem.l	a0-a1,-(a7)		; the camera's lateral position
+		move.l	ENH_BLOCK.w,a0		; as the landscape starts (enh_Frame)
+		lea	_enh_lat(pc),a1
+		move.w	($DBEC,a0),(a1)
+		movem.l	(a7)+,a0-a1
+		bsr	enh_QueueIdle
 		jsr	([_blk_E4F8,pc])
 		bra	fix_WaitShown
 
