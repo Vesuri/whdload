@@ -121,6 +121,7 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		tst.l	d0
 		beq.b	.done
 		move.b	#1,(a2)			; 1: on
+		bsr	enh_FmodeInit
 		moveq	#3,d0			; 16.7 Hz
 		tst.l	d1
 		beq.b	.period
@@ -155,6 +156,7 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		pea	(a2,d1.w)
 		move.l	(a7)+,(a0)+
 		dbf	d0,.tramp
+		bsr	enh_Fmode		; before the block's copy
 		lea	_enh_pl(pc),a0
 		sub.l	a1,a1
 		move.l	_resload(pc),a2
@@ -919,6 +921,206 @@ enh_Blt6	move.w	d6,bltsize(a6)
 enh_Blt		tst.b	_custom+dmaconr
 		rts
 
+;---------------------------------------------------------------------------
+; 64-bit bitplane fetch (AGA; docs/internals.md, "64-bit fetch"). Four lores
+; planes fetched 16 bits at a time take one chip bus slot in two on a display
+; line; FMODE 3 takes a quarter of that, and the slots go to the blitter, whose
+; time is the gap to 50 fps. It needs every plane on an 8-byte boundary: the
+; two screens ($1FAC6 and $277C6, 8000-byte planes, 40-byte rows) move down by
+; ENH_SCR_D bytes, into the fill below the first one. Every reference to them:
+; the startup's (the first picture and its plane pointers into the copper list
+; $A720; the data disk's loader has a copy of the first, $1DA6E-$1DAA3), the
+; screens' and the draw buffer's pointers $86E2/$86E6/$86EA, the screen the
+; VBL shows next $A71C, the copper lists' initial plane pointers ($A720,
+; $A78C), and three in the race's map code ($1278C, $12A62, $12BC4); the rest
+; takes them from the pointers. Its own fetch window: the mode setting ($A4A6)
+; writes DDFSTOP $D0 for FMODE 0; the 64-bit fetch of the same 320 pixels at
+; the same place stops at $B0 (DDFSTRT $38 for both). Every lores plane
+; pointer setting ($A32C, $A3F4: the VBL's new screen; $A4A6: a new mode) picks
+; the fetch by the address it sets, so a screen not moved keeps FMODE 0. The
+; hires mode ($A388, $A4C0) keeps FMODE 0.
+;---------------------------------------------------------------------------
+
+ENH_SCR_D	= 6			; the screens' move down
+
+ENH_SCR		MACRO			; a long that holds a screen address
+		dc.l	\1,\2
+		ENDM
+_enh_scr0	ENH_SCR	$3676,$1FAC6		; Vroom's startup
+		ENH_SCR	$36B0,$277C6
+		ENH_SCR	$36C2,$1FAC6
+		ENH_SCR	$36C8,$277C6
+		ENH_SCR	$3BBA,$277C6
+		ENH_SCR	$3BC8,$277C6+8000
+		ENH_SCR	$3BD8,$277C6+2*8000
+		ENH_SCR	$3BE8,$277C6+3*8000
+		dc.l	0
+_enh_scr1	ENH_SCR	$3676,$1FAC6		; the data disk's startup
+		ENH_SCR	$36EA,$277C6
+		ENH_SCR	$36FC,$1FAC6
+		ENH_SCR	$3702,$277C6
+		ENH_SCR	$3BAA,$277C6
+		ENH_SCR	$3BB8,$277C6+8000
+		ENH_SCR	$3BC8,$277C6+2*8000
+		ENH_SCR	$3BD8,$277C6+3*8000
+		ENH_SCR	$1DA7C,$277C6		; and its loader's copy of the
+		ENH_SCR	$1DA8E,$1FAC6		; first picture's
+		ENH_SCR	$1DA94,$277C6
+		dc.l	0
+_enh_scrc	ENH_SCR	$86E2,$1FAC6		; both programs'
+		ENH_SCR	$86E6,$277C6
+		ENH_SCR	$1278E,$1FAC6+$99A	; the race's map code
+		ENH_SCR	$12A64,$1FAC6
+		ENH_SCR	$12BC6,$1FAC6+$434
+		dc.l	0
+_enh_scro	ENH_SCR	$86EA,$1FAC6		; the draw buffer and the displayed
+		ENH_SCR	$86EA,$277C6		; screen: either (not required)
+		ENH_SCR	$A71C,$1FAC6
+		ENH_SCR	$A71C,$277C6
+		dc.l	0
+_enh_scrw	dc.w	$A726,$77C6		; the copper lists' planes' low words
+		dc.w	$A72E,$77C6+8000
+		dc.w	$A736,$77C6+2*8000
+		dc.w	$A73E,$77C6+3*8000
+		dc.w	$A792,$77C6
+		dc.w	$A79A,$77C6+8000
+		dc.w	$A7A2,$77C6+2*8000
+		dc.w	$A7AA,$77C6+3*8000
+		dc.w	0
+
+; At the first Fix with CUSTOM1: on AGA (Lisa, $F8 in LISAID: the chip
+; revision bits WHDLoad passes on from Kickstart 3.1 can lack the AA ones),
+; with the program's screen references as above, the 64-bit fetch is on.
+; FMODE 0 until a mode sets it.
+; IN:	-
+; OUT:	-	all registers preserved
+enh_FmodeInit	movem.l	d0-d1/a0-a1,-(a7)
+		move.w	_custom+deniseid,d0
+		cmp.b	#$F8,d0
+		bne.b	.out
+		move.w	#0,_custom+fmode
+		lea	_enh_scrc(pc),a0	; at the first Fix all of a program's
+		bsr.b	enh_ScrHeld		; references hold the screens
+		bne.b	.out
+		lea	_enh_scr0(pc),a0	; and which program's startup
+		bsr.b	.held
+		beq.b	.on
+		lea	_enh_scr1(pc),a0
+		bsr.b	.held
+		bne.b	.out
+.on		lea	_enh_fmlist(pc),a1
+		move.l	a0,(a1)
+		lea	_enh_fm(pc),a0
+		st	(a0)
+.out		movem.l	(a7)+,d0-d1/a0-a1
+		rts
+.held		move.l	a0,-(a7)
+		bsr.b	enh_ScrHeld
+		movem.l	(a7)+,a0		; (the flags stay)
+		rts
+
+; At every Fix (a load may bring the original values back): the screens'
+; references that still hold the original addresses move, and the plane
+; pointer settings pick the fetch.
+; IN:	-
+; OUT:	-	all registers preserved
+enh_Fmode	tst.b	_enh_fm(pc)
+		beq.b	.out
+		movem.l	d0-d1/a0-a2,-(a7)
+		move.l	_enh_fmlist(pc),a0	; the program's startup
+		bsr.b	enh_ScrMove
+		lea	_enh_scrc(pc),a0
+		bsr.b	enh_ScrMove
+		lea	_enh_scro(pc),a0
+		bsr.b	enh_ScrMove
+.words		lea	_enh_scrw(pc),a0
+.word		moveq	#0,d0
+		move.w	(a0)+,d0
+		beq.b	.patch
+		move.l	d0,a1
+		move.w	(a0)+,d1
+		cmp.w	(a1),d1
+		bne.b	.word
+		subq.w	#ENH_SCR_D,(a1)
+		bra.b	.word
+.patch		lea	_enh_fmpl(pc),a0
+		sub.l	a1,a1
+		move.l	_resload(pc),a2
+		jsr	resload_Patch(a2)
+		movem.l	(a7)+,d0-d1/a0-a2
+.out		rts
+
+; IN:	a0 = a list of screen references
+; OUT:	Z set if every one holds its screen address; d0-d1/a1 changed
+enh_ScrHeld	move.l	(a0)+,d0
+		beq.b	.out			; (Z set)
+		move.l	d0,a1
+		move.l	(a0)+,d1
+		cmp.l	(a1),d1
+		beq.b	enh_ScrHeld
+.out		rts
+; IN:	a0 = a list of screen references
+; OUT:	those that hold their screen address moved; d0-d1/a0-a1 changed
+enh_ScrMove	move.l	(a0)+,d0
+		beq.b	.out
+		move.l	d0,a1
+		move.l	(a0)+,d1
+		cmp.l	(a1),d1
+		bne.b	enh_ScrMove
+		subq.l	#ENH_SCR_D,(a1)
+		bra.b	enh_ScrMove
+.out		rts
+
+_enh_fmpl	PL_START
+		PL_PS	$A32C,enh_Ptr0		; lea $A722(pc),a1; moveq #3,d0
+		PL_PS	$A388,enh_Ptr1		; lea $A74E(pc),a1; moveq #1,d0
+		PL_PS	$A3F4,enh_Ptr2		; lea $A78E(pc),a1; moveq #3,d0
+		PL_P	$A4A6,enh_Lores		; the lores mode
+		PL_P	$A4C0,enh_Hires		; the hires mode
+		PL_END
+
+; The VBL's new screen (d1) into a copper list's plane pointers.
+enh_Ptr0	bsr.b	enh_Fetch
+		lea	$A722,a1
+		moveq	#3,d0
+		rts
+enh_Ptr1	move.w	#0,_custom+fmode
+		lea	$A74E,a1
+		moveq	#1,d0
+		rts
+enh_Ptr2	bsr.b	enh_Fetch
+		lea	$A78E,a1
+		moveq	#3,d0
+		rts
+; A new mode (d1: its last plane's end, the screen's alignment).
+enh_Lores	lea	_custom,a0
+		move.w	#$4200,bplcon0(a0)
+		move.w	#$38,ddfstrt(a0)
+		bra.b	enh_Fetch
+enh_Hires	lea	_custom,a0
+		move.w	#$A200,bplcon0(a0)
+		move.w	#$3C,ddfstrt(a0)
+		move.w	#$D4,ddfstop(a0)
+		move.w	#0,fmode(a0)
+		rts
+; The lores fetch for the screen at d1: 64 bits if it is 8-byte aligned.
+; IN:	d1 = a plane's address
+; OUT:	-	all registers preserved
+enh_Fetch	move.l	d0,-(a7)
+		moveq	#7,d0
+		and.l	d1,d0
+		bne.b	.narrow
+		move.w	#$B0,_custom+ddfstop
+		move.w	#3,_custom+fmode
+		move.l	(a7)+,d0
+		rts
+.narrow		move.w	#$D0,_custom+ddfstop
+		move.w	#0,_custom+fmode
+		move.l	(a7)+,d0
+		rts
+
+_enh_fmlist	dc.l	0		; the program's startup references
+_enh_fm		dc.b	0		; the 64-bit fetch is on
 _enh_state	dc.b	0		; 0 unknown, -1 off, 1 on
 _enh_moved	dc.b	0		; the block has been copied (or stays)
 		even

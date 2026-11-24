@@ -137,7 +137,7 @@ their state across a reload.
   the field of the previous swap, so a frame takes at least one field. At its end ($D50A-$D524)
   it hands the draw buffer to the VBL through $A71C, sets $E258 and calls $12FA6, which
   toggles $86DE (0/4) and sets the draw buffer $86EA from $86E2/$86E6 ($1FAC6 and $277C6,
-  4 planes of 8000 bytes each). The wait comes before the frame's end, so at most one frame
+  4 planes of 8000 bytes each; 6 bytes lower with Enhanced framerate's 64-bit fetch). The wait comes before the frame's end, so at most one frame
   ends in a field, and $E258 changes at each: that is the frame count the tools read. The
   buffer index is not one: when the panel changes (laps, times), the race loop calls $12FA6
   in pairs ($CC12-$CCE6) to draw it into both screens.
@@ -201,6 +201,7 @@ rate, on every 68020 and up.
 | $366E (`movea.l #$2FC96,a7`, at the program's start) | with fast ExpMem, the stack moves there, below the race block's copy (below, "Fast memory") |
 | $A924-$1B4FF (the race block) | with fast ExpMem, copied there at the first `Fix` and run from there; its 12 PC-relative reads out and its branch out become `bsr.w` to trampolines below the stack's copy (`_enh_edges`) |
 | 91 blitter starts in $11C20-$19B1C (`src/blitwait.i`) | `jsr $10C`-`$124.w` (the original slave's start-and-wait) become `jsr $1E0`-`$1F8.w`: start, one read of dmaconr, return (below) |
+| the screens' references, $A32C, $A388, $A3F4, $A4A6, $A4C0 | on AGA, the screens move 6 bytes down and the lores modes fetch 64 bits wide (below, "64-bit fetch") |
 
 At most 3 passes in a row leave out the drawing; behind by more than 50 fields (1 s), the
 debt past it is dropped and counted. Link play ($87BC not 0: the pass waits for the other
@@ -225,6 +226,35 @@ mostly lands below a field. The a1200-040 is unchanged (its frame is 2 fields ei
 `frames 150` at the swap on the a1200-040 and the a1200, before and after: every frame the
 same in lines 0-30 and 36-174. Lines 31-35 are the race clock (real time) and lines 175-199
 of the cockpit differ between two runs of the same build as well.
+
+**64-bit fetch.** On AGA (Lisa, $F8 in `LISAID` $DFF07C: the chip revision bits WHDLoad
+passes on can lack the AA ones) the lores modes fetch their planes 64 bits wide (`FMODE` 3,
+`enh_Fmode`): a quarter of the chip bus slots FMODE 0 takes on each display line, the rest to
+the blitter, whose time is the gap to 50 fps (an instant blitter draws every frame in a
+field). It needs every plane 8-byte aligned, and the screens, $1FAC6 and $277C6, are 6 bytes
+past it: they move down by 6, into fill nothing uses ($1FAC0-$1FAC5 holds $CC through the
+boot, the menu and a race). Every reference to them, from memory images of both programs at
+the title, the menu and a race (instruction operands and longs into $1FAC6-$2F4C5):
+
+| Where | What |
+|---|---|
+| $3674-$36D2, $3BB2-$3BF2 (Vroom); $3674-$3705, $3BA8-$3BDB and the loader's copy $1DA6E-$1DAA3 (the data disk) | the startup: the first picture, unpacked to the second screen and copied to the first, and its plane pointers into the copper list $A720 |
+| $86E2, $86E6, $86EA | the screens' pointers and the draw buffer |
+| $A71C; $A726-$A73E, $A792-$A7AA | the screen the VBL shows next; the copper lists' initial plane pointers (low words) |
+| $1278C, $12A62, $12BC4 (in the race block) | the race's map code: `movea.l #$20460`, `adda.l #$1FAC6`, `movea.l #$1FEFA` |
+
+The rest takes the screens from the pointers (the loader's unpacks to $22686 are the first
+screen plus $2BC0, for example). At the first `Fix` every one of a program's references must
+hold its address, or nothing changes; at every `Fix` those that still hold it move (a load
+brings the program's values back). The fetch follows the address a lores plane pointer
+setting writes: the VBL's new screen ($A32C for the copper list $A720, $A3F4 for $A78C, the
+race's) and a new mode ($A4A6, the last plane's end) fetch 64 bits from an aligned screen,
+with `DDFSTOP` $B0 (FMODE 0's $D0 fetches 64 pixels more; `DDFSTRT` stays $38, every sprite
+kept; the sprites' fetch width stays 16 bits), and 16 bits from any other. The hires mode
+($A388, $A4C0) fetches 16 bits. The menu is a lores screen through $A720 and fetches 64 bits
+too. Checked against the FMODE 0 picture: screenshots of the title, the menu, both programs'
+races at the green light and 150 fields on are the same but for the time bar (lines 31-35,
+real time).
 
 **Fast memory.** The slave asks for an 80 KB ExpMem, optional (`ws_ExpMem` negative): the
 1 MB a500 (512 KB of slow memory), where WHDLoad also allocates it, must still load

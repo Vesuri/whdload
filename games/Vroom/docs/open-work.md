@@ -181,7 +181,7 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     variables (a crash on the a1200-030 in a player race; frames now leave such a car out).
     Ticks wait for the shown screen again (about 3%). No tearing: the swap is
     the copper list's at the VBL. Left for 50 fps: most frames fit a field on the a1200-040,
-    about 1 in 5 takes 2. A third screen would let a frame that runs over draw on instead
+    about 1 in 5 takes 2 (step 24). A third screen would let a frame that runs over draw on instead
     of waiting: not tried (32000 bytes of chip memory, not yet found inside BaseMem).
 
 ### E. Speed: a frame per field on the 68040 (Enhanced framerate, 68020 and up)
@@ -249,7 +249,7 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
 
     `CACHE` it is: all but 1 of 500 ticks drawn at 25 Hz on the 68030, 68040 and 68060, no
     chip-access restarts on a 68060, and correct in emulation with or without an MMU model. The ReadMe
-    (step 25) names `DCache` as the alternative for boards, not for emulators.
+    (step 26) names `DCache` as the alternative for boards, not for emulators.
 22. **The hot routines** (done, no change: nothing measured is worth rewriting). aprof,
     `CUSTOM1=1 CUSTOM2=1`, 200 fields of the first demo race (`internals.md`, "Where the
     time goes (68020)"). With fast memory every measured machine already draws all but at
@@ -308,15 +308,39 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
       sound sample's decode (28), and the boot before the game (Kickstart, WHDLoad,
       `PRELOAD`: about 450 fields in FS-UAE, its hard drive's timing).
 
+24. **The blitter's share** (`internals.md`, "64-bit fetch"). What was left after step 16
+    is blitter time: with an instant blitter the a1200-040 and the a1200-030 draw every
+    frame in a field (`bench 300` at 16.7 Hz: 50.17 fps). aprof on the a1200-040 put 12.4%
+    of the time in the objects' wait for the blitter queue ($1421E: the sky and ground clear
+    `$10F90` queues is still running when the road spans are done) and 10.7% in the
+    slave's waits after single blits; 11.3% waited for the VBL. Measured, scratch builds:
+    - Blitter nasty (`BLTPRI`) for the whole race: 40.76 fps on the a1200-040 and 42.13 on
+      the a1200-030 (41.67 and 41.55 before); only while the slave waits for a blit, 42.25
+      and 42.98. The game already sets it in its own queue waits ($11202-$1125C), and it
+      takes the slots from the CPU's own screen writes: not kept.
+    - **The 64-bit fetch (done)**: FMODE 3 on AGA, the screens 6 bytes lower. `bench 300`:
+
+      | | before | FMODE 3 |
+      |---|---|---|
+      | a1200-040 | 41.67 | 46.30 |
+      | a1200-030 (`MMU`) | 41.55 | 47.02 |
+      | a1200-fast | 26.09 | 27.83 |
+      | a1200 | 14.73 (41 undrawn) | 15.86 (17 undrawn) |
+      | the data disk, a1200-040 | 49.34 | 49.67 |
+
+      `statelog` agrees with the a500's in all 300 frames, `shown` none of 80 frames, the
+      data disk's race and a driven player race ran with no dump, and screenshots match the
+      FMODE 0 picture (the title, the menu, both programs' races).
+
 ### F. Acceptance
 
-24. With the installed icon's tooltypes, on the a1200-040 and the a1200-060, the `bench`
+25. With the installed icon's tooltypes, on the a1200-040 and the a1200-060, the `bench`
     window and a real race show a swap every field. Game speed is within 1% of the chosen
     tick on every machine. The render and state checks (steps 2 and 14) pass. With the
     option off, the original code paths run. The 68000 works correctly with the option on
     and off. FS-UAE's 040/060 timing is not hardware's, so the 50 fps figure needs a real
     accelerator to confirm.
-25. **Release.**
+26. **Release.**
     - The installed icon gets `CUSTOM1=1` and the cache tooltype. `Vroom.inf` and
       `Vroom.colicon` ship with no tooltypes, so the packager's `tooltypes` cannot add them.
       Instead, add two `settooltype` lines to the Install script's `P_SelectIcon` block,
