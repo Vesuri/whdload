@@ -18,6 +18,9 @@ and set in the installed icon (step 26). `make dist` builds `VroomEnhanced-2.0b-
 The user ran the archive on real hardware (step 25). Published 24.11.2026 (tag
 `VroomEnhanced-2.0b-20261124`).
 
+Since then, not yet released: the player's car has its tyres again. 2.0b's blitter queue
+fix left a6 off the blitter before their blits (`internals.md`, "Fixes", $11BEA), on every CPU.
+
 ## Decisions (the user's, 23.11.2026)
 
 - **Enhanced framerate** (`CUSTOM1=1`) is one toggle for the whole enhancement: the fixed

@@ -5,7 +5,8 @@
 
 ; IN:	-
 ; OUT:	-	all registers preserved
-FIX_TRAMP	= $1B0			; a JMP trampoline, after src/smc.i's
+FIX_TRAMP	= $1B0			; JMP trampolines, after src/smc.i's
+FIX_TRAMP2	= $1B6
 
 Fix		movem.l	d0-d1/a0-a2,-(a7)
 	IFD	ENH_PROTECT
@@ -14,6 +15,9 @@ Fix		movem.l	d0-d1/a0-a2,-(a7)
 		lea	FIX_TRAMP.w,a0
 		move.w	#$4EF9,(a0)+		; jmp xxx.l
 		pea	fix_Queue(pc)
+		move.l	(a7)+,(a0)+
+		move.w	#$4EF9,(a0)+
+		pea	fix_Tyres(pc)
 		move.l	(a7)+,(a0)
 		lea	_fix_pl(pc),a0
 		sub.l	a1,a1
@@ -63,6 +67,9 @@ _fix_pl		PL_START
 	; queue to finish and the blitter
 		PL_L	$10F90,$4EB80000+FIX_TRAMP	; lea $11268(pc),a6
 		PL_L	$11BE6,$1123A		; jsr $11202
+	; $11BE4 (the car's two tyres) then writes the blitter through a6,
+	; which $11202 kept at $DFF000 and $1123A leaves at $11260
+		PL_L	$11BEA,$4EB80000+FIX_TRAMP2	; move.l a4,84(a6)
 		PL_L	$11CA8,$1123A		; jsr $11202
 	; the keyboard handshake: $C8 loops of nop/dbf, a count the boot loader
 	; would have calibrated and the original slave set to 0
@@ -86,6 +93,10 @@ _fix_pl020	PL_START
 fix_Queue	move.l	_blk_1123A(pc),a6	; it uses a6 (any CPU: src/enhanced.i's
 		jsr	(a6)			; race block, maybe in fast memory)
 		move.l	_blk_11268(pc),a6
+		rts
+
+fix_Tyres	lea	_custom,a6
+		move.l	a4,bltdpt(a6)
 		rts
 
 fix_BlitInt	move.w	#INTF_BLIT,_custom+intreq

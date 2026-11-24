@@ -58,7 +58,7 @@ with the data disk in the drive would. Races on Vroom's own circuits, with the V
 left in the drive, are not offered; the Vroom slave has them.
 
 Low memory holds `jmp` trampolines, so a 4-byte site can become `jsr $1xx.w`: the original
-slave's at $100-$129, `smc.i`'s at $130-$1A7 and `fixes.i`'s at $1B0. `enhanced.i` keeps its
+slave's at $100-$129, `smc.i`'s at $130-$1A7 and `fixes.i`'s at $1B0 and $1B6. `enhanced.i` keeps its
 variables at $1C0-$1D5 and its blitter-start trampolines at $1E0-$1FD.
 
 ## Fixes (every CPU)
@@ -68,6 +68,7 @@ variables at $1C0-$1D5 and its blitter-start trampolines at $1E0-$1FD.
 | $A514 | the VBL routine's drive motor off (`or`/`and`/`or` on ciab.prb at $A50E) skipped: WHDLoad owns the drives, and SNOOP reports it |
 | $A094 | the blitter-done interrupt's dispatcher acknowledges, then waits for the blitter before it starts the next queued blit |
 | $10F90, $11BE6, $11CA8 | the blitter queue: before writing a new queue ($10F90) or programming the blitter ($11BE4, $11CA6), the CPU waited only for the current blit ($11202). A fast CPU then overwrote a queue the interrupt was still working through, and the interrupt jumped to a field as its next handler (a 68060 crash at PC $4 with a6 = 0, with the original slave too, caches off). These now wait in $1123A for the queue to drain, as the game's other blitter users do |
+| $11BEA | $1123A leaves a6 at the queue ($11260), where $11202 kept $DFF000: the blits after it at $11BE4, the car's two tyres, went into memory, and the tyres were missing (2.0b as published). `move.l a4,84(a6)` there now first loads a6 with $DFF000 (`fix_Tyres`, through the trampoline at $1B6) |
 
 | $A2AC | the keyboard handshake waited $C8 loops of `nop`/`dbf`: the boot loader would have calibrated $C8 with a CIA timer, the original slave sets it to 0. It is now a wait for 3 raster lines (over the 75 µs the keyboard needs) |
 
