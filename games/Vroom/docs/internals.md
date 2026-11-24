@@ -428,15 +428,18 @@ tick was due over the period, a frame shows S(n-1) moved alpha of the way to S(n
 picture is a tick late, as in any interpolation.
 
 - **The snapshot.** At the end of every tick (`enh_Snap`, from the pass's start) the slave
-  keeps a copy of the race state the drawing reads (`_enh_r`, 2244 bytes in the ExpMem
+  keeps a copy of the race state the drawing reads (`_enh_r`, 2212 bytes in the ExpMem
   after the unpacker's page): $DBE8-$E253 (the race state but the map marker's position in
   each screen $DBD8-$DBE7, the landscape's result $E254 and the swap field $E258),
   $10A90-$10C53 (the landscape's variables), and a few words the drawing reads elsewhere
   ($DBC0-$DBD7, $C46E, $1067C, $11784, $11C84, $12150, $133DC, $1407C, $1B28C, $1B3D4,
-  $8370, $9CD0, $4988A). It keeps two, the tick before and this one, and swaps them.
+  $8370, $4988A). It keeps two, the tick before and this one, and swaps them.
   Left out: the screens, the blitter queue $11268-$11527 (with the ground's top lines
   $11368/$1136C: the steering wheel `$11C88` rebuilds the queue past them), the sound and
-  the VBL's variables.
+  the VBL's variables. The sound's interrupt state $9CD0-$9CEB (the engine's two-step
+  sample change, below) was in it once: a frame put back the tick before's, the change
+  ran its first step again and again, and the engine played one sample at the other's
+  period, an octave off, until the next change.
 - **A frame** (`enh_Frame`) loads the tick before, moves it, runs the drawing, and loads
   this tick back. The player's distance $DC50 moves by alpha of this tick's step ($10C30),
   and the landscape `$E4F8` runs again with that step: it integrates the lateral position,
@@ -484,8 +487,10 @@ picture is a tick late, as in any interpolation.
   $E936, from the revs $DC00) are not written. A frame's engine pitch came from the tick
   before's revs, so $9FC4 held the value a tick behind between the ticks' writes; the
   sound routine latches it in some of its states ($999A, from the VBL's sound code), glides
-  to it, and switches the engine's sample at 138 ($9A0C, through the audio interrupt,
-  $A044). A tick leaves out
+  to it, and switches the engine's sample at 138 ($9A0C). The switch takes two AUD0
+  interrupts ($9C7C): the first, at a sample block's start, sets the other sample's
+  location and length ($9CDC, $9CE4 by $9CDA) and $9CD2; the second, as that sample
+  starts, its period and $A044. A tick leaves out
   what only the frames draw: the map marker ($C8F8), the HUD (`$120A6`; the wheel's lower
   part `$118D8`, from $D20A, patched at $118DE where the site holds no block address;
   $D21C-$D3BB: the cockpit, mirrors, gear, speed and wheel, after the pit stop `$D5FC`,

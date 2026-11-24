@@ -188,7 +188,8 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     (the mountain's top) and the crash's flying wheel still moved once a tick, and the
     frames wrote the engine's pitch from the tick before's revs; each is now mixed, or left
     to the ticks (`internals.md`, "Frames between ticks"). Then the road on a flat
-    stretch (its slope from the unmixed pitch at $F436) in a jump.
+    stretch (its slope from the unmixed pitch at $F436) in a jump, and the engine's
+    sample: the snapshot held the sound's interrupt state, and frames put it back.
 
 ### E. Speed: a frame per field on the 68040 (Enhanced framerate, 68020 and up)
 

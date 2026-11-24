@@ -81,7 +81,7 @@ ENH_WORK	= ENH_BOTTOM+((ENH_TAIL-ENH_BOTTOM+$FFF)&$FFFFF000)
 ENH_SNAP	= ENH_WORK+((ENH_WORK_HI-ENH_WORK_LO+$F)&-$10)	; after them: the
 					; two snapshots of the race state (frames
 					; between ticks), ENH_RSIZE bytes each
-ENH_RSIZE	= $8C4			; the ranges of _enh_r
+ENH_RSIZE	= $8A4			; the ranges of _enh_r
 ENH_EXPSIZE	= (ENH_SNAP+2*ENH_RSIZE-ENH_BOTTOM+$FFF)&$FFFFF000	; ws_ExpMem (optional; small
 					; for the 1 MB A500): the trampolines, the
 					; stack and the block, from its start, then
@@ -550,7 +550,6 @@ _enh_r		ENH_R	ENH_R1,$E254-ENH_R1	; to the landscape's result $E254
 		ENH_R	$1B28C,8		; the collision's state
 		ENH_R	$1B3D4,4
 		ENH_R	$8370,4			; the ARCADE score
-		ENH_R	$9CD0,$20		; the car order's work
 		ENH_R	$4988A,$12		; the three sky objects
 		dc.l	0
 	IFNE	ENH_RS-ENH_RSIZE
