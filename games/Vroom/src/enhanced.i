@@ -29,7 +29,8 @@
 ; With fast ExpMem the program's stack and the race block ($A924-$1B4FF: the
 ; race's setup and loop, its state, the renderer, the objects and the
 ; scalers) move there (enh_Fast,
-; enh_Move, enh_RelocOut; docs/internals.md, "Fast memory"). Developer builds:
+; enh_Move, enh_RelocOut; docs/internals.md, "Fast memory"), and so do the
+; loader's unpacker variables and tables (the load's time). Developer builds:
 ; -DENH_PROTECT protects the block left in chip memory (a 68030 with MMU),
 ; -DENH_NOBLOCK moves only the stack (for A/B measurements).
 ;
@@ -70,9 +71,17 @@ ENH_STACKSIZE	= $1000			; and its size
 ENH_TRSIZE	= $100			; the trampolines, below the stack (bsr.w range)
 ENH_TR		= ENH_STACK-ENH_STACKSIZE-ENH_TRSIZE
 ENH_BOTTOM	= ENH_TR		; the lowest address used, in the copy
-ENH_EXPSIZE	= (ENH_HI-ENH_BOTTOM+$FFF)&$FFFFF000	; ws_ExpMem (optional; small
+ENH_TAIL	= $1B600		; the scaler's pointer table ($1B464) runs on
+					; to here: in the copy too, past ENH_HI
+ENH_WORK_HI	= ENH_WORK_LO+$64C	; the loader's unpacker variables and
+					; tables (ENH_WORK_LO: in the slave's source),
+					; moved to the page after the copy (ENH_WORK,
+					; in its addresses)
+ENH_WORK	= ENH_BOTTOM+((ENH_TAIL-ENH_BOTTOM+$FFF)&$FFFFF000)
+ENH_EXPSIZE	= (ENH_WORK+ENH_WORK_HI-ENH_WORK_LO-ENH_BOTTOM+$FFF)&$FFFFF000	; ws_ExpMem (optional; small
 					; for the 1 MB A500): the trampolines, the
-					; stack and the block, from its start
+					; stack and the block, from its start, then
+					; the unpacker's page
 
 ENH_LIMIT	= 50			; fields of debt kept: 1 s
 ENH_SKIPS_MAX	= 3			; passes in a row without drawing
@@ -232,10 +241,39 @@ enh_Move	movem.l	d0-d2/a0-a3,-(a7)
 		moveq	#(_blk_end-_blk_ptrs)/4-1,d0
 .ptr		add.l	d2,(a0)+
 		dbf	d0,.ptr
+		lea	ENH_WORK_LO,a0		; the unpacker's variables and tables:
+		lea	ENH_WORK,a1		; to ENH_WORK
+		add.l	d2,a1
+		move.w	#(ENH_WORK_HI-ENH_WORK_LO)/2-1,d0
+.wcopy		move.w	(a0)+,(a1)+
+		dbf	d0,.wcopy
+		lea	_enh_work(pc),a0	; and the loader's references to them
+		move.l	#ENH_WORK-ENH_WORK_LO,d1
+		add.l	d2,d1
+.work		moveq	#0,d0
+		move.w	(a0)+,d0
+		beq.b	.flush
+		add.l	#ENH_LDR,d0
+		move.l	d0,a1
+		move.l	(a1),d0
+		sub.l	#ENH_WORK_LO,d0
+		cmp.l	#ENH_WORK_HI-ENH_WORK_LO,d0
+		bhs.b	.work
+		add.l	d1,(a1)
+		bra.b	.work
+.flush
 		move.l	_resload(pc),a2
 		jsr	resload_FlushCache(a2)
 .out		movem.l	(a7)+,d0-d2/a0-a3
 		rts
+
+; The loader's long addresses of the unpacker's variables and tables
+; (ENH_WORK_LO-ENH_WORK_HI; the decrunched length before them, $34F32, which
+; the slave and the tools read, stays), as offsets from ENH_LDR. The same in
+; both programs.
+ENH_LDR		= $1D000
+_enh_work	dc.w	$5BA,$5C2,$5E4,$5EC,$5FA,$628,$62E,$634,$680,$6A6,$6AC,$6B8
+		dc.w	$6CE,$6D4,$6E2,$6EC,$704,$782,$7B8,$7BE,$7C4,$7D0,$810,$86E,0
 
 ; The addresses into the block from outside it, where the site still holds
 ; the address (after each Fix: a reload over the program brings back the

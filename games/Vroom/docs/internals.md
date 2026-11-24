@@ -5,7 +5,7 @@ hunk or file), current measurements and known limitations.
 
 ## Loading and memory
 
-A direct slave in 512 KB of chip memory (`ws_BaseMemSize` $80000), with an optional 72 KB
+A direct slave in 512 KB of chip memory (`ws_BaseMemSize` $80000), with an optional 76 KB
 ExpMem for Enhanced framerate's fast memory (below, "Enhanced framerate"). The slave
 loads the boot block's loader from disk offset 0 to $60000, patches it and jumps to $6000C;
 the loader loads the main program (about $3658-$1E000) and calls the slave's `Patch`, which
@@ -226,11 +226,12 @@ mostly lands below a field. The a1200-040 is unchanged (its frame is 2 fields ei
 same in lines 0-30 and 36-174. Lines 31-35 are the race clock (real time) and lines 175-199
 of the cockpit differ between two runs of the same build as well.
 
-**Fast memory.** The slave asks for a 72 KB ExpMem, optional (`ws_ExpMem` negative): the
+**Fast memory.** The slave asks for a 76 KB ExpMem, optional (`ws_ExpMem` negative): the
 1 MB a500 (512 KB of slow memory), where WHDLoad also allocates it, must still load
 WHDLoad's overlays (at 136 KB it no longer did). When WHDLoad finds it in fast memory (not
 below $200000, chip memory, nor in $C00000-$DFFFFF, slow memory on the chip bus), the stack
-and the race block move there. Without it (the a1200, a 68000) nothing moves.
+and the race block move there, and the loader's unpacker variables and tables. Without it (the
+a1200, a 68000) nothing moves.
 
 - **The stack** is set once, at the program's start ($366E), to $2FC96, just past the
   second screen. The race uses it down to about $2FC10, and in the a500's CPU accesses to
@@ -263,6 +264,19 @@ and the race block move there. Without it (the a1200, a 68000) nothing moves.
   it lists, and a review of what it leaves undecoded (numbers, data tables, and code that
   holds no absolute address). Every `Fix` still applies the patch lists to the chip copy
   too, which nothing runs any more.
+
+- **The scaler's pointer table** at $1B464, read PC-relative, runs past the block's end to
+  about $1B5FB (`ENH_TAIL`, $1B600). Nothing addresses $1B500-$1B5FF absolutely, so in the
+  copy its tail lives past the copy's end, as consistently as in chip memory: the space
+  after the copy is the table's, up to `ENH_TAIL`.
+- **The loader's unpacker area**, $34F36-$35581 ($34F4A on the data disk, `ENH_WORK_LO` in
+  each source): the unpacker's escape byte and counters and its Huffman tables, read for
+  every bit of a file. They go to the page after the copy (`ENH_WORK`, $1B800 in the
+  copy's addresses); `enh_Move` copies them and rewrites the loader's 24 long addresses
+  of them (`_enh_work`, the same sites in both programs, each only where it still holds
+  one). The decrunched length before them ($34F32), which the slave and the tools read,
+  stays. The race uses parts of the same chip memory as its own buffers ($34D92, $3517A:
+  object spans), which it fills before it reads.
 
 Checks of the moved block. `statelog 600 tick` against the a500 (`CUSTOM3=2`, pointers into
 the copy logged as the program's addresses) agreed in all 600 passes on the a1200-040.
@@ -441,6 +455,29 @@ On the a1200 the landscape's time is spread thin (no instruction above 0.5%) and
 of it is fetches and data in chip memory; the projection's `muls` take 1.1% together. About
 8 times a field a WHDLoad routine runs from wherever the CPU is (5% on the a1200; most likely
 its interrupt entry), not from the game's calls.
+
+## Where the load's time goes
+
+An aprof profile of a boot to the first race's green light (`aprof race`, the a1200-040
+without an MMU model, `CACHE`, the menu's START at once): 1224 fields. About 450 of them come
+before the game starts: Kickstart, the startup sequence and WHDLoad with `PRELOAD`, mostly in
+exec's idle `stop` while the emulated hard drive reads (FS-UAE's timing; nothing the slave
+does). The game's 772:
+
+| | fields |
+|---|---|
+| the program's unpacker ($1D798, with its reads from the track buffer, 23; its table setup $1D572) | 164 (54) |
+| the boot loader's unpacker ($6F3FA), the program itself, before `Patch` | 58 |
+| a sound sample's delta decode ($43AF8) | 28 |
+| the race start's passes before the green light (`enh_Pass`) | 117 |
+| the title's waits ($12F78), the menu's wipes (`fix_Wipe`) | 87, 29 |
+
+The unpacker's time was its reads of its own Huffman tables in chip memory (`cmp.w (a2)+`
+and `move.w (a3)+` for every bit, and a 256-byte selection sort for every file), not the
+track reads or the code. With its tables and variables in fast memory (above, "Fast memory")
+it is 85 fields (the setup 23), the game's part 666 and the green light at the game's field
+603 instead of 709. The boot loader's unpacker runs before the slave reads `CUSTOM1`, and the
+sample's decode is one pass; both are left.
 
 ## Verification
 

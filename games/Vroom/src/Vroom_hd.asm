@@ -449,6 +449,7 @@ _Key	move.b	$bfec01,d0
 ; where the init code writes the VBL routine's vectors (src/smc.i), and the fixes
 SMC_VBLW1	= $3B54		; the address in move.l #x,$A572
 SMC_VBLW2	= $3B5E		; the address in move.l #x,$A56C
+ENH_WORK_LO	= $34F36		; the loader's unpacker variables and tables (src/enhanced.i)
 	INCLUDE	fixes.i
 	INCLUDE	reloc_Vroom.i
 ;--------------------------------

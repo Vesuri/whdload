@@ -196,7 +196,7 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     before the game's wait (loops; 0.8 fps more at most) and drawing the smallest blits with
     the CPU.
 19. **Fast memory for data and the race block** (done; `internals.md`, "Fast memory").
-    With an optional 72 KB fast ExpMem the stack and the race block move there. Checked with
+    With an optional fast ExpMem the stack and the race block move there. Checked with
     `statelog`, `frames`, an MMU-protected developer build through the menus, a driven race,
     its end and a second race, the data disk, and the matrix. Without fast memory, or on a
     68000, nothing moves. What else in chip memory the CPU uses most (the a500's 100 race
@@ -264,22 +264,33 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
       and drew 18.75). Not worth an exact copy of the projection's first line.
 
     Left for the a1200 at 25 Hz: a third screen (step 16), not measured.
-23. **Loading time.** From the boot to a race's green light (`race`, field counter $A884)
-    takes 930 fields on the a1200-030 with `CACHE` and 976 on the a1200-040, about 19 s.
-    With `DCACHE` it is 691 and 578 (the MMU model caches chip data, which boards do not, and
-    the race then goes wrong: step 21), and on the a1200-030 without caches 2221. PC samples
-    put most of the load in the program's streaming loader and unpacker ($1D4xx-$1D8xx,
-    entry $1D798), which runs from chip memory. Its track buffers ($7C174, $3458) and its
-    output are in chip memory too. The steps:
-    - Profile the boot on the a1200-040 with `CACHE` with aprof, not field-boundary
-      samples (those land in the VBL handler). That gives the loader's share against the
-      fixed waits (the menu wipes, the start lights).
-    - If the loader dominates, the slave reads each archive from the preloaded disk image
-      into ExpMem. It unpacks it with its own copy of the unpacker, run from fast memory, so
-      only the output goes to chip memory.
-    - It is a performance change, so it sits behind `CUSTOM1`. The data disk switches disks
-      in the same loader (`internals.md`, "The data disk's two disks"), so the copy must
-      keep that switch.
+23. **Loading time (done).** An aprof profile of the boot to the green light (`aprof race`;
+    `internals.md`, "Where the load's time goes") put the program's unpacker first among
+    the game's own work (164 of its 772 fields, and 54 for its table setup). That was its
+    reads of its own Huffman tables in chip memory, not the track reads or its code, so the
+    slave moves the tables and the unpacker's variables to a page of the ExpMem (now 76 KB)
+    and rewrites the loader's 24 addresses of them (`enh_Move`, with the block; behind
+    `CUSTOM1` with fast memory). Reading whole archives into fast memory and a copy of the
+    unpacker were not needed. The game's field counter at the green light (`race`, two runs
+    each; the boot before the game varies by ±100 fields with the emulated hard drive):
+
+    | | before | after |
+    |---|---|---|
+    | a1200-040, `CACHE` | 769, 771 | 607, 617 (-3.2 s) |
+    | a1200-030, `CACHE` | 637, 639 | 540, 541 (-2.0 s) |
+    | a1200-fast | 961 | 909 (one run each) |
+
+    `statelog 600 tick` against the a500: the same in all 599 passes on the a1200-040, and on
+    the a1200-030 except 11 passes that differ only by the copy's offset (`development.md`).
+    The race on the a500, the a1200 and the a1200-fast, and the data disk's race, scores and
+    second race on the a1200-040 and the a1200-030, ran with no dump.
+    - On the way: the title's copy of its load routine to $1CF94 had been relocated into the
+      fast copy and wrote 302 bytes past the ExpMem since step 19 (`internals.md`, "Fast
+      memory"; fixed in `tools/reloc.py`). And the scaler's pointer table runs past the
+      block's end, so the unpacker's page starts at the next page after `ENH_TAIL`.
+    - Left: the boot loader's unpacker (58 fields, before the slave reads `CUSTOM1`), a
+      sound sample's decode (28), and the boot before the game (Kickstart, WHDLoad,
+      `PRELOAD`: about 450 fields in FS-UAE, its hard drive's timing).
 
 ### F. Acceptance
 
