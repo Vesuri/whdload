@@ -15,7 +15,8 @@ fast memory draws frames between the ticks (step 15).
 2.0b (24.11.2026): phase B's fixes and Enhanced framerate (`CUSTOM1=1`), with the ReadMe
 entry above CFou's, `$VER` and info text in both slaves, the option described in the ReadMe
 and set in the installed icon (step 26). `make dist` builds `VroomEnhanced-2.0b-20261124.lha`.
-Not published. The user ran the archive on real hardware (step 25).
+The user ran the archive on real hardware (step 25). Published 24.11.2026 (tag
+`VroomEnhanced-2.0b-20261124`).
 
 ## Decisions (the user's, 23.11.2026)
 
@@ -365,7 +366,7 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     accelerator to confirm. Real hardware (24.11.2026, the user, the 2.0b archive installed
     with its icon): an A1200 with a 40 MHz 68040, MMU and 32 MB of Zorro III fast memory
     works well. The a1200-060 and the 68000 are not yet tried on hardware.
-26. **Release** (done but publishing). The installed icon gets `CUSTOM1=1` and `CACHE`:
+26. **Release** (done; published). The installed icon gets `CUSTOM1=1` and `CACHE`:
     `Vroom.inf` and `Vroom.colicon` ship with no tooltypes, so the packager's `tooltypes`
     cannot add them; `release/Install` (the shipped script) sets both after `P_SelectIcon`
     in `P_MakeIcons`, which makes Vroom's and the data disk's icon alike. The ReadMe's
