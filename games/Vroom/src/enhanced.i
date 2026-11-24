@@ -186,6 +186,7 @@ _enh_pl		PL_START
 	PL_PS	$118DE,enh_Wheel	; movea.l #$DFF000,a6: the wheel ($D20A)
 	PL_PS	$D414,enh_Score		; lea $8374,a0: the score's digits
 	PL_PS	$D43E,enh_Time		; lea $850E,a0: the time's digits
+	PL_PSS	$ED76,enh_Sort,2	; sub.l d7,d1; cmpi.l #32767,d1: the cars ahead
 	INCLUDE	blitwait.i
 		PL_END
 
@@ -832,6 +833,27 @@ enh_Score	ENH_TICK .draw
 enh_Time	ENH_TICK .draw
 		ENH_GOTO $D48A
 .draw		lea	$850E,a0
+		rts
+
+; The cars ahead of the camera, sorted by distance into the list at $10B3E
+; ($ED5A-$EDD6): the insertion walks down until an entry is no further than
+; this car, and the word 0 at $10B3A ends it. A tick takes them in the car
+; order from the camera on, all ahead of it. A frame mixes the cars and the
+; camera, which moves by alpha of the player's step, but keeps the tick
+; before's order: a car the player passes in this tick can be behind the
+; camera. Its distance ahead is then negative, the walk runs below the list
+; and the insertion moves the landscape's variables up ($10ADA, the road's
+; detail, indexes a jump table at $10776: an Illegal Instruction at $10B76 on
+; the a1200-030 in a player race). A frame leaves such a car out: it is
+; behind the camera.
+; IN:	d1 = the car's distance, d7 = the camera's
+; OUT:	d1 = the car's distance ahead, the flags as cmpi.l #32767,d1
+enh_Sort	sub.l	d7,d1
+		bpl.b	.ahead
+		tst.b	_enh_frame(pc)
+		beq.b	.ahead
+		ENH_GOTO $ED5A			; the next car
+.ahead		cmpi.l	#32767,d1
 		rts
 
 ; $D13C's first drawing: $10F90 waits for the blitter queue ($1B0, src/fixes.i's

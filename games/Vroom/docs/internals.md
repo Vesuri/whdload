@@ -415,7 +415,13 @@ picture is a tick late, as in any interpolation.
   more than 4096 or crosses the line stays. Alpha is kept within 0..1: outside it the
   step turns huge, the camera jumps to the line, and the cars' sort by distance at
   $ED88-$EDA6 runs off its list into the landscape's code at $10A42 (a Line 1111
-  exception on the a1200-fast in a first build of step 16). Then the landscape's result
+  exception on the a1200-fast in a first build of step 16). The order the cars are sorted
+  in is the tick before's, so a car the player passes in this tick can be behind the
+  mixed camera: its distance ahead is negative, and the same sort's walk runs below its
+  list at $10B3E and moves the landscape's variables up (the road's detail $10ADA then
+  indexes the jump table at $10776 past its end: an Illegal Instruction at $10B76 on the
+  a1200-030 in a player race). A frame leaves such a car out (`enh_Sort`, at $ED76); a
+  tick is unchanged. Then the landscape's result
   into $E254 and $DBEE/$DBF0 (as $C960-$C984), the wait for the shown screen, the map
   marker (as $C8F2-$C91C, after the wait: the CPU draws it into the screen) and `$D13C`,
   which swaps.

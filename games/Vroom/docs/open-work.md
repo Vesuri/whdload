@@ -176,7 +176,10 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     could go negative (an early tick, then the VBL took the frame), which crashed the
     a1200-fast; the map marker drew before the wait for the shown screen; a tick drew the
     wheel's lower part and the panel updates into the screen on display (`shown`: none of 80
-    frames now). Ticks wait for the shown screen again (about 3%). No tearing: the swap is
+    frames now); a frame's cars kept the tick before's order, so one the player had just
+    passed could be behind the camera, and the cars' sort then wrote over the landscape's
+    variables (a crash on the a1200-030 in a player race; frames now leave such a car out).
+    Ticks wait for the shown screen again (about 3%). No tearing: the swap is
     the copper list's at the VBL. Left for 50 fps: most frames fit a field on the a1200-040,
     about 1 in 5 takes 2. A third screen would let a frame that runs over draw on instead
     of waiting: not tried (32000 bytes of chip memory, not yet found inside BaseMem).
