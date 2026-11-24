@@ -1182,7 +1182,6 @@ RELOC_IN
 		dc.w	-360		; $12C42 12c40: movea.l $12cb0.l, a2
 		dc.w	-24		; $12EE2 12ee0: jsr $1a018.l
 		dc.w	-2		; $12F0E 12f0c: movea.l #$12d27, a0
-		dc.w	1		; $12F14 12f12: movea.l #$15294, a1
 		dc.w	249		; $13104 13102: movea.l #$13e78, a4
 		dc.w	278		; $1313E 1313c: clr.w $1322a.l
 		dc.w	291		; $13158 13156: tst.w $1322a.l

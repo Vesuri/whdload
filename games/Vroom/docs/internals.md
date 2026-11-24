@@ -246,7 +246,11 @@ and the race block move there. Without it (the a1200, a 68000) nothing moves.
   (`ENH_BLOCK`, $1D6, holds its offset; the tools read it). Any offset works: the block
   moved by an offset that is not a multiple of $10000 gave the same state in 600 passes and
   the same frames. `enh_Move` copies it once, at the first `Fix`, after every patch is in,
-  and relocates the long addresses into it (`RELOC_IN` in `src/reloc_<variant>.i`: 1385).
+  and relocates the long addresses into it (`RELOC_IN` in `src/reloc_<variant>.i`: 1384).
+  One long immediate into the block is not an address in it: the title copies its load
+  routine from $12D27 to $15294+32000, the loader's entry $1CF94 (the bytes the program
+  loaded there), so `tools/reloc.py` keeps it as a number (`NOT_ADDRS`). Relocated, the copy
+  wrote 302 bytes 6 KB past the ExpMem's end.
   The long addresses into it from outside (`RELOC_OUT`: 225 in Vroom, 235 on the data disk,
   whose race start writes the lap figures into the race loop's immediates at $CAE4-$CAFC)
   are relocated after every `Fix`, where the site still holds its value (a reload over the

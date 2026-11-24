@@ -50,6 +50,10 @@ CODE_ADDRS = [0xD78E, 0xD862, 0xD92C, 0xD9EA, 0x110A8, 0x110D0, 0x110EC, 0x1110C
 # Data in the block whose address the code takes as a long immediate.
 DATA_ADDRS = {0x10AEE, 0x11260, 0x11268}
 ADDR_OPS = ('movea', 'adda', 'suba', 'cmpa', 'lea', 'pea')
+# Instructions whose long immediate into the block is the base of an address outside it,
+# kept as numbers: the title's install of a load routine into the loader
+# (movea.l #$15294,a1 / lea 32000(a1),a1: $1D094).
+NOT_ADDRS = {0x12F12}
 
 
 MID = ((S + E) // 2) & ~1
@@ -180,7 +184,9 @@ def census(mem, code):
             if o.type == M.M68K_OP_IMM and i.mnemonic.endswith('.l'):
                 v = o.imm & 0xFFFFFFFF
                 if inb(v):
-                    if i.mnemonic.split('.')[0] in ADDR_OPS or v in code or v in DATA_ADDRS:
+                    if pc in NOT_ADDRS:
+                        kept.append((pc, v, f'{i.mnemonic} {i.op_str}'))
+                    elif i.mnemonic.split('.')[0] in ADDR_OPS or v in code or v in DATA_ADDRS:
                         vals.append(v)
                     else:
                         kept.append((pc, v, f'{i.mnemonic} {i.op_str}'))
