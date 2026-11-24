@@ -15,7 +15,7 @@ fast memory draws frames between the ticks (step 15).
 2.0b (24.11.2026): phase B's fixes and Enhanced framerate (`CUSTOM1=1`), with the ReadMe
 entry above CFou's, `$VER` and info text in both slaves, the option described in the ReadMe
 and set in the installed icon (step 26). `make dist` builds `VroomEnhanced-2.0b-20261124.lha`.
-Not published: the user tests it on real hardware (step 25).
+Not published. The user ran the archive on real hardware (step 25).
 
 ## Decisions (the user's, 23.11.2026)
 
@@ -362,7 +362,9 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     on every machine. The render and state checks (steps 2 and 14) pass. With the
     option off, the original code paths run. The 68000 works correctly with the option on
     and off. FS-UAE's 040/060 timing is not hardware's, so the 50 fps figure needs a real
-    accelerator to confirm.
+    accelerator to confirm. Real hardware (24.11.2026, the user, the 2.0b archive installed
+    with its icon): an A1200 with a 40 MHz 68040, MMU and 32 MB of Zorro III fast memory
+    works well. The a1200-060 and the 68000 are not yet tried on hardware.
 26. **Release** (done but publishing). The installed icon gets `CUSTOM1=1` and `CACHE`:
     `Vroom.inf` and `Vroom.colicon` ship with no tooltypes, so the packager's `tooltypes`
     cannot add them; `release/Install` (the shipped script) sets both after `P_SelectIcon`
