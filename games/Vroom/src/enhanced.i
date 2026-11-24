@@ -176,6 +176,7 @@ _enh_pl		PL_START
 		PL_PS	$B724,enh_Unpause	; clr.w $8504: the end of a pause
 		PL_PS	$C968,enh_Landscape	; jsr $E4F8 (src/fixes.i's fix_Landscape)
 		PL_PS	$D13C,enh_Clear		; jsr $10F90: the sky and ground clear
+		PL_S	$1103A,$11078-$1103A	; the ground's queue entries (enh_Ground)
 		PL_PSS	$D142,enh_Objects,6	; move.l $E258(pc),d7; cmp.l $A884,d7; beq.s *-6
 		PL_PSS	$D510,enh_Swap,4	; move.l $A884,$E258
 	PL_PS	$D530,enh_Clock		; clr.w $8504: the start lights
@@ -861,11 +862,13 @@ enh_Sort	sub.l	d7,d1
 ; $D13C's first drawing: $10F90 waits for the blitter queue ($1B0, src/fixes.i's
 ; fix_Queue), lets $13F16 scroll the horizon (its blits go into the queue),
 ; queues the sky and ground clear, clamps the ground's top line $1136C and
-; starts the queue. A pass that does not draw keeps the state: the queue is
+; starts the queue; then the CPU fills the ground (enh_Ground). A pass that
+; does not draw keeps the state: the queue is
 ; written as $10F90 would, but not started.
 enh_Clear	tst.b	ENH_SKIP.w
 		bne.b	.undrawn
-		jmp	([_blk_10F90,pc])
+		jsr	([_blk_10F90,pc])
+		bra	enh_Ground
 .undrawn	jsr	FIX_TRAMP.w		; fix_Queue: a6 = the queue, now idle
 		move.w	([_blk_10C42,pc]),d7	; as $10F94
 		jsr	([_blk_13F16,pc])
@@ -880,6 +883,35 @@ enh_Clear	tst.b	ENH_SKIP.w
 		move.l	#2720,(a0)
 		move.l	(a7)+,a0
 .done		rts
+
+; The ground's fill: the two planes the queue's ground entries fill ($1103A-
+; $11077: plane 2 with 0, 3 with 1, from the ground's top line $1136C to the
+; screen's end; the road spans $10CD2 draw the others). The CPU fills them
+; while the blitter runs the rest of the queue $10F90 started (the horizon and
+; the sky), which goes without those entries. Measured against other splits
+; (docs/open-work.md, step 24), this one is the fastest.
+; IN:	-
+; OUT:	-	all registers preserved
+enh_Ground	movem.l	d0-d2/a0-a1,-(a7)
+		move.l	#8000,d0
+		move.l	([_blk_1136C,pc]),d1
+		sub.l	d1,d0
+		ble.b	.out
+		move.l	$86EA,a0
+		add.l	#16000,a0
+		add.l	d1,a0			; plane 2: 0
+		lea	8000(a0),a1		; plane 3: 1
+		lsr.l	#3,d0
+		subq.l	#1,d0
+		moveq	#0,d1
+		moveq	#-1,d2
+.fill		move.l	d1,(a0)+
+		move.l	d1,(a0)+
+		move.l	d2,(a1)+
+		move.l	d2,(a1)+
+		dbf	d0,.fill
+.out		movem.l	(a7)+,d0-d2/a0-a1
+		rts
 
 ; $D13C's wait for a new field and its road spans, objects and scaler. A pass
 ; that does not draw goes on at $D1C2 (the start lights).

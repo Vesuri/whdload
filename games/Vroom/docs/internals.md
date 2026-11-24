@@ -196,6 +196,7 @@ rate, on every 68020 and up.
 | $B724 (`clr.w $8504`) | the end of a pause (the pause loops at $B676-$B6C8 inside a pass): the tick clock starts again |
 | $C968 (`jsr $E4F8`) | the wait for the blitter queue, the landscape, then the wait for the VBL to take the last frame (`fix_WaitShown`; without the option `fix_Landscape` waits before it; with frames between ticks only while a tick draws, below) |
 | $D13C (`jsr $10F90`) | a pass that does not draw leaves out the sky and ground clear but keeps its state: the horizon's scroll (`$13F16`, its blits written into the idle queue, which is not started) and the clamp of the ground's top line $1136C |
+| $1103A-$11077 (the queue's ground entries) | left out: after `$10F90` the CPU fills the ground's planes 2 and 3 (`enh_Ground`) while the blitter runs the horizon and the sky |
 | $D142-$D14D (the wait for a new field) | a pass that does not draw goes on at $D1C2, leaving out the road spans `$10CD2`, the three objects `$140C0` and the scaler `$18154` |
 | $D510 (`move.l $A884,$E258`) | a pass that does not draw returns from `$D13C`, leaving out the swap ($E258, $A71C, `$12FA6`) |
 | $366E (`movea.l #$2FC96,a7`, at the program's start) | with fast ExpMem, the stack moves there, below the race block's copy (below, "Fast memory") |

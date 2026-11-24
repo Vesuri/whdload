@@ -332,6 +332,26 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
       data disk's race and a driven player race ran with no dump, and screenshots match the
       FMODE 0 picture (the title, the menu, both programs' races).
 
+      Left after it (aprof): the objects' wait for the queue was still 3 ms a frame, the
+      sky and ground fill (a D-only blit, which FMODE 3 hardly sped up).
+    - **The ground fill by the CPU (done)**: the queue's ground entries fill planes 2 and 3
+      below the ground's top line (the road spans draw the others), so the CPU fills them
+      (`enh_Ground`) while the blitter runs the horizon and the sky. The queue wait fell
+      from 14.1% to 2.3% of the time. `bench 300`: the a1200-040 48.23, the a1200-030
+      (`MMU`) 48.54, the a1200-fast 28.20, the a1200 16.04 (13 undrawn), the data disk 49.67.
+      `frames 200` (`CUSTOM3=2`) against the FMODE 3 build: every frame the same in lines
+      36-174; the other checks as above. Tried and not kept, `bench 300`:
+      - the CPU fills the sky too (the blitter keeps the horizon and the sky's last row,
+        which the horizon's 21-word rows overlap): 47.02, 48.08, 27.62;
+      - the fill behind the beam while a frame waits for the VBL (the buffer to draw into is
+        on display, but a row the beam has passed is not shown again), the rest as above:
+        the same 48.23 and 48.70 as without it on the a1200-040 and the a1200-030, 28.41
+        against 28.20 on the a1200-fast. The frames that take 2 fields are the ones that
+        hardly wait.
+
+      Left for 50 fps: 1 frame in 25 takes 2 fields on the a1200-040; the scaler (31%) and
+      the landscape (21%) are the most of a frame now.
+
 ### F. Acceptance
 
 25. With the installed icon's tooltypes, on the a1200-040 and the a1200-060, the `bench`
