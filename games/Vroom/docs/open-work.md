@@ -33,7 +33,7 @@ then carry step C (`ws_Version` 17), which the 2.0b ReadMe does not describe.
 - **The 68000 and 68010 keep the original loop**, with the option on or off: one step per
   frame, as today.
 - **Caches are left to the icon.** The slave makes no cache calls (`resload_SetCPU`). The
-  installed icon carries the cache tooltype beside `CUSTOM1=1` (step 21 picks which one).
+  installed icon carries `CACHE` beside `CUSTOM1=1` (step 21).
 
 What this means per machine, from the race-start figures:
 - A 14 MHz 68020 with chip memory only (17.5 fps today) gets a steady game speed; at 25 Hz
@@ -211,19 +211,29 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
     drawing at 39.0% of the time (47.0%) and the wait for the next tick at 52.1% (43.6%).
     With fast memory every measured machine draws all but at most 1 of 500 ticks at 25 Hz,
     so triple buffering could only help without fast memory (the a1200) or above 25 Hz.
-21. **The icon's cache tooltype.**
-    - `Cache` turns on the instruction cache and turns the data cache off for the whole
-      program, so data moved to ExpMem in step 19 would run uncached.
-    - `DCache` caches both. Chip memory gets marked cacheable write-through, which real
-      boards refuse for data; BuggyBoy's notes say 68040/68060 boards are slower on such
-      accesses.
-    - Without either, WHDLoad leaves BaseMem uncached: 18.8 fps on the a1200-040, against
-      31.8 with `Cache`.
+21. **The icon's cache tooltype** (done): `CACHE`. Both options mark chip memory cacheable
+    write-through under the MMU; `Cache` turns the data cache off in the CACR (everywhere,
+    fast memory too), `DCache` turns it on. On real boards chip memory is never cached, so
+    `DCache` could only gain on the data in fast memory (the stack and the race block's
+    variables), and on a 68060 every rejected cacheable chip access is restarted (WHDLoad's
+    `cache.html`: reads about 3 times, writes about 5 times slower), in a race whose time is
+    mostly chip accesses (77% on the 68040). Measured, `CUSTOM1=1 CUSTOM2=1`, the first demo
+    race:
+    - `bench 500` on the a1200-060 without an MMU model (`--cpu=68060-NOMMU`, chip data not
+      cached, as on boards): 25.03 fps with either option, 1 of 500 passes undrawn. aprof on
+      the 68040 without an MMU model: the same profile with either (that model charges
+      nothing for fast memory, so a data cache there cannot show); with `CACHE` the wait for
+      the next tick (`enh_Pass`) is 50.5% of the time.
+    - `statelog 600 tick` (`CUSTOM3=2`) against `CACHE` on the a1200-040: the 68040 and the
+      68060 without an MMU model agree in every pass with `DCACHE`. With the MMU model, where
+      FS-UAE caches chip data, `DCACHE` changes the race from its first passes (the 68040 at
+      pass 1, the 68060 at pass 0) and the frames (`frames 150`: none of 150 the same in
+      lines 36-171): the CPU reads chip memory the blitter or the loader wrote since. An
+      emulator with an MMU model is the one place that caches chip data.
 
-    Measure `Cache` against `DCache` once step 19 is in. For real-hardware data-cache
-    figures, run `CPU=68040-NOMMU`/`68060-NOMMU` (playbook §8): without an MMU model, FS-UAE
-    refuses to cache chip data, as boards do. Choose
-    one tooltype for the icon. The ReadMe describes both and how to remove them.
+    `CACHE` it is: all but 1 of 500 ticks drawn at 25 Hz on the 68030, 68040 and 68060, no
+    chip-access restarts on a 68060, and correct in emulation with or without an MMU model. The ReadMe
+    (step 25) names `DCache` as the alternative for boards, not for emulators.
 22. **Then the hot routines.** Profile again (a traced 68020 with fast memory, aprof on the
     040). Candidates: the projection's `muls` ($F672, $F680), the road spans' whole-line
     writes, the span filler ($10E72) and the scaler.
@@ -239,7 +249,8 @@ Then a fix-only release: B's fixes, with a ReadMe line for each.
       that catches up could leave the projection out.
 23. **Loading time.** From the boot to a race's green light (`race`, field counter $A884)
     takes 930 fields on the a1200-030 with `CACHE` and 976 on the a1200-040, about 19 s.
-    With `DCACHE` it is 691 and 578, and on the a1200-030 without caches 2221. PC samples
+    With `DCACHE` it is 691 and 578 (the MMU model caches chip data, which boards do not, and
+    the race then goes wrong: step 21), and on the a1200-030 without caches 2221. PC samples
     put most of the load in the program's streaming loader and unpacker ($1D4xx-$1D8xx,
     entry $1D798), which runs from chip memory. Its track buffers ($7C174, $3458) and its
     output are in chip memory too. The steps:
