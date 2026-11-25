@@ -10,7 +10,8 @@ the a1200-030 with 24-bit fast RAM, the a1200-fast and the a1200-040 (WHDLoad's 
 The intro's pictures were damaged at random by its music, and the game's samples popped
 ([internals.md](internals.md#slave-patches)); with 2.0b the a1200-030's panorama matched a
 clean reference in every dump, and in an audio capture of the first hole the outputs return
-to 0 after each sample (before, a bird sample left them at +2046 and +472).
+to 0 after each sample (before, a bird sample left them at +2046 and +472) and after the
+intro's music (before, +2560 after a click).
 
 ## Release
 

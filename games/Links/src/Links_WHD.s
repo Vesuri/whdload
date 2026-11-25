@@ -26,7 +26,7 @@
 ;		  self-modifying code in v1.50), code and variables of the chip
 ;		  memory hunks moved to fast memory, the intro's pictures no
 ;		  longer damaged by its music, no pops around the game's samples
-;		  on machines with fast memory
+;		  or after the intro's music
 
 ; 28-Apr-2013	- course disk bug fixed, game destroyed the FIB while
 ;		  trying to read the course name so only 1 coourse
@@ -293,9 +293,33 @@ PT_GAME	dc.w	$e70a,PLGAME150-PT_GAME,PLCACHE150-PT_GAME,PLCHIP150-PT_GAME,MVGAME
 ; the routine has the channel), so each sample start wrote two bytes up to 64 KB past the hunk:
 ; under WHDLoad into the buffer the pictures are unpacked from, which damaged the picture
 ; being unpacked. Nothing reads the counters; the writes are skipped.
+;
+; The music stops channels 0 and 1 mid-sample when the intro is clicked away (hunk 8 $f6),
+; and on the interrupt that reloads the last sample when it ends (hunk 8 $ba). Paula holds
+; its last output byte, at volume 64 on channel 1: a DC level, and a pop when the game's
+; first sample starts. _audiooff ends both on a zero word.
 PLTITLE	PL_START
 	PL_S	$2614,12		; hunk 8 $78
+	PL_PS	$2656,_audioend		; hunk 8 $ba: volume, DMA and interrupt off
+	PL_S	$265c,$d2-$c0
+	PL_PS	$2692,_audiooff		; hunk 8 $f6: DMA off
+	PL_NOP	$2698,2
 	PL_END
+
+; Channels 0 and 1 off: with DMA off and their interrupt requests clear, Paula plays the word
+; written to AUDxDAT after the current one, sets the request and idles on its last byte, 0.
+; The end of the music, in its audio interrupt (a0: the -1 that ends the list): the list
+; pointer (hunk 8 $128) stays on the -1, so an interrupt the zero word raises stops again
+; instead of reading past the list.
+_audioend
+	move.l	(sp),a0			; hunk 8 $c0
+	subq.l	#2,$128-$c0(a0)
+_audiooff
+	move.w	#3,$dff096		; DMACON
+	move.w	#$180,$dff09c		; INTREQ
+	move.w	#0,$dff0aa		; AUD0DAT
+	move.w	#0,$dff0ba		; AUD1DAT
+	rts
 
 PLGAME150
 	PL_START

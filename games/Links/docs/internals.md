@@ -77,6 +77,19 @@ unpacked into the panorama (hunk 0 `$BEC`). A sample starting while a picture sa
 its byterun stream: the bottom rows of that picture became noise, at random, more often on
 fast machines. Nothing reads the counters, so the writes are skipped.
 
+The same music routine stops channels 0 and 1 mid-sample when the intro ends or is clicked
+away (hunk 8 `$F6`, called from hunk 0 `$774`), and on the audio interrupt that reloads the
+list's last sample (hunk 8 `$BA`). Paula holds its last output byte at volume 64 (the interrupt path
+clears channel 0's volume only): a level left on until the game's first sample, which then
+pops. `PL_PS` at `$2692` (hunk 8 `$F6`) and at `$2656` (hunk 8 `$BA`, then skip to `$D2`)
+call `_audiooff`: DMA off, the two channels' interrupt requests cleared, and a zero word
+written to `AUD0DAT` and `AUD1DAT`. Paula plays that word after the current one, sets the
+request and idles on 0. The interrupt path also keeps the list pointer (hunk 8 `$128`) on the
+`-1`, so a later interrupt stops again instead of reading past the list. In audio captures on
+the a1200-fast, the outputs stayed at +2560 after a click with the previous build and return
+to 0 with this one, both after a click and when the intro ends by itself. The intro always
+ended before the list did, so the `$BA` path was never reached in the captures.
+
 `golf` with a chip memory word (`PLCHIP150`, `PLCHIP153`, Vesuri; skipped if `_bootdos`
 cannot allocate the 8 cleared bytes of chip memory `SILENT`):
 
