@@ -56,6 +56,8 @@ PatchSeg offsets count the segments' data end to end.
 | v1.50 | `$1546C`, `$15476` | 13 | `jsr getFIB`/`getFIB2`: the course list reads into the slave's FileInfoBlock instead of one it overwrites, so every course is listed | StingRay |
 | v1.53 | `$2E4` | 0 `$2E4` | skip to `$2F2`: the `CACR` write | StingRay |
 | v1.53 | `$15478`, `$15482` | 13 `$170`, `$17A` | as v1.50 | StingRay |
+| v1.50 | `$2A879`, `$2A87F` | 44 `$A61`, `$A67` | the sample end count `-2` becomes `-3` (below) | Vesuri |
+| v1.53 | `$2AA8B`, `$2AA91` | 44 `$A6B`, `$A71` | as v1.50 | Vesuri |
 
 On a 68020 or later (`PLCACHE150`, `PLCACHE153`, Vesuri):
 
@@ -84,10 +86,22 @@ cannot allocate the 8 cleared bytes of chip memory `SILENT`):
 | v1.53 | `$2AAB6` | 44 `$A96` | `jsr _silence`, then skip to `$AB2` |
 
 After starting a sample the game loops both channels on two zero words in hunk 44 (`$1236`
-v1.50, `$123C` v1.53) until the second audio interrupt turns them off. Hunk 44 is not a chip
-memory hunk, so from fast memory Paula fetched whatever chip memory lay at that address, and
-the channel held the last of it while off: a pop at the end of each sample and another when
-the next one set its volume. `_silence` loops on `SILENT` instead.
+v1.50, `$123C` v1.53) and counts the first channel's audio interrupts from -2 (v1.53 hunk 44
+`$A68`; the handlers from `$AF8`), switching the pair off on the second. Two faults left the
+channels holding a level while off, which Paula keeps outputting: a pop at the end of each
+sample, and another when the next one set its volume.
+
+- The second interrupt comes when Paula has fetched the sample's last word, before the zero
+  words play, so the channel stopped on the sample's last byte, and only the first
+  channel's volume is cleared. This happens on every machine. Counting from -3 plays one
+  silent block first.
+- Hunk 44 is not a chip memory hunk, so from fast memory Paula fetched whatever chip memory
+  lay at that address. `_silence` loops on `SILENT` instead.
+
+An audio capture of the first hole on the a1200-fast (`SDL_AUDIODRIVER=disk` with
+`--audio_driver=sdl`, AmigaXDev's `headless-fsuae.md`) showed it: with 2.0b's first build a
+bird sample left the outputs at +2046 and +472 until the next sound, about 2 s; with the count
+from -3 they returned to 0.
 
 `title` and `golf` then go through `MoveCode` ([caches and fast memory](#caches-and-fast-memory)).
 

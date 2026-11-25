@@ -302,6 +302,8 @@ PLGAME150
 	PL_SA	$2da,$2e8		; skip cache clear
 	PL_PS	$1546c,getFIB		; fix course disk support
 	PL_PS	$15476,getFIB2		; as above
+	PL_B	$2a879,-3		; hunk 44 $a61, sample end count
+	PL_B	$2a87f,-3		; hunk 44 $a67
 	PL_END
 
 PLGAME153
@@ -309,8 +311,17 @@ PLGAME153
 	PL_SA	$2e4,$2f2		; skip cache clear
 	PL_PS	$15478,getFIB		; fix course disk support
 	PL_PS	$15482,getFIB2		; as above
+	PL_B	$2aa8b,-3		; hunk 44 $a6b, sample end count
+	PL_B	$2aa91,-3		; hunk 44 $a71
 	PL_END
 
+; The sample player (hunk 44 $9f4, v1.53 offsets) counts the first channel's audio
+; interrupts from -2 and switches the pair off on the second (hunk 44 $af8 and on). That one
+; comes when Paula has fetched the sample's last word, before the silent loop plays, so Paula
+; holds its last output byte, and the second channel's volume is never cleared: a DC offset,
+; with a pop when the sample ends and another when the next one sets the volume. Counting
+; from -3 lets one silent block play first.
+;
 ; After a sample the game loops its channels on two zero words in hunk 44 ($123c v1.53,
 ; $1236 v1.50), until the next audio interrupt switches them off. Hunk 44 is not a chip memory
 ; hunk, so from fast memory Paula played whatever chip memory was at that address and the

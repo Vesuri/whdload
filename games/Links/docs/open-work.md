@@ -7,10 +7,10 @@ wind indicator), for v1.53 and v1.50 on the a1200-030 with Zorro III RAM
 (`EXTRA_ARGS='--fast_memory=0 --zorro_iii_memory=32768'`, `WHD_ARGS='CACHE CUSTOM1=1'`),
 the a1200-030 with 24-bit fast RAM, the a1200-fast and the a1200-040 (WHDLoad's MMU on, and
 `NOMMU`), all with `CACHE`; the intro with `CACHE`; and the 68000 `custom` setup.
-The intro's pictures were damaged at random by its music, and the game's samples popped from
-fast memory ([internals.md](internals.md#slave-patches)); with 2.0b the a1200-030's
-panorama matched a clean reference in every dump, and the game's sample loop runs on
-cleared chip memory (checked with a breakpoint, not by ear).
+The intro's pictures were damaged at random by its music, and the game's samples popped
+([internals.md](internals.md#slave-patches)); with 2.0b the a1200-030's panorama matched a
+clean reference in every dump, and in an audio capture of the first hole the outputs return
+to 0 after each sample (before, a bird sample left them at +2046 and +472).
 
 ## Release
 
@@ -21,7 +21,8 @@ The installed icon does not set `CACHE` (the Install script writes the tooltypes
 ## Next
 
 - Play past the first hole with `CACHE` (putting, the next holes, the course disks).
-- Listen to the samples on a real machine or with audio capture to confirm the pops are gone.
+- Capture the swing's swoosh too (the capture covered the first hole's ambient samples; the
+  swoosh goes through the same player, hunk 44 `$9F4`).
 - On fast machines the intro can draw `COPYRIGHT ...` over the previous credit (hunk 0
   `$726` draws it straight onto the screen after the scroll loop, whose length is timer
   driven); not yet checked against a 68000.
