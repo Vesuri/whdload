@@ -290,6 +290,12 @@ takes type `$F`'s `$40` back first, so its dots move once a step.
 MEASURED, PAL:
 - the marble's dot points plotted (`$68E4`) per race field on `a1200-030` and `a1200`: 8 in
   every field; before the lists were put back, 4 in the fields without a step;
+- the practice race on `a1200-030` with a rail covering the ball while it scrolls: the
+  scenery mask (`$11060`) runs to its pixel loop in step and draw-only fields alike; a
+  covering piece's y in `+$38` grows by the change of `$9BA` (records count y from the
+  bottom: the projection `$6918` adds `$9BA`);
+- the respawn after a fall off the practice course on `a1200-030`: the shards (`+$AE`,
+  `+$38`) are placed in every field and converge as in the original loop;
 - steps (`$230`) in 360 race fields on `a1200-030` + `CACHE`: 180 without the option, 216
   with it; with it on NTSC (`NTSC=1`), 180;
 - race timer over 500 fields: 35 → 25 with it (50 fields a game second), 39 → 31 without;

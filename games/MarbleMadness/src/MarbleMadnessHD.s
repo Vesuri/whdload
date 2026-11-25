@@ -796,26 +796,25 @@ step_draw
 ; bl_view = the blended view offset $9BA minus the step's: what a draw at bl_alpha adds to
 ; the screen y of the scenery (sprites' blended positions include it already)
 set_view
-	movem.l	d0/d5-d6,-(a7)
+	movem.l	d0-d1/d5-d6,-(a7)
 	moveq	#0,d5
 	lea	bl_valid(pc),a0
 	tst.b	(a0)
 	beq.b	.set
-	move.w	view_cur(pc),d6
-	move.w	d6,d5
-	sub.w	view_prev(pc),d5
+	move.w	view_cur(pc),d1
+	sub.w	view_prev(pc),d1	; the step's move (blend uses d5 and d6)
+	move.w	d1,d5
 	moveq	#64,d0
 	bsr	blend
 	bcs.b	.none
-	add.w	view_prev(pc),d5
-	sub.w	d6,d5
+	sub.w	d1,d5			; its share at alpha, minus the whole move
 	bra.b	.set
 .none
 	moveq	#0,d5
 .set
 	lea	bl_view(pc),a0
 	move.w	d5,(a0)
-	movem.l	(a7)+,d0/d5-d6
+	movem.l	(a7)+,d0-d1/d5-d6
 	rts
 
 ; $116BC in the scenery mask $11678: the view offset, moved with the blended view

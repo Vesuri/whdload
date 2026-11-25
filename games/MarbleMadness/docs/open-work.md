@@ -134,9 +134,9 @@ Steps, each verified before the next:
    are now counted by a VERTB server, not CIA-A's TOD. Open: the bonus count and the end
    of the game, which need a finished level, are checked only from the code. Draw jobs restore what
    a step leaves for its draw (the scenery covering each sprite, the marble's dots and
-   shards); objects whose image changes are not blended. Open: occlusion by walls, the
-   shards, the worms and slimes are checked only from the code and the user's report, not
-   yet in a capture (the practice runs had none in view).
+   shards); objects whose image changes are not blended. The masking by walls and the
+   respawn's shards are checked in practice-race captures; open: the worms and slimes
+   (Beginner and on), checked only from the code and the user's report.
 9. **Budget and matrix.** On `a500` (the original loop), `a1200`, `a1200-030` and
    `a1200-040`, measure step, draw and copper cycles, draws per second and fields per game
    second, in the busiest scenes (Aerial, Silly, Ultimate, two players). When behind, steps
