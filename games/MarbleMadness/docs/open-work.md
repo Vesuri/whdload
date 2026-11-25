@@ -10,7 +10,7 @@ CPU-bound on a 68020+; it is frame-locked at one logic step per two vsyncs, writ
 NTSC, so PAL plays at 5/6 speed and 25 fps. Music and sound effects are also clocked by the
 vblank and play at 5/6 tempo on PAL ("Sound timing").
 
-1. Enhanced framerate (the plan below). Steps 1 to 6 are done; next is step 7.
+1. Enhanced framerate (the plan below). Steps 1 to 7 are done; next is step 8.
 2. The idle task's keyboard poll writes CIA-A SDR about 1950 times a field; harmless for
    speed, but worth moving to the keyboard interrupt if it is ever touched.
 
@@ -97,7 +97,9 @@ Steps, each verified before the next:
    "Enhanced framerate"). Only `$230` needed a change; `$7690` is reset by every new frame,
    so the game's half-step scroll no longer runs, and the scroll moves once a step until
    step 7. Draws go only to an idle Scroller whose last frame has been shown, because the
-   draw pass waits for the sprite-set swap (`$5BCA`).
+   draw pass waits for the sprite-set swap (`$5BCA`). Step 7 found that every other field
+   still showed the older sprite set (the copper list built at the vsync is shown a field
+   later); frames are now presented at the end of their draw.
 7. **Interpolation.** After each step, snapshot each listed object's world position
    (`+$C`/`+$10`/`+$14`) and the scroll state (`$224`, `$9BA`, the remaining distance
    `$7692`/`$D30C`). For each draw:
@@ -117,6 +119,11 @@ Steps, each verified before the next:
      steps, and the ball does not wobble against the playfield while scrolling;
    - a snapshot taken at α = 0 equals the native pose;
    - obscuring by the scenery still matches at blended positions.
+
+   Done (`docs/internals.md`, "Enhanced framerate"), blending the screen positions the draw
+   routines read rather than re-projecting world positions. Nothing masks sprites by the
+   scenery; the pre-pass only sorts them by depth. Open: a visual check in a level with
+   enemies (Beginner and on), including type `$F`'s dots.
 8. **Other modes.** Options menu (mode 5, `$B18C` → `$CA14`): find the pointer's position
    fields and blend them the same way, or move the pointer every field from the mouse.
    Every other mode (level intro, bonus count `$B05A`, game over, high scores, demo) gets

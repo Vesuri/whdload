@@ -192,36 +192,74 @@ Ours:
 ## Enhanced framerate (CUSTOM4)
 
 68020 and up only (kick13's `_attnflags`); on a 68000 the option changes nothing. A fixed
-30 Hz world, with a new picture every field (no interpolation yet):
+30 Hz world, with a new, interpolated picture every field.
+
+**Clock and jobs.**
 - `$6E48`, `$6ED0` (`vsync_hook`): both per-vsync calls of the Framer first add 30 to a
-  world clock, capped at two steps owed;
+  world clock, capped at two steps owed.
 - `$6EB4`/`$6EBA` (`step_due`): the `minvbl` padding loop ends when the clock owes a step,
-  and charges it (the field rate: 50 from `is_pal`, else 60). A step (the game's frame:
-  logic and drawing) therefore starts in 3 of every 5 PAL fields, and in every second NTSC
-  field;
-- `$6EC0` (`pad_field`): in each padding field, the Framer sends the Scroller a draw-only
-  job (message `+$14` = 6; the game's codes are 4, a frame, and 5, quit). It is sent only
-  when the Scroller is waiting for a message and its last frame has been shown (`$5DB`
-  clear), so a late draw costs one picture instead of making every later one spin a field
-  in `$1179C`;
-- `$AA32` (`scroller_job`): the Scroller runs a draw job as the draw pass `$11704`, then
-  sets `$5DB`. It sends no reply;
-- `$B292` (`step_ready`) and `$7600` (`count_frame`): the frame counter `$230`, which the
+  and charges it (the field rate: 50 from `is_pal`, else 60). A step (the game's frame,
+  logic and drawing) starts in 3 of every 5 PAL fields, and in every second NTSC field.
+- `$6EC0` (`pad_field`): in each padding field the Framer sends the Scroller a draw-only
+  job (message `+$14` = 6; the game's codes are 4, a frame, and 5, quit), when the
+  Scroller is waiting for a message and its last frame is out (`$5DB` clear).
+- `$AA32` (`scroller_job`): the Scroller runs a draw job as the draw pass `$11704`.
+- `$B292` (`step_ready`), `$7600` (`count_frame`): the frame counter `$230`, which the
   logic reads, counts only frames that a step drew.
+
+**Presentation.** The game swaps the sprite sets and rebuilds the copper list (`$86B4`,
+two Views alternated by `$7A7E`, ending in `LoadView`) at the vsync after a frame's draw.
+That list is shown only from the vsync after that, while the next draw already fills the
+set that the swap freed, which is still on screen. With 2 fields a frame that is harmless.
+With a frame every field it shows the older set every other field. Under CUSTOM4:
+- `present` (end of every draw): swap (`$38F0`), sprite pointers into the copper templates
+  (`$85EC`, `$8630`), the blended row into `$226` and `$7692`, rebuild, all under
+  `Forbid`. The display takes it at the next vsync.
+- At most one list is built per field (fields counted by CIA-A's TOD, which the vsync
+  clocks), because a second build would go into the list on screen. A draw that ends after
+  one has been built is left to the game's vsync path (`$5BCA` stays set).
+- `$767C` (`vsync_rebuild`): the vsync builds only after such a swap, or for a change
+  (colour cycling, the `$1E20D` display) that has waited a whole field for a draw.
+  Otherwise the field's draw builds it, as late as the game would have.
+- `draw_wait`: no draw starts in the field in which the display still shows its target
+  set.
+- `$7664`: the half step `$74D4` is off; the row is blended instead.
+
+**Interpolation**, one step behind. With α the clock's remainder over the field rate (0,
+0.2, 0.4, 0.6 or 0.8 on PAL; 0 or 0.5 on NTSC):
+- the nine calls of the draw routines in the draw pass (`$11850`–`$11996`) go through
+  `blend_call`. It writes `prev + α·(cur − prev)` into the screen position that routine
+  reads, calls it, and restores the field. The fields are `+$1E` (types 1, 2), `+$28`
+  (4, `$E`), `+$4E` (5), `+$20` (7–9, `$F`), `+$6` (`$2A`) and `+$0` (`$2C`, in 1/16
+  pixel). prev is that record's position at the step before; each step's draw (`$B28C`,
+  `step_draw`) records the positions in one of two tables of 48, allocated at install;
+- the displayed row (`$226`, mod 512) and the view distance (`$7692`) blend between the
+  logic's `$224`/`$D30C` at the two steps;
+- shares are rounded half away from zero, so a sprite and the playfield moved by −d and
+  +d stay together;
+- a position that is new, jumps more than 48 pixels, or a mode change (`$5D2`) is drawn
+  unblended.
+
+Animation frames, the marble's texture dots and the depth sort of the pre-pass (`$1085C`,
+`$DD1C`, world positions) stay at the step rate. The pre-pass only orders the sprites;
+nothing masks them against the scenery. Type `$F`'s draw (`$6350`) adds `$40` to five dot
+offsets (`+$2C`, 8 apart) per draw while `$6860` is set; on draw-only jobs `dots_f` takes it
+back first, so they move once a step.
 
 MEASURED, PAL:
 - steps (`$230`) in 360 race fields on `a1200-030` + `CACHE`: 180 without the option, 216
   with it; with it on NTSC (`NTSC=1`), 180;
 - race timer over 500 fields: 35 → 25 with it (50 fields a game second), 39 → 31 without;
-- 20 traced race fields, on `a1200-030` and on `a1200`: a draw pass and a copper rebuild in
-  every field, and the race step in 3 of every 5. `a1200` is 38% idle there (Intermediate
-  start, no enemy in view), `a1200-030` 92%;
-- after the same input, at the same step, the game's data hunks equal those of a run with
-  one picture per step, apart from task stacks and structures, the copper-list and
-  sprite-set double-buffer pointers and counters, and the placement count;
+- 20 traced race fields on `a1200`: a draw and a copper rebuild in every field, the race
+  step in 3 of every 5, 38% idle (Intermediate start, no enemy in view);
+- 30 fields with the marble rolling fast (`a1200-030`): its screen position advances in
+  every field, by 1 to 2 pixels. Without blending it stands still in 2 of every 5 fields;
+- a scroll at 1 row per step: the displayed row advances 0 or 1 rows a field, 3 rows per 5
+  fields, one step behind `$224`;
+- after the same input, the game's data hunks equal those of the `NOBLEND` check build
+  (`docs/development.md`), apart from task stacks and the TOD-dependent idle counters;
 - the practice race times out and the game returns to the options menu;
-- on `a500-1.5m` with the option, the game's code differs from a run of the original slave
-  only in the targets of JOTD's `jsr` patches into the slave.
+- on `a500-1.5m` with the option, the game's code is byte-identical to a run without it.
 
 ## Caches
 

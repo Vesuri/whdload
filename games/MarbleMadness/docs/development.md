@@ -50,6 +50,13 @@ python3 tools/mmtrace.py tree tmp/ana/mem/run.bin.segmap.json Scroller 3 tmp/pro
 python3 tools/mmtrace.py count tmp/ana/mem/run.bin.segmap.json AF9E,11704,86B4 tmp/prof/race/f.0*
 ```
 
+Checking CUSTOM4: `make build BUILD=noblend DEFINES_noblend=-DNOBLEND=1` draws every picture
+unblended with the same allocations, so a dump of its data hunks after the same input must
+equal the release build's (apart from task stacks and idle counters). The release build's
+table allocation moves the game's later allocations, so compare against this build, not
+against a build without interpolation. A larger slave also moves where the hunks load: map
+every dump with `segmap`, and compare code only between runs of the same slave.
+
 Traps:
 - The built-in commands resume the emulator after each call, so a run of `gdb monitor ...`
   calls lets an unknown number of warp fields pass between them; a held mouse button then
