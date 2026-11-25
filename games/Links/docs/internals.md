@@ -65,6 +65,30 @@ On a 68020 or later (`PLCACHE150`, `PLCACHE153`, Vesuri):
 | v1.50 | `$14520`, `$14692`, `$15964` | 12 `$5D4`, 12 `$746`, 14 `$3C` | as v1.53 |
 | v1.50 | `$146DC`, `$14784` | 12 `$790`, 12 `$838` | the per-pixel `move.b d4,` into the displacement of `move.b (0,a6,d0.w),d6` and its `jmp` become `adda.w d4,a6`, the read, `suba.w d4,a6`, `bra.s` on: no code is modified, no flush per pixel |
 
+`title` (`PLTITLE`, Vesuri): `PL_S` at `$2614` (hunk 8 `$78`, 12 bytes). The intro's music
+routine sets two channel counters with `move.b #-2,(0,a2,d0.w)` and `(1,a2,d0.w)` (a2 hunk 8
+`$1A6`), but d0 holds the sample's length in words there, not the channel as in the game's
+copy of the routine (golf hunk 44 `$A64`). Each sample start, from the audio interrupt,
+wrote two `$FE` bytes up to 64 KB past hunk 8: under WHDLoad into the 9500-byte buffer that
+follows it (hunk 0 `$C04`), from which `P1.BLK`, `P2.BLK` and `P3.BLK` (`INTROGFX.LZ`) are
+unpacked into the panorama (hunk 0 `$BEC`). A sample starting while a picture sat there broke
+its byterun stream: the bottom rows of that picture became noise, at random, more often on
+fast machines. Nothing reads the counters, so the writes are skipped.
+
+`golf` with a chip memory word (`PLCHIP150`, `PLCHIP153`, Vesuri; skipped if `_bootdos`
+cannot allocate the 8 cleared bytes of chip memory `SILENT`):
+
+| Version | Offset | Hunk | Patch |
+|---|---|---|---|
+| v1.50 | `$2A8A4` | 44 `$A8C` | `jsr _silence`, then skip to `$AA8` |
+| v1.53 | `$2AAB6` | 44 `$A96` | `jsr _silence`, then skip to `$AB2` |
+
+After starting a sample the game loops both channels on two zero words in hunk 44 (`$1236`
+v1.50, `$123C` v1.53) until the second audio interrupt turns them off. Hunk 44 is not a chip
+memory hunk, so from fast memory Paula fetched whatever chip memory lay at that address, and
+the channel held the last of it while off: a pop at the end of each sample and another when
+the next one set its volume. `_silence` loops on `SILENT` instead.
+
 `title` and `golf` then go through `MoveCode` ([caches and fast memory](#caches-and-fast-memory)).
 
 ## Caches and fast memory

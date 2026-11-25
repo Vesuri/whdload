@@ -24,7 +24,9 @@
 ; 25-Nov-2026	- 2.0b by Vesuri: the renderer's self-modifying code made safe
 ;		  for the caches on 68020+ (flushes, a per-pixel change without
 ;		  self-modifying code in v1.50), code and variables of the chip
-;		  memory hunks moved to fast memory
+;		  memory hunks moved to fast memory, the intro's pictures no
+;		  longer damaged by its music, no pops around the game's samples
+;		  on machines with fast memory
 
 ; 28-Apr-2013	- course disk bug fixed, game destroyed the FIB while
 ;		  trying to read the course name so only 1 coourse
@@ -129,6 +131,15 @@ _bootdos
 	lea	TAGLIST(pc),a0
 	jsr	resload_Control(a2)
 
+; the chip memory word the game's samples end in (PLCHIP); without it those patches are skipped
+	move.l	$4.w,a6
+	moveq	#8,d0
+	move.l	#MEMF_CHIP|MEMF_CLEAR,d1
+	jsr	_LVOAllocMem(a6)
+	lea	SILENT(pc),a0
+	move.l	d0,(a0)
+	move.l	DOSbase(pc),a6
+
 ; load intro
 	move.l	NOINTRO(pc),d0
 	bne.b	.skipintro
@@ -178,7 +189,7 @@ _bootdos
 	move.l	a0,d1
 	jsr	_LVOLoadSeg(a6)
 	move.l	d0,d7
-	beq.b	.error
+	beq.w	.error
 
 	move.l	d7,a0
 	add.l	a0,a0
@@ -200,7 +211,7 @@ _bootdos
 	beq.b	.found
 	cmp.w	d0,d2
 	beq.b	.found
-	addq.w	#2,a0
+	addq.w	#PT_SIZE-2,a0
 	bra.b	.find
 
 ; unsupported/unknown version
@@ -222,8 +233,17 @@ _bootdos
 	add.w	d0,a0
 	bsr.b	.patch
 .nocache
+	move.w	4(a4),d0		; the patches that need the chip memory word
+	beq.b	.nochip
+	lea	SILENT(pc),a0
+	tst.l	(a0)
+	beq.b	.nochip
+	move.l	a5,a0
+	add.w	d0,a0
+	bsr.b	.patch
+.nochip
 	move.l	a5,a1			; the code to move out of chip memory
-	add.w	4(a4),a1
+	add.w	6(a4),a1
 	move.l	d6,a0
 	bra.w	MoveCode
 
@@ -251,21 +271,30 @@ EXIT	move.l	_resload(pc),a2
 	jmp	resload_Abort(a2)
 
 DOSbase	dc.l	0
+SILENT	dc.l	0			; 8 cleared bytes of chip memory, or 0
 
 ; format: checksum, offset to patch list, offset to the patch list for a 68020 or later
-; (0: none), offset to the MoveCode table
+; (0: none), offset to the patch list that needs SILENT (0: none), offset to the MoveCode
+; table
+PT_SIZE	= 10
 PT_TITLE
-	dc.w	-2,PLTITLE-PT_TITLE,0,MVTITLE-PT_TITLE	; SPS 2010+SPS2481 (1.50/1.53)
+	dc.w	-2,PLTITLE-PT_TITLE,0,0,MVTITLE-PT_TITLE	; SPS 2010+SPS2481 (1.50/1.53)
 	dc.w	0			; end of tab
 
 
 ; format: as PT_TITLE
-PT_GAME	dc.w	$e70a,PLGAME150-PT_GAME,PLCACHE150-PT_GAME,MVGAME150-PT_GAME	; SPS 2010 (v1.50)
-	dc.w	$371d,PLGAME153-PT_GAME,PLCACHE153-PT_GAME,MVGAME153-PT_GAME	; SPS 2481 (v1.53)
+PT_GAME	dc.w	$e70a,PLGAME150-PT_GAME,PLCACHE150-PT_GAME,PLCHIP150-PT_GAME,MVGAME150-PT_GAME	; SPS 2010 (v1.50)
+	dc.w	$371d,PLGAME153-PT_GAME,PLCACHE153-PT_GAME,PLCHIP153-PT_GAME,MVGAME153-PT_GAME	; SPS 2481 (v1.53)
 	dc.w	0			; end of tab
 
 
+; The intro's music routine (hunk 8 $74) marks two channel counters with move.b #-2,
+; (0,a2,d0.w) and (1,a2,d0.w), but d0 holds the sample's length there (the game's own copy of
+; the routine has the channel), so each sample start wrote two bytes up to 64 KB past the hunk:
+; under WHDLoad into the buffer the pictures are unpacked from, which damaged the picture
+; being unpacked. Nothing reads the counters; the writes are skipped.
 PLTITLE	PL_START
+	PL_S	$2614,12		; hunk 8 $78
 	PL_END
 
 PLGAME150
@@ -281,6 +310,31 @@ PLGAME153
 	PL_PS	$15478,getFIB		; fix course disk support
 	PL_PS	$15482,getFIB2		; as above
 	PL_END
+
+; After a sample the game loops its channels on two zero words in hunk 44 ($123c v1.53,
+; $1236 v1.50), until the next audio interrupt switches them off. Hunk 44 is not a chip memory
+; hunk, so from fast memory Paula played whatever chip memory was at that address and the
+; channel kept the last of it: a pop at the end of the sample, and another when the next one
+; set the volume. The loop now plays SILENT.
+PLCHIP150
+	PL_START
+	PL_PS	$2a8a4,_silence		; hunk 44 $a8c
+	PL_S	$2a8aa,$1c-6
+	PL_END
+
+PLCHIP153
+	PL_START
+	PL_PS	$2aab6,_silence		; hunk 44 $a96
+	PL_S	$2aabc,$1c-6
+	PL_END
+
+; a1: the first channel's registers
+_silence
+	move.w	#2,4(a1)		; AUDxLEN, two words
+	move.l	SILENT(pc),(a1)		; AUDxLC
+	move.w	#2,$14(a1)
+	move.l	SILENT(pc),$10(a1)
+	rts
 
 ; The renderer modifies its own code and then jumps to the next instruction, which on a
 ; 68000 only empties the prefetch. On a 68020 or later each such jmp becomes a call that
