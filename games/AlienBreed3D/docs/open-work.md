@@ -6,9 +6,17 @@ where mouse control (M) turns and moves.
 
 ## Goal
 
-Replace the game's 2x2-pixel 3D renderer with a 1x1-pixel one, as fast as possible,
-behind an "Enhanced resolution" CUSTOM option (CUSTOM1-4 are taken by the original's
-options, so CUSTOM5), with the original renderer when it is off.
+Enhanced resolution (CUSTOM5): both views at 1x1 pixels on bitplane screens fed by a
+Kalms c2p, as fast as we can make them. The design, the steps and the open decisions are
+in [resolution-plan.md](resolution-plan.md); how the original draws is in
+[internals](internals.md#display).
+
+## Next
+
+1. Plan step 0: `tools/ab3d.py` (menu to level, full-screen toggle, frame counts, input
+   scripts) and the renderer routines matched to game offsets.
+2. Plan step 1: the original's baseline, both views, on a1200-030 and a1200-040.
+3. Plan step 2: the display inventory.
 
 ## Before a first release
 
@@ -18,10 +26,3 @@ options, so CUSTOM5), with the original renderer when it is off.
   `make dist` is its first test.
 - Boot both variants on every machine in `SETUPS` (only AlienBreed3D on the a1200-030 so
   far).
-
-## Next
-
-1. Find the renderer: where the 2x2 view is drawn (chunky buffer, chunky-to-planar, the
-   copper's line doubling), its size and its cost, measured on the a1200-030
-   (AmigaXDev `reference/measurement-method.md`).
-2. Name the remaining `Lxxxx` labels as the code is understood.

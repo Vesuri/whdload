@@ -15,6 +15,8 @@ Read `docs/open-work.md` first.
 |---|---|
 | `docs/open-work.md` | where the work stands and the ordered next items |
 | `docs/development.md` | what differs from the shared workflow: inputs, the build, driving it |
-| `docs/internals.md` | how it loads, memory, every slave patch, limitations |
+| `docs/internals.md` | how it loads, memory, every slave patch, the display, limitations |
+| `docs/resolution-plan.md` | Enhanced resolution: the design, the steps, the open decisions |
 
-The slave source is `src/`.
+The slave source is `src/`; `tools/` is the development harness and never ships
+(`tools/exe.py` unpacks the game executable for analysis).
