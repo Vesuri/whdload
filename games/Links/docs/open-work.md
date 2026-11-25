@@ -14,15 +14,18 @@ reference in every dump, and in audio captures the sounds are centred (the birds
 to -16 instead of +1640 to +1900) and scaled to about the full 8 bits, and the outputs rest at
 0 between them and after the intro ([internals.md](internals.md#samples)).
 
-On v1.53 the course view is drawn in 89 fields instead of 137 on the a1200-030 with
-`CACHE` (the picture to the screen in 2 instead of 27), with code checked equal to the
-game's in Unicorn ([internals.md](internals.md#slave-patches)).
+On the a1200-030 with `CACHE`, from the ready screen to the first hole's view takes 275
+fields instead of V1.01's 655: the files load about 7 times faster (the unpacker's buffers
+in fast memory and a faster unpacker, both versions), and v1.53's course view takes 55
+fields instead of 167 (no cache flushes in its span loops, the picture to the screen 16
+pixels a word). The slave's code was checked equal to the game's in Unicorn
+(`tools/drawcheck.py`, `tools/lzwcheck.py`; [internals.md](internals.md#slave-patches)).
 
 ## Release
 
-`make dist` builds `LinksEnhanced-2.0b`: StingRay's package with the new slave and ReadMe.
-The installed icon does not set `CACHE` (the Install script writes the tooltypes, and
-`Links.inf` has none for `release.json` to add to); the player adds it.
+`make dist` builds `LinksEnhanced-2.0b`: StingRay's package with the new slave, ReadMe and
+`Install`: the Install script sets `CACHE` in whichever icon is chosen (beside its `Slave`
+and `PreLoad`; `Links.inf`, the default, has no tooltypes for `release.json` to add to).
 
 ## Next
 
@@ -34,9 +37,13 @@ The installed icon does not set `CACHE` (the Install script writes the tooltypes
   `golf`, not yet traced, nor measured since the scaling.
 - The intro's music still averages -120 to -220 (centred on 30); a per-sample centre would
   take the rest of that step at its start and stop.
-- The course view's set-up is mostly hunk 23's LZW unpacking (26 of 34 fields on the aprof
-  68030), half of it chip memory time: its input, output and dictionary are in chip
-  memory. Where the game allocates them, and whether they can be fast memory, is not yet
-  known. v1.50 plots each pixel to the screen in its span loops and was not changed.
+- `DRAWING COURSE` (27 fields on the a1200-030) is spread over the 3D code; the largest parts
+  are a matrix product (hunk 5 `$280`-`$2AE`, 11%) and an integer square root (hunk 25
+  `$4DC`, about 8%: Newton steps from 32767, a `divu` each), which a root with the same
+  results could cut to a few steps. v1.50 plots each pixel to the screen in its span
+  loops and was not changed.
+- The game needs 512 KB chip and 1.25 MB ExpMem in one block: 512 KB chip with 2 MB fast
+  boots, 512 KB or 1 MB chip with 1.5 MB fast, and the a500-1.5m, do not. A smaller ExpMem
+  would need the game's peak use measured first.
 - The 68000 `custom` route stops on the course's picture (`boot.sh`) or the player screen,
   with 2.0b's earlier builds as well: its waits need retuning before it reaches the hole.

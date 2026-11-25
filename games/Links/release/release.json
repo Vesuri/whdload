@@ -5,6 +5,7 @@
       "output": "LinksEnhanced-{version}-{date}.lha",
       "replace": {
         "Links_Install/Links.slave": "build:Links",
+        "Links_Install/Install": "release/Install",
         "Links_Install/ReadMe": "release/ReadMe"
       },
       "add": {},
