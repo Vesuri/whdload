@@ -10,7 +10,7 @@ CPU-bound on a 68020+; it is frame-locked at one logic step per two vsyncs, writ
 NTSC, so PAL plays at 5/6 speed and 25 fps. Music and sound effects are also clocked by the
 vblank and play at 5/6 tempo on PAL ("Sound timing").
 
-1. Enhanced framerate (the plan below). Steps 1 to 4 are done; next is step 5.
+1. Enhanced framerate (the plan below). Steps 1 to 6 are done; next is step 7.
 2. The idle task's keyboard poll writes CIA-A SDR about 1950 times a field; harmless for
    speed, but worth moving to the keyboard interrupt if it is ever touched.
 
@@ -81,7 +81,9 @@ Steps, each verified before the next:
    handler, the reply and the `$794` countdown) and draw (`$11704`, then set `$5DB`). Keep
    the native order inside a step. Gate: with one draw per step, the decoded state at
    matched steps (player records `$236`/`$32A`, the object tables, `$224`, `$9BA`, the clock)
-   and the screenshots equal step 4's.
+   and the screenshots equal step 4's. Done differently: the step job stays the game's
+   whole frame (`$B23A`), and a separate draw-only job is added, so a step is unchanged by
+   construction.
 6. **Draw every field, same state.** On fields without a step, send a draw job with
    unchanged state. Audit what the draw pass and the Framer's new-frame path change, and
    make those count steps, not draws:
@@ -91,7 +93,11 @@ Steps, each verified before the next:
    - `$5BCB`;
    - the placement counter `$638`.
    Gate: repeated draws leave matched-step state identical to step 5's, both sprite sets
-   show the same picture, and nothing flickers across set swaps.
+   show the same picture, and nothing flickers across set swaps. Done (`docs/internals.md`,
+   "Enhanced framerate"). Only `$230` needed a change; `$7690` is reset by every new frame,
+   so the game's half-step scroll no longer runs, and the scroll moves once a step until
+   step 7. Draws go only to an idle Scroller whose last frame has been shown, because the
+   draw pass waits for the sprite-set swap (`$5BCA`).
 7. **Interpolation.** After each step, snapshot each listed object's world position
    (`+$C`/`+$10`/`+$14`) and the scroll state (`$224`, `$9BA`, the remaining distance
    `$7692`/`$D30C`). For each draw:

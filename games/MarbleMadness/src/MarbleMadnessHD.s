@@ -18,6 +18,8 @@
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
 	INCLUDE	lvo/dos.i
+	INCLUDE	lvo/exec.i
+	INCLUDE	exec/tasks.i
 
 	IFD BARFLY
 	OUTPUT	"MarbleMadness.slave"
@@ -397,32 +399,46 @@ patch_exe:
 	beq.b	.ntsc
 	move.w	#50,(a0)
 .ntsc
-	; the Framer's per-vsync routine $7596 is hunk 36 + $C2
+	; the game addresses the enhanced path uses
+	lea	en_table(pc),a3
+	lea	en_addr(pc),a4
+.addr
+	move.w	(a3)+,d2
+	bmi.b	.addrdone
 	move.l	d7,d1
 	add.l	d1,d1
 	add.l	d1,d1
-	moveq	#36,d2
 	bsr	get_section
-	lea	($7596-$74D4,a0),a0
-	lea	vsync_routine(pc),a1
-	move.l	a0,(a1)
+	add.w	(a3)+,a0
+	move.l	a0,(a4)+
+	bra.b	.addr
+.addrdone
 	lea	pl_enhanced(pc),a0
 	move.l	d7,a1
 	jsr	(resload_PatchSeg,a2)
 .noenhanced
 	rts
 
-; Enhanced framerate (CUSTOM4, 68020+): a fixed 30 Hz world. The Framer (hunk 33) gives
-; the Scroller a frame (one logic step and its drawing), waits for it and then pads to
-; minvbl (2) vsyncs. Here the padding instead waits until the world clock owes a step:
-; the clock gains 30 per vsync and a step costs the field rate (3 steps per 5 PAL fields,
-; 1 per 2 NTSC fields).
+; Enhanced framerate (CUSTOM4, 68020+): a fixed 30 Hz world, drawn every field.
+; The Framer (hunk 33) gives the Scroller a frame (one logic step and its drawing), waits
+; for it and then pads to minvbl (2) vsyncs. Here the padding instead waits until the world
+; clock owes a step: the clock gains 30 per vsync and a step costs the field rate (3 steps
+; per 5 PAL fields, 1 per 2 NTSC fields). Each padding field also asks the Scroller for a
+; draw-only job, so every field shows a new picture; the frame counter $230, which the
+; logic reads, counts only the frames that a step drew.
+DRAW_JOB = 6			; message +$14: the game's own codes are 4 (frame) and 5 (quit)
+
 pl_enhanced
 	PL_START
 	PL_PS	$6E48,vsync_hook	; both per-vsync calls of the Framer
 	PL_PS	$6ED0,vsync_hook
 	PL_PS	$6EB4,step_due		; "count < minvbl": ge leaves the padding loop
 	PL_NOP	$6EBA,4
+	PL_PS	$6EC0,pad_field		; the padding loop's WaitTOF
+	PL_PS	$AA32,scroller_job	; the Scroller's jsr to its frame job $B23A
+	PL_PS	$B292,step_ready	; move.b #1,$5DB after a step's draw
+	PL_NOP	$B298,2
+	PL_PS	$7600,count_frame	; addq.l #1,$230 on a new frame
 	PL_END
 
 ; one vsync: credit the world clock, then the game's per-vsync routine (its argument stays
@@ -438,7 +454,71 @@ vsync_hook
 	move.w	d1,d0
 .keep
 	move.w	d0,(a0)
-	move.l	vsync_routine(pc),-(a7)
+	move.l	a_vsync(pc),-(a7)
+	rts
+
+; a field without a step: send a draw job if the Scroller is idle and its last frame has
+; been shown, then wait for the vsync. A draw that starts before the vsync has taken the
+; last sprite set spins in $1179C until it does, so sending one regardless would leave
+; every later draw a field late (and the CPU spinning).
+pad_field
+	lea	draw_busy(pc),a0
+	tst.b	(a0)
+	bne.b	.wait
+	move.l	a_ready(pc),a1
+	tst.b	(a1)
+	bne.b	.wait
+	move.l	a_scroller(pc),a1
+	cmp.b	#TS_WAIT,(TC_STATE,a1)
+	bne.b	.wait
+	move.l	a_port(pc),a1
+	move.l	(a1),d0			; the Scroller's port
+	beq.b	.wait
+	st	(a0)
+	move.l	d0,a0
+	lea	draw_msg(pc),a1
+	move.l	#DRAW_JOB,($14,a1)
+	move.l	a6,-(a7)
+	move.l	(4).w,a6
+	jsr	(_LVOPutMsg,a6)
+	move.l	(a7)+,a6
+.wait
+	move.l	a_waittof(pc),-(a7)
+	rts
+
+; the Scroller's job: the game's frame, or a draw of the current state (the message stays
+; ours; it needs no reply)
+scroller_job
+	move.l	(4,a7),a0
+	cmp.l	#DRAW_JOB,($14,a0)
+	beq.b	.draw
+	move.l	a_frame_job(pc),-(a7)
+	rts
+.draw
+	move.l	a_draw(pc),a0
+	jsr	(a0)
+	lea	draw_frame(pc),a0
+	st	(a0)
+	move.l	a_ready(pc),a0
+	move.b	#1,(a0)
+	lea	draw_busy(pc),a0
+	sf	(a0)
+	rts
+
+step_ready
+	lea	draw_frame(pc),a0
+	sf	(a0)
+	move.l	a_ready(pc),a0
+	move.b	#1,(a0)
+	rts
+
+; the vsync that shows a new frame: count it only if a step drew it
+count_frame
+	move.b	draw_frame(pc),d0
+	bne.b	.draw
+	move.l	a_frames(pc),a0
+	addq.l	#1,(a0)
+.draw
 	rts
 
 ; > ccr: ge when a step is owed (and charges it), lt otherwise
@@ -773,8 +853,32 @@ sfx_step:
 	dc.l	0		; the game's effects step ($21740)
 sfx_phase:
 	dc.w	0		; fifths of a step owed
-vsync_routine:
-	dc.l	0		; the Framer's per-vsync routine ($7596)
+en_table			; hunk, offset in it: the addresses below, in order
+	dc.w	36,$7596-$74D4		; the Framer's per-vsync routine
+	dc.w	342,$24B54-$24A64	; the WaitTOF stub
+	dc.w	72,$AF60-$AB1C		; the Scroller's port pointer
+	dc.w	72,0			; the Scroller's Task ($AB1C)
+	dc.w	74,$B23A-$AF74		; the Scroller's frame job
+	dc.w	150,0			; the draw pass $11704
+	dc.w	3,$5DB-$224		; frame ready
+	dc.w	3,$230-$224		; frame counter
+	dc.w	-1
+en_addr
+a_vsync:	dc.l	0
+a_waittof:	dc.l	0
+a_port:		dc.l	0
+a_scroller:	dc.l	0
+a_frame_job:	dc.l	0
+a_draw:		dc.l	0
+a_ready:	dc.l	0
+a_frames:	dc.l	0
+draw_msg:
+	dcb.b	MN_SIZE+4,0	; a Message and the job code
+draw_busy:
+	dc.b	0		; a draw job is queued or running
+draw_frame:
+	dc.b	0		; the pending new frame is a draw job's
+	even
 field_rate:
 	dc.w	0		; 50 or 60
 world_clock:

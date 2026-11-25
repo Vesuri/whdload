@@ -74,7 +74,10 @@ The logic reads the frame counter: `$D320` re-decides the scroll every 8th frame
 
   `$122AC` places an image at a screen position: it allocates sprite channels through the
   multiplexer `$3BB2` and copies the image in. Its counter `$638` limits a draw pass to 60
-  placements. The marble's rolling texture is dots plotted into its sprite image (`$6864`,
+  placements. The sets are handed over at the vsync: `$3F38`, at the end of a pass, sets
+  `$5BCA`, the per-vsync routine swaps the sets and clears it (`$38F0`), and the next pass's
+  placement loop (`$1179C`) spins while it is set. So a pass that starts before the vsync
+  has taken the last set waits for that vsync. The marble's rolling texture is dots plotted into its sprite image (`$6864`,
   `$68B6`), with one dot list per sprite set (record `+$38` and `+$AE`).
 - **Positions:** world coordinates are 16.16 fixed-point longwords at record `+$C`, `+$10`
   and `+$14`. The logic projects them during its step with `$6918` (integer parts only):
@@ -188,23 +191,37 @@ Ours:
 
 ## Enhanced framerate (CUSTOM4)
 
-68020 and up only (kick13's `_attnflags`); on a 68000 the option changes nothing. So far it
-is a fixed 30 Hz world without interpolation:
+68020 and up only (kick13's `_attnflags`); on a 68000 the option changes nothing. A fixed
+30 Hz world, with a new picture every field (no interpolation yet):
 - `$6E48`, `$6ED0` (`vsync_hook`): both per-vsync calls of the Framer first add 30 to a
   world clock, capped at two steps owed;
 - `$6EB4`/`$6EBA` (`step_due`): the `minvbl` padding loop ends when the clock owes a step,
-  and charges it (the field rate: 50 from `is_pal`, else 60).
+  and charges it (the field rate: 50 from `is_pal`, else 60). A step (the game's frame:
+  logic and drawing) therefore starts in 3 of every 5 PAL fields, and in every second NTSC
+  field;
+- `$6EC0` (`pad_field`): in each padding field, the Framer sends the Scroller a draw-only
+  job (message `+$14` = 6; the game's codes are 4, a frame, and 5, quit). It is sent only
+  when the Scroller is waiting for a message and its last frame has been shown (`$5DB`
+  clear), so a late draw costs one picture instead of making every later one spin a field
+  in `$1179C`;
+- `$AA32` (`scroller_job`): the Scroller runs a draw job as the draw pass `$11704`, then
+  sets `$5DB`. It sends no reply;
+- `$B292` (`step_ready`) and `$7600` (`count_frame`): the frame counter `$230`, which the
+  logic reads, counts only frames that a step drew.
 
-A frame (one step and its drawing) therefore takes 2, 2, 1 fields on PAL, and 2 on NTSC as
-before.
-
-MEASURED on `a1200-030` + `CACHE`, PAL:
-- steps (`$230`) in 360 race fields: 180 without the option, 216 with it;
-- NTSC (`NTSC=1`) with it: 180 in 360;
+MEASURED, PAL:
+- steps (`$230`) in 360 race fields on `a1200-030` + `CACHE`: 180 without the option, 216
+  with it; with it on NTSC (`NTSC=1`), 180;
 - race timer over 500 fields: 35 → 25 with it (50 fields a game second), 39 → 31 without;
-- 50 traced fields: the race step runs 3 times in every 5 fields, and the copper list is
-  rebuilt in the field after each step, 2, 2, 1 fields apart;
-- on `a500-1.5m` with the option, the game's code is byte-identical to a run without it.
+- 20 traced race fields, on `a1200-030` and on `a1200`: a draw pass and a copper rebuild in
+  every field, and the race step in 3 of every 5. `a1200` is 38% idle there (Intermediate
+  start, no enemy in view), `a1200-030` 92%;
+- after the same input, at the same step, the game's data hunks equal those of a run with
+  one picture per step, apart from task stacks and structures, the copper-list and
+  sprite-set double-buffer pointers and counters, and the placement count;
+- the practice race times out and the game returns to the options menu;
+- on `a500-1.5m` with the option, the game's code differs from a run of the original slave
+  only in the targets of JOTD's `jsr` patches into the slave.
 
 ## Caches
 
