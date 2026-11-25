@@ -10,7 +10,7 @@ CPU-bound on a 68020+; it is frame-locked at one logic step per two vsyncs, writ
 NTSC, so PAL plays at 5/6 speed and 25 fps. Music and sound effects are also clocked by the
 vblank and play at 5/6 tempo on PAL ("Sound timing").
 
-1. Enhanced framerate (the plan below). Steps 1 and 3 are done, and the C5 half of step 2.
+1. Enhanced framerate (the plan below). Steps 1 to 4 are done; next is step 5.
 2. The idle task's keyboard poll writes CIA-A SDR about 1950 times a field; harmless for
    speed, but worth moving to the keyboard interrupt if it is ever touched.
 
@@ -57,11 +57,10 @@ Steps, each verified before the next:
    by task with a call tree for one task. Add harness commands that count, per field, the
    entries to a set of offsets (step, draw, copper, sound ticks) and that dump a state
    snapshot.
-2. **Option plumbing.** The C5 tag and `is_pal`, which measures the field rate from the beam
-   rather than trusting the PAL flag, are done. Left for step 4: the C4 tag and config line,
-   and a 68020 check (kick13's `_attnflags`). Gate: with both options off, and with C4
-   alone on a 68000, the game memory after `patch_exe` is byte-identical to the original
-   slave's.
+2. **Option plumbing.** The C4 and C5 tags, the 68020 check (kick13's `_attnflags`) and
+   `is_pal`, which measures the field rate from the beam rather than trusting the PAL flag.
+   Gate: with both options off, and with C4 alone on a 68000, the game's code after
+   `patch_exe` is byte-identical to the original slave's.
 3. **Sound tempo on PAL** (C5). Music: use 125 instead of 150 at
    `$1F3D6` when the field rate is 50. Effects: run `$21740` six times per five fields
    (an accumulator in the SfxTask loop at `$20B1A`), or switch its request to
@@ -75,7 +74,9 @@ Steps, each verified before the next:
    `$230`, `$794` and `$D320`'s every-8th-step decision count steps. Scrolling and the
    mid-frame half step (`$6658`, which runs on the second field of a 2-field frame) still
    look right with 1- and 2-field frames. This is a usable fallback on its own: correct
-   speed, with 2-2-1 frame spacing on PAL.
+   speed, with 2-2-1 frame spacing on PAL. Done (`docs/internals.md`, "Enhanced
+   framerate"): the half step (`$74D4`) runs only at scroll speed 2 or more, and then only
+   in the 2-field frames, so step 7's blended scroll replaces it.
 5. **Separate the step from the draw.** The Scroller takes two jobs: step (the mode
    handler, the reply and the `$794` countdown) and draw (`$11704`, then set `$5DB`). Keep
    the native order inside a step. Gate: with one draw per step, the decoded state at

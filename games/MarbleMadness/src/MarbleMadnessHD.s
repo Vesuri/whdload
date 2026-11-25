@@ -115,6 +115,7 @@ slv_config:
 	dc.b    "C1:X:Trainer Infinite Time (ESC=game over):0;"
 	dc.b    "C2:X:Sound effects only (no music):0;"
 	dc.b    "C3:L:Start level:Practice,Beginner,Intermediate,Aerial,Silly,Ultimate;"			
+	dc.b	"C4:X:Enhanced framerate (68020+):0;"
 	dc.b	"C5:X:Music and sound at NTSC tempo on PAL:0;"
 	dc.b	0
 
@@ -384,6 +385,73 @@ patch_exe:
 	move.l	d7,a1
 	jsr	(resload_PatchSeg,a2)
 .nosound
+
+	move.l	_enhanced(pc),d0
+	beq.b	.noenhanced
+	move.l	_attnflags(pc),d0
+	btst	#AFB_68020,d0
+	beq.b	.noenhanced
+	lea	field_rate(pc),a0
+	move.w	#60,(a0)
+	tst.b	pal_display-field_rate(a0)
+	beq.b	.ntsc
+	move.w	#50,(a0)
+.ntsc
+	; the Framer's per-vsync routine $7596 is hunk 36 + $C2
+	move.l	d7,d1
+	add.l	d1,d1
+	add.l	d1,d1
+	moveq	#36,d2
+	bsr	get_section
+	lea	($7596-$74D4,a0),a0
+	lea	vsync_routine(pc),a1
+	move.l	a0,(a1)
+	lea	pl_enhanced(pc),a0
+	move.l	d7,a1
+	jsr	(resload_PatchSeg,a2)
+.noenhanced
+	rts
+
+; Enhanced framerate (CUSTOM4, 68020+): a fixed 30 Hz world. The Framer (hunk 33) gives
+; the Scroller a frame (one logic step and its drawing), waits for it and then pads to
+; minvbl (2) vsyncs. Here the padding instead waits until the world clock owes a step:
+; the clock gains 30 per vsync and a step costs the field rate (3 steps per 5 PAL fields,
+; 1 per 2 NTSC fields).
+pl_enhanced
+	PL_START
+	PL_PS	$6E48,vsync_hook	; both per-vsync calls of the Framer
+	PL_PS	$6ED0,vsync_hook
+	PL_PS	$6EB4,step_due		; "count < minvbl": ge leaves the padding loop
+	PL_NOP	$6EBA,4
+	PL_END
+
+; one vsync: credit the world clock, then the game's per-vsync routine (its argument stays
+; on the stack); at most two steps are owed, so a long frame does not run a burst
+vsync_hook
+	lea	world_clock(pc),a0
+	move.w	(a0),d0
+	add.w	#30,d0
+	move.w	field_rate(pc),d1
+	add.w	d1,d1
+	cmp.w	d1,d0
+	ble.b	.keep
+	move.w	d1,d0
+.keep
+	move.w	d0,(a0)
+	move.l	vsync_routine(pc),-(a7)
+	rts
+
+; > ccr: ge when a step is owed (and charges it), lt otherwise
+step_due
+	move.w	world_clock(pc),d0
+	sub.w	field_rate(pc),d0
+	blt.b	.not
+	lea	world_clock(pc),a0
+	move.w	d0,(a0)
+	moveq	#0,d0
+	rts
+.not
+	moveq	#-1,d0
 	rts
 
 ; PAL sound at the NTSC tempo (CUSTOM5): both sound clocks tick once a field.
@@ -679,6 +747,8 @@ _buttonwait
 	dc.l	0
 	dc.l	WHDLTAG_CUSTOM3_GET
 _start_level	dc.l	0
+	dc.l	WHDLTAG_CUSTOM4_GET
+_enhanced	dc.l	0
 	dc.l	WHDLTAG_CUSTOM5_GET
 _pal_sound	dc.l	0
 	dc.l	0
@@ -703,6 +773,12 @@ sfx_step:
 	dc.l	0		; the game's effects step ($21740)
 sfx_phase:
 	dc.w	0		; fifths of a step owed
+vsync_routine:
+	dc.l	0		; the Framer's per-vsync routine ($7596)
+field_rate:
+	dc.w	0		; 50 or 60
+world_clock:
+	dc.w	0		; 30 per vsync, the field rate per step
 
 	even
 

@@ -84,9 +84,11 @@ The logic reads the frame counter: `$D320` re-decides the scroll every 8th frame
 - **Scrolling:** a scroll moves `$9BA` and the target row `$224` in steps decided by
   `$D320` (`$D0xx` also asks the Painter for the new rows). `$22A` is set while a scroll is
   running, `$22B` holds its speed in rows per frame and `$228` its direction. The game
-  already smooths it: on the second vsync of a frame, `$6658` moves `$226` by half a step
-  and shifts every built sprite to match (`$65B6`). With `minvbl` = 4, `$74D4` steps it one
-  row per vsync.
+  already smooths it: on a vsync without a new frame, while a scroll runs at a speed of 2
+  or more, `$74D4` (from the per-vsync routine) moves `$226` part of the way, shifts every
+  built sprite to match (`$65B6`, `$6658`) and has the copper list rebuilt. With `minvbl` =
+  2 that is half a step on the second vsync of a frame. At speed 1 the view moves once a
+  frame.
 - **Per-vsync colour cycling:** `$A7A2` and `$B6DE` advance player colour animations once a
   vsync (counters at player record `+$7A`, `+$7B`). They run at the display rate: 50 Hz on
   PAL, 60 Hz on NTSC.
@@ -167,8 +169,9 @@ NTSC machine (`NTSC=1`) the game's code is byte-identical to a run without the o
 ## Slave patches
 
 JOTD's (`pl_main`, always):
-- `$2CF0`: the idle loop calls `key_control` (Esc ends the race, F1 adds 10 s, Help skips
-  the level, P pauses);
+- `$2CF0`: the idle loop calls `key_control` (Esc ends the race, F1 adds 10 s, P pauses;
+  Help sets the level-completed state, which JOTD's comment says does not work because no
+  player is flagged as finished);
 - `$99F6`/`$99F8`: the level 1 access fault;
 - `$1E684`: the level 5 access fault, when a bird hits the marble;
 - `$B566`: `seconds_count`, which handles pause, the infinite-time trainer (C1) and the
@@ -179,7 +182,29 @@ JOTD's (`pl_main`, always):
 
 After `pl_main`, the slave makes the ExpMem non-cacheable (`WCPUF_Exp_NCS`).
 
-Ours: `pl_pal_sound` (C5, above).
+Ours:
+- `pl_pal_sound` (C5, "Sound timing");
+- `pl_enhanced` (C4, below).
+
+## Enhanced framerate (CUSTOM4)
+
+68020 and up only (kick13's `_attnflags`); on a 68000 the option changes nothing. So far it
+is a fixed 30 Hz world without interpolation:
+- `$6E48`, `$6ED0` (`vsync_hook`): both per-vsync calls of the Framer first add 30 to a
+  world clock, capped at two steps owed;
+- `$6EB4`/`$6EBA` (`step_due`): the `minvbl` padding loop ends when the clock owes a step,
+  and charges it (the field rate: 50 from `is_pal`, else 60).
+
+A frame (one step and its drawing) therefore takes 2, 2, 1 fields on PAL, and 2 on NTSC as
+before.
+
+MEASURED on `a1200-030` + `CACHE`, PAL:
+- steps (`$230`) in 360 race fields: 180 without the option, 216 with it;
+- NTSC (`NTSC=1`) with it: 180 in 360;
+- race timer over 500 fields: 35 → 25 with it (50 fields a game second), 39 → 31 without;
+- 50 traced fields: the race step runs 3 times in every 5 fields, and the copper list is
+  rebuilt in the field after each step, 2, 2, 1 fields apart;
+- on `a500-1.5m` with the option, the game's code is byte-identical to a run without it.
 
 ## Caches
 
