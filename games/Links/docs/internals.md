@@ -79,16 +79,20 @@ fast machines. Nothing reads the counters, so the writes are skipped.
 
 The same music routine stops channels 0 and 1 mid-sample when the intro ends or is clicked
 away (hunk 8 `$F6`, called from hunk 0 `$774`), and on the audio interrupt that reloads the
-list's last sample (hunk 8 `$BA`). Paula holds its last output byte at volume 64 (the interrupt path
-clears channel 0's volume only): a level left on until the game's first sample, which then
-pops. `PL_PS` at `$2692` (hunk 8 `$F6`) and at `$2656` (hunk 8 `$BA`, then skip to `$D2`)
-call `_audiooff`: DMA off, the two channels' interrupt requests cleared, and a zero word
-written to `AUD0DAT` and `AUD1DAT`. Paula plays that word after the current one, sets the
-request and idles on 0. The interrupt path also keeps the list pointer (hunk 8 `$128`) on the
-`-1`, so a later interrupt stops again instead of reading past the list. In audio captures on
-the a1200-fast, the outputs stayed at +2560 after a click with the previous build and return
-to 0 with this one, both after a click and when the intro ends by itself. The intro always
-ended before the list did, so the `$BA` path was never reached in the captures.
+list's last sample (hunk 8 `$BA`). Paula holds its last output byte at volume 64 (the
+interrupt path clears channel 0's volume only): a level left on until the game's first
+sample. `PL_PS` at `$2692` (hunk 8 `$F6`) and at `$2656` (hunk 8 `$BA`, then skip to `$D2`)
+call `_audiooff`: channel 0's interrupt off (else the request the current word's end raises
+can start the next sample before the click path disables it at hunk 8 `$FE`), DMA off, the
+two channels' interrupt requests cleared, and a zero word written to `AUD0DAT` and
+`AUD1DAT`. Paula plays that word after the current one, sets the request and idles on 0. The
+interrupt path also keeps the list pointer (hunk 8 `$128`) on the `-1`, so a later interrupt
+stops again instead of reading past the list. The intro always ended before the list did in
+the captures, so the `$BA` path was never reached there.
+
+`PL_PS` at `$259C` (hunk 8 `$0`, the music's start) calls `_introstart`, which centres every
+intro sample first ([samples](#samples)), and at `$25E8` (hunk 8 `$4C`) `_sndprep` gives the
+player the sample's length.
 
 `golf` with a chip memory word (`PLCHIP150`, `PLCHIP153`, Vesuri; skipped if `_bootdos`
 cannot allocate the 8 cleared bytes of chip memory `SILENT`):
@@ -116,7 +120,33 @@ An audio capture of the first hole on the a1200-fast (`SDL_AUDIODRIVER=disk` wit
 bird sample left the outputs at +2046 and +472 until the next sound, about 2 s; with the count
 from -3 they returned to 0.
 
+`golf` also has `PL_PS` at `$2A834` (v1.50, hunk 44 `$A1C`) and `$2AA46` (v1.53, hunk 44
+`$A26`): `_sndprep` reads the sample's length for the player.
+
 `title` and `golf` then go through `MoveCode` ([caches and fast memory](#caches-and-fast-memory)).
+
+### Samples
+
+The samples (`INTROSND.LZ`, `SOUNDS.LZ`) have a 32-byte header (`STEVEH`, the rate index at
+5, the length at 7-8 little-endian) and data that holds 0-69, with silence at 35 (the game's
+sounds start and fade to 34-36), played as signed bytes. Every sound therefore sat on a level
+of +35 × volume (+2240 at 64), which each start and end of a sample stepped to and from: the
+pops at the start and end of every sound and the offset under the intro's music, on every
+Amiga. Most samples end in a zero byte. Both programs find the samples by walking the headers
+(length + 32 to the next `ST`: title hunk 0 `$B1C`, golf hunk 44 `$856` v1.53, `$858` v1.50),
+and the last sample of each group `golf` loads gives a length 32 bytes too long, so it ran on
+into the next group's header, loaded over its end: noise at the end of four sounds.
+
+`_sndprep` (a0 the header) returns the length cut at a header in the sample's last 40 bytes,
+and on a sample's first play subtracts 35 from its data, but the trailing zero bytes, and marks
+the header `STEVEh`. The header's length is left alone: both walks read it. In the game the
+first play does the work (up to 6365 bytes); the intro's samples (about 112 KB) are centred
+at the music's start instead, not in its audio interrupt.
+
+In audio captures of the first hole (a1200-fast, v1.53 and v1.50, and the a1200-030 with
+`CACHE`), the birds' average output went from +1640..+1900 to -3..-16, and the step at their
+ends from 310-1544 to 15-62, at the same spread. The intro's music averages about -300 to -450
+(its samples average about 30 rather than 35) instead of +1200 to +2500.
 
 ## Caches and fast memory
 

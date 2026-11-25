@@ -99,8 +99,8 @@
  - the course is drawn correctly on 68020+ machines with caches enabled
  - the game's code runs from fast memory instead of chip memory
  - the intro's pictures are no longer damaged by its music
- - no more pops at the start and end of the game's sound effects,
-   or after the intro's music
+ - the sound effects and the intro's music no longer sit on an
+   offset: no more pops at their start and end
 
  version 1.01 (28.04.2013) done by StingRay:
  - support for Bountiful and Firestone course disks added

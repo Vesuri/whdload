@@ -25,8 +25,8 @@
 ;		  for the caches on 68020+ (flushes, a per-pixel change without
 ;		  self-modifying code in v1.50), code and variables of the chip
 ;		  memory hunks moved to fast memory, the intro's pictures no
-;		  longer damaged by its music, no pops around the game's samples
-;		  or after the intro's music
+;		  longer damaged by its music, samples centred and channels
+;		  stopped on silence: no pops around the sounds and the music
 
 ; 28-Apr-2013	- course disk bug fixed, game destroyed the FIB while
 ;		  trying to read the course name so only 1 coourse
@@ -304,21 +304,109 @@ PLTITLE	PL_START
 	PL_S	$265c,$d2-$c0
 	PL_PS	$2692,_audiooff		; hunk 8 $f6: DMA off
 	PL_NOP	$2698,2
+	PL_PS	$259c,_introstart	; hunk 8 $0: the music's start
+	PL_NOP	$25a2,4
+	PL_PS	$25e8,_sndprep		; hunk 8 $4c: the sample's length
+	PL_NOP	$25ee,4
 	PL_END
 
-; Channels 0 and 1 off: with DMA off and their interrupt requests clear, Paula plays the word
-; written to AUDxDAT after the current one, sets the request and idles on its last byte, 0.
 ; The end of the music, in its audio interrupt (a0: the -1 that ends the list): the list
-; pointer (hunk 8 $128) stays on the -1, so an interrupt the zero word raises stops again
-; instead of reading past the list.
+; pointer (hunk 8 $128) stays on the -1, so a later interrupt stops again instead of reading
+; past the list.
 _audioend
 	move.l	(sp),a0			; hunk 8 $c0
 	subq.l	#2,$128-$c0(a0)
+
+; Channels 0 and 1 off: with DMA off and their interrupt requests clear, Paula plays the word
+; written to AUDxDAT after the current one, sets the request and idles on its last byte, 0.
+; Channel 0's interrupt goes off first: the request the current word's end raises would
+; otherwise start the music's next sample, with DMA, before the click path disables the
+; interrupt (hunk 8 $fe).
 _audiooff
+	move.w	#$80,$dff09a		; INTENA
 	move.w	#3,$dff096		; DMACON
 	move.w	#$180,$dff09c		; INTREQ
 	move.w	#0,$dff0aa		; AUD0DAT
 	move.w	#0,$dff0ba		; AUD1DAT
+	rts
+
+; The samples (headers "STEVEH", length at 7-8 little-endian, data from 32) hold 0-69, silence
+; at 35, as signed bytes: every sound sat on a level of +35, which each start and end of a
+; sample stepped to and from. Some end in zero bytes, and the last sample of each group the game
+; loads runs on into the next group's header, which is loaded over its last 32 bytes.
+;
+; a0: a sample's header. Returns its length in d0.w, cut at a header in its last 40 bytes. On
+; the first call it centres the data on 0 (but the trailing zero bytes, which stay 0) and
+; marks the header ("STEVEh"). Keeps every other register and d0's upper word (the game's
+; player keeps the channel there).
+_sndprep
+	movem.l	d1-d3/a1-a2,-(sp)
+	moveq	#0,d1
+	move.b	8(a0),d1
+	lsl.w	#8,d1
+	move.b	7(a0),d1		; the length
+	lea	32(a0),a1		; the data
+	move.l	d1,d3
+	subq.l	#4,d3			; the last offset a header can start at
+	move.l	d1,d2
+	sub.l	#40,d2
+	bcc.b	.from
+	moveq	#0,d2
+.from	lea	(a1,d2.l),a2
+.scan	cmp.l	d3,d2
+	bgt.b	.conv
+	cmp.b	#"S",(a2)+
+	bne.b	.next
+	cmp.b	#"T",(a2)
+	bne.b	.next
+	cmp.b	#"E",1(a2)
+	bne.b	.next
+	cmp.b	#"V",2(a2)
+	bne.b	.next
+	move.l	d2,d1			; the length up to that header
+	bra.b	.conv
+.next	addq.l	#1,d2
+	bra.b	.scan
+.conv	cmp.b	#"H",6(a0)
+	bne.b	.done
+	move.b	#"h",6(a0)
+	lea	(a1,d1.l),a2
+.zero	cmp.l	a1,a2			; skip the trailing zero bytes
+	bls.b	.done
+	tst.b	-(a2)
+	beq.b	.zero
+	addq.l	#1,a2
+	moveq	#35,d3
+.centre	sub.b	d3,(a1)+
+	cmp.l	a2,a1
+	blo.b	.centre
+.done	move.w	d1,d0
+	movem.l	(sp)+,d1-d3/a1-a2
+	rts
+
+; The intro's music start (hunk 8 $0, lea $12c(pc),a0 and move.l a0,$128): first centres every
+; sample of the table hunk 0 $b1c built (its address is hunk 8 $e's operand), following the
+; headers as that routine does, so that the audio interrupt does not have to.
+_introstart
+	movem.l	d0-d1/a1-a2,-(sp)
+	move.l	16(sp),a1		; hunk 8 $6
+	move.l	$e-6(a1),a2		; hunk 0 $b4c
+	move.l	(a2),d0
+	beq.b	.end
+	move.l	d0,a0
+.walk	bsr.w	_sndprep
+	moveq	#0,d1
+	move.b	8(a0),d1
+	lsl.w	#8,d1
+	move.b	7(a0),d1
+	lea	32(a0,d1.l),a0
+	cmp.b	#"S",(a0)
+	bne.b	.end
+	cmp.b	#"T",1(a0)
+	beq.b	.walk
+.end	lea	$12c-6(a1),a0
+	move.l	a0,$128-6(a1)
+	movem.l	(sp)+,d0-d1/a1-a2
 	rts
 
 PLGAME150
@@ -328,6 +416,8 @@ PLGAME150
 	PL_PS	$15476,getFIB2		; as above
 	PL_B	$2a879,-3		; hunk 44 $a61, sample end count
 	PL_B	$2a87f,-3		; hunk 44 $a67
+	PL_PS	$2a834,_sndprep		; hunk 44 $a1c: the sample's length
+	PL_NOP	$2a83a,4
 	PL_END
 
 PLGAME153
@@ -337,6 +427,8 @@ PLGAME153
 	PL_PS	$15482,getFIB2		; as above
 	PL_B	$2aa8b,-3		; hunk 44 $a6b, sample end count
 	PL_B	$2aa91,-3		; hunk 44 $a71
+	PL_PS	$2aa46,_sndprep		; hunk 44 $a26: the sample's length
+	PL_NOP	$2aa4c,4
 	PL_END
 
 ; The sample player (hunk 44 $9f4, v1.53 offsets) counts the first channel's audio
