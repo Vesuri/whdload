@@ -32,6 +32,3 @@ The installed icon does not set `CACHE` (the Install script writes the tooltypes
   take the rest of that step at its start and stop.
 - The 68000 `custom` route stops on the course's picture (`boot.sh`) or the player screen,
   with 2.0b's earlier builds as well: its waits need retuning before it reaches the hole.
-- On fast machines the intro can draw `COPYRIGHT ...` over the previous credit (hunk 0
-  `$726` draws it straight onto the screen after the scroll loop, whose length is timer
-  driven); not yet checked against a 68000.

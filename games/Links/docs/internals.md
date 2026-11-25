@@ -94,6 +94,19 @@ the captures, so the `$BA` path was never reached there.
 intro sample first ([samples](#samples)), and at `$25E8` (hunk 8 `$4C`) `_sndprep` gives the
 player the sample's length.
 
+`PL_PS` at `$7A4` (hunk 0, the top of the credits' scroll loop at `$7A0`) calls
+`_creditpace`. The loop turns 98 times as fast as the machine runs, while the credits in it
+change on the field timer hunk 3 `$120` (step 0 the first credit, 1 blank, 2 the second, 3
+blank, from field 480 to 660); after it hunk 0 `$726` draws `COPYRIGHT ...` straight onto the
+screen. With the original slave on the 68000 `custom` setup the loop took 490 fields (5 a
+turn) and ended in step 3; with 2.0b's code in fast memory, the a1200-030 with `CACHE` took
+388 and ended in step 2, so `COPYRIGHT` was drawn over the second credit. `_creditpace` waits
+at the loop's top until 5 fields have passed since the last turn, on the VBL's fourth counter
+(hunk 3 `$124`, which nothing else uses), and keeps the click flag's test (hunk 3 `$11D`): the
+loop now ends in step 3 after 490 fields on the 68000 and 488 on the a1200-030 and a1200-040
+with `CACHE` (read at hunk 0 `$718` through the gdb stub), and the scroll runs at the 68000's
+speed.
+
 `golf` with a chip memory word (`PLCHIP150`, `PLCHIP153`, Vesuri; skipped if `_bootdos`
 cannot allocate the 8 cleared bytes of chip memory `SILENT`):
 

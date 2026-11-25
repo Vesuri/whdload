@@ -98,7 +98,8 @@
  version 2.0b (25.11.2026) done by Vesuri:
  - the course is drawn correctly on 68020+ machines with caches enabled
  - the game's code runs from fast memory instead of chip memory
- - the intro's pictures are no longer damaged by its music
+ - the intro's pictures are no longer damaged by its music, and its
+   credits no longer overlap on fast machines
  - the sound effects and the intro's music no longer sit on an
    offset: no more pops at their start and end, and use the full
    8-bit range

@@ -25,7 +25,8 @@
 ;		  for the caches on 68020+ (flushes, a per-pixel change without
 ;		  self-modifying code in v1.50), code and variables of the chip
 ;		  memory hunks moved to fast memory, the intro's pictures no
-;		  longer damaged by its music, samples centred and scaled
+;		  longer damaged by its music nor its credits overlapping,
+;		  samples centred and scaled
 ;		  to 8 bits, and channels stopped on silence: no pops
 ;		  around the sounds and the music
 
@@ -300,6 +301,7 @@ PT_GAME	dc.w	$e70a,PLGAME150-PT_GAME,PLCACHE150-PT_GAME,PLCHIP150-PT_GAME,MVGAME
 ; its last output byte, at volume 64 on channel 1: a DC level, and a pop when the game's
 ; first sample starts. _audiooff ends both on a zero word.
 PLTITLE	PL_START
+	PL_PS	$7a4,_creditpace	; hunk 0 $7a4: the credits' scroll loop, 5 fields a turn
 	PL_S	$2614,12		; hunk 8 $78
 	PL_PS	$2656,_audioend		; hunk 8 $ba: volume, DMA and interrupt off
 	PL_S	$265c,$d2-$c0
@@ -404,6 +406,26 @@ _sndtab
 	blo.b	.centre
 .done	move.w	d1,d0
 	movem.l	(sp)+,d1-d3/a1-a2
+	rts
+
+; The credits' scroll (hunk 0 $7a0) turns its loop 98 times as fast as the machine runs, while
+; the credits in it change on the field timer hunk 3 $120 (step 0 the first, 1 blank, 2 the
+; second, 3 blank). After the loop hunk 0 $726 draws COPYRIGHT straight onto the screen: on a
+; 68000 the loop takes 490 fields, 5 a turn, and ends in step 3; on the a1200-030 with CACHE
+; it took 388 and ended in step 2, under the second credit. At the loop's top (tst.b of the
+; click flag, hunk 3 $11d) this waits until 5 fields have passed since the last turn, on the
+; VBL's fourth counter (hunk 3 $124, unused), and keeps the flag test.
+_creditpace
+	move.l	a0,-(sp)
+	move.l	4(sp),a0		; hunk 0 $7aa
+	move.l	$7ae-$7aa(a0),a0	; hunk 3 $120 (tst.w's operand)
+.wait	tst.b	$11d-$120(a0)		; clicked: no wait
+	bne.b	.out
+	tst.w	$124-$120(a0)
+	bne.b	.wait
+	move.w	#5,$124-$120(a0)
+.out	tst.b	$11d-$120(a0)
+	move.l	(sp)+,a0		; keeps the flags
 	rts
 
 ; The intro's music start (hunk 8 $0, lea $12c(pc),a0 and move.l a0,$128): first centres every
