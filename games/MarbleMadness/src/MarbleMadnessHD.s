@@ -115,6 +115,7 @@ slv_config:
 	dc.b    "C1:X:Trainer Infinite Time (ESC=game over):0;"
 	dc.b    "C2:X:Sound effects only (no music):0;"
 	dc.b    "C3:L:Start level:Practice,Beginner,Intermediate,Aerial,Silly,Ultimate;"			
+	dc.b	"C5:X:Music and sound at NTSC tempo on PAL:0;"
 	dc.b	0
 
 ; version xx.slave works
@@ -361,6 +362,86 @@ patch_exe:
 	move.l	#WCPUF_Exp,d1
 	jsr	(resload_SetCPU,a2)
 
+	; the display rate decides the PAL changes (WHDLoad's NTSC option makes it 60 Hz)
+	bsr	is_pal
+	lea	pal_display(pc),a0
+	move.b	d0,(a0)
+
+	move.l	_pal_sound(pc),d0
+	beq.b	.nosound
+	tst.b	(a0)
+	beq.b	.nosound
+	; the effects step $21740 is hunk 254 + $38
+	move.l	d7,d1
+	add.l	d1,d1
+	add.l	d1,d1
+	move.l	#254,d2
+	bsr	get_section
+	lea	($21740-$21708,a0),a0
+	lea	sfx_step(pc),a1
+	move.l	a0,(a1)
+	lea	pl_pal_sound(pc),a0
+	move.l	d7,a1
+	jsr	(resload_PatchSeg,a2)
+.nosound
+	rts
+
+; PAL sound at the NTSC tempo (CUSTOM5): both sound clocks tick once a field.
+pl_pal_sound
+	PL_START
+	; music: each vblank step adds (tempo << 16) / 150; on PAL / 125 (6/5 of it)
+	PL_L	$1F3D8,125
+	; effects: SfxTask runs the envelope step once per vblank; run it 6 times per 5
+	PL_PS	$20B1A,sfx_tick
+	PL_END
+
+sfx_tick
+	move.l	d2,-(a7)
+	lea	sfx_phase(pc),a0
+	move.w	(a0),d2
+	addq.w	#6,d2
+.step
+	cmp.w	#5,d2
+	blt.b	.done
+	subq.w	#5,d2
+	move.w	d2,(a0)
+	move.l	sfx_step(pc),a0
+	jsr	(a0)			; the game's step: keeps d2-d7/a2-a6
+	lea	sfx_phase(pc),a0
+	move.w	(a0),d2
+	bra.b	.step
+.done
+	move.w	d2,(a0)
+	move.l	(a7)+,d2
+	rts
+
+; > d0.b: -1 when the display has more than 300 lines (PAL), else 0. Watches the beam
+;   for two frame wraps and keeps the highest line seen.
+is_pal
+	movem.l	d1-d3,-(a7)
+	moveq	#0,d1			; highest line
+	moveq	#2,d2			; wraps to go
+	move.l	$dff004,d3
+	lsr.l	#8,d3
+	and.w	#$1ff,d3
+.loop
+	move.l	$dff004,d0
+	lsr.l	#8,d0
+	and.w	#$1ff,d0
+	cmp.w	d3,d0
+	bhs.b	.same
+	subq.w	#1,d2
+	beq.b	.done
+.same
+	move.w	d0,d3
+	cmp.w	d1,d0
+	bls.b	.loop
+	move.w	d0,d1
+	bra.b	.loop
+.done
+	cmp.w	#300,d1
+	shi	d0
+	movem.l	(a7)+,d1-d3
 	rts
 
 pl_main
@@ -598,6 +679,8 @@ _buttonwait
 	dc.l	0
 	dc.l	WHDLTAG_CUSTOM3_GET
 _start_level	dc.l	0
+	dc.l	WHDLTAG_CUSTOM5_GET
+_pal_sound	dc.l	0
 	dc.l	0
 _dosbase
 	dc.l	0
@@ -613,6 +696,13 @@ seconds_bonus_table:
 	dc.b	0,0,40,50,55,60,65
 old_sdr_value:
 	dc.b	0
+pal_display:
+	dc.b	0		; -1: the display has PAL's 312 lines
+	even
+sfx_step:
+	dc.l	0		; the game's effects step ($21740)
+sfx_phase:
+	dc.w	0		; fifths of a step owed
 
 	even
 

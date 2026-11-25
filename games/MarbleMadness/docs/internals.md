@@ -155,6 +155,32 @@ the NTSC tempo. The arcade original plays its music at the faster (NTSC) tempo.
 MEASURED, `a1200` PAL, 8 consecutive fields: `$1F260`, `$1F286`, `$21740` and the Framer's
 `$7596` each ran exactly once per field.
 
+**CUSTOM5** (PAL only: `is_pal` watches the beam for two frames, and a display with more
+than 300 lines counts as PAL) patches both clocks:
+- `$1F3D8` changes the divisor from 150 to 125, so each vblank's music step grows by 6/5;
+- `$20B1A` (`sfx_tick`) runs the effects step six times per five fields.
+
+MEASURED: with CUSTOM5 the music step `$1FA68` is `$13333`, against `$10000` without it,
+on `a500-1.5m` at the options menu. `$21740` ran 12 times in 10 fields on `a1200-030`. On an
+NTSC machine (`NTSC=1`) the game's code is byte-identical to a run without the option.
+
+## Slave patches
+
+JOTD's (`pl_main`, always):
+- `$2CF0`: the idle loop calls `key_control` (Esc ends the race, F1 adds 10 s, Help skips
+  the level, P pauses);
+- `$99F6`/`$99F8`: the level 1 access fault;
+- `$1E684`: the level 5 access fault, when a bird hits the marble;
+- `$B566`: `seconds_count`, which handles pause, the infinite-time trainer (C1) and the
+  start level's time bonus;
+- `$CF46`–`$CF59`: the menu's device names;
+- `$33FA`: the start level (C3);
+- `$1F384`: no music (C2).
+
+After `pl_main`, the slave makes the ExpMem non-cacheable (`WCPUF_Exp_NCS`).
+
+Ours: `pl_pal_sound` (C5, above).
+
 ## Caches
 
 `patch_exe` calls `resload_SetCPU(WCPUF_Exp_NCS, WCPUF_Exp)` after loading the game.

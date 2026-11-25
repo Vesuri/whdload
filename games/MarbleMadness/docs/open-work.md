@@ -10,7 +10,7 @@ CPU-bound on a 68020+; it is frame-locked at one logic step per two vsyncs, writ
 NTSC, so PAL plays at 5/6 speed and 25 fps. Music and sound effects are also clocked by the
 vblank and play at 5/6 tempo on PAL ("Sound timing").
 
-1. Enhanced framerate (the plan below).
+1. Enhanced framerate (the plan below). Steps 1 and 3 are done, and the C5 half of step 2.
 2. The idle task's keyboard poll writes CIA-A SDR about 1950 times a field; harmless for
    speed, but worth moving to the keyboard interrupt if it is ever touched.
 
@@ -57,9 +57,9 @@ Steps, each verified before the next:
    by task with a call tree for one task. Add harness commands that count, per field, the
    entries to a set of offsets (step, draw, copper, sound ticks) and that dump a state
    snapshot.
-2. **Option plumbing.** Add the C4 and C5 tags and a 68020 check (AttnFlags). Measure the field
-   rate from the beam (the highest line, 312 or 262) rather than trusting the PAL flag,
-   because WHDLoad's `NTSC` option changes it. Gate: with both options off, and with C4
+2. **Option plumbing.** The C5 tag and `is_pal`, which measures the field rate from the beam
+   rather than trusting the PAL flag, are done. Left for step 4: the C4 tag and config line,
+   and a 68020 check (kick13's `_attnflags`). Gate: with both options off, and with C4
    alone on a 68000, the game memory after `patch_exe` is byte-identical to the original
    slave's.
 3. **Sound tempo on PAL** (C5). Music: use 125 instead of 150 at
