@@ -23,7 +23,9 @@
 
 ; 25-Nov-2026	- 2.0b by Vesuri: the renderer's self-modifying code made safe
 ;		  for the caches on 68020+ (flushes, a per-pixel change without
-;		  self-modifying code in v1.50), code and variables of the chip
+;		  self-modifying code in v1.50, v1.53's span loops without it),
+;		  v1.53's course picture to the screen 16 pixels a word instead
+;		  of a pixel at a time on 68020+, code and variables of the chip
 ;		  memory hunks moved to fast memory, the intro's pictures no
 ;		  longer damaged by its music nor its credits overlapping,
 ;		  samples centred and scaled
@@ -140,7 +142,19 @@ _bootdos
 	jsr	_LVOAllocMem(a6)
 	lea	SILENT(pc),a0
 	move.l	d0,(a0)
-	move.l	DOSbase(pc),a6
+
+; _copyscr's tables and row buffer, on a 68020 or later; without them the game's own copy runs
+	btst	#AFB_68020,AttnFlags+1(a6)
+	beq.b	.noc2p
+	move.l	#C2P_SIZE,d0
+	moveq	#MEMF_PUBLIC,d1
+	jsr	_LVOAllocMem(a6)
+	lea	C2PBUF(pc),a0
+	move.l	d0,(a0)
+	beq.b	.noc2p
+	move.l	d0,a0
+	bsr.w	_c2pinit
+.noc2p	move.l	DOSbase(pc),a6
 
 ; load intro
 	move.l	NOINTRO(pc),d0
@@ -274,6 +288,7 @@ EXIT	move.l	_resload(pc),a2
 
 DOSbase	dc.l	0
 SILENT	dc.l	0			; 8 cleared bytes of chip memory, or 0
+C2PBUF	dc.l	0			; _copyscr's tables and row buffer (C2P_SIZE), or 0
 
 ; format: checksum, offset to patch list, offset to the patch list for a 68020 or later
 ; (0: none), offset to the patch list that needs SILENT (0: none), offset to the MoveCode
@@ -557,10 +572,259 @@ PLCACHE150
 
 PLCACHE153
 	PL_START
-	PL_PS	$14544,_flushcache	; hunk 12 $5dc: the span loop's opcodes and offsets
-	PL_PS	$146b0,_flushcache	; hunk 12 $748: two opcodes
+	PL_PA	$1446e,_sp1+$5e2-$5e2	; hunk 12 $502-$5cc: the span loop's opcodes and
+	PL_PA	$14498,_sp1+$5e2-$5e2	; displacements are written to _sp1, not into the loop
+	PL_PA	$14476,_sp1+$5e6-$5e2
+	PL_PA	$144a0,_sp1+$5e6-$5e2
+	PL_PA	$1447e,_sp1+$5ea-$5e2
+	PL_PA	$144a8,_sp1+$5ea-$5e2
+	PL_PA	$14486,_sp1+$5ee-$5e2
+	PL_PA	$144b0,_sp1+$5ee-$5e2
+	PL_PA	$1448e,_sp1+$5f0-$5e2
+	PL_PA	$144b8,_sp1+$5f0-$5e2
+	PL_PA	$144ce,_sp1+$5fc-$5e2
+	PL_PA	$144d8,_sp1+$5fc-$5e2
+	PL_PA	$144fa,_sp1+$5fe-$5e2
+	PL_PA	$14504,_sp1+$5fe-$5e2
+	PL_PA	$1452a,_sp1+$600-$5e2
+	PL_PA	$14534,_sp1+$600-$5e2
+	PL_PS	$14544,_span1		; hunk 12 $5dc: the loop $5e2-$60a, from _sp1
+	PL_PA	$14666,_sp2		; hunk 12 $6fa-$738: bclr/bset #6 on _sp2 and _sp2+1,
+	PL_PA	$14670,_sp2		; not on the opcodes at $78a and $790
+	PL_PA	$14694,_sp2+1
+	PL_PA	$1469e,_sp2+1
+	PL_PS	$146b0,_span2		; hunk 12 $748: the loop $74e-$796, signs from _sp2
 	PL_PS	$1597c,_flushcache	; hunk 14 $48: four immediates
+	PL_PS	$14a5a,_copyscr		; hunk 12 $af2: the picture to the screen
 	PL_END
+
+; v1.53's span loop (hunk 12 $5e2-$60a), after the set-up at $502-$5cc chose its first
+; instruction (nop, or addq.w #1,d0), the displacement of its first move (0 or 6; the next
+; two are 2 and 4 on), and add or sub (opcode bit 6) for its adda #12,a1 and the three steps
+; d4-d6. The same with the signs on registers; returns to $60c. The last instruction that
+; sets flags is the loop's subq, as in the original.
+_span1	movem.l	d4-d7/a0/a2,-(a7)
+	move.l	6*4(a7),a2
+	lea	$60c-$5e2(a2),a2
+	move.l	a2,6*4(a7)		; return to hunk 12 $60c
+	lea	_sp1(pc),a0
+	cmp.w	#$4e71,(a0)		; $5e2: nop or addq.w #1,d0
+	beq.b	.nop
+	addq.w	#1,d0
+.nop	move.w	$5e6-$5e2(a0),d7
+	lea	(a1,d7.w),a2		; a2: a1 + the first displacement
+	moveq	#12,d7
+	btst	#6,$5f0-$5e2(a0)	; adda.l ($d3fc) or suba.l ($93fc) #12,a1
+	bne.b	.a
+	neg.l	d7
+.a	btst	#6,$5fc-$5e2(a0)	; add.l ($d084) or sub.l ($9084) d4,d0
+	bne.b	.b
+	neg.l	d4
+.b	btst	#6,$5fe-$5e2(a0)	; d5,d1
+	bne.b	.c
+	neg.l	d5
+.c	btst	#6,$600-$5e2(a0)	; d6,d2
+	bne.b	.loop
+	neg.l	d6
+.loop	move.w	d0,(a2)
+	move.w	d1,2(a2)
+	move.w	d2,4(a2)
+	add.l	d7,a2
+	add.l	d7,a1
+	swap	d0
+	swap	d1
+	swap	d2
+	add.l	d4,d0
+	add.l	d5,d1
+	add.l	d6,d2
+	swap	d0
+	swap	d1
+	swap	d2
+	subq.w	#1,d3
+	bne.b	.loop
+	movem.l	(a7)+,d4-d7/a0/a2
+	rts
+
+; v1.53's pixel loop (hunk 12 $74e-$796), its two steps added or subtracted as the set-up at
+; $6fa-$738 marked bit 6 of _sp2 (d6) and _sp2+1 (d7). Returns to $798 with the flags of
+; the loop's last subq.
+_span2	movem.l	d6-d7/a2,-(a7)
+	move.l	3*4(a7),a2		; hunk 12 $74e
+	btst	#6,_sp2(pc)		; add.l ($d286) or sub.l ($9286) d6,d1
+	bne.b	.a
+	neg.l	d6
+.a	btst	#6,_sp2+1(pc)		; add.l ($d087) or sub.l ($9087) d7,d0
+	bne.b	.b
+	neg.l	d7
+.b	move.l	a4,d5
+	sub.l	d3,d3
+	move.w	(a0),d3
+	add.l	d3,d5
+	sub.l	d0,d0
+	move.w	4(a0),d0
+	add.w	$bda-$74e(a2),d0
+	sub.l	d1,d1
+	move.w	2(a0),d1
+	lea	$798-$74e(a2),a2
+	move.l	a2,3*4(a7)		; return to hunk 12 $798
+.loop	move.l	d5,d3
+	add.l	d3,d3
+	cmp.w	(a1,d3.l),d1
+	bcc.b	.next
+	move.w	d1,(a1,d3.l)
+	move.b	d0,(a5,d5.l)
+	asl.w	#2,d0
+	move.b	(a6,d0.w),(a3,d5.l)
+	lsr.w	#2,d0
+.next	subq.w	#1,d2
+	beq.b	.done
+	swap	d1
+	add.l	d6,d1
+	swap	d1
+	swap	d0
+	add.l	d7,d0
+	swap	d0
+	addq.l	#1,d5
+	bra.b	.loop
+.done	movem.l	(a7)+,d6-d7/a2
+	rts
+
+_sp1	ds.b	$602-$5e2		; hunk 12 $5e2-$601 as the set-up writes it
+_sp2	dc.b	$40,$40			; bit 6: hunk 12 $78a and $790 add (set) or subtract
+	CNOP	0,4
+
+; v1.53 hunk 12 $af2-$ba4 turns the rendered picture (a byte a pixel, 320 x 160) into the
+; screen's six planes one pixel at a time: each pixel's colour comes from its byte, its
+; region and a dither step, and a jsr to one of hunk 4's 64 routines sets or clears its bit
+; in every plane of the visible screen (6 read-modify-writes of chip memory a pixel). The
+; same colours go to a row buffer, and each row goes to the planes 16 pixels a word.
+; d0: the first row. Without C2PBUF the game's own code runs.
+C2P_T01	= 0				; colour -> plane 0 bit 16, plane 1 bit 0
+C2P_T23	= 1024
+C2P_T45	= 2048
+C2P_ROW	= 3072
+C2P_SIZE = 3072+320
+
+	MC68020				; _copyscr runs on a 68020 or later (PLCACHE153)
+_copyscr
+	move.l	(a7)+,a0		; hunk 12 $af8
+	move.l	C2PBUF(pc),d1
+	bne.b	.c2p
+	move.l	$ba6-$af8(a0),a1	; the instruction replaced: movea.l (hunk 12 $ba6),a1
+	jmp	(a0)
+.c2p	move.l	d1,a5
+	move.l	$ba6-$af8(a0),a1	; the same registers as the original: a1 the depth map
+	move.l	$afa-$af8(a0),a2	; (hunk 12 $af8: movea.l abs,a2) the screen, plane 1
+	move.l	(a2),a2
+	move.l	$b00-$af8(a0),a3	; ($afe: lea abs,a3) colour and dither table
+	move.l	$b06-$af8(a0),a4	; ($b04) the picture
+	move.l	(a4),a4
+	move.l	$b0c-$af8(a0),a6	; ($b0a) its regions
+	move.l	(a6),a6
+	moveq	#0,d7
+	move.w	d0,d7
+	lsl.l	#6,d7
+	move.l	d7,d1
+	lsl.l	#2,d1
+	add.l	d1,d7			; d7 = the first row x 320
+.row	moveq	#0,d5			; hunk 12 $b1e, as the original
+	moveq	#0,d6
+	lea	C2P_ROW(a5),a0
+.px	moveq	#0,d0
+	move.b	(a4,d7.l),d0
+	bmi.b	.neg
+	cmp.b	(a6,d7.l),d6
+	beq.b	.same
+	moveq	#0,d4
+	move.b	(a6,d7.l),d6
+.same	lsl.w	#2,d0
+	add.w	d4,d0
+	move.b	(a3,d0.w),d0
+	addq.w	#1,d4
+	cmp.b	#4,d4
+	blt.b	.put
+	moveq	#1,d4
+	bra.b	.put
+.neg	moveq	#1,d4
+	neg.b	d0
+	cmp.b	(a6,d7.l),d6
+	beq.b	.put
+	move.l	d7,d2
+	add.l	d2,d2
+	cmp.w	#-1,(a1,d2.l)
+	bne.b	.take
+	cmp.w	#-1,-2(a1,d2.l)
+	beq.b	.put
+.take	move.b	(a6,d7.l),d6
+	move.b	d6,d0
+.put	move.b	d0,(a0)+		; the original's jsr to hunk 4 for colour d0
+	addq.l	#1,d7
+	addq.w	#1,d5
+	cmp.w	#320,d5
+	bmi.b	.px
+	movem.l	d4/d7/a1/a3-a4/a6,-(a7)
+	sub.l	#320,d7
+	lsr.l	#3,d7
+	lea	(a2,d7.l),a1		; the row in plane 1
+	lea	C2P_ROW(a5),a0
+	lea	C2P_T01(a5),a3
+	lea	C2P_T23(a5),a4
+	lea	C2P_T45(a5),a6
+	moveq	#0,d0
+	moveq	#320/16-1,d4
+.word	moveq	#0,d1
+	moveq	#0,d2
+	moveq	#0,d3
+	moveq	#16-1,d5
+.bit	move.b	(a0)+,d0
+	add.l	d1,d1
+	or.l	(a3,d0.w*4),d1
+	add.l	d2,d2
+	or.l	(a4,d0.w*4),d2
+	add.l	d3,d3
+	or.l	(a6,d0.w*4),d3
+	dbf	d5,.bit
+	move.w	d1,(a1)			; plane 1
+	swap	d1
+	move.w	d1,-8000(a1)		; plane 0
+	move.w	d2,16000(a1)		; plane 3
+	swap	d2
+	move.w	d2,8000(a1)		; plane 2
+	move.w	d3,32000(a1)		; plane 5
+	swap	d3
+	move.w	d3,24000(a1)		; plane 4
+	addq.l	#2,a1
+	dbf	d4,.word
+	movem.l	(a7)+,d4/d7/a1/a3-a4/a6
+	cmp.l	#51200,d7		; hunk 12 $b9a
+	blo.w	.row
+	rts
+	MC68000
+
+; a0: C2PBUF. Its three tables: for each byte (its low 6 bits the colour) planes 0 and 1,
+; 2 and 3, 4 and 5 as bits 16 and 0
+_c2pinit
+	movem.l	d2-d3,-(a7)
+	moveq	#0,d3			; the first plane: 0, 2, 4
+.tab	moveq	#0,d0
+.t	move.l	d0,d1
+	lsr.w	d3,d1
+	moveq	#0,d2
+	lsr.w	#1,d1
+	bcc.b	.1
+	bset	#16,d2
+.1	lsr.w	#1,d1
+	bcc.b	.2
+	bset	#0,d2
+.2	move.l	d2,(a0)+
+	addq.w	#1,d0
+	cmp.w	#256,d0
+	bne.b	.t
+	addq.w	#2,d3
+	cmp.w	#6,d3
+	bne.b	.tab
+	movem.l	(a7)+,d2-d3
+	rts
 
 ; MoveCode tables: hunk, split: the hunk's bytes below split (its code and variables) move
 ; to fast memory, the rest (sprites, copper list) stays in chip memory; -1. Then hunk,

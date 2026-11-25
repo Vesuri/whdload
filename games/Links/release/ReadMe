@@ -96,7 +96,8 @@
  --------
 
  version 2.0b (25.11.2026) done by Vesuri:
- - the course is drawn correctly on 68020+ machines with caches enabled
+ - the course is drawn correctly on 68020+ machines with caches enabled,
+   and on the PAL version a third faster, the view at once
  - the game's code runs from fast memory instead of chip memory
  - the intro's pictures are no longer damaged by its music, and its
    credits no longer overlap on fast machines

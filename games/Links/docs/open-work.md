@@ -14,6 +14,10 @@ reference in every dump, and in audio captures the sounds are centred (the birds
 to -16 instead of +1640 to +1900) and scaled to about the full 8 bits, and the outputs rest at
 0 between them and after the intro ([internals.md](internals.md#samples)).
 
+On v1.53 the course view is drawn in 89 fields instead of 137 on the a1200-030 with
+`CACHE` (the picture to the screen in 2 instead of 27), with code checked equal to the
+game's in Unicorn ([internals.md](internals.md#slave-patches)).
+
 ## Release
 
 `make dist` builds `LinksEnhanced-2.0b`: StingRay's package with the new slave and ReadMe.
@@ -30,5 +34,9 @@ The installed icon does not set `CACHE` (the Install script writes the tooltypes
   `golf`, not yet traced, nor measured since the scaling.
 - The intro's music still averages -120 to -220 (centred on 30); a per-sample centre would
   take the rest of that step at its start and stop.
+- The course view's set-up is mostly hunk 23's LZW unpacking (26 of 34 fields on the aprof
+  68030), half of it chip memory time: its input, output and dictionary are in chip
+  memory. Where the game allocates them, and whether they can be fast memory, is not yet
+  known. v1.50 plots each pixel to the screen in its span loops and was not changed.
 - The 68000 `custom` route stops on the course's picture (`boot.sh`) or the player screen,
   with 2.0b's earlier builds as well: its waits need retuning before it reaches the hole.

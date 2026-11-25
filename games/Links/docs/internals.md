@@ -63,9 +63,49 @@ On a 68020 or later (`PLCACHE150`, `PLCACHE153`, Vesuri):
 
 | Version | Offset | Hunk | Patch |
 |---|---|---|---|
-| v1.53 | `$14544`, `$146B0`, `$1597C` | 12 `$5DC`, 12 `$748`, 14 `$48` | `jsr _flushcache` over the `jmp`: the cache is flushed after each modification |
-| v1.50 | `$14520`, `$14692`, `$15964` | 12 `$5D4`, 12 `$746`, 14 `$3C` | as v1.53 |
+| v1.53 | `$1446E`-`$14534` (16) | 12 `$502`-`$5CC` | `PL_PA`: the set-up's writes into the span loop (`$5E2`-`$600`: its first instruction, three displacements, `adda`/`suba` and three `add`/`sub`) go to `_sp1` |
+| v1.53 | `$14544` | 12 `$5DC` | `jsr _span1` over the `jmp`: the loop from `_sp1`'s values, the signs on registers; returns to `$60C` |
+| v1.53 | `$14666`-`$1469E` (4) | 12 `$6FA`-`$738` | `PL_PA`: the `bclr`/`bset #6` on the opcodes at `$78A` and `$790` go to `_sp2` |
+| v1.53 | `$146B0` | 12 `$748` | `jsr _span2` over the `jmp`: the pixel loop `$74E`-`$796`, `d6` and `d7` negated where `_sp2` says subtract; returns to `$798` |
+| v1.53 | `$1597C` | 14 `$48` | `jsr _flushcache` over the `jmp`: the cache is flushed after each modification |
+| v1.53 | `$14A5A` | 12 `$AF2` | `jsr _copyscr`: the picture to the screen (below) |
+| v1.50 | `$14520`, `$14692`, `$15964` | 12 `$5D4`, 12 `$746`, 14 `$3C` | `jsr _flushcache` over the `jmp` |
 | v1.50 | `$146DC`, `$14784` | 12 `$790`, 12 `$838` | the per-pixel `move.b d4,` into the displacement of `move.b (0,a6,d0.w),d6` and its `jmp` become `adda.w d4,a6`, the read, `suba.w d4,a6`, `bra.s` on: no code is modified, no flush per pixel |
+
+v1.53 draws a course view in hunk 12's driver (`$0`): the set-up, mostly hunk 23's LZW
+unpacking of the hole (its input, output and dictionary in chip memory), then `DRAWING
+COURSE` (`$5E`), `DRAWING BACKGROUND` (`$74`), `DRAWING OBJECTS` (`$82`) into a picture
+of a byte a pixel, 320 x 160 (hunk 19 `$1AC`), and `$AF2` to the screen (from `$90`).
+`$AF2` takes each pixel's colour from its byte, its region (hunk 0 `$610`), the depth map
+(hunk 12 `$BA6`) and a dither step (the table hunk 46 `$C2C`), and calls one of hunk 4's 64
+routines (colour c: `bset` or `bclr` of bit c's plane, at `-8000`-`32000` from plane 1),
+6 read-modify-writes of chip memory a pixel, straight onto the visible screen.
+`_copyscr` runs the same colour code into a row buffer and puts each row into the planes
+16 pixels a word (tables from `_c2pinit`, in `C2PBUF`, 3392 bytes allocated at start on
+a 68020 or later; without it the game's own copy runs). The two span loops changed their
+own code every span and needed a flush each, about 4700 in 25 fields; `_span1` and
+`_span2` read the same choices from the slave. `tools/drawcheck.py` runs each against the
+game's code in Unicorn: 2000 random spans and pixel runs, and 20 random pictures, equal
+(registers, memory, planes).
+
+Measured on the a1200-030 with `CACHE CUSTOM1=1`, from `$0` to `$B8` (the first hole,
+one run each; the pin differs between runs), the game's VBL counter (hunk 20 `$4DE`)
+read at each address through the gdb stub, before and after:
+
+| Phase | Fields | |
+|---|---|---|
+| set-up | 35 | 34 |
+| `DRAWING COURSE` | 49 | 27 |
+| `DRAWING BACKGROUND` | 10 | 10 |
+| `DRAWING OBJECTS` | 16 | 16 |
+| to the screen | 27 | 2 |
+| all | 137 | 89 |
+
+On the cycle profiler's 68030 (aprof, `--uae_mmu_model=0`, no data cache) the same
+phases took 34.7, 79.3, 11.0, 25.3 and 26.3 fields and 34.6, 53.9, 11.1, 25.3 and 4.2:
+`resload_FlushCache` had taken about 23 of `DRAWING COURSE`'s fields and hunk 4's
+routines 20 of the 26. v1.50 plots each pixel straight to the screen inside its span
+loops (hunk 12 `$7BA`, `$85C`) and has neither change.
 
 `title` (`PLTITLE`, Vesuri): `PL_S` at `$2614` (hunk 8 `$78`, 12 bytes). The intro's music
 routine sets two channel counters with `move.b #-2,(0,a2,d0.w)` and `(1,a2,d0.w)` (a2 hunk 8

@@ -66,6 +66,9 @@ speed (AmigaXDev's `measurement-method.md`), so count fields there, not seconds.
 output with `68040 MMU:` lines, which break the capture otherwise. Parallel boots need
 `NOBUILD=1` (they race in the build).
 
+`python3 tools/drawcheck.py [N]` checks `_span1`, `_span2` and `_copyscr` against v1.53's
+code on random inputs (internals.md, the course view); run it after changing them.
+
 ## Traps
 
 - The plain a1200 (2 MB chip, no fast) and the a500-1.5m cannot allocate the ExpMem

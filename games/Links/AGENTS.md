@@ -19,5 +19,6 @@ Read `docs/open-work.md` first.
 | `docs/internals.md` | how it loads, memory, every slave patch, limitations |
 
 The slave source is `src/`; `tools/` is the harness: `links.py` (the gdb-stub server with
-mouse commands and the route to the first hole) and `boot.sh` (boot, route, screenshot)
+mouse commands and the route to the first hole), `boot.sh` (boot, route, screenshot) and
+`drawcheck.py` (the slave's course drawing against the game's, in Unicorn)
 ([development.md](docs/development.md)).
