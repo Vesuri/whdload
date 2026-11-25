@@ -78,7 +78,8 @@ The logic reads the frame counter: `$D320` re-decides the scroll every 8th frame
   `$5BCA`, the per-vsync routine swaps the sets and clears it (`$38F0`), and the next pass's
   placement loop (`$1179C`) spins while it is set. So a pass that starts before the vsync
   has taken the last set waits for that vsync. The marble's rolling texture is dots plotted into its sprite image (`$6864`,
-  `$68B6`), with one dot list per sprite set (record `+$38` and `+$AE`).
+  `$68B6`, list `+$AE`); walls cover sprites by masking their images (below, "What a step
+  leaves for its draw").
 - **Positions:** world coordinates are 16.16 fixed-point longwords at record `+$C`, `+$10`
   and `+$14`. The logic projects them during its step with `$6918` (integer parts only):
   `sx = y − x + $88`, `sy = z + [$9BA] + $6C − (x + y)/2`. The result goes into the record
@@ -242,13 +243,33 @@ With a frame every field it shows the older set every other field. Under CUSTOM4
 - shares are rounded half away from zero, so a sprite and the playfield moved by −d and
   +d stay together;
 - a position that is new, jumps more than 48 pixels, or a mode change (`$5D2`) is drawn
-  unblended.
+  unblended; so is an object whose image changed since the step before (the game moves the
+  worms and slimes with a new frame). The image is `*(*(record + F))`, F = `+$64` (type 2),
+  `+$62` (4), `+$42` (5), `+$1C` (7–9, `$F`), `+$3A` (`$E`); types 1, `$2A` and `$2C` are
+  not checked.
 
-Animation frames, the marble's texture dots and the depth sort of the pre-pass (`$1085C`,
-`$DD1C`, world positions) stay at the step rate. The pre-pass only orders the sprites;
-nothing masks them against the scenery. Type `$F`'s draw (`$6350`) adds `$40` to five dot
-offsets (`+$2C`, 8 apart) per draw while `$6860` is set; on draw-only jobs `dots_f` takes it
-back first, so they move once a step.
+Animation frames and the depth sort of the pre-pass (`$1085C`, `$DD1C`, world positions)
+stay at the step rate.
+
+**What a step leaves for its draw.** The logic puts lists in the records, and the draw
+marks each entry it uses (its first long becomes −1), so a second draw of the same state
+finds them empty. Entries are 8 bytes, image.l and a screen x.w, y.w:
+- `+$38` (5 entries; types 1, 2, 4; 3 for `$F`): the scenery pieces that cover the sprite.
+  `$11270(list, n, x, y, sprite)` clears the sprite's pixels under each piece's image
+  (`$11060`). This is the occlusion by walls. Levels 1 and 3 also mask against fixed
+  pieces (`$5BE0`, `$11678`), which read the view offset `$9BA` at draw time.
+- `+$AE` (4 entries, two points each): the marble's texture dots, plotted by `$6864`.
+- When the marble breaks, the step sets `+$EB` and fills `+$38` and `+$AE` with the
+  shards' images; the draw places them (`$10FDC(list, image, n)`) and clears `+$EB`.
+  Type `$F`'s dots are such a list at `+$26` (5 entries); its draw adds `$40` to each y
+  (`+$2C`, 8 apart) while `$6860` is set.
+
+Under CUSTOM4 a step's draw saves every list as it is used (`list_call`, up to 32 a step)
+and each marble's `+$EB` (`marble_flag`); a draw job puts them back first, so it leaves the
+records as the step's draw left them. The pieces' screen y are the step's; for a draw at α
+they move by `bl_view`, the blended `$9BA` minus the step's (it is 0 without a scroll), and
+back after the call, and `$11678` reads `$9BA + bl_view` (`$116BC`). On draw jobs `dots_f`
+takes type `$F`'s `$40` back first, so its dots move once a step.
 
 **Other modes.** Every mode handler (`$B2A2`) runs as a step, so the race (0), the pause
 (1), the menu (5) and the end of the game (6, a state machine at `$C478`) run at 30 Hz.
@@ -267,6 +288,8 @@ back first, so they move once a step.
   fields).
 
 MEASURED, PAL:
+- the marble's dot points plotted (`$68E4`) per race field on `a1200-030` and `a1200`: 8 in
+  every field; before the lists were put back, 4 in the fields without a step;
 - steps (`$230`) in 360 race fields on `a1200-030` + `CACHE`: 180 without the option, 216
   with it; with it on NTSC (`NTSC=1`), 180;
 - race timer over 500 fields: 35 → 25 with it (50 fields a game second), 39 → 31 without;
