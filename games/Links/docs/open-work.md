@@ -11,8 +11,8 @@ The intro's pictures were damaged at random by its music, and the game's samples
 ([internals.md](internals.md#slave-patches)): its sample data sits on +35, and the channels
 were left holding a level when stopped. With 2.0b the a1200-030's panorama matched a clean
 reference in every dump, and in audio captures the sounds are centred (the birds average -3
-to -16 instead of +1640 to +1900) and the outputs rest at 0 between them and after the intro
-([internals.md](internals.md#samples)).
+to -16 instead of +1640 to +1900) and scaled to about the full 8 bits, and the outputs rest at
+0 between them and after the intro ([internals.md](internals.md#samples)).
 
 ## Release
 
@@ -26,9 +26,12 @@ The installed icon does not set `CACHE` (the Install script writes the tooltypes
 - Capture the swing's swoosh too (the captures covered the first hole's ambient samples; the
   swoosh goes through the same player, hunk 44 `$9F4`).
 - About 0.3 s after the intro is clicked away a single blip of 10 ms is left (755-901 in the
-  captures, 755-3246 before 2.0b's sample changes): the hand-over to `golf`, not yet traced.
-- The intro's music averages about -300 to -450 after centring on 35 (its samples average
-  about 30); centring it on its own average would remove that step at its start and stop.
+  captures before the scaling, 755-3246 before 2.0b's sample changes): the hand-over to
+  `golf`, not yet traced, nor measured since the scaling.
+- The intro's music still averages -120 to -220 (centred on 30); a per-sample centre would
+  take the rest of that step at its start and stop.
+- The 68000 `custom` route stops on the course's picture (`boot.sh`) or the player screen,
+  with 2.0b's earlier builds as well: its waits need retuning before it reaches the hole.
 - On fast machines the intro can draw `COPYRIGHT ...` over the previous credit (hunk 0
   `$726` draws it straight onto the screen after the scroll loop, whose length is timer
   driven); not yet checked against a 68000.

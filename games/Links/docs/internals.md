@@ -121,7 +121,9 @@ bird sample left the outputs at +2046 and +472 until the next sound, about 2 s; 
 from -3 they returned to 0.
 
 `golf` also has `PL_PS` at `$2A834` (v1.50, hunk 44 `$A1C`) and `$2AA46` (v1.53, hunk 44
-`$A26`): `_sndprep` reads the sample's length for the player.
+`$A26`): `_sndprep` reads the sample's length for the player; and at `$2A678` (v1.50, hunk 44
+`$860`) and `$2A87E` (v1.53, hunk 44 `$85E`): `_sndwalk` converts each sample of the group
+loaded at the start as the walk enters it in the table.
 
 `title` and `golf` then go through `MoveCode` ([caches and fast memory](#caches-and-fast-memory)).
 
@@ -138,15 +140,29 @@ and the last sample of each group `golf` loads gives a length 32 bytes too long,
 into the next group's header, loaded over its end: noise at the end of four sounds.
 
 `_sndprep` (a0 the header) returns the length cut at a header in the sample's last 40 bytes,
-and on a sample's first play subtracts 35 from its data, but the trailing zero bytes, and marks
-the header `STEVEh`. The header's length is left alone: both walks read it. In the game the
-first play does the work (up to 6365 bytes); the intro's samples (about 112 KB) are centred
-at the music's start instead, not in its audio interrupt.
+and, if the header still reads `STEVEH`, converts the data (but the trailing zero bytes) and
+marks the header `STEVEh`. The header's length is left alone: both walks read it. The
+conversion is a 256-byte table (`SNDTAB`, built by the assembler): the game's sounds go from
+35 to 0 scaled by 3.5 (-123..119, about the full 8 bits; some samples reach both 0 and 69, so
+one factor serves all and keeps their balance), the intro's from 30, their average (the
+music holds no silence), scaled by 3.25 (-98..126). Both are about 11 dB louder at the same
+volume.
+
+`golf` loads its samples two ways (hunk 44, v1.53): one group at its start (`$814`, into its
+own 17000-byte chip buffer at `$CC8`, when 231144 bytes of chip memory are free), which
+`_sndwalk` converts in the walk at `$856`; and the others one list at a time just before they
+play (`$79A`, into the 14000-byte buffer at `$CCC`, dropped from the table after), which the
+player's `_sndprep` converts. The marker keeps a sample the loader returns from its cache
+(hunk 13 `$116`) from being converted twice. The intro's samples (about 112 KB) are converted
+at the music's start (after the table's build), not in its audio interrupt.
 
 In audio captures of the first hole (a1200-fast, v1.53 and v1.50, and the a1200-030 with
-`CACHE`), the birds' average output went from +1640..+1900 to -3..-16, and the step at their
-ends from 310-1544 to 15-62, at the same spread. The intro's music averages about -300 to -450
-(its samples average about 30 rather than 35) instead of +1200 to +2500.
+`CACHE`), centring on 35 took the birds' average output from +1640..+1900 to -3..-16, and the
+step at their ends from 310-1544 to 15-62, at the same spread. With the scaling, the a1200-030
+capture's peak went from 6028 to 10752 and its quiet stretches stay within 2 of 0, and the
+intro's music averages -120 to -220 (-300 to -450 centred on 35 unscaled, +1200 to +2500
+before). A game dump (a1200-fast) shows the start group converted (-98..105, averages about
+-1) and the intro's samples at -95..126.
 
 ## Caches and fast memory
 

@@ -25,8 +25,9 @@
 ;		  for the caches on 68020+ (flushes, a per-pixel change without
 ;		  self-modifying code in v1.50), code and variables of the chip
 ;		  memory hunks moved to fast memory, the intro's pictures no
-;		  longer damaged by its music, samples centred and channels
-;		  stopped on silence: no pops around the sounds and the music
+;		  longer damaged by its music, samples centred and scaled
+;		  to 8 bits, and channels stopped on silence: no pops
+;		  around the sounds and the music
 
 ; 28-Apr-2013	- course disk bug fixed, game destroyed the FIB while
 ;		  trying to read the course name so only 1 coourse
@@ -330,6 +331,17 @@ _audiooff
 	move.w	#0,$dff0ba		; AUD1DAT
 	rts
 
+; The sounds the game loads at its start (hunk 44 $814, into their own buffer) are centred as
+; they load, in the walk that enters them in the sample table (a0 the header). The others are
+; loaded just before they play, so the player centres them (and a cached one is marked).
+_sndwalk
+	move.l	d0,-(sp)
+	bsr.b	_sndprep
+	move.l	(sp)+,d0
+	move.b	8(a0),d2
+	asl.w	#8,d2
+	rts
+
 ; The samples (headers "STEVEH", length at 7-8 little-endian, data from 32) hold 0-69, silence
 ; at 35, as signed bytes: every sound sat on a level of +35, which each start and end of a
 ; sample stepped to and from. Some end in zero bytes, and the last sample of each group the game
@@ -338,8 +350,17 @@ _audiooff
 ; a0: a sample's header. Returns its length in d0.w, cut at a header in its last 40 bytes. On
 ; the first call it centres the data on 0 (but the trailing zero bytes, which stay 0) and
 ; marks the header ("STEVEh"). Keeps every other register and d0's upper word (the game's
-; player keeps the channel there).
+; player keeps the channel there). The data goes through _sndgame: 35 to 0, scaled by 3.5 to
+; -123..119, about the full 8 bits, 11 dB louder at the same volume. _sndtab takes the
+; table in a3 (the intro's).
 _sndprep
+	move.l	a3,-(sp)
+	lea	_sndgame(pc),a3
+	bsr.b	_sndtab
+	move.l	(sp)+,a3
+	rts
+
+_sndtab
 	movem.l	d1-d3/a1-a2,-(sp)
 	moveq	#0,d1
 	move.b	8(a0),d1
@@ -376,8 +397,9 @@ _sndprep
 	tst.b	-(a2)
 	beq.b	.zero
 	addq.l	#1,a2
-	moveq	#35,d3
-.centre	sub.b	d3,(a1)+
+	moveq	#0,d2
+.centre	move.b	(a1),d2
+	move.b	(a3,d2.w),(a1)+
 	cmp.l	a2,a1
 	blo.b	.centre
 .done	move.w	d1,d0
@@ -386,15 +408,18 @@ _sndprep
 
 ; The intro's music start (hunk 8 $0, lea $12c(pc),a0 and move.l a0,$128): first centres every
 ; sample of the table hunk 0 $b1c built (its address is hunk 8 $e's operand), following the
-; headers as that routine does, so that the audio interrupt does not have to.
+; headers as that routine does, so that the audio interrupt does not have to. The music's
+; samples average 29.5, not 35 (they hold no silence), so _sndintro centres them on 30 and
+; scales them by 3.25, to -98..126.
 _introstart
-	movem.l	d0-d1/a1-a2,-(sp)
-	move.l	16(sp),a1		; hunk 8 $6
+	movem.l	d0-d1/a1-a3,-(sp)
+	move.l	20(sp),a1		; hunk 8 $6
+	lea	_sndintro(pc),a3
 	move.l	$e-6(a1),a2		; hunk 0 $b4c
 	move.l	(a2),d0
 	beq.b	.end
 	move.l	d0,a0
-.walk	bsr.w	_sndprep
+.walk	bsr.w	_sndtab
 	moveq	#0,d1
 	move.b	8(a0),d1
 	lsl.w	#8,d1
@@ -406,8 +431,33 @@ _introstart
 	beq.b	.walk
 .end	lea	$12c-6(a1),a0
 	move.l	a0,$128-6(a1)
-	movem.l	(sp)+,d0-d1/a1-a2
+	movem.l	(sp)+,d0-d1/a1-a3
 	rts
+
+; SNDTAB centre,num,shift: 256 bytes, byte n to (n - centre) * num / 2^shift, rounded down and
+; held to -128..127.
+SNDTAB	MACRO
+SNDN	SET	0
+	REPT	256
+SNDV	SET	(SNDN-\1)*\2
+	IFLT	SNDV
+SNDV	SET	-((-SNDV+(1<<\3)-1)>>\3)
+	ELSE
+SNDV	SET	SNDV>>\3
+	ENDIF
+	IFGT	SNDV-127
+SNDV	SET	127
+	ENDIF
+	IFLT	SNDV+128
+SNDV	SET	-128
+	ENDIF
+	dc.b	SNDV
+SNDN	SET	SNDN+1
+	ENDR
+	ENDM
+
+_sndgame	SNDTAB	35,7,1
+_sndintro	SNDTAB	30,13,2
 
 PLGAME150
 	PL_START
@@ -418,6 +468,7 @@ PLGAME150
 	PL_B	$2a87f,-3		; hunk 44 $a67
 	PL_PS	$2a834,_sndprep		; hunk 44 $a1c: the sample's length
 	PL_NOP	$2a83a,4
+	PL_PS	$2a678,_sndwalk		; hunk 44 $860: the walk of the sounds loaded at the start
 	PL_END
 
 PLGAME153
@@ -429,6 +480,7 @@ PLGAME153
 	PL_B	$2aa91,-3		; hunk 44 $a71
 	PL_PS	$2aa46,_sndprep		; hunk 44 $a26: the sample's length
 	PL_NOP	$2aa4c,4
+	PL_PS	$2a87e,_sndwalk		; hunk 44 $85e: the walk of the sounds loaded at the start
 	PL_END
 
 ; The sample player (hunk 44 $9f4, v1.53 offsets) counts the first channel's audio

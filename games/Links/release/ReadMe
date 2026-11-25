@@ -100,7 +100,8 @@
  - the game's code runs from fast memory instead of chip memory
  - the intro's pictures are no longer damaged by its music
  - the sound effects and the intro's music no longer sit on an
-   offset: no more pops at their start and end
+   offset: no more pops at their start and end, and use the full
+   8-bit range
 
  version 1.01 (28.04.2013) done by StingRay:
  - support for Bountiful and Firestone course disks added
