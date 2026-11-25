@@ -42,8 +42,10 @@
  and	aminet:game/patch/
 
  version 3.0b (25.11.2026) done by Vesuri:
- - on 68020+ machines the game runs at its original speed, also on PAL, and
-   is drawn smoothly at 50 or 60 frames a second (CUSTOM4)
+ - on 68020+ machines the game runs at its original NTSC speed, also on PAL
+   (CUSTOM4)
+ - on 68020+ machines it is drawn at 50 or 60 frames a second, with the
+   movement smoothed between the game's steps (CUSTOM4)
  - music and sound effects play at their original tempo on PAL (CUSTOM5)
  - the installed icon sets CUSTOM4, CUSTOM5 and CACHE
  - no more pops at the end of notes, and the practice race's rumble loops
