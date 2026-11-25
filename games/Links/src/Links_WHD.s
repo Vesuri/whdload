@@ -25,8 +25,9 @@
 ;		  for the caches on 68020+ (flushes, a per-pixel change without
 ;		  self-modifying code in v1.50, v1.53's span loops without it),
 ;		  v1.53's course picture to the screen 16 pixels a word instead
-;		  of a pixel at a time on 68020+, code and variables of the chip
-;		  memory hunks moved to fast memory, the intro's pictures no
+;		  of a pixel at a time on 68020+, the files unpacked in fast
+;		  memory by a faster unpacker on 68020+, code and variables of
+;		  the chip memory hunks moved to fast memory, the intro's pictures no
 ;		  longer damaged by its music nor its credits overlapping,
 ;		  samples centred and scaled
 ;		  to 8 bits, and channels stopped on silence: no pops
@@ -143,9 +144,10 @@ _bootdos
 	lea	SILENT(pc),a0
 	move.l	d0,(a0)
 
-; _copyscr's tables and row buffer, on a 68020 or later; without them the game's own copy runs
+; _copyscr's tables and row buffer, and _lzw's buffers in fast memory, on a 68020 or later;
+; without them the game's own copy and unpacker run
 	btst	#AFB_68020,AttnFlags+1(a6)
-	beq.b	.noc2p
+	beq.b	.no020
 	move.l	#C2P_SIZE,d0
 	moveq	#MEMF_PUBLIC,d1
 	jsr	_LVOAllocMem(a6)
@@ -154,7 +156,15 @@ _bootdos
 	beq.b	.noc2p
 	move.l	d0,a0
 	bsr.w	_c2pinit
-.noc2p	move.l	DOSbase(pc),a6
+.noc2p	move.l	#LZW_SIZE,d0
+	moveq	#MEMF_FAST,d1
+	jsr	_LVOAllocMem(a6)
+	lea	LZWBUF(pc),a0
+	move.l	d0,(a0)
+	beq.b	.no020
+	move.l	d0,a0
+	bsr.w	_lzwinit
+.no020	move.l	DOSbase(pc),a6
 
 ; load intro
 	move.l	NOINTRO(pc),d0
@@ -289,6 +299,7 @@ EXIT	move.l	_resload(pc),a2
 DOSbase	dc.l	0
 SILENT	dc.l	0			; 8 cleared bytes of chip memory, or 0
 C2PBUF	dc.l	0			; _copyscr's tables and row buffer (C2P_SIZE), or 0
+LZWBUF	dc.l	0			; _lzw's input, dictionary and lengths (LZW_SIZE, fast), or 0
 
 ; format: checksum, offset to patch list, offset to the patch list for a 68020 or later
 ; (0: none), offset to the patch list that needs SILENT (0: none), offset to the MoveCode
@@ -568,6 +579,8 @@ PLCACHE150
 	PL_DATA	$14784,10		; hunk 12 $838
 	dc.w	$dcc4,$1c36,$0000,$9cc4,$6006
 	PL_PS	$15964,_flushcache	; hunk 14 $3c: three immediates
+	PL_PS	$1549a,_lzwbuf		; hunk 13 $19e: the unpacker's buffers
+	PL_P	$17ac8,_lzw		; hunk 23 $0: the unpacker
 	PL_END
 
 PLCACHE153
@@ -596,6 +609,8 @@ PLCACHE153
 	PL_PS	$146b0,_span2		; hunk 12 $748: the loop $74e-$796, signs from _sp2
 	PL_PS	$1597c,_flushcache	; hunk 14 $48: four immediates
 	PL_PS	$14a5a,_copyscr		; hunk 12 $af2: the picture to the screen
+	PL_PS	$154a6,_lzwbuf		; hunk 13 $19e: the unpacker's buffers
+	PL_P	$179f8,_lzw		; hunk 23 $0: the unpacker
 	PL_END
 
 ; v1.53's span loop (hunk 12 $5e2-$60a), after the set-up at $502-$5cc chose its first
@@ -825,6 +840,243 @@ _c2pinit
 	bne.b	.tab
 	movem.l	(a7)+,d2-d3
 	rts
+
+; The game's files are LZW-packed: hunk 13 $b6 loads a file and hunk 23 $1e0 unpacks it,
+; through $0: 9- to 13-bit codes, least significant bit first, 256 clears the table and 257
+; ends; 16 KB of input at a time (hunk 23 $350, read with dos Read), a dictionary of
+; 8192 x (prefix.w, byte.b, pad.b) (hunk 23 $348), both in the game's 64 KB chip buffer
+; (hunk 13 $44e). Each string goes through the stack and out a byte a call (hunk 23 $194),
+; which counts it and, when hunk 23 $397 is set, stops at the count in $35c. The same
+; versions: v1.50 and v1.53 differ only in the dos base's address (hunk 23 $1c).
+LZW_IN	= 0				; the input, 16 KB
+LZW_DICT = $4000			; the dictionary, 8192 x 4
+LZW_LEN	= $c000				; each code's string length, 8192 words
+LZW_SIZE = $10000
+
+; a0: LZWBUF. Codes 0-257 are one byte long.
+_lzwinit
+	add.l	#LZW_LEN,a0
+	move.w	#257,d0
+.len	move.w	#1,(a0)+
+	dbf	d0,.len
+	rts
+
+; hunk 13 $19e: d0 the game's buffer; the input there, the dictionary 16 KB on (hunk 23 $350,
+; $348). With LZWBUF both go to it.
+_lzwbuf	movem.l	d1/a0,-(a7)
+	move.l	8(a7),a0		; hunk 13 $1a4
+	move.l	LZWBUF(pc),d1
+	beq.b	.game
+	move.l	d1,d0
+.game	move.l	$1ac-$1a4(a0),a0	; hunk 13 $1aa: move.l d0,abs (hunk 23 $348)
+	move.l	d0,8(a0)		; hunk 23 $350
+	add.l	#LZW_DICT,d0
+	move.l	d0,(a0)
+	movem.l	(a7)+,d1/a0
+	add.l	#$1b0-$1a4,(a7)
+	rts
+
+	MC68020				; _lzw runs on a 68020 or later (PLCACHE150, PLCACHE153)
+; hunk 23 $0, called from $21e after $1e0 has set the width, the next code and the count:
+; the same reads, output and variables, each string written backwards from its length
+; (LZWBUF + LZW_LEN) by its chain in the dictionary. The dictionary skips codes from 8192
+; on, which the original writes below it (only a 13-bit table that is never cleared gets
+; there). Without LZWBUF the original runs.
+LZWGET	MACRO				; d0.w: the next code (hunk 23 $e6)
+	move.l	d7,d1
+	lsr.l	#3,d1
+	cmp.l	#16374,d1
+	blo.b	.g\@
+	bsr.w	.fill
+.g\@	move.l	(a0,d1.l),d0		; least significant byte first
+	ror.w	#8,d0
+	swap	d0
+	ror.w	#8,d0
+	moveq	#7,d1
+	and.l	d7,d1
+	lsr.l	d1,d0
+	move.w	d4,d1			; the mask: the code limit less 1 (hunk 23 $37a)
+	subq.w	#1,d1
+	and.w	d1,d0
+	add.l	d6,d7
+	ENDM
+
+_lzw	move.l	(a7),a0
+	lea	-$222(a0),a0		; hunk 23
+	move.l	LZWBUF(pc),d0
+	bne.b	.fast
+	lea	$37a(a0),a2		; the instruction replaced: movea.l #(hunk 23 $37a),a2
+	jmp	6(a0)
+.fast	move.l	a7,$360(a0)		; the stack the limit returns on, as $2e
+	movem.l	d6-d7/a5,-(a7)
+	move.l	a0,a4
+	move.l	d0,a2
+	add.l	#LZW_LEN,a2
+	move.l	$1c(a4),a6		; ($1a: movea.l abs,a6) the dos base
+	move.l	(a6),a6
+	move.l	a6,-(a7)		; 8(a7): dos
+	move.l	a4,-(a7)		; 4(a7): hunk 23
+	move.l	$350(a4),a0		; the input
+	move.l	$348(a4),a1		; the dictionary
+	move.l	$354(a4),a3		; the output
+	move.l	a3,a5
+	sub.l	$34c(a4),a5		; a5: the output less the count
+	moveq	#-1,d0
+	tst.b	$397(a4)
+	beq.b	.nolim
+	move.l	a5,d0
+	add.l	$35c(a4),d0
+.nolim	move.l	d0,-(a7)		; (a7): where the limit stops the output
+	movem.l	d2-d4/a0-a1,-(a7)	; the first read ($0-$2a)
+	move.l	$340(a4),d1
+	move.l	a0,d2
+	move.l	#$4000,d3
+	jsr	-42(a6)
+	movem.l	(a7)+,d2-d4/a0-a1
+	tst.l	d0
+	beq.w	.err0
+	move.l	$384(a4),d7		; the bit
+	move.l	$36c(a4),d6		; the width
+	move.w	$364(a4),d5		; the next code
+	move.w	$378(a4),d4		; its limit
+	move.w	$374(a4),d3		; the last code
+	move.b	$398(a4),d2		; its string's first byte
+
+.code	LZWGET
+	cmp.w	#257,d0
+	beq.w	.done
+	cmp.w	#256,d0
+	beq.w	.clear
+	move.w	d0,a6			; the code (the last one, after it)
+	cmp.w	d5,d0
+	bge.b	.kwk
+	move.w	d0,d1
+	moveq	#0,d0
+	move.w	(a2,d1.w*2),d0
+	lea	(a3,d0.l),a4		; the string's end
+	cmp.l	(a7),a4
+	bhs.w	.limit
+	move.l	a4,a3
+	bra.b	.walkt
+.kwk	move.w	d3,d1			; not in the table yet: the last string, then its first byte
+	moveq	#0,d0
+	move.w	(a2,d1.w*2),d0
+	lea	1(a3,d0.l),a4
+	cmp.l	(a7),a4
+	bhs.w	.limitk
+	move.l	a4,a3
+	move.b	d2,-(a4)
+	bra.b	.walkt
+.walk	move.b	2(a1,d1.w*4),-(a4)
+	move.w	(a1,d1.w*4),d1
+.walkt	cmp.w	#255,d1
+	bgt.b	.walk
+	move.b	d1,-(a4)
+	move.b	d1,d2			; the first byte ($398, $399)
+	cmp.w	#8192,d5		; the new code ($1be): the last string and this first byte
+	bhs.b	.full
+	move.w	d3,(a1,d5.w*4)
+	move.b	d2,2(a1,d5.w*4)
+	move.w	(a2,d3.w*2),d0
+	addq.w	#1,d0
+	move.w	d0,(a2,d5.w*2)
+.full	addq.w	#1,d5
+	move.w	a6,d3
+	cmp.w	d4,d5
+	blt.w	.code
+	move.l	4(a7),a4
+	cmp.w	$38a(a4),d6		; the widest
+	beq.w	.code
+	addq.l	#1,d6
+	add.w	d4,d4
+	bra.w	.code
+
+.clear	moveq	#9,d6			; $178
+	move.w	#512,d4
+	move.w	#258,d5
+	LZWGET
+	move.w	d0,d3
+	move.b	d0,d2
+	lea	1(a3),a4
+	move.b	d0,(a3)+
+	cmp.l	(a7),a4
+	blo.w	.code
+	bra.b	.stopped
+
+; the limit falls in this string: its bytes up to there, at least one
+.limitk	bsr.b	.stop
+	subq.l	#1,a4
+	cmp.l	d0,a4
+	bhs.b	.lt
+	move.b	d2,(a4)
+	bra.b	.lt
+.limit	bsr.b	.stop
+	bra.b	.lt
+.l	subq.l	#1,a4
+	cmp.l	d0,a4
+	bhs.b	.l1
+	move.b	2(a1,d1.w*4),(a4)
+.l1	move.w	(a1,d1.w*4),d1
+.lt	cmp.w	#255,d1
+	bgt.b	.l
+	subq.l	#1,a4
+	cmp.l	d0,a4
+	bhs.b	.l2
+	move.b	d1,(a4)
+.l2	move.b	d1,d2
+	move.l	d0,a3
+.stopped
+	move.l	4(a7),a4
+	clr.b	$397(a4)
+.done	move.l	4(a7),a4		; the variables as the original leaves them
+	move.l	d7,$384(a4)
+	move.l	d6,$36c(a4)
+	move.w	d5,$364(a4)
+	move.w	d4,$378(a4)
+	move.w	d3,$374(a4)
+	move.b	d2,$398(a4)
+	move.b	d2,$399(a4)
+	move.l	a3,d0
+	sub.l	a5,d0
+	move.l	d0,$34c(a4)
+	move.l	8(a7),a6
+	lea	12(a7),a7
+	movem.l	(a7)+,d6-d7/a5
+	rts
+
+.stop	move.l	a3,d0			; d0: max(the limit, a3 + 1)
+	addq.l	#1,d0
+	cmp.l	4(a7),d0
+	bhs.b	.s1
+	move.l	4(a7),d0
+.s1	rts
+
+; d1: the byte the code starts in, 16374 or more. The rest to the start and the buffer
+; filled up behind it ($106-$144); d1 = 0, d7 the bit in the first byte.
+.fill	movem.l	d2-d4/a0-a1,-(a7)
+	move.l	#16384-1,d2
+	sub.l	d1,d2
+	move.l	d1,d3
+	lea	(a0,d1.l),a1
+.mv	move.b	(a1)+,(a0)+
+	dbf	d2,.mv
+	move.l	a0,d2
+	move.l	28(a7),a1		; hunk 23
+	move.l	$340(a1),d1
+	move.l	32(a7),a6
+	jsr	-42(a6)
+	movem.l	(a7)+,d2-d4/a0-a1
+	tst.l	d0
+	beq.b	.err1
+	moveq	#7,d1
+	and.l	d1,d7
+	moveq	#0,d1
+	rts
+.err1	move.l	8(a7),a4		; nothing read: the original's exit ($230)
+	jmp	$230(a4)
+.err0	move.l	4(a7),a4
+	jmp	$230(a4)
+	MC68000
 
 ; MoveCode tables: hunk, split: the hunk's bytes below split (its code and variables) move
 ; to fast memory, the rest (sprites, copper list) stays in chip memory; -1. Then hunk,

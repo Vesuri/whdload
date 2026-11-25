@@ -70,10 +70,12 @@ On a 68020 or later (`PLCACHE150`, `PLCACHE153`, Vesuri):
 | v1.53 | `$1597C` | 14 `$48` | `jsr _flushcache` over the `jmp`: the cache is flushed after each modification |
 | v1.53 | `$14A5A` | 12 `$AF2` | `jsr _copyscr`: the picture to the screen (below) |
 | v1.50 | `$14520`, `$14692`, `$15964` | 12 `$5D4`, 12 `$746`, 14 `$3C` | `jsr _flushcache` over the `jmp` |
+| both | `$154A6` (v1.53), `$1549A` (v1.50) | 13 `$19E` | `jsr _lzwbuf`: the unpacker's input and dictionary (hunk 23 `$350`, `$348`) in `LZWBUF` instead of the game's chip buffer (below) |
+| both | `$179F8` (v1.53), `$17AC8` (v1.50) | 23 `$0` | `jmp _lzw`: the unpacker (below) |
 | v1.50 | `$146DC`, `$14784` | 12 `$790`, 12 `$838` | the per-pixel `move.b d4,` into the displacement of `move.b (0,a6,d0.w),d6` and its `jmp` become `adda.w d4,a6`, the read, `suba.w d4,a6`, `bra.s` on: no code is modified, no flush per pixel |
 
 v1.53 draws a course view in hunk 12's driver (`$0`): the set-up, mostly hunk 23's LZW
-unpacking of the hole (its input, output and dictionary in chip memory), then `DRAWING
+unpacking of the hole (below), then `DRAWING
 COURSE` (`$5E`), `DRAWING BACKGROUND` (`$74`), `DRAWING OBJECTS` (`$82`) into a picture
 of a byte a pixel, 320 x 160 (hunk 19 `$1AC`), and `$AF2` to the screen (from `$90`).
 `$AF2` takes each pixel's colour from its byte, its region (hunk 0 `$610`), the depth map
@@ -101,11 +103,49 @@ read at each address through the gdb stub, before and after:
 | to the screen | 27 | 2 |
 | all | 137 | 89 |
 
+`_lzw` then took the set-up from 34 fields to 8 (below).
+
 On the cycle profiler's 68030 (aprof, `--uae_mmu_model=0`, no data cache) the same
 phases took 34.7, 79.3, 11.0, 25.3 and 26.3 fields and 34.6, 53.9, 11.1, 25.3 and 4.2:
 `resload_FlushCache` had taken about 23 of `DRAWING COURSE`'s fields and hunk 4's
 routines 20 of the 26. v1.50 plots each pixel straight to the screen inside its span
 loops (hunk 12 `$7BA`, `$85C`) and has neither change.
+
+Every file the game loads goes through hunk 13 `$B6`: a 122-byte `MDmd` header (byte 5
+set: packed, the size at 24), then the data, which hunk 23 `$1E0` unpacks through `$0`:
+LZW, 9- to 13-bit codes least significant bit first, 256 clears the table and 257 ends.
+It reads 16 KB at a time (dos `Read`, refilled once a code starts at byte 16374 or later)
+into hunk 23 `$350`, keeps 8192 dictionary entries of a prefix word and a byte (hunk 23
+`$348`), both in the game's 64 KB chip buffer (hunk 13 `$44E`, allocated `MEMF_CHIP` at
+hunk 19 `$98`, also a scratch screen and sample buffer elsewhere), and puts each string on
+the stack and out a byte a call (`$194`), which counts it and, with hunk 23 `$397` set,
+stops at the count in `$35C` (hunk 31 `$1032`). The two versions' hunk 23 differ only in
+the dos base's address (`$1C`). On a 68020 or later `_lzwbuf` points the input and
+dictionary at `LZWBUF` (64 KB `MEMF_FAST` allocated at start, its last 16 KB each code's
+string length), and `_lzw` unpacks with the same reads, output and variables, writing each
+string backwards from its length by its chain. It skips dictionary entries from 8192 on,
+which the original writes below the dictionary; no file gets there (each clears the
+table when it is full). Without `LZWBUF` both run the game's code.
+`tools/lzwcheck.py` runs both on every packed member of every file of the four drawers
+(545, whole and with 2 random limits each) in Unicorn: registers, variables, output,
+input, dictionary and the memory under it equal.
+
+On the a1200-030 with `CACHE CUSTOM1=1`, from the ready screen's OK to the first hole's
+view (one run each, the game's VBL counter at hunk 30 `$0`, `$1C0`, `$1E0` and hunk 12
+`$0`, `$5E`, `$B8`), V1.01 (no `CACHE`), the 2.0b build before `_lzw`, and with it:
+
+| Phase | V1.01 | before | 2.0b |
+|---|---|---|---|
+| the overview map's files (hunk 30 `$0`-`$1C0`) | 160 | 133 | 26 |
+| the map's wait (to `$1E0`) | 39 | 62 | 157 |
+| the description and the hole's files (to hunk 12 `$0`) | 289 | 234 | 37 |
+| the course view's set-up | 43 | 34 | 8 |
+| `DRAWING` and to the screen | 124 | 55 | 47 |
+| all | 655 | 518 | 275 |
+
+The map stays up at least 180 fields from hunk 30 `$12` (the counter hunk 20 `$52A`,
+waited on at hunk 30 `$1C0`) unless clicked: by design, and now most of its time. The
+description screen is shown while the hole loads, so now briefly.
 
 `title` (`PLTITLE`, Vesuri): `PL_S` at `$2614` (hunk 8 `$78`, 12 bytes). The intro's music
 routine sets two channel counters with `move.b #-2,(0,a2,d0.w)` and `(1,a2,d0.w)` (a2 hunk 8

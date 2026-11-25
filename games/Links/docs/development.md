@@ -68,10 +68,15 @@ output with `68040 MMU:` lines, which break the capture otherwise. Parallel boot
 
 `python3 tools/drawcheck.py [N]` checks `_span1`, `_span2` and `_copyscr` against v1.53's
 code on random inputs (internals.md, the course view); run it after changing them.
+`python3 tools/lzwcheck.py [LIMITS]` checks `_lzw` against hunk 23's unpacker on every
+packed member of the drawers in `tmp/game` (internals.md, loading), about a minute; run it
+after changing `_lzw`. Unicorn keeps code it has translated when memory is written, so a
+check that changes code between runs needs a machine per version (as it does).
 
 ## Traps
 
 - The plain a1200 (2 MB chip, no fast) and the a500-1.5m cannot allocate the ExpMem
-  ("Can't allocate ExpMem.").
+  ("Can't allocate ExpMem."), nor 512 KB or 1 MB chip with 1.5 MB fast; 512 KB chip with
+  2 MB fast boots.
 - The Barto profile records no instructions on the a1200-030's MMU core
   (`EXTRA_ARGS=--uae_mmu_model=0`) and none outside the 24-bit space (Zorro III).
