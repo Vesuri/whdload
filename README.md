@@ -15,6 +15,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Game | Original slave by | Release |
 |---|---|---|
 | 4D Sports Driving Enhanced | JOTD | [2.0b (10.11.2026)](https://github.com/Vesuri/whdload/releases/tag/4DSportsDrivingEnhanced-2.0b-20261110) |
+| Alien Breed 3D Enhanced | Psygore | not yet released |
 | Archipelagos Enhanced | StingRay | [2.0b (19.11.2026)](https://github.com/Vesuri/whdload/releases/tag/ArchipelagosEnhanced-2.0b-20261119) |
 | Battlehawks 1942 Enhanced | Galahad/Fairlight | [2.0b (09.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Battlehawks1942Enhanced-2.0b-20261109) |
 | Buggy Boy Enhanced | Codetapper | [2.0b (16.11.2026)](https://github.com/Vesuri/whdload/releases/tag/BuggyBoyEnhanced-2.0b-20261116) |
