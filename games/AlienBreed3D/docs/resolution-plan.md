@@ -1,12 +1,14 @@
 # Enhanced resolution plan
 
 The goal (decided 26.11.2026): replace the copper chunky view with real 1x1 pixels in both
-views, behind one option, and make both run as fast as we can.
+views, behind one option, and make both run as fast as possible: there is no fixed frame
+rate to reach, the work goes on while measured gains remain.
 
 - **Enhanced resolution**, CUSTOM5 (`C5:B:Enhanced resolution`; CUSTOM1-4 are the
   original's). Off, the game is the original byte for byte.
 - The small view becomes 192x160 at 1x1 (4x the original's 96x80 pixels), full screen
-  288x240 at 1x1 (9x). Keypad Enter still switches between them.
+  288x240 at 1x1 (9x), the original's size and field of view (decided, for now). Keypad
+  Enter still switches between them.
 - Both are bitplane screens (8 planes) fed by a Kalms c2p from a chunky buffer in fast
   memory, replacing the copper chunky lists.
 
@@ -123,26 +125,33 @@ just step further, up to 15 fields.
    - Done when the small view draws everything at 192x160 with no holes, play-tested
      through levels 1 and 2.
 6. **Full screen at 288x240**: the same writers at the second size, with the projection
-   scaled 3x from 96x80 in both directions. That is the original's field of view and
-   aspect; a wider screen is a later option, not this step.
-7. **Speed.** Profile both 1x1 views on each CPU and work down the shares: the writers'
-   inner loops (on the 030, keep them inside the 256-byte instruction cache), tables and
-   textures in fast memory, the c2p choice and its overlap with rendering. Report against
-   step 1, per view and per CPU, and stop at the agreed bar.
+   scaled 3x from 96x80 in both directions: the original's field of view and aspect.
+7. **Speed, as fast as possible.** Profile both 1x1 views on each CPU and work down the
+   shares: the writers' inner loops (on the 030, keep them inside the 256-byte instruction
+   cache), tables and textures in fast memory, the c2p choice and its overlap with
+   rendering. Report each step against step 1, per view and per CPU. With no bar to meet,
+   stop by AmigaXDev's `reference/measurement-method.md` §9: when the profile is flat
+   and experiments move the totals by about 1% or less, change the structure or close the
+   scope.
 8. **Machines and play.** a1200, a1200-030 and a1200-040, plus an ACA1221-class 28 MHz
    68020 (`EXTRA_ARGS`), both variants, two-player link at least not broken, and CUSTOM5
    off unchanged. Decide from the measurements which CPUs the option applies on; below
    that it is ignored.
-9. **The other versions**: the floppy ($23d2) and CD32 ($fd78) executables, which only
-   the original disks and CD hold. Port the patches by finding the same routines.
+9. **The other versions.** The work is done on the Aminet 8-channel version ($c4dc, the
+   AGA drawer), then ported to the CD32 one ($fd78, the CD32 drawer). The CD32 version
+   draws the same way, with its routines byte for byte or with only their addresses changed
+   ([internals](internals.md#display)), so the port is finding them. The floppy version
+   ($23d2) is in no archive; it needs the original disks.
 10. **Release**: a dated `$VER` and ReadMe entry, CUSTOM5=1 in the installed icon, the new
     memory figures, and the reconstructed source in place of the encrypted archive (decided).
 
+## Decided
+
+- Full screen 288x240, as the original, for now (26.11.2026).
+- Performance: as fast as possible, no fixed frame rate (26.11.2026).
+
 ## Open decisions
 
-- The bar: which frame rate, for which view, on which machine (needed by step 7).
-- Versions: the Aminet 8-channel one alone (all we have), or the floppy and CD32 as well
-  (step 9 needs their files).
-- Full screen: 288x240 as the original, or wider once 288x240 works.
+- The floppy version: in scope only if its executable is supplied (step 9).
 - The slowest CPU the option runs on (from steps 4 and 7).
 - The palette method (from step 3).
