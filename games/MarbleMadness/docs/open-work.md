@@ -44,7 +44,8 @@ and faster have a wide margin.
 - `C5:X:Music and sound at NTSC tempo on PAL:0`: its own toggle (step 3), on any CPU.
 
 The installed icon sets `CUSTOM4=1` and `CUSTOM5=1`. With both off, the patch list is the
-original plus the always-on sound fixes (`docs/internals.md`, "Sound fixes").
+original plus the always-on sound and mouse fixes (`docs/internals.md`, "Sound
+fixes", "Mouse").
 
 **Decided:** interpolation, one step behind, with no prediction. The per-vsync colour
 cycling stays as it is.

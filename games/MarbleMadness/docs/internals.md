@@ -210,6 +210,34 @@ build), 10 s from the race start, full stereo separation:
   the rumble in chip memory has the designed bytes, and on `a1200-030` neither stereo side
   holds a level other than 0 for more than 10 ms in the first 10 s of the race.
 
+## Mouse
+
+Always on (`pl_mouse_fix`). The race reads the mouse once a step (`$19390`, hunk 206, from
+the mode handler at `$AF8E`): for each port, the change of the 8-bit counters (JOY0DAT or
+JOY1DAT, swapped by `$195E1`) since the last step, against the last values at `$195E2`/
+`$195E6` + port. The deltas go to `$195E4`/`$195E8` and, turned 45° for the isometric view,
+to the words `$195EA`/`$195EE`. A change beyond $60 counts whose sign differs from the
+last step's output is taken for a counter that wrapped and replaced by 127 the other way
+(`$194A8`, `$19506`). An output of 0 counts as positive, so from rest a move of 97–127
+counts in +x or −y goes the wrong way at full speed, and so does any fast reversal (80
+counts one way, then 100 back, gives 127 the first way). Moves of more than 127 counts a
+step are guessed from the last step's sign. The options menu has its own reader (`$19008`,
+no guess) and is unchanged.
+
+The slave samples both counters every field (a VERTB server, `mouse_irq`) into 16-bit
+totals. At `$1947E`, the counter path, `mouse_read` samples again, takes the port's total,
+limits it to −128..127 and writes it as the counter word, so the game's own subtraction
+gives the total; totals older than 10 fields are dropped (the race's start). The guess is
+switched off: the limits $60 and −$60 become 127 and −128.
+
+MEASURED (`monitor mouse` moves in a practice race, the outputs at `$195E8`/`$195E4`):
+- original, `a1200`: +110 x gave +127 (+60 gave −60); −110 y gave +127; 80 then −100 x gave
+  −80, then +64 and +36;
+- fixed (release build, CUSTOM4=1): +110 x gives −110, −110 y gives −110 and 80 then −100
+  x gives −80 then +100, on `a500-1.5m`, `a1200`, `a1200-030` and `a1200-040` (FS-UAE
+  sometimes spreads a move over two steps; the outputs then add up to it); −110 x gives
+  +110 and three steps of +127 x give −127, −122, −1, −123 on `a1200`.
+
 ## Slave patches
 
 JOTD's (`pl_main`, always):
@@ -228,6 +256,7 @@ After `pl_main`, the slave makes the ExpMem non-cacheable (`WCPUF_Exp_NCS`).
 
 Ours:
 - `pl_sound_fix` (always, "Sound fixes");
+- `pl_mouse_fix` (always, "Mouse");
 - `pl_pal_sound` (C5, "Sound timing");
 - `pl_enhanced` (C4, below).
 

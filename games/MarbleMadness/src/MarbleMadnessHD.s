@@ -397,6 +397,29 @@ patch_exe:
 	move.l	d7,a1
 	jsr	(resload_PatchSeg,a2)
 
+	; mouse fix, always on: the counters sampled every field (mouse_irq)
+	move.l	a6,-(a7)
+	moveq	#IS_SIZE,d0
+	move.l	#MEMF_PUBLIC|MEMF_CLEAR,d1
+	move.l	(4).w,a6
+	jsr	(_LVOAllocMem,a6)
+	tst.l	d0
+	beq.b	.nomouse
+	move.l	d0,a1
+	move.b	#NT_INTERRUPT,(LN_TYPE,a1)
+	lea	mouse_state(pc),a0
+	move.l	($dff00a).l,(MS_LAST,a0)
+	move.l	a0,(IS_DATA,a1)
+	lea	mouse_irq(pc),a0
+	move.l	a0,(IS_CODE,a1)
+	moveq	#INTB_VERTB,d0
+	jsr	(_LVOAddIntServer,a6)
+	lea	pl_mouse_fix(pc),a0
+	move.l	d7,a1
+	jsr	(resload_PatchSeg,a2)
+.nomouse
+	move.l	(a7)+,a6
+
 	move.l	_enhanced(pc),d0
 	beq.w	.noenhanced
 	move.l	_attnflags(pc),d0
@@ -1485,6 +1508,119 @@ pl_sound_fix
 	PL_PS	$8D00,seg_loaded		; LoadSeg wrapper $8CF0: addq.l #8,a7; move.l d0,(-4,a6)
 	PL_END
 
+; The race reads the mouse once a step ($19390, hunk 206): the 8-bit counters' change since
+; the last step, in -128..127. A change beyond $60 counts is taken for a counter that
+; wrapped when its sign differs from the last step's output, and is then replaced by 127
+; in the other direction; from rest (an output of 0 counts as positive) or on a reversal,
+; a real move of 97-127 counts goes the wrong way at full speed, and beyond 127 counts
+; the direction is a guess. Here the counters are sampled every field into 16-bit
+; totals, and the step gets the total since the last step, limited to -128..127, as the
+; change of a counter the game compares with its own last value; the guess is switched
+; off (the limits $60 and -$60 become 127 and -128).
+pl_mouse_fix
+	PL_START
+	PL_PS	$1947E,mouse_read	; the counter path: lea (-8,a6),a0; move.b (a0),d0
+	PL_W	$194AA,$007F		; cmpi.b #$60,d7
+	PL_W	$194B0,$0080		; cmpi.b #-$60,d7
+	PL_W	$19508,$007F		; cmpi.b #$60,d6
+	PL_W	$1950E,$0080		; cmpi.b #-$60,d6
+	PL_END
+
+MS_ACC = 0			; words: port 0 y, x, port 1 y, x (sums of the changes)
+MS_LAST = 8			; bytes: JOY0DAT, JOY1DAT at the last sample
+MS_AGE = 12			; bytes: fields since each port's last read, at most 255
+MOUSE_STALE = 10		; older totals are dropped (the race's start, a pause)
+
+; VERTB server: a1 = mouse_state
+mouse_irq
+	bsr.b	mouse_sample
+	addq.b	#1,(MS_AGE,a1)
+	bne.b	.age1
+	st	(MS_AGE,a1)
+.age1
+	addq.b	#1,(MS_AGE+1,a1)
+	bne.b	.age2
+	st	(MS_AGE+1,a1)
+.age2
+	moveq	#0,d0
+	rts
+
+; add the counters' changes since the last sample to the totals; a1 = mouse_state,
+; d0-d1/a0 scratch
+mouse_sample
+	move.l	d2,-(a7)
+	move.l	($dff00a).l,d2		; JOY0DAT, JOY1DAT: y, x bytes each
+	lea	(MS_LAST,a1),a0
+	moveq	#0,d1
+.next
+	rol.l	#8,d2
+	move.b	d2,d0
+	sub.b	(a0,d1.w),d0
+	move.b	d2,(a0,d1.w)
+	ext.w	d0
+	add.w	d1,d1
+	add.w	d0,(MS_ACC,a1,d1.w)
+	lsr.w	#1,d1
+	addq.w	#1,d1
+	cmp.w	#4,d1
+	bne.b	.next
+	move.l	(a7)+,d2
+	rts
+
+; $1947E, in the step's loop over the game's ports: d5 = port, a5 = $195E4 + port,
+; a6 = the frame with the counter word read at (-8,a6)
+mouse_read
+	movem.l	d1-d4/a0-a2/a6,-(a7)
+	move.l	a6,a2
+	lea	mouse_state(pc),a1
+	move.l	a5,a0
+	sub.l	d5,a0
+	move.l	d5,d4			; the hardware port: the game's, or the other one
+	tst.b	($195E1-$195E4,a0)	; when the ports are swapped
+	beq.b	.port
+	eor.w	#1,d4
+.port
+	move.l	(4).w,a6
+	jsr	(_LVODisable,a6)
+	bsr.b	mouse_sample
+	moveq	#0,d1
+	move.b	(MS_AGE,a1,d4.w),d1
+	clr.b	(MS_AGE,a1,d4.w)
+	add.w	d4,d4
+	add.w	d4,d4
+	move.w	(MS_ACC,a1,d4.w),d2	; y
+	move.w	(MS_ACC+2,a1,d4.w),d3	; x
+	clr.l	(MS_ACC,a1,d4.w)
+	jsr	(_LVOEnable,a6)
+	cmp.w	#MOUSE_STALE,d1
+	bls.b	.fresh
+	moveq	#0,d2
+	moveq	#0,d3
+.fresh
+	moveq	#127,d1
+	cmp.w	d1,d2
+	ble.b	.y1
+	move.w	d1,d2
+.y1	cmp.w	d1,d3
+	ble.b	.x1
+	move.w	d1,d3
+.x1	moveq	#-128,d1
+	cmp.w	d1,d2
+	bge.b	.y2
+	move.w	d1,d2
+.y2	cmp.w	d1,d3
+	bge.b	.x2
+	move.w	d1,d3
+.x2	add.b	($195E2-$195E4,a5),d2	; the game's last y ($195E2 + port)
+	add.b	($195E6-$195E4,a5),d3	; and x
+	move.b	d2,(-8,a2)
+	move.b	d3,(-7,a2)
+	movem.l	(a7)+,d1-d4/a0-a2/a6
+	lea	(-8,a6),a0
+	moveq	#0,d0
+	move.b	(a0),d0
+	rts
+
 ; Notes fade out before they are cut. Each note or effect is a CMD_WRITE of a short loop
 ; that the game cuts with CMD_FLUSH ($201CA) 2-3 fields later. The flush stops Paula
 ; mid-loop and the channel holds the last byte it fetched at the note's volume (often the
@@ -1920,6 +2056,11 @@ sfx_phase:
 	dc.w	0		; fifths of a step owed
 note_volume:
 	dc.b	0,0,0,0		; each channel's volume, from the game's requests
+	even
+mouse_state:			; MS_ACC, MS_LAST, MS_AGE (mouse_irq, mouse_read)
+	dc.w	0,0,0,0
+	dc.b	0,0,0,0
+	dc.b	255,255
 en_table			; hunk, offset in it: the addresses below, in order
 	dc.w	36,$7596-$74D4		; the Framer's per-vsync routine
 	dc.w	342,$24B54-$24A64	; the WaitTOF stub
