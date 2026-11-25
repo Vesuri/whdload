@@ -1,0 +1,106 @@
+Short : HD-Installer for Alien Breed 3D
+Type : game/patch
+Author : Psygore (psygore@whdload.de)
+
+
+That install applies to "Alien Breed 3D" © 1995 Team 17
+It supports floppy disks, CD32 and aminet (8ch sound patch) version.
+
+It requires:
+ - WHDLoad 18+
+ - 576 KB ChipMem & 1.3 MB OtherMem (+2.0 MB extra mem for preload)
+ - AGA chipset and a 68020 processor (at least)
+ - XFD package must be installed to depack some files
+
+
+Version 1.3 (08.01.2020) by Psygore:
+ - An access fault removed (level 13), thanks to Angus for the bug report
+   (mantis #4316)
+ - CUSTOM1 for trainers modified, set
+   CUSTOM1=1 for unlimited energy
+   CUSTOM1=2 for unlimited shots
+   CUSTOM1=4 to skip level
+   To select unlimited energy and shots, set CUSTOM1=3 (1+2), ...  
+
+Version 1.2 (05.04.2014) by Psygore:
+ - Slave updated for WHDLoad 17+ (custom options displayed on splash window)
+ - CPU caches was enabled before detecting CPU type (on 060, all caches were
+   not enabled). This is fixed now.
+ - Joystick control is set by default (as CD32 version)
+ - If 'plain shaded' is selected with joypad for floor detail, pause option was
+   broken. Fixed now.
+ - Press 'Reverse+Forward+Play' (at least 1 sec. with joypad) to quit slave
+ - Install script updated
+
+Version 1.1 (25.06.2011) by Psygore:
+ - Slave completely rewritten (no need OSEmu anymore)
+ - CD32 version and joypad supported (thanks to Sascha Steinert)
+ - Trainer added (CUSTOM1=1, unlimited energy and ammo, F1 to skip level)
+ - Set CUSTOM2=1 for LMB=forward/RMB=fire (mouse control)
+ - Set CUSTOM2=2 for RMB=forward/LMB=fire (mouse control)
+ - Set CUSTOM3=1 to load aminet version (abd8ch)
+ - Set CUSTOM4=1 to enable main music (HackAB3D) in the end part
+ - Load/Save prefs file
+ - All unpacked files (abd.pk, HackAB3D,...) can be packed as data with Propack
+ - New install script
+ - Some box icons added
+ - The game must be re-installed
+
+Version 1.0 (29.09.2001) by Psygore:
+ - SSP & USP relocated to fast memory
+ - OSEmu used (2nd copper-list is not reloaded)
+ - Password protection removed
+ - 'HackAB3D' supported (just copy it to 'data' dir)
+ - Aminet version (8 ch sound patch) supported, depack 'abd.pk' with XFD
+   and copy it to 'data' dir
+ - Access fault removed
+ - Quit with F10
+
+
+Note:
+This slave needs less memory than the original game now (a slave -no music- is
+included, only 428kb (!) chipmem required, HackAB3D will not be loaded).
+The access fault which occured in the version 1.0 is caused by a random read
+(outside a data table in the game code), this is fixed now. And some problems
+you may have had with ennemies and objects should be removed.
+
+You can download the 8ch sound patch here:
+http://aminet.net/game/patch/AB3D-patch.lha
+Depack the file, rename it to adb8ch and copy it in data/ dir.
+Use CUSTOM3=1 option to load it. Just notice there is no end part in this
+version.
+
+and the music here:
+ftp://ftp.team17.com/pub/t17/goodies/hackab3d.lha
+Depack the archive and copy the file into data/ dir.
+
+Known bug: if you use 'HackAB3D' and the aminet version, when you go back
+           to the main screen, the music is corrupted.
+This bug is removed from slave 1.1.
+
+Thanks go to Bored Seal for sending the disk-files and for testing it!
+
+
+Please support the development of WHDLoad by registering.
+For more infos: http://www.whdload.de/reg.html
+
+If you have problems with this installation please report them via the
+Bug-Report-Form which can be accessed via 
+
+                http://www.whdload.de/
+
+or via mail to: psygore@whdload.de
+
+for full WHDLoad package and other installs refer to:
+
+                http://www.whdload.de/
+        or      aminet:dev/misc/whdload#?
+        and     aminet:game/patch/
+
+
+     _________________________________
+--- (_ __¬) __) \ ¬) ___)   ¬) __¬)¬__) ---
+ --  /  _/__¬\  / / /_¬\  --/ _  / __)  --
+  - (__/(_____)  /(_____)  /_/ \(_____) -
+            (___/      \__/     \__)in 01.2020
+

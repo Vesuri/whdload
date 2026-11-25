@@ -1,0 +1,15 @@
+{
+  "archives": [
+    {
+      "input": "AlienBreed3D.lha",
+      "output": "AlienBreed3DEnhanced-{version}-{date}.lha",
+      "replace": {
+        "AlienBreed3DHD/AlienBreed3D.slave": "build:AlienBreed3D",
+        "AlienBreed3DHD/AlienBreed3D_nomusic.slave": "build:AlienBreed3D_nomusic",
+        "AlienBreed3DHD/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": []
+    }
+  ]
+}
