@@ -170,6 +170,46 @@ MEASURED: with CUSTOM5 the music step `$1FA68` is `$13333`, against `$10000` wit
 on `a500-1.5m` at the options menu. `$21740` ran 12 times in 10 fields on `a1200-030`. On an
 NTSC machine (`NTSC=1`) the game's code is byte-identical to a run without the option.
 
+## Sound fixes
+
+Always on (`pl_sound_fix`). Sound goes through Kick 1.3's `audio.device`, via the game's
+BeginIO stub `$24A3C` (hunk 337; timer.device's requests use it too). Each music note or
+effect is a CMD_WRITE of a short loop (16 to 256 bytes), with ADIOF_PERVOL and cycles 1,
+then the same with cycles 0; ADCMD_PERVOL steps its volume each field, and `$201CA` cuts it
+with CMD_FLUSH (IOF_QUICK) 2 to 3 fields later, copying the channel's request from `$21250`
+(`$44` a channel).
+
+**Note pops.** The flush stops Paula mid-loop. The channel then holds the last byte it
+fetched, at the note's volume, until the next note starts with a jump from that level.
+The 16-byte waveform starts 13, 124, so the held level is often its peak.
+- `audio_io` keeps each channel's volume from the requests that set it, and before a flush
+  takes the channel's volume register (`AUDxVOL`) down to 0 over 32 display lines (2 ms)
+  while the loop plays on; the flush then holds 0. The next note's write sets its own
+  volume.
+- Ending a note at a loop boundary instead (ADCMD_FINISH with ADIOF_SYNCCYCLE, waiting for
+  the write's reply) did not help: `audio.device` stops at the interrupt of the next loop's
+  start, when Paula already plays its first word, and the levels held were the same.
+
+**The practice rumble's loop.** At the race start channel 0 loops a 3200-byte rumble at
+period 429 (0.39 s), `prcsnd` hunk 40, PatchSeg offset `$23A8`. Where it loops the waveform
+jumps from -59 (mid-fall) to 2. `seg_loaded` (after the LoadSeg at `$8CF0`'s `$8D00`)
+patches 12 bytes when the file is `prcsnd`: bytes 0–3 and 3192–3199. The values come from a
+16th-order linear predictor fitted to the sample, solved by least squares for the bytes
+that make the played loop as predictable as the rest of it: the worst prediction error
+across the loop point is 2.7σ, against 21.8σ before; 99% of the sample is within 2.8σ.
+
+MEASURED, `a1200-030`, the practice race with channels 0 and 2 alone (a temporary debug
+build), 10 s from the race start, full stereo separation:
+- channel 2 held a level between notes 74 times, up to 7770 (of 32767), and jumped out of
+  them by up to 10087 (median 902); with the fade the 71 holds are at 0 and the jumps up
+  to 1523 (median 78). The waveform's own steps (99.9th percentile, about 1290) are
+  unchanged;
+- 69 cuts in the first 700 fields after GO!, so the fade waits about 140 ms in 14 s (1%,
+  computed from the count, not measured as time);
+- the release build on `a500-1.5m`, `a1200`, `a1200-030` and `a1200-040`: the race runs,
+  the rumble in chip memory has the designed bytes, and on `a1200-030` neither stereo side
+  holds a level other than 0 for more than 10 ms in the first 10 s of the race.
+
 ## Slave patches
 
 JOTD's (`pl_main`, always):
@@ -187,6 +227,7 @@ JOTD's (`pl_main`, always):
 After `pl_main`, the slave makes the ExpMem non-cacheable (`WCPUF_Exp_NCS`).
 
 Ours:
+- `pl_sound_fix` (always, "Sound fixes");
 - `pl_pal_sound` (C5, "Sound timing");
 - `pl_enhanced` (C4, below).
 

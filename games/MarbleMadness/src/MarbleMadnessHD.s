@@ -392,6 +392,11 @@ patch_exe:
 	jsr	(resload_PatchSeg,a2)
 .nosound
 
+	; sound fixes, always on: notes fade out before a cut, the practice rumble's loop
+	lea	pl_sound_fix(pc),a0
+	move.l	d7,a1
+	jsr	(resload_PatchSeg,a2)
+
 	move.l	_enhanced(pc),d0
 	beq.w	.noenhanced
 	move.l	_attnflags(pc),d0
@@ -1474,6 +1479,135 @@ pl_pal_sound
 	PL_PS	$20B1A,sfx_tick
 	PL_END
 
+pl_sound_fix
+	PL_START
+	PL_PS	$24A3C,audio_io		; the BeginIO stub: move.l (4,a7),a1; move.l a6,-(a7)
+	PL_PS	$8D00,seg_loaded		; LoadSeg wrapper $8CF0: addq.l #8,a7; move.l d0,(-4,a6)
+	PL_END
+
+; Notes fade out before they are cut. Each note or effect is a CMD_WRITE of a short loop
+; that the game cuts with CMD_FLUSH ($201CA) 2-3 fields later. The flush stops Paula
+; mid-loop and the channel holds the last byte it fetched at the note's volume (often the
+; waveform's peak, a quarter of full scale), until the next note starts with a jump from
+; that level: a pop. Ending at a loop boundary (ADCMD_FINISH, ADIOF_SYNCCYCLE) does not
+; help: audio.device stops at the interrupt of the next loop's start, when Paula already
+; plays its first word. So before the flush, the channel's volume register goes down to 0
+; over FADE_LINES display lines while the loop plays on, and the flush holds 0. The next
+; note's write sets its own volume (ADIOF_PERVOL).
+FADE_LINES = 32			; 2 ms; volume * left >> 5
+
+; the game's BeginIO stub $24A3C (hunk 337): audio.device and timer.device requests
+audio_io
+	move.l	(8,a7),a1		; the request
+	movem.l	d0/a0,-(a7)
+	move.l	($14,a1),a0		; io_Device
+	move.l	(LN_NAME,a0),a0
+	cmp.b	#'a',(a0)		; audio.device, not timer.device
+	bne.b	.pass
+	move.w	($1C,a1),d0		; io_Command
+	cmp.w	#8,d0			; CMD_FLUSH
+	bne.b	.notflush
+	bsr.b	note_fade
+	bra.b	.pass
+.notflush
+	cmp.w	#12,d0			; ADCMD_PERVOL sets the volume
+	beq.b	.volume
+	cmp.w	#3,d0			; CMD_WRITE
+	bne.b	.pass
+	btst	#4,($1E,a1)		; ADIOF_PERVOL: it sets the volume
+	beq.b	.pass
+.volume
+	bsr.b	note_chan
+	bmi.b	.pass
+	lea	note_volume(pc),a0
+	move.b	($2D,a1),(a0,d0.w)	; ioa_Volume (0-64)
+.pass
+	movem.l	(a7)+,d0/a0
+	move.l	(a7),-(a7)		; the stub's move.l a6,-(a7) under our return
+	move.l	a6,(4,a7)
+	rts
+
+; < a1: the request. > d0.w: its channel (the lowest bit of io_Unit), mi if none
+note_chan
+	move.l	d1,-(a7)
+	move.l	($18,a1),d1
+	moveq	#0,d0
+.bit
+	btst	d0,d1
+	bne.b	.found
+	addq.w	#1,d0
+	cmp.w	#4,d0
+	blo.b	.bit
+	moveq	#-1,d0
+.found
+	move.l	(a7)+,d1
+	tst.w	d0
+	rts
+
+; < a1: a CMD_FLUSH
+note_fade
+	movem.l	d0-d4/a0,-(a7)
+	bsr.b	note_chan
+	bmi.b	.done
+	lea	note_volume(pc),a0
+	add.w	d0,a0
+	moveq	#0,d2
+	move.b	(a0),d2			; the volume now
+	beq.b	.done
+	clr.b	(a0)
+	lsl.w	#4,d0
+	lea	$dff0a8,a0		; AUD0VOL
+	add.w	d0,a0
+	moveq	#FADE_LINES-1,d3
+.line
+	move.w	d2,d0
+	mulu.w	d3,d0
+	lsr.w	#5,d0
+	move.w	d0,(a0)
+	move.b	$dff006,d4
+.wait
+	cmp.b	$dff006,d4
+	beq.b	.wait
+	dbf	d3,.line
+.done
+	movem.l	(a7)+,d0-d4/a0
+	rts
+
+; The practice rumble (prcsnd hunk 40: 3200 bytes, looped at period 429) jumps from -59 to
+; 2 where it loops. New bytes at both ends make the loop as predictable as the rest of the
+; sample, by a linear predictor fitted to it (docs/internals.md, "Sound fixes").
+pl_rumble
+	PL_START
+	PL_L	$23A8,$07050301		; bytes 0-3
+	PL_L	$3020,$F4F4F8FC		; bytes 3192-3195
+	PL_L	$3024,$FDFD0104		; bytes 3196-3199
+	PL_END
+
+; after the LoadSeg in $8CF0: patch prcsnd
+seg_loaded
+	move.l	d0,(-4,a6)
+	beq.b	.out
+	movem.l	d0-d1/a0-a2,-(a7)
+	move.l	(8,a6),a0		; the file name, maybe odd
+	moveq	#3,d1
+.name
+	lsl.l	#8,d0
+	move.b	(a0)+,d0
+	dbf	d1,.name
+	or.l	#$20202020,d0		; any case
+	cmp.l	#'prcs',d0
+	bne.b	.other
+	move.l	_resload(pc),a2
+	move.l	(-4,a6),a1		; the seglist
+	lea	pl_rumble(pc),a0
+	jsr	(resload_PatchSeg,a2)
+.other
+	movem.l	(a7)+,d0-d1/a0-a2
+.out
+	move.l	(a7),(8,a7)		; the call's addq.l #8,a7
+	addq.l	#8,a7
+	rts
+
 sfx_tick
 	move.l	d2,-(a7)
 	lea	sfx_phase(pc),a0
@@ -1784,6 +1918,8 @@ sfx_step:
 	dc.l	0		; the game's effects step ($21740)
 sfx_phase:
 	dc.w	0		; fifths of a step owed
+note_volume:
+	dc.b	0,0,0,0		; each channel's volume, from the game's requests
 en_table			; hunk, offset in it: the addresses below, in order
 	dc.w	36,$7596-$74D4		; the Framer's per-vsync routine
 	dc.w	342,$24B54-$24A64	; the WaitTOF stub
