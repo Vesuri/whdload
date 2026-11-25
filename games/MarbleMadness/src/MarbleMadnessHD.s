@@ -88,20 +88,8 @@ slv_keyexit	= $5D	; num '*'
 
 ;============================================================================
 
-	IFD BARFLY
-	DOSCMD	"WDate  >T:date"
-	ENDC
-
 DECL_VERSION:MACRO
-	dc.b	"2.3"
-	IFD BARFLY
-		dc.b	" "
-		INCBIN	"T:date"
-	ENDC
-	IFD	DATETIME
-		dc.b	" "
-		incbin	datetime
-	ENDC
+	dc.b	"3.0b (25.11.2026)"
 	ENDM
 
 slv_name		dc.b	"Marble Madness"
@@ -110,7 +98,8 @@ slv_name		dc.b	"Marble Madness"
 	ENDC
 	dc.b	0
 slv_copy		dc.b	"1984-1986 Atari Games & Electronic Arts",0
-slv_info		dc.b	"Installed & fixed by JOTD",10,10
+slv_info		dc.b	"Installed & fixed by JOTD",10
+			dc.b	"Enhanced by Vesuri",10,10
 			dc.b	"Version "
 			DECL_VERSION
 		dc.b	0
@@ -127,7 +116,11 @@ slv_config:
 
 ; version xx.slave works
 
-	dc.b	"$","VER: slave "
+	IFD	DISKIMAGE
+	dc.b	"$","VER: MarbleMadnessImage.slave "
+	ELSE
+	dc.b	"$","VER: MarbleMadness.slave "
+	ENDC
 	DECL_VERSION
 	dc.b	0
 	even

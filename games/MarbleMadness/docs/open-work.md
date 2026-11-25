@@ -10,7 +10,8 @@ CPU-bound on a 68020+; it is frame-locked at one logic step per two vsyncs, writ
 NTSC, so PAL plays at 5/6 speed and 25 fps. Music and sound effects are also clocked by the
 vblank and play at 5/6 tempo on PAL ("Sound timing").
 
-1. Enhanced framerate (the plan below). Steps 1 to 8 are done; next is step 9.
+1. Enhanced framerate (the plan below). Steps 1 to 8 and the release (10) are done; step 9
+   (budget and matrix in the busiest scenes) is open.
 2. The idle task's keyboard poll writes CIA-A SDR about 1950 times a field; harmless for
    speed, but worth moving to the keyboard interrupt if it is ever touched.
 
@@ -43,7 +44,7 @@ and faster have a wide margin.
   68000, or with it off, the game's loop is the original.
 - `C5:X:Music and sound at NTSC tempo on PAL:0`: its own toggle (step 3), on any CPU.
 
-The installed icon sets `CUSTOM4=1` and `CUSTOM5=1`. With both off, the patch list is the
+The installed icon sets `CUSTOM4=1`, `CUSTOM5=1` and `CACHE`. With both off, the patch list is the
 original plus the always-on sound and mouse fixes (`docs/internals.md`, "Sound
 fixes", "Mouse").
 
@@ -146,5 +147,6 @@ Steps, each verified before the next:
    come first and draws are skipped; cap the step debt at 2. If the `a1200` drops draws,
    make the copper rebuild cheaper first: `$86B4` rebuilds the whole list, but per field
    only the plane pointers and the wrap split change.
-10. **Release.** The ReadMe credits JOTD and adds about five player-facing lines. The icon
-    gets `CUSTOM4=1` and `CUSTOM5=1`.
+10. **Release.** Done: 3.0b (25.11.2026). The ReadMe credits JOTD and has the 3.0b entry;
+    the Install script sets `CUSTOM4=1`, `CUSTOM5=1` and `CACHE` in the installed icon (the
+    shipped icons have no tooltypes for `release.json` to add to).

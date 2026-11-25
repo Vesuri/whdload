@@ -6,7 +6,8 @@
       "replace": {
         "MarbleMadnessHD/MarbleMadness.slave": "build:MarbleMadness",
         "MarbleMadnessHD/MarbleMadnessImage.slave": "build:MarbleMadnessImage",
-        "MarbleMadnessHD/README": "release/ReadMe"
+        "MarbleMadnessHD/README": "release/ReadMe",
+        "MarbleMadnessHD/Install": "release/Install"
       },
       "add": {},
       "remove": [],
