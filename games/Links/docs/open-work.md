@@ -1,19 +1,19 @@
 # Open work
 
-Set up from StingRay's V1.01 slave. The build is equivalent to the shipped slave (another
-`kick13.s`, [development.md](development.md#the-build)). It boots v1.53 and v1.50 to the
-first hole on the a1200-030 without `CACHE`.
+Version 2.0b, from StingRay's V1.01 slave: the game runs with WHDLoad's `CACHE` and its
+code runs from fast memory ([internals.md](internals.md#caches-and-fast-memory)).
+Verified to the first hole, with renders equal to V1.01's without `CACHE` (but the animated
+wind indicator), for v1.53 and v1.50 on the a1200-030 with Zorro III RAM
+(`EXTRA_ARGS='--fast_memory=0 --zorro_iii_memory=32768'`, `WHD_ARGS='CACHE CUSTOM1=1'`),
+the a1200-030 with 24-bit fast RAM, the a1200-fast and the a1200-040 (WHDLoad's MMU on, and
+`NOMMU`), all with `CACHE`; the intro with `CACHE`; and the 68000 `custom` setup.
 
 ## Release
 
-No improvement yet. A first release needs a dated `$VER` and info text in the slave, and a
-ReadMe entry above StingRay's.
+`make dist` builds `LinksEnhanced-2.0b`: StingRay's package with the new slave and ReadMe.
+The installed icon does not set `CACHE` (the Install script writes the tooltypes, and
+`Links.inf` has none for `release.json` to add to); the player adds it.
 
-## Caches and fast memory
+## Next
 
-The goal: the game running from Zorro III fast memory with the caches on, on the a1200-030
-with Zorro III RAM (`EXTRA_ARGS='--fast_memory=0 --zorro_iii_memory=32768'`,
-`WHD_ARGS='CACHE CUSTOM1=1'`). With `CACHE` the first hole draws no landscape: the
-renderer's self-modifying code ([internals.md](internals.md#the-games-cache-handling))
-runs stale. Code in the four `MEMF_CHIP` hunks of `golf` and in `title`'s hunk 3 runs from
-chip memory.
+- Play past the first hole with `CACHE` (putting, the next holes, the course disks).

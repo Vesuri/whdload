@@ -8,6 +8,9 @@
  CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
  PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
+ Links - The Challenge of Golf Enhanced 2.0b (25.11.2026)
+ Original install: StingRay. Version 2.0b: Vesuri.
+
  This install applies to "LINKS - The Challenge of Golf © 1992 Access.
 
  Requirements:
@@ -91,6 +94,10 @@
 
  History:
  --------
+
+ version 2.0b (25.11.2026) done by Vesuri:
+ - the course is drawn correctly on 68020+ machines with caches enabled
+ - the game's code runs from fast memory instead of chip memory
 
  version 1.01 (28.04.2013) done by StingRay:
  - support for Bountiful and Firestone course disks added

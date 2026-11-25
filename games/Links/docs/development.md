@@ -26,7 +26,8 @@ path go, `DEBUG` is commented out (the shipped slave has no debug strings and th
 encoding), and the fake command line `"",10,0` is written `0,10,0`, because his assembler
 emitted a zero byte for the empty string (the shipped slave passes three bytes).
 
-The build is not byte-identical: it includes the WHDLoad 20.1 `kick13.s`, larger than the
+This held for the setup (StingRay's V1.01 unchanged); 2.0b's changes are on top. The
+build was not byte-identical: it includes the WHDLoad 20.1 `kick13.s`, larger than the
 2013 one, so everything after it moves (a code hunk of `$13F0` bytes against `$12BC`; the
 header offsets `CurrentDir`, `name`, `copy`, `info`, `kickname` and `config` by `$134`). The
 equivalence is proved as the playbook asks: every other header field is equal (version 17,
@@ -34,7 +35,7 @@ flags `WHDLF_NoError|WHDLF_EmulPriv|WHDLF_Examine`, BaseMem `$80000`, ExpMem `$1
 `$F9E3`); the slave's own part after the strings, 596 bytes, differs in three bytes only,
 two PC-relative displacements into `kick13.s` (`_dosname`) and one `CNOP` padding word
 that StingRay's assembler filled with garbage (`$6010`) and vasm with zero; the strings and
-patch lists are byte-identical; and it boots both versions to the first hole.
+patch lists are byte-identical; and it booted both versions to the first hole.
 
 ## Driving it
 
@@ -61,6 +62,9 @@ both longer: the 68000 takes `TITLE_WAIT` 25 and `PLAY_SCALE=5`.
 The route's mouse moves assume the pointer where the title menu leaves it; the player file
 needs a click of 6 fields (3 is too short). The data cache halves the a1200-030's emulated
 speed (AmigaXDev's `measurement-method.md`), so count fields there, not seconds.
+`boot.sh` stops the emulator before the shot: on the a1200-040 WHDLoad's MMU fills the stub's
+output with `68040 MMU:` lines, which break the capture otherwise. Parallel boots need
+`NOBUILD=1` (they race in the build).
 
 ## Traps
 

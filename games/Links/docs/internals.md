@@ -42,9 +42,9 @@ The renderer modifies its own code. Every site ends with a `jmp` to the next ins
 | v1.50 | 12 | `$790`, `$838`, per pixel: the index d4 (0-3) into a displacement byte | `$79F`, `$847` | `$796`, `$83E` |
 | v1.50 | 14 | `$2A`-`$36`: three immediates | `$2B6`, `$2BE`, `$37E` | `$3C` |
 
-With the instruction cache on and the slave skipping the game's switch-off, the renderer
-runs stale code: on the a1200-030 and the a1200-fast with WHDLoad's `CACHE` the first hole
-draws no landscape, and the a1200-030 has also crashed with an illegal instruction in hunk 3.
+With the instruction cache on and the slave skipping the game's switch-off, V1.01's
+renderer ran stale code: with WHDLoad's `CACHE` the first hole drew no landscape, and the
+a1200-030 with 24-bit fast RAM crashed with an illegal instruction in hunk 3.
 
 ## Slave patches
 
@@ -57,8 +57,32 @@ PatchSeg offsets count the segments' data end to end.
 | v1.53 | `$2E4` | 0 `$2E4` | skip to `$2F2`: the `CACR` write | StingRay |
 | v1.53 | `$15478`, `$15482` | 13 `$170`, `$17A` | as v1.50 | StingRay |
 
-`title` is not patched.
+On a 68020 or later (`PLCACHE150`, `PLCACHE153`, Vesuri):
 
-## Limitations
+| Version | Offset | Hunk | Patch |
+|---|---|---|---|
+| v1.53 | `$14544`, `$146B0`, `$1597C` | 12 `$5DC`, 12 `$748`, 14 `$48` | `jsr _flushcache` over the `jmp`: the cache is flushed after each modification |
+| v1.50 | `$14520`, `$14692`, `$15964` | 12 `$5D4`, 12 `$746`, 14 `$3C` | as v1.53 |
+| v1.50 | `$146DC`, `$14784` | 12 `$790`, 12 `$838` | the per-pixel `move.b d4,` into the displacement of `move.b (0,a6,d0.w),d6` and its `jmp` become `adda.w d4,a6`, the read, `suba.w d4,a6`, `bra.s` on: no code is modified, no flush per pixel |
 
-With WHDLoad's `CACHE` the game draws no landscape ([open-work.md](open-work.md)).
+`title` and `golf` then go through `MoveCode` ([caches and fast memory](#caches-and-fast-memory)).
+
+## Caches and fast memory
+
+`MoveCode` (after the patches) moves the code part of each `MEMF_CHIP` hunk to fast memory
+and leaves the DMA data in chip memory:
+
+| File | Hunk | Moved part | Stays in chip |
+|---|---|---|---|
+| `golf` v1.53 | 2, 20, 24 | `$0`-`$373`, `$0`-`$5B3`, all `$144` | sprites, the copper list |
+| `golf` v1.50 | 2, 20, 24 | `$0`-`$373`, `$0`-`$55D`, all `$144` | as v1.53 |
+| `title` | 3 | `$0`-`$125` | the pointer table and copper data |
+
+Hunk 27 (sprite data only) stays. `MoveCode` loads the file again, allocates each moved
+part (`MEMF_FAST`, plus 8 longword slots), copies it, and walks the file's `HUNK_RELOC32`
+blocks: a reference into a moved part gets the new address, and a reference *from* a moved
+part is fixed in the copy. A `lea d16(pc),An` in a moved part that points into the chip
+part cannot reach it, so it becomes `movea.l slot(pc),An` with the address in a slot:
+`golf` v1.53 2 `$19E`, `$20E`, 20 `$228`, `$384`, `$398`, `$3A4`; v1.50 2 `$19E`, `$20E`,
+20 `$21E`, `$32E`, `$342`, `$34E`; `title` none. The old chip copies stay allocated, unused.
+Without fast memory the allocation fails and that hunk stays where it is.

@@ -17,4 +17,6 @@ trap 'python3 tools/links.py quit >/dev/null 2>&1 || true' EXIT
 python3 tools/links.py wait "$wt" >/dev/null
 python3 tools/links.py play ${PLAY_SCALE:-1} >/dev/null
 python3 tools/links.py wait "$wg" >/dev/null
-python3 tools/links.py shot "$shot" | sed 's/ Program received.*//'
+# stop first: on the a1200-040 the MMU messages WHDLoad causes otherwise break the capture
+python3 tools/links.py stop >/dev/null
+python3 tools/links.py shot "$shot" | grep -o '^.* kind=[0-9]* [0-9]* bytes'

@@ -3,7 +3,8 @@
 Links - The Challenge of Golf (Access Software, 1992) under WHDLoad: a Kickstart 1.3
 (kick13) slave that boots the game's DOS executables `title` (the intro) and `golf` from
 the installed `data/` drawer, skips the game's own cache switch-off and fixes the course
-list for course disks. The original slave is by StingRay (V1.00 13.04.2013, V1.01
+list for course disks; version 2.0b makes it run with the caches on and its code from fast
+memory. The original slave is by StingRay (V1.00 13.04.2013, V1.01
 28.04.2013) (game.conf `AUTHOR`, `UPSTREAM`). Neither JOTD's nor StingRay's repository holds
 it: `src/Links_WHD.s` is the source the whdload.de install package ships.
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
