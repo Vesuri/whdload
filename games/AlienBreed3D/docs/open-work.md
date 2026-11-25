@@ -13,8 +13,9 @@ options, so CUSTOM5), with the original renderer when it is off.
 ## Before a first release
 
 - A dated `$VER` string in both slaves and a ReadMe entry above Psygore's.
-- Decide the release's `src/AlienBreed3DHD_src.lzx`: keep the encrypted original or
-  ship the reconstruction in its place (`release.json` `source`).
+- The release ships `src/AlienBreed3D.s` in place of the encrypted
+  `src/AlienBreed3DHD_src.lzx` (decided 26.11.2026; `release.json` `source`). The first
+  `make dist` is its first test.
 - Boot both variants on every machine in `SETUPS` (only AlienBreed3D on the a1200-030 so
   far).
 
