@@ -32,6 +32,22 @@ INSTANCE=mine SETUP=a1200-030 WHD_ARGS=CACHE WARP=1 WINDOW=none python3 tools/ma
 python3 tools/marblemadness.py menu          # Mouse Port + Mouse selected, pointer on GO!
 python3 tools/marblemadness.py go            # into the practice race
 python3 tools/marblemadness.py chain 100 2 1 $PWD/tmp/prof/race/f   # 100 one-field traces
+python3 tools/marblemadness.py dump $PWD/tmp/ana/mem/run.bin 0x940000 0xa00000   # for the map
+```
+
+`tools/mmtrace.py` (its docstring) works at PatchSeg offsets:
+- `image`: the flat image;
+- `ghidra`: its listing, with library calls named, and call graph;
+- `segmap`: the hunk map of a dump;
+- `split`: cycles by task;
+- `tree`: one task's call tree;
+- `count`: entries per field to given offsets.
+
+```sh
+python3 tools/mmtrace.py image && python3 tools/mmtrace.py ghidra
+python3 tools/mmtrace.py segmap tmp/ana/mem/run.bin 940000
+python3 tools/mmtrace.py tree tmp/ana/mem/run.bin.segmap.json Scroller 3 tmp/prof/race/f.0*
+python3 tools/mmtrace.py count tmp/ana/mem/run.bin.segmap.json AF9E,11704,86B4 tmp/prof/race/f.0*
 ```
 
 Traps:
@@ -41,12 +57,10 @@ Traps:
 - A menu click needs at least about 6 fields of press; a longer press repeats.
 - The `a1200-030` preset's MMU-model core records no instructions: trace with
   `EXTRA_ARGS=--uae_mmu_model=0` (same cycle-exact 68030).
-- Where the hunks load depends on the setup: in fast memory on the fast-memory setups, in
-  chip RAM on `a1200`, which has no fast memory. Map a
-  trace through the seglist of a memory dump from the same run. Search for the `Framer`
-  task name, and check that the word at +`$A` of the struct points back at it: a stale copy
-  of the name also turns up in chip RAM.
-- Ghidra headless needs `JAVA_HOME` set to Homebrew's `openjdk@21`. The installed 12.x has
-  no native decompiler, so use listings and call graphs. Import the flat PatchSeg-addressed
-  image (`docs/internals.md`, "Program") as a raw 68000 binary at base 0, with each code
-  hunk's start marked as a function.
+- Where the hunks load depends on the setup: in fast memory (`$940000`–`$A00000`) on the
+  fast-memory setups, in chip RAM on `a1200`, which has no fast memory (`dump`'s default
+  range). Map each trace with a dump from the same run. `segmap` checks that the Framer
+  task's name pointer points back at the name, because a stale copy of the name also turns
+  up in chip RAM.
+- Ghidra headless needs Homebrew's `openjdk@21` (`ghidra` sets `JAVA_HOME`). The installed
+  12.x has no native decompiler, so work from the listings and the call graph.

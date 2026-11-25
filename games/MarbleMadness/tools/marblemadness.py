@@ -9,6 +9,10 @@
     python3 tools/marblemadness.py chain FIELDS DX DY BIN
                                               profile FIELDS fields in one-field chunks,
                                               moving the mouse DX,DY before each (BIN.NNN)
+    python3 tools/marblemadness.py dump OUT [START END]
+                                              memory START..END (default 0..$200000, chip RAM
+                                              of every setup) into OUT, for tools/mmtrace.py segmap;
+                                              on fast-memory setups dump $940000..$A00000 too
 
 Every command stops the CPU first and leaves it stopped, so fields are counted exactly; the
 built-in `cont` resumes. The menu is a gray screen whose pointer is the ball; one mouse count
@@ -99,7 +103,15 @@ def cmd_chain(server, g, rest):
     return 'ok'
 
 
+def cmd_dump(server, g, rest):
+    g.stop()
+    a = rest.split()
+    start, end = (a[1], a[2]) if len(a) > 2 else ('0', '0x200000')
+    g.cmd(f'dump binary memory {a[0]} {start} {end}', timeout=600)
+    return f'{a[0]} {start}..{end}'
+
+
 server = game_server('game', commands={'menu': cmd_menu, 'go': cmd_go, 'step': cmd_step,
-                                       'chain': cmd_chain})
+                                       'chain': cmd_chain, 'dump': cmd_dump})
 if __name__ == '__main__':
     server.main(sys.argv[1:])
