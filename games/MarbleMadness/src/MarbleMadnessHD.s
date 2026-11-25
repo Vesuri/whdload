@@ -21,6 +21,9 @@
 	INCLUDE	lvo/exec.i
 	INCLUDE	exec/tasks.i
 	INCLUDE	exec/memory.i
+	INCLUDE	exec/interrupts.i
+	INCLUDE	exec/ports.i
+	INCLUDE	hardware/intbits.i
 
 	IFD BARFLY
 	OUTPUT	"MarbleMadness.slave"
@@ -390,10 +393,10 @@ patch_exe:
 .nosound
 
 	move.l	_enhanced(pc),d0
-	beq.b	.noenhanced
+	beq.w	.noenhanced
 	move.l	_attnflags(pc),d0
 	btst	#AFB_68020,d0
-	beq.b	.noenhanced
+	beq.w	.noenhanced
 	lea	field_rate(pc),a0
 	move.w	#60,(a0)
 	tst.b	pal_display-field_rate(a0)
@@ -414,23 +417,45 @@ patch_exe:
 	move.l	a0,(a4)+
 	bra.b	.addr
 .addrdone
-	; the two position tables for interpolation
+	; the two position tables for interpolation, and the field counter's interrupt
 	move.l	a6,-(a7)
-	move.l	#2*BL_TABLE,d0
+	move.l	#2*BL_TABLE+IS_SIZE,d0
 	move.l	#MEMF_PUBLIC|MEMF_CLEAR,d1
 	move.l	(4).w,a6
 	jsr	(_LVOAllocMem,a6)
-	move.l	(a7)+,a6
 	tst.l	d0
-	beq.b	.noenhanced
+	beq.b	.nomem
 	lea	bl_cur(pc),a0
 	move.l	d0,(a0)+
 	add.l	#BL_TABLE,d0
 	move.l	d0,(a0)
+	add.l	#BL_TABLE,d0
+	move.l	d0,a1
+	move.b	#NT_INTERRUPT,(LN_TYPE,a1)
+	move.b	#FIELD_PRI,(LN_PRI,a1)
+	lea	field_count(pc),a0
+	move.l	a0,(IS_DATA,a1)
+	lea	field_irq(pc),a0
+	move.l	a0,(IS_CODE,a1)
+	moveq	#INTB_VERTB,d0
+	jsr	(_LVOAddIntServer,a6)
+	move.l	(a7)+,a6
 	lea	pl_enhanced(pc),a0
 	move.l	d7,a1
 	jsr	(resload_PatchSeg,a2)
 .noenhanced
+	rts
+.nomem
+	move.l	(a7)+,a6
+	rts
+
+; VERTB server: counts fields. Its priority is above graphics.library's, so a task woken
+; by WaitTOF already sees the new field. (CIA-A's TOD, the obvious counter, ticks a little
+; after the vblank in FS-UAE, and some machines clock it from the mains.)
+FIELD_PRI = 20
+field_irq
+	addq.b	#1,(a1)
+	moveq	#0,d0
 	rts
 
 ; Enhanced framerate (CUSTOM4, 68020+): a fixed 30 Hz world, drawn every field.
@@ -446,8 +471,8 @@ patch_exe:
 ; ($86B4, which ends with LoadView), so the display takes it at the next vsync. The game
 ; does that at the vsync, and the list it builds there is shown only a field later, while
 ; the next draw already fills the set still on screen: fine at 2 fields a frame, not at 1.
-; At most one list is built per field (fields counted by CIA-A's TOD, which the vsync
-; clocks), since a second one would be written into the list on screen; a draw that ends
+; At most one list is built per field (fields counted by a VERTB server, field_irq),
+; since a second one would be written into the list on screen; a draw that ends
 ; after one has been built is presented by the game's own vsync path, and no draw starts
 ; while the display still shows the set it would fill.
 ;
@@ -489,6 +514,7 @@ pl_enhanced
 	PL_PS	$11946,draw_5
 	PL_PS	$11972,draw_7
 	PL_PS	$11996,draw_f
+	PL_PS	$8DF4,wait_fields	; the vsync wait $8DF0(n): move.w $5D2,d0
 	PL_END
 
 ; screen position field, routine (offset in hunk 26 at $5BE0), largest blended move
@@ -511,9 +537,9 @@ draw_2c	DRAWCALL	$00,$6562,48*16		; in 1/16 pixels
 ; type $F's draw adds $40 to five dot offsets (+$2C, 8 apart) while $6860 is set; take it
 ; back first on a draw-only job, so that they move once a step
 dots_f
-	lea	bl_record(pc),a0
+	lea	draw_job(pc),a0
 	tst.b	(a0)
-	bne.b	.done
+	beq.b	.done
 	move.l	a_h27(pc),a0
 	tst.w	($6860-$6750,a0)
 	beq.b	.done
@@ -563,6 +589,8 @@ blend_call
 .find
 	lea	bl_valid(pc),a0
 	tst.b	(a0)
+	beq.b	.call
+	move.w	bl_record-bl_valid(a0),d4	; bl_record, draw_job: one of ours
 	beq.b	.call
 	move.l	bl_prev(pc),a4
 	move.w	(a4)+,d4
@@ -659,8 +687,11 @@ step_draw
 	lea	bl_valid(pc),a0
 	st	(a0)
 	move.w	($5D2-$224,a1),d0	; the mode
+	cmp.w	#MODE_MENU,d0
+	beq.b	.noblend		; menu_pointer moves the pointer every field
 	cmp.w	bl_mode(pc),d0
 	beq.b	.same
+.noblend
 	sf	(a0)			; no blending into a new mode
 	lea	bl_mode(pc),a0
 	move.w	d0,(a0)
@@ -753,11 +784,19 @@ pad_field
 	move.l	a_ready(pc),a1
 	tst.b	(a1)
 	bne.b	.wait
+	move.l	a_port(pc),a1
+	move.l	(a1),d0			; the Scroller's port
+	beq.b	.wait
+	move.l	d0,a1
+	moveq	#0,d1
+	move.b	(MP_SIGBIT,a1),d1
 	move.l	a_scroller(pc),a1
 	cmp.b	#TS_WAIT,(TC_STATE,a1)
 	bne.b	.wait
-	move.l	a_port(pc),a1
-	move.l	(a1),d0			; the Scroller's port
+	move.l	(TC_SIGWAIT,a1),a1
+	exg	d0,a1			; d0 = the signals waited for, a1 = the port
+	btst	d1,d0
+	exg	d0,a1
 	beq.b	.wait
 	st	(a0)
 	move.l	d0,a0
@@ -772,6 +811,23 @@ pad_field
 	move.l	a_waittof(pc),-(a7)
 	rts
 
+; the game's waits of n vsyncs ($8DF0: the end of a race, the bonus count, menu clicks)
+; last n/60 s, as on NTSC: n * field_rate / 60 fields, the remainder carried over
+wait_fields
+	move.w	($A,a6),d0		; n
+	ble.b	.keep
+	mulu.w	field_rate(pc),d0
+	add.w	wait_rem(pc),d0
+	divu.w	#60,d0
+	move.w	d0,($A,a6)
+	swap	d0
+	lea	wait_rem(pc),a0
+	move.w	d0,(a0)
+.keep
+	move.l	a_h3(pc),a0
+	move.w	($5D2-$224,a0),d0
+	rts
+
 ; the Scroller's job: the game's frame, or a draw of the current state (the message stays
 ; ours; it needs no reply)
 scroller_job
@@ -784,8 +840,13 @@ scroller_job
 	lea	bl_alpha(pc),a1
 	move.w	($18,a0),(a1)
 	bsr	draw_wait
+	bsr	menu_pointer
+	lea	draw_job(pc),a0
+	st	(a0)
 	move.l	a_draw(pc),a0
 	jsr	(a0)
+	lea	draw_job(pc),a0
+	sf	(a0)
 	lea	draw_frame(pc),a0
 	st	(a0)
 	bsr	present
@@ -793,18 +854,45 @@ scroller_job
 	sf	(a0)
 	rts
 
+; the options menu reads the mouse once a step; a draw job reads it again and moves the
+; pointer ($CCA, type $2C, in 1/16 pixel) the way the menu's step does ($CBB4)
+MODE_MENU = 5
+menu_pointer
+	move.l	a_h3(pc),a1
+	cmp.w	#MODE_MENU,($5D2-$224,a1)
+	bne.b	.done
+	move.l	a_menu(pc),a0
+	cmp.b	#2,(a0)			; the menu is up
+	bne.b	.done
+	clr.l	-(a7)			; port 0
+	pea	($CDB8-$CDAC,a0)
+	pea	($CDB6-$CDAC,a0)
+	move.l	a_mouse(pc),a0
+	jsr	(a0)
+	lea	(12,a7),a7
+	move.l	a_menu(pc),a0
+	move.l	a_h3(pc),a1
+	lea	($CCA-$224,a1),a1
+	move.w	($CDB6-$CDAC,a0),d0
+	lsl.w	#4,d0
+	move.w	d0,(a1)
+	move.w	#$100-8,d0
+	sub.w	($CDB8-$CDAC,a0),d0
+	lsl.w	#4,d0
+	move.w	d0,(2,a1)
+.done
+	rts
+
 step_ready
 	lea	draw_frame(pc),a0
 	sf	(a0)
 	bra	present
 
-TODLO = $BFE801				; CIA-A TOD: counts vsyncs
-
 ; don't start a draw in the field in which the display still shows its target set
 draw_wait
 .again
-	move.b	TODLO,d0
-	cmp.b	block_tod(pc),d0
+	move.b	field_count(pc),d0
+	cmp.b	block_field(pc),d0
 	bne.b	.go
 	move.l	a_waittof(pc),a0
 	jsr	(a0)
@@ -819,8 +907,8 @@ present
 	move.l	a6,-(a7)
 	move.l	(4).w,a6
 	jsr	(_LVOForbid,a6)
-	move.b	TODLO,d0
-	cmp.b	last_build_tod(pc),d0
+	move.b	field_count(pc),d0
+	cmp.b	last_build_field(pc),d0
 	beq.b	.ready
 	move.l	a_swap(pc),a0
 	jsr	(a0)
@@ -836,7 +924,7 @@ present
 	move.l	a_split(pc),a0
 	move.w	pending_split(pc),(a0)	; $7692
 	bsr	build
-	lea	block_tod(pc),a0
+	lea	block_field(pc),a0
 	move.b	d0,(a0)
 .ready
 	move.l	a_ready(pc),a0
@@ -845,7 +933,7 @@ present
 	move.l	(a7)+,a6
 	rts
 
-; rebuild the copper list; < d0.b = the TOD at its end
+; rebuild the copper list; < d0.b = the field it ended in
 build
 	move.l	a_rebuild(pc),a0
 	jsr	(a0)
@@ -854,8 +942,8 @@ build
 	move.l	a_display(pc),a0
 	lea	built_display(pc),a1
 	move.l	(a0),(a1)
-	move.b	TODLO,d0
-	lea	last_build_tod(pc),a0
+	move.b	field_count(pc),d0
+	lea	last_build_field(pc),a0
 	move.b	d0,(a0)
 	rts
 
@@ -867,26 +955,26 @@ vsync_rebuild
 	move.l	(a0),d0
 	cmp.l	built_display(pc),d0
 	bne.b	.swapped
-	move.b	TODLO,d0
-	cmp.b	last_build_tod(pc),d0
+	move.b	field_count(pc),d0
+	cmp.b	last_build_field(pc),d0
 	beq.b	.done			; built in this field already
 	lea	owed(pc),a0
 	tst.b	(a0)
 	beq.b	.new
-	cmp.b	owed_tod(pc),d0
+	cmp.b	owed_field(pc),d0
 	bne.b	.build			; owed since an earlier field
 	rts
 .new
 	tst.b	d7
 	beq.b	.done
 	st	(a0)
-	lea	owed_tod(pc),a0
+	lea	owed_field(pc),a0
 	move.b	d0,(a0)
 .done
 	rts
 .swapped
 	bsr	build
-	lea	block_tod(pc),a0
+	lea	block_field(pc),a0
 	move.b	d0,(a0)
 	rts
 .build
@@ -1259,6 +1347,8 @@ en_table			; hunk, offset in it: the addresses below, in order
 	dc.w	37,$7692-$7690		; the view's distance from the top, shown
 	dc.w	93,$D30C-$D308		; the same, from the logic
 	dc.w	27,0			; $6860: type $F's dots move
+	dc.w	90,0			; $CDAC: the options menu's state
+	dc.w	200,$19008-$18F64	; the menu's mouse reader
 	dc.w	-1
 en_addr
 a_vsync:	dc.l	0
@@ -1279,6 +1369,8 @@ a_display:	dc.l	0
 a_split:	dc.l	0
 a_split_logic:	dc.l	0
 a_h27:		dc.l	0
+a_menu:		dc.l	0
+a_mouse:	dc.l	0
 built_display:	dc.l	0		; the set the last copper list shows
 bl_cur:		dc.l	0		; this step's positions
 bl_prev:	dc.l	0		; the step before's
@@ -1286,18 +1378,21 @@ bl_slot:	dc.l	0,0,0		; field, its value, the caller's return
 bl_alpha:	dc.w	0		; this draw's alpha, in 1/field_rate steps
 step_alpha:	dc.w	0
 bl_mode:	dc.w	-1
+wait_rem:	dc.w	0		; wait_fields' remainder, in 1/60 field
 row_prev:	dc.w	0
 row_cur:	dc.w	0
 split_prev:	dc.w	0		; row_prev + 4
 split_cur:	dc.w	0
 pending_row:	dc.w	0
 pending_split:	dc.w	0
-last_build_tod:	dc.b	-1
-block_tod:	dc.b	-1
+last_build_field:	dc.b	-1
+block_field:	dc.b	-1
 owed:		dc.b	0		; the vsync found a change not yet built
-owed_tod:	dc.b	0
-bl_valid:	dc.b	0		; prev is from the same mode
+owed_field:	dc.b	0
 bl_record:	dc.b	0		; a step's draw: record the positions
+draw_job:	dc.b	0		; a draw job's draw (follows bl_record)
+bl_valid:	dc.b	0		; prev is from the same mode
+field_count:	dc.b	0		; fields, from field_irq
 draw_msg:
 	dcb.b	MN_SIZE+6,0	; a Message, the job code (long) and its alpha (word)
 draw_busy:

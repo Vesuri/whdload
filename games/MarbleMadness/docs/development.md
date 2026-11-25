@@ -33,7 +33,11 @@ python3 tools/marblemadness.py menu          # Mouse Port + Mouse selected, poin
 python3 tools/marblemadness.py go            # into the practice race
 python3 tools/marblemadness.py chain 100 2 1 $PWD/tmp/prof/race/f   # 100 one-field traces
 python3 tools/marblemadness.py dump $PWD/tmp/ana/mem/run.bin 0x940000 0xa00000   # for the map
+python3 tools/marblemadness.py watch 0x9bfc8e 4000   # fields where a word (here $5D2) changes
 ```
+
+`watch` reads a game address, so map a dump of the same slave and setup first. The mode
+word `$5D2` is hunk 3 + `$3AE`.
 
 `tools/mmtrace.py` (its docstring) works at PatchSeg offsets:
 - `image`: the flat image;
@@ -66,7 +70,8 @@ Traps:
   `EXTRA_ARGS=--uae_mmu_model=0` (same cycle-exact 68030).
 - Where the hunks load depends on the setup: in fast memory (`$940000`–`$A00000`) on the
   fast-memory setups, in chip RAM on `a1200`, which has no fast memory (`dump`'s default
-  range). Map each trace with a dump from the same run. `segmap` checks that the Framer
+  range), and in slow memory (`$C00000`–`$D80000`) on `a500-1.5m`. The plain `a500` has
+  too little memory for the slave. Map each trace with a dump from the same run. `segmap` checks that the Framer
   task's name pointer points back at the name, because a stale copy of the name also turns
   up in chip RAM.
 - Ghidra headless needs Homebrew's `openjdk@21` (`ghidra` sets `JAVA_HOME`). The installed

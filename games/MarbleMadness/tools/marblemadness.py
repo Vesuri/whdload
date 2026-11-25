@@ -9,6 +9,10 @@
     python3 tools/marblemadness.py chain FIELDS DX DY BIN
                                               profile FIELDS fields in one-field chunks,
                                               moving the mouse DX,DY before each (BIN.NNN)
+    python3 tools/marblemadness.py click      one menu click (a 6-field press, 40 fields of release)
+    python3 tools/marblemadness.py watch ADDR FIELDS
+                                              run FIELDS fields one at a time and list the
+                                              fields where the word at ADDR changes
     python3 tools/marblemadness.py dump OUT [START END]
                                               memory START..END (default 0..$200000, chip RAM
                                               of every setup) into OUT, for tools/mmtrace.py segmap;
@@ -103,6 +107,25 @@ def cmd_chain(server, g, rest):
     return 'ok'
 
 
+def cmd_click(server, g, rest):
+    g.stop()
+    click(g)
+    return 'ok'
+
+
+def cmd_watch(server, g, rest):
+    g.stop()
+    addr, n = rest.split()
+    out, last = [], None
+    for i in range(int(n)):
+        v = g.cmd(f'x/hx {addr}').split()[-1]
+        if v != last:
+            out.append(f'{i}:{v}')
+            last = v
+        fields(g, 1)
+    return ' '.join(out)
+
+
 def cmd_dump(server, g, rest):
     g.stop()
     a = rest.split()
@@ -112,6 +135,7 @@ def cmd_dump(server, g, rest):
 
 
 server = game_server('game', commands={'menu': cmd_menu, 'go': cmd_go, 'step': cmd_step,
-                                       'chain': cmd_chain, 'dump': cmd_dump})
+                                       'chain': cmd_chain, 'click': cmd_click, 'watch': cmd_watch,
+                                       'dump': cmd_dump})
 if __name__ == '__main__':
     server.main(sys.argv[1:])

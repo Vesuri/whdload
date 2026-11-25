@@ -10,7 +10,7 @@ CPU-bound on a 68020+; it is frame-locked at one logic step per two vsyncs, writ
 NTSC, so PAL plays at 5/6 speed and 25 fps. Music and sound effects are also clocked by the
 vblank and play at 5/6 tempo on PAL ("Sound timing").
 
-1. Enhanced framerate (the plan below). Steps 1 to 7 are done; next is step 8.
+1. Enhanced framerate (the plan below). Steps 1 to 8 are done; next is step 9.
 2. The idle task's keyboard poll writes CIA-A SDR about 1950 times a field; harmless for
    speed, but worth moving to the keyboard interrupt if it is ever touched.
 
@@ -128,7 +128,11 @@ Steps, each verified before the next:
    fields and blend them the same way, or move the pointer every field from the mouse.
    Every other mode (level intro, bonus count `$B05A`, game over, high scores, demo) gets
    30 Hz steps and plain redraws. Gate: each mode's durations in fields equal NTSC timing,
-   and the transitions into and out of the race work, including two players.
+   and the transitions into and out of the race work, including two players. Done
+   (`docs/internals.md`, "Enhanced framerate", "Other modes"): draw jobs move the pointer
+   from the mouse, and the game's waits in vsyncs (`$8DF0`) are scaled to NTSC time. Fields
+   are now counted by a VERTB server, not CIA-A's TOD. Open: the bonus count and the end
+   of the game, which need a finished level, are checked only from the code.
 9. **Budget and matrix.** On `a500` (the original loop), `a1200`, `a1200-030` and
    `a1200-040`, measure step, draw and copper cycles, draws per second and fields per game
    second, in the busiest scenes (Aerial, Silly, Ultimate, two players). When behind, steps

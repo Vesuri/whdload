@@ -202,7 +202,8 @@ Ours:
   logic and drawing) starts in 3 of every 5 PAL fields, and in every second NTSC field.
 - `$6EC0` (`pad_field`): in each padding field the Framer sends the Scroller a draw-only
   job (message `+$14` = 6; the game's codes are 4, a frame, and 5, quit), when the
-  Scroller is waiting for a message and its last frame is out (`$5DB` clear).
+  Scroller is waiting at its port (`TC_SIGWAIT` has the port's signal; a step blocked in
+  one of its own waits is also in `TS_WAIT`) and its last frame is out (`$5DB` clear).
 - `$AA32` (`scroller_job`): the Scroller runs a draw job as the draw pass `$11704`.
 - `$B292` (`step_ready`), `$7600` (`count_frame`): the frame counter `$230`, which the
   logic reads, counts only frames that a step drew.
@@ -215,8 +216,11 @@ With a frame every field it shows the older set every other field. Under CUSTOM4
 - `present` (end of every draw): swap (`$38F0`), sprite pointers into the copper templates
   (`$85EC`, `$8630`), the blended row into `$226` and `$7692`, rebuild, all under
   `Forbid`. The display takes it at the next vsync.
-- At most one list is built per field (fields counted by CIA-A's TOD, which the vsync
-  clocks), because a second build would go into the list on screen. A draw that ends after
+- At most one list is built per field, because a second build would go into the list on
+  screen. Fields are counted by a VERTB interrupt server (`field_irq`, priority 20, above
+  graphics.library's, so a task that WaitTOF wakes already sees the new field). CIA-A's
+  TOD is no substitute: in FS-UAE it ticks a little after the vblank, which made the
+  menu's draws wait a second field, and some machines clock it from the mains. A draw that ends after
   one has been built is left to the game's vsync path (`$5BCA` stays set).
 - `$767C` (`vsync_rebuild`): the vsync builds only after such a swap, or for a change
   (colour cycling, the `$1E20D` display) that has waited a whole field for a draw.
@@ -246,6 +250,22 @@ nothing masks them against the scenery. Type `$F`'s draw (`$6350`) adds `$40` to
 offsets (`+$2C`, 8 apart) per draw while `$6860` is set; on draw-only jobs `dots_f` takes it
 back first, so they move once a step.
 
+**Other modes.** Every mode handler (`$B2A2`) runs as a step, so the race (0), the pause
+(1), the menu (5) and the end of the game (6, a state machine at `$C478`) run at 30 Hz.
+- Options menu (mode 5, `$CA14` with `$CDAC` = 2): the step reads the mouse (`$19008`,
+  which only accumulates the counters; the buttons are levels) and sets the pointer
+  (`$CCA`, type `$2C`, in 1/16 pixel) at `$CBB4`. A draw job does the same
+  (`menu_pointer`), so the pointer follows the mouse every field; mode 5 is not blended.
+- `$8DF4` (`wait_fields`): the game's waits of n vsyncs (`$8DF0`, 17 calls) last n/60 s,
+  as on NTSC: n · field rate / 60 fields, with the remainder carried to the next wait.
+  They time menu clicks (20), the end of a race (`$BEBC`, 180, in mode 4), the bonus count
+  (`$BB2C`, 384, in mode 3) and hunk 30's sequence (10 to 60). Modes 3 and 4 run their
+  whole sequence inside one step.
+- `$11CBE`, the mode changes' redraw, calls the draw pass twice itself; those draws are the
+  game's, with no blending and no `dots_f` (the flag `draw_job` marks a draw job's draw).
+- Nothing is timed by vsyncs before the menu, and an idle menu starts no demo (4000
+  fields).
+
 MEASURED, PAL:
 - steps (`$230`) in 360 race fields on `a1200-030` + `CACHE`: 180 without the option, 216
   with it; with it on NTSC (`NTSC=1`), 180;
@@ -257,8 +277,27 @@ MEASURED, PAL:
 - a scroll at 1 row per step: the displayed row advances 0 or 1 rows a field, 3 rows per 5
   fields, one step behind `$224`;
 - after the same input, the game's data hunks equal those of the `NOBLEND` check build
-  (`docs/development.md`), apart from task stacks and the TOD-dependent idle counters;
-- the practice race times out and the game returns to the options menu;
+  (`docs/development.md`), apart from task stacks, idle counters and music bytes, and,
+  in one pair of runs, the sprite-set index, its descriptors and the copper lists (one
+  swap apart); the logic's records (`$230`, `$236`–`$32A`, `$224`/`$226`, the object
+  tables) are equal;
+- the options menu on `a1200-030` with the mouse moving 1 count a field: the pointer moves
+  2 pixels in every field (without the option 4 pixels every second field); steps in 3
+  of every 5 fields, a draw in every field. On `a1200`: the same, 68% idle;
+- mode durations from GO! (`a1200-030`, fields; seconds in brackets):
+
+  | Sequence | NTSC, no option | PAL, no option | PAL, option |
+  |---|---|---|---|
+  | GO! to the practice race | 238 (3.97) | 234 (4.68) | 203 (4.06) |
+  | practice race, to the timeout | 3658 (60.97) | 3658 (73.16) | 3047 (60.94) |
+  | the same, two players | 3657 (60.95) | – | 3046 (60.92) |
+  | Beginner race (`CUSTOM3=1`) | 4558 (75.97) | – | 3797 (75.94) |
+  | out of time (mode 4) | 184 (3.07) | 184 (3.68) | 153 (3.06) |
+
+  GO! to the race also paints the playfield, which is not timed. Each sequence then returns
+  to the options menu. The bonus count and the end of the game were not reached (no
+  level was finished);
+- boot to the options menu: 1.82 s in all three (load and paint bound);
 - on `a500-1.5m` with the option, the game's code is byte-identical to a run without it.
 
 ## Caches
