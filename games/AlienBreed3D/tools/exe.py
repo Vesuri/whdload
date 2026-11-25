@@ -1,9 +1,12 @@
 """Unpack the game executable for static analysis.
 
-    python3 tools/exe.py [FILE]      (default tmp/game/AlienBreed3DAGA/data/ABD.PK)
+    python3 tools/exe.py [FILE [OUT]]
+      FILE  default tmp/game/AlienBreed3DAGA/data/ABD.PK (the $c4dc version);
+            tmp/game/AlienBreed3DCD32/data/abd is the CD32 one ($fd78)
+      OUT   default tmp/exe (relative to the game directory)
 
 Decrunches the RNC (ProPack method 1) file, checking both CRC16s in its header, and writes
-tmp/exe/abd (the hunk executable) and tmp/exe/abd.flat: the hunks laid end to end and
+OUT/abd (the hunk executable) and OUT/abd.flat: the hunks laid end to end and
 relocated to 0, so an address in it is the offset resload_PatchSeg patch lists use (the
 offsets in docs/internals.md). Prints each hunk's offset, size and memory type, and the
 CRC16 the slave's version check sees. Disassemble with
@@ -169,7 +172,7 @@ def main():
     src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(GAME, 'tmp/game/AlienBreed3DAGA/data/ABD.PK')
     data = open(src, 'rb').read()
     exe = unrnc(data) if data[:3] == b'RNC' else data
-    out = os.path.join(GAME, 'tmp/exe')
+    out = os.path.join(GAME, sys.argv[2] if len(sys.argv) > 2 else 'tmp/exe')
     os.makedirs(out, exist_ok=True)
     hunks, image, nrelocs = flatten(exe)
     open(os.path.join(out, 'abd'), 'wb').write(exe)
@@ -177,7 +180,7 @@ def main():
     print('%s: %d bytes, CRC16 $%04x' % (os.path.basename(src), len(exe), crc16(exe)))
     for i, (offset, size, memory) in enumerate(hunks):
         print('hunk %d  $%06x-$%06x  %-4s %d bytes' % (i, offset, offset + size, memory, size))
-    print('%d relocations; wrote tmp/exe/abd and tmp/exe/abd.flat' % nrelocs)
+    print('%d relocations; wrote %s/abd and abd.flat' % (nrelocs, os.path.relpath(out, GAME)))
 
 
 if __name__ == '__main__':
