@@ -135,8 +135,10 @@ Steps, each verified before the next:
    of the game, which need a finished level, are checked only from the code. Draw jobs restore what
    a step leaves for its draw (the scenery covering each sprite, the marble's dots and
    shards); objects whose image changes are not blended. The masking by walls and the
-   respawn's shards are checked in practice-race captures; open: the worms and slimes
-   (Beginner and on), checked only from the code and the user's report.
+   respawn's shards are checked in practice-race captures. The shards and the covering
+   scenery are redone for blended draws, and unblended (animated) objects move with the
+   blended view; open: a look at the flags (Beginner), the worms and slimes (Intermediate)
+   and a marble passing behind a wall, which the harness's routes do not reach.
 9. **Budget and matrix.** On `a500` (the original loop), `a1200`, `a1200-030` and
    `a1200-040`, measure step, draw and copper cycles, draws per second and fields per game
    second, in the busiest scenes (Aerial, Silly, Ultimate, two players). When behind, steps

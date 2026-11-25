@@ -246,7 +246,9 @@ With a frame every field it shows the older set every other field. Under CUSTOM4
   unblended; so is an object whose image changed since the step before (the game moves the
   worms and slimes with a new frame). The image is `*(*(record + F))`, F = `+$64` (type 2),
   `+$62` (4), `+$42` (5), `+$1C` (7–9, `$F`), `+$3A` (`$E`); types 1, `$2A` and `$2C` are
-  not checked.
+  not checked. An unblended object still moves with the blended view: its y gains
+  `bl_view` (below), so animated objects (the flags, the worms) stay on the scrolling
+  playfield.
 
 Animation frames and the depth sort of the pre-pass (`$1085C`, `$DD1C`, world positions)
 stay at the step rate.
@@ -269,7 +271,20 @@ and each marble's `+$EB` (`marble_flag`); a draw job puts them back first, so it
 records as the step's draw left them. The pieces' screen y are the step's; for a draw at α
 they move by `bl_view`, the blended `$9BA` minus the step's (it is 0 without a scroll), and
 back after the call, and `$11678` reads `$9BA + bl_view` (`$116BC`). On draw jobs `dots_f`
-takes type `$F`'s `$40` back first, so its dots move once a step.
+takes type `$F`'s `$40` back first, so its dots move once a step. Two lists are redone for
+the blended draw instead:
+- **Covering scenery** (`rebuild`). The step picks the pieces for the sprite's position at
+  the step (`$1E49A(record, kind)`: kind 0 a player and 1 another type 1 or 2, through
+  `$1ED00`; 2 type 4, from `$1AB90`; 3 type `$F`, from `$1D29C`). It reads the world
+  position (`+$C`/`+$10`/`+$14`, integer parts), the screen position the draw reads and
+  `$9BA`, and writes only the list and the scratch `$BA2`. At a blended position a piece
+  the step did not pick could cover the sprite (a column of the marble showed beside a
+  wall), so for a blended sprite whose step list has a piece, `list_call` calls it again
+  with the world position (recorded at each step) and `$9BA` blended, then restores them.
+- **Shards** (`shard_blend`). Each step places the shards anew (images `$10044` + n, one
+  per shard), and they move between the record's two lists and their entries from step to
+  step; each one blends between its place now and the place of the same image at the step
+  before (a second lists table, swapped each step), and is put back after the call.
 
 **Other modes.** Every mode handler (`$B2A2`) runs as a step, so the race (0), the pause
 (1), the menu (5) and the end of the game (6, a state machine at `$C478`) run at 30 Hz.
@@ -294,6 +309,12 @@ MEASURED, PAL:
   scenery mask (`$11060`) runs to its pixel loop in step and draw-only fields alike; a
   covering piece's y in `+$38` grows by the change of `$9BA` (records count y from the
   bottom: the projection `$6918` adds `$9BA`);
+- the same respawn with a log of the drawn shards (check build, removed): each of the
+  eight shards moves in every field (for one, x 142, 155, 167, 177, 189, 202 over a step
+  and its draw jobs); with index matching, shards that changed entries swapped places;
+- the re-picked covering scenery in that run (21 re-picks): with the same pieces, their y
+  is the step's plus `bl_view`; at blended positions the list can hold the previous step's
+  piece instead of the step's;
 - the respawn after a fall off the practice course on `a1200-030`: the shards (`+$AE`,
   `+$38`) are placed in every field and converge as in the original loop;
 - steps (`$230`) in 360 race fields on `a1200-030` + `CACHE`: 180 without the option, 216

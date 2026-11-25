@@ -419,7 +419,7 @@ patch_exe:
 .addrdone
 	; the two position tables for interpolation, and the field counter's interrupt
 	move.l	a6,-(a7)
-	move.l	#2*BL_TABLE+LS_TABLE+IS_SIZE,d0
+	move.l	#2*BL_TABLE+2*LS_TABLE+IS_SIZE,d0
 	move.l	#MEMF_PUBLIC|MEMF_CLEAR,d1
 	move.l	(4).w,a6
 	jsr	(_LVOAllocMem,a6)
@@ -431,7 +431,9 @@ patch_exe:
 	move.l	d0,(a0)
 	add.l	#BL_TABLE,d0
 	lea	lists(pc),a0
-	move.l	d0,(a0)
+	move.l	d0,(a0)+
+	add.l	#LS_TABLE,d0
+	move.l	d0,(a0)			; lists_prev
 	add.l	#LS_TABLE,d0
 	move.l	d0,a1
 	move.b	#NT_INTERRUPT,(LN_TYPE,a1)
@@ -532,23 +534,26 @@ pl_enhanced
 	PL_END
 
 ; screen position field, routine (offset in hunk 26 at $5BE0), largest blended move, the
-; field pointing at the image's pointer (0: none; the image is the record's first long)
+; field pointing at the image's pointer (0: none; the image is the record's first long),
+; the kind of its covering scenery list for $1E49A (-1: none; 0: 0 for a player, else 1)
 DRAWCALL	MACRO
+	lea	bl_kind(pc),a0
+	move.b	#\5,(a0)
 	move.l	#(\3<<16)|\1,d0
 	move.l	#(\4<<16)|(\2-$5BE0),d1
 	bra	blend_call
 	ENDM
 draw_1	bsr	marble_flag
-	DRAWCALL	$1E,$5DFC,48,0
-draw_2	DRAWCALL	$1E,$60F6,48,$64
-draw_4	DRAWCALL	$28,$621C,48,$62
-draw_5	DRAWCALL	$4E,$64B6,48,$42
-draw_7	DRAWCALL	$20,$650A,48,$1C	; types 7 to 9
-draw_e	DRAWCALL	$28,$645E,48,$3A
+	DRAWCALL	$1E,$5DFC,48,0,0
+draw_2	DRAWCALL	$1E,$60F6,48,$64,0
+draw_4	DRAWCALL	$28,$621C,48,$62,2
+draw_5	DRAWCALL	$4E,$64B6,48,$42,-1
+draw_7	DRAWCALL	$20,$650A,48,$1C,-1	; types 7 to 9
+draw_e	DRAWCALL	$28,$645E,48,$3A,-1
 draw_f	bsr	dots_f
-	DRAWCALL	$20,$6350,48,$1C
-draw_2a	DRAWCALL	$06,$62C6,48,0
-draw_2c	DRAWCALL	$00,$6562,48*16,0	; in 1/16 pixels
+	DRAWCALL	$20,$6350,48,$1C,3
+draw_2a	DRAWCALL	$06,$62C6,48,0,-1
+draw_2c	DRAWCALL	$00,$6562,48*16,0,-1	; in 1/16 pixels
 
 ; type $F's draw adds $40 to five dot offsets (+$2C, 8 apart) while $6860 is set; take it
 ; back first on a draw-only job, so that they move once a step
@@ -607,16 +612,20 @@ marble_flag
 	rts
 
 BL_MAX = 48				; positions per table
-BL_ENTRY = 14				; record.l, field.w, x.w, y.w, image.l
+BL_ENTRY = 20				; record.l, field.w, x.w, y.w, image.l, world x.w, y.w, z.w
 BL_TABLE = 2+BL_MAX*BL_ENTRY		; count.w, entries
 
 ; > d0 = largest move << 16 | field offset, d1 = image field << 16 | routine's offset in
 ; hunk 26; the record is the routine's first argument. Calls the routine with the record's
 ; position blended; an object whose image changed since the step before is not blended
-; (the game moves it with the new frame).
+; (the game moves it with the new frame), but moves with the blended view.
 blend_call
-	movem.l	d2-d6/a2-a4,-(a7)
-	move.l	(36,a7),a2		; the record
+	movem.l	d2-d7/a2-a4,-(a7)
+	lea	rb_record(pc),a0
+	clr.l	(a0)
+	move.l	d0,d7
+	swap	d7			; the largest move
+	move.l	(40,a7),a2		; the record
 	move.l	d1,d4
 	swap	d4
 	sub.l	a1,a1			; its image
@@ -631,9 +640,9 @@ blend_call
 	lea	bl_slot(pc),a0
 	move.l	a3,(a0)+		; restored after the routine
 	move.l	(a3),(a0)+
-	move.l	(32,a7),(a0)		; the caller
+	move.l	(36,a7),(a0)		; the caller
 	lea	blend_return(pc),a0
-	move.l	a0,(32,a7)
+	move.l	a0,(36,a7)
 	; the step's draw records the position
 	lea	bl_record(pc),a0
 	tst.b	(a0)
@@ -649,13 +658,16 @@ blend_call
 	move.w	d0,(a4)+
 	move.w	d2,(a4)+
 	move.w	d3,(a4)+
-	move.l	a1,(a4)
+	move.l	a1,(a4)+
+	move.w	($C,a2),(a4)+		; the world position's integer parts
+	move.w	($10,a2),(a4)+
+	move.w	($14,a2),(a4)
 .find
 	lea	bl_valid(pc),a0
 	tst.b	(a0)
-	beq.b	.call
+	beq.w	.call
 	move.w	bl_record-bl_valid(a0),d4	; bl_record, draw_job: one of ours
-	beq.b	.call
+	beq.w	.call
 	move.l	bl_prev(pc),a4
 	move.w	(a4)+,d4
 	bra.b	.next
@@ -668,16 +680,16 @@ blend_call
 	lea	(BL_ENTRY,a4),a4
 .next
 	dbf	d4,.look
-	bra.b	.call
+	bra.w	.unblended		; new
 .found
 	cmp.l	(10,a4),a1
-	bne.b	.call			; a new frame
-	swap	d0			; the largest move
+	bne.w	.unblended		; a new frame
+	move.w	d7,d0
 	move.w	(6,a4),d4		; prev x
 	move.w	d2,d5
 	sub.w	d4,d5
 	bsr	blend
-	bcs.b	.call
+	bcs.w	.unblended
 	add.w	d5,d4
 	move.w	d4,(a3)
 	move.w	(8,a4),d4		; prev y
@@ -687,18 +699,53 @@ blend_call
 	bcs.b	.restore_x
 	add.w	d5,d4
 	move.w	d4,(2,a3)
-	bra.b	.call
+	; its covering scenery is picked again for the blended position (list_call)
+	move.b	bl_kind(pc),d4
+	bmi.w	.call
+	ext.w	d4
+	moveq	#$38,d5
+	tst.w	d4
+	bne.b	.kind
+	move.l	a2,d0
+	sub.l	a_h3(pc),d0
+	cmp.w	#$236-$224,d0
+	beq.b	.list
+	cmp.w	#$32A-$224,d0
+	beq.b	.list
+	moveq	#1,d4			; not a player
+	bra.b	.list
+.kind
+	moveq	#$2C,d5
+	cmp.w	#2,d4
+	beq.b	.list
+	moveq	#$26,d5
+.list
+	lea	rb_record(pc),a0
+	move.l	a2,(a0)+
+	move.l	a4,(a0)+		; rb_entry
+	add.l	a2,d5
+	move.l	d5,(a0)+		; rb_list
+	move.w	d4,(a0)			; rb_kind
+	bra.w	.call
 .restore_x
 	move.w	d2,(a3)
+.unblended
+	move.w	bl_view(pc),d4
+	beq.w	.call
+	cmp.w	#64,d7
+	bhi.w	.call			; not in pixels
+	add.w	d4,(2,a3)
 .call
 	move.l	a_h26(pc),a0
 	add.w	d1,a0
-	movem.l	(a7)+,d2-d6/a2-a4
+	movem.l	(a7)+,d2-d7/a2-a4
 	jmp	(a0)
 
 blend_return
 	subq.l	#4,a7
 	movem.l	a0/a1,-(a7)
+	lea	rb_record(pc),a0
+	clr.l	(a0)
 	lea	bl_slot(pc),a0
 	move.l	(a0)+,a1
 	move.l	(a0)+,(a1)
@@ -777,8 +824,12 @@ step_draw
 	move.w	(6,a0),(4,a0)
 	move.w	(10,a0),(8,a0)
 .rows
-	move.l	lists(pc),a0
-	clr.w	(a0)			; this step's lists are saved afresh
+	lea	lists(pc),a0		; this step's lists are saved afresh
+	move.l	(a0)+,d0
+	move.l	(a0),-(a0)
+	move.l	d0,(4,a0)		; lists_prev = the old lists
+	move.l	(a0),a0
+	clr.w	(a0)
 	lea	mf_table(pc),a0
 	clr.w	(a0)
 	bsr	set_view
@@ -830,27 +881,35 @@ mask_view
 ; The step leaves lists in the records for its draw, and the draw marks each entry it uses
 ; (-1): the pieces of scenery that cover a sprite (image.l, x.w, y.w, in screen positions;
 ; $11270(list, n, x, y, sprite)) and the marble's dots ($6864(list, sprite), 4 entries).
-; A step's draw saves each list before its use, a draw job puts it back first; the screen y
-; of the scenery moves by bl_view for the call and is restored after it.
+; A step's draw saves each list before its use, a draw job puts it back first. Then, for the
+; call only:
+; - the scenery covering a blended sprite is picked again for its blended position (rebuild);
+; - each shard blends between its place at this step and at the step before (shard_blend);
+; - else the screen y of the scenery moves by bl_view.
 LS_MAX = 32				; lists per step
 LS_ENTRY = 4+2+2+5*8			; list.l, n.w, pad, the entries
 LS_TABLE = 2+LS_MAX*LS_ENTRY
+LC_NOVIEW = 31				; flags in d1: no y to move
+LC_OCCL = 30				; scenery covering a sprite
+LC_SHARDS = 29
 
 occl_call
 	move.l	a_occl(pc),a0
 	move.l	(8,a7),d0		; n
 	moveq	#5,d1			; arguments
+	bset	#LC_OCCL,d1
 	bra.b	list_call
 shard_call				; $10FDC(list, image, n)
 	move.l	a_shards(pc),a0
 	move.l	(12,a7),d0
 	moveq	#3,d1
+	bset	#LC_SHARDS,d1
 	bra.b	list_call
 dots_call
 	move.l	a_dots(pc),a0
 	moveq	#4,d0
 	moveq	#2,d1			; arguments
-	bset	#31,d1			; and no y to move
+	bset	#LC_NOVIEW,d1
 list_call
 	movem.l	d2-d4/a2-a4,-(a7)
 	move.l	a0,a4			; the routine
@@ -905,12 +964,29 @@ list_call
 	move.l	(a3)+,(a0)+
 	dbf	d3,.put
 .move
+	btst	#LC_OCCL,d1
+	beq.b	.noocl
+	bsr	rebuild
+	beq.b	.plain
+.noocl
+	btst	#LC_SHARDS,d1
+	beq.b	.view
+	move.w	d0,d2
+	lsl.w	#3,d2
+	sub.w	d2,a3			; the step's entries
+	move.l	d0,d2
+	bsr	shard_blend
+	bset	#31,d2			; put back after the call
+	bra.b	.call
+.view
+	moveq	#0,d2
 	move.w	bl_view(pc),d2
 	beq.b	.plain
 	tst.l	d1
-	bmi.b	.plain
+	bmi.b	.plain			; LC_NOVIEW
 	move.w	d0,a3			; n (the routine keeps d2-d4/a2-a4)
 	bsr.b	.shift
+.call
 	move.w	d1,d3			; the arguments, again
 	move.w	d1,d4
 	lsl.w	#2,d4
@@ -921,10 +997,22 @@ list_call
 	bne.b	.arg
 	jsr	(a4)
 	lea	(-24,a7,d4.w),a7
+	tst.l	d2
+	bmi.b	.back
 	neg.w	d2
 	bsr.b	.shift
+.out
 	movem.l	(a7)+,d2-d4/a2-a4
 	rts
+.back
+	move.l	a2,a0			; the shards' x, y as the step left them
+	subq.w	#1,d2
+.bnext
+	move.l	(4,a3),(4,a0)
+	addq.l	#8,a3
+	addq.l	#8,a0
+	dbf	d2,.bnext
+	bra.b	.out
 .plain
 	move.l	a4,a0
 	movem.l	(a7)+,d2-d4/a2-a4
@@ -939,6 +1027,146 @@ list_call
 	addq.l	#8,a0
 .snext
 	dbf	d3,.sadd
+	rts
+
+; > a2 = a list of the scenery covering a sprite, d0.w = its entries; < eq when it has been
+; picked again by the game's $1E49A(record, kind) for the sprite's blended position: the
+; record's world position (integer parts) and the view offset $9BA blended for the call.
+; Only a list that the step found pieces for (the game skips the pick in some states).
+rebuild
+	movem.l	d0-d6/a0-a4,-(a7)
+	move.l	rb_record(pc),d2
+	beq.b	.no
+	cmp.l	rb_list(pc),a2
+	bne.b	.no
+	move.l	a2,a0
+	move.w	d0,d3
+	subq.w	#1,d3
+	moveq	#-1,d4
+.any
+	cmp.l	(a0),d4
+	bne.b	.some
+	addq.l	#8,a0
+	dbf	d3,.any
+.no
+	moveq	#1,d0			; ne
+	movem.l	(a7)+,d0-d6/a0-a4
+	rts
+.some
+	move.l	d2,a3			; the record
+	move.l	rb_entry(pc),a4		; its place at the step before
+	move.l	($C,a3),-(a7)
+	move.l	($10,a3),-(a7)
+	move.l	($14,a3),-(a7)
+	lea	($C,a3),a1
+	lea	(14,a4),a4		; world x, y, z
+	moveq	#2,d3
+.axis
+	move.w	(a1),d5
+	sub.w	(a4),d5
+	moveq	#64,d0
+	bsr	blend
+	bcs.b	.keep
+	add.w	(a4),d5
+	move.w	d5,(a1)
+.keep
+	addq.l	#4,a1
+	addq.l	#2,a4
+	dbf	d3,.axis
+	move.l	a_h3(pc),a1
+	lea	($9BA-$224,a1),a1
+	move.l	(a1),-(a7)
+	move.w	bl_view(pc),d0
+	ext.l	d0
+	add.l	d0,(a1)
+	move.w	rb_kind(pc),d0
+	ext.l	d0
+	move.l	d0,-(a7)
+	move.l	a3,-(a7)
+	move.l	a_build(pc),a0
+	jsr	(a0)
+	addq.l	#8,a7
+	move.l	a_h3(pc),a1
+	move.l	(a7)+,($9BA-$224,a1)
+	move.l	(a7)+,($14,a3)
+	move.l	(a7)+,($10,a3)
+	move.l	(a7)+,($C,a3)
+	moveq	#0,d0			; eq
+	movem.l	(a7)+,d0-d6/a0-a4
+	rts
+
+; > a2 = a list of shards, a3 = its entries as the step left them, d2.w = their number; each
+; shard placed at this step and the step before moves to the blend of the two places, the
+; others by bl_view. A shard keeps its image, but moves between the record's two lists
+; (+$38, +$AE) and their entries from step to step, so it is found by its image.
+shard_blend
+	movem.l	d0-d6/a0-a1/a3,-(a7)
+	move.l	a2,a0
+	move.w	d2,d4
+	subq.w	#1,d4
+.ent
+	moveq	#-1,d3
+	cmp.l	(a0),d3
+	beq.b	.next			; none
+	bsr.b	shard_prev
+	beq.b	.view
+	moveq	#64,d0
+	move.w	(4,a0),d5
+	sub.w	(4,a1),d5
+	bsr	blend
+	bcs.b	.view
+	move.w	d5,d1
+	move.w	(6,a0),d5
+	sub.w	(6,a1),d5
+	bsr	blend
+	bcs.b	.view
+	add.w	(6,a1),d5
+	move.w	d5,(6,a0)
+	add.w	(4,a1),d1
+	move.w	d1,(4,a0)
+	bra.b	.next
+.view
+	move.w	bl_view(pc),d3
+	add.w	d3,(6,a0)
+.next
+	addq.l	#8,a0
+	dbf	d4,.ent
+	movem.l	(a7)+,d0-d6/a0-a1/a3
+	rts
+
+; > a0 = a shard's entry in the list a2; < a1 = its entry at the step before, ne when found:
+; the same image in a list saved then near a2 (the same record's)
+shard_prev
+	move.l	(a0),d1
+	move.l	lists_prev(pc),a3
+	move.w	(a3)+,d3
+	bra.b	.lnext
+.llook
+	move.l	(a3),d0
+	sub.l	a2,d0
+	bpl.b	.pos
+	neg.l	d0
+.pos
+	cmp.l	#$100,d0
+	bhi.b	.lskip
+	lea	(8,a3),a1
+	move.w	(4,a3),d0
+	bra.b	.enext
+.elook
+	cmp.l	(a1),d1
+	beq.b	.found
+	addq.l	#8,a1
+.enext
+	dbf	d0,.elook
+.lskip
+	lea	(LS_ENTRY,a3),a3
+.lnext
+	dbf	d3,.llook
+	sub.l	a1,a1
+	moveq	#0,d0			; eq
+	rts
+.found
+	moveq	#1,d0			; ne
 	rts
 
 ; the displayed row of the frame about to be shown, from the frame's alpha
@@ -1580,6 +1808,7 @@ en_table			; hunk, offset in it: the addresses below, in order
 	dc.w	147,$11270-$10FDC	; mask a sprite by a list of scenery
 	dc.w	29,0			; $6864: plot the marble's dots
 	dc.w	147,0			; $10FDC: place a list's images
+	dc.w	245,$1E49A-$1E478	; pick the scenery covering a sprite
 	dc.w	-1
 en_addr
 a_vsync:	dc.l	0
@@ -1605,7 +1834,13 @@ a_mouse:	dc.l	0
 a_occl:		dc.l	0
 a_dots:		dc.l	0
 a_shards:	dc.l	0
+a_build:	dc.l	0
 lists:		dc.l	0		; the lists saved at a step's draw
+lists_prev:	dc.l	0		; at the step before's (follows lists)
+rb_record:	dc.l	0		; a blended sprite whose covering scenery is picked again
+rb_entry:	dc.l	0		; its bl_prev entry (follows rb_record)
+rb_list:	dc.l	0
+rb_kind:	dc.w	0
 built_display:	dc.l	0		; the set the last copper list shows
 bl_cur:		dc.l	0		; this step's positions
 bl_prev:	dc.l	0		; the step before's
@@ -1631,6 +1866,7 @@ mf_table:	dcb.b	2+MF_MAX*6,0	; marble_flag: count.w, (record.l, +$EB.b, pad)
 bl_record:	dc.b	0		; a step's draw: record the positions
 draw_job:	dc.b	0		; a draw job's draw (follows bl_record)
 bl_valid:	dc.b	0		; prev is from the same mode
+bl_kind:	dc.b	-1		; the drawn type's covering scenery kind (DRAWCALL)
 field_count:	dc.b	0		; fields, from field_irq
 draw_msg:
 	dcb.b	MN_SIZE+6,0	; a Message, the job code (long) and its alpha (word)
