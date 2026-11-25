@@ -38,7 +38,9 @@ music) and $158000 bytes of ExpMem.
 - The installed `ABD.PK` (RNC-packed, 749824 bytes unpacked) is the same file as
   `abd8ch`: the $c4dc version, which `_pl_v3` patches. It is the Aminet 8-channel version:
   its list has none of the end-part patches, and the ReadMe says that version has no end
-  part. Neither archive holds the floppy or the CD32 executable ($23d2, $fd78).
+  part. The CD32 drawer's `data/abd` (RNC, 765368 bytes unpacked, a fifth hunk of 6140
+  bytes) is the $fd78 version, which `_pl_v2` patches. No archive holds the floppy one,
+  $23d2.
 
 ## Slave patches
 
@@ -92,6 +94,10 @@ their own colours: a wall tile is 32 colours at 33 brightness levels of 12-bit w
 ahead of its texels (the source's `walltiles` and `PaletteAddr`). Game time does not
 depend on the frame rate: each frame advances the game by the fields since the last one
 (`TempFrames`, at most 15), which the interrupt counts (`FramesToDraw`).
+
+The CD32 version draws the same way, at other offsets: the small-view builder's loop at
+$501c, the full-screen builder at $5206, keypad Enter at $404c2, and byte for byte the span
+routine at $1ffcc and the colour moves at $90fe.
 
 The published AB3D I source (the 1997 Amiga Format cover CD, as
 `Agrigaatti/Alien-Breed-3D-I` on GitHub) names these routines: the view's constants are

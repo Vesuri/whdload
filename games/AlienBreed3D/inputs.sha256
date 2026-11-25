@@ -1,5 +1,8 @@
 # "<sha256>  <file name>" per original archive or disk image (shasum -a 256).
-# The installed game (Retroplay 0624, AGA), then the whdload.de install package, which
-# ships both slaves and their source in an XPK IDEA-encrypted archive (unreadable).
+# The installed game (Retroplay 0624, AGA; its ABD.PK is the Aminet 8-channel version),
+# the installed CD32 game (Retroplay, its data/abd the CD32 version), then the whdload.de
+# install package, which ships both slaves and their source in an XPK IDEA-encrypted
+# archive (unreadable).
 546855597ea7cf3e28a1e101937941f7272097f467d41c63223a008e2cf272cc  AlienBreed3D_v1.3_AGA_0624.lha
+b54b0ec33d024f0f598b695a612b042373d4b786d894284c62277342548116bd  AlienBreed3D_v1.3_CD32.lha
 afd9e1c52e1cab44a00f82cde660c1e383dda3e844f914ba13d4e4be3012bd88  AlienBreed3D.lha

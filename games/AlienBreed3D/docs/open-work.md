@@ -1,8 +1,9 @@
 # Open work
 
 Psygore's slave 1.3, reconstructed (both slaves byte for byte); no improvement yet. The
-AlienBreed3D variant boots on the a1200-030 to the main menu and into the first level,
-where mouse control (M) turns and moves.
+AlienBreed3D variant boots on the a1200-030 into the first level with both the Aminet
+8-channel ($c4dc, AGA drawer) and the CD32 ($fd78) version; in the first, mouse control
+(M) turns and moves.
 
 ## Goal
 
