@@ -1,0 +1,120 @@
+
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
+
+ This install applies to "LINKS - The Challenge of Golf © 1992 Access.
+
+ Requirements:
+ -------------
+ This install requires WHDLoad to be in the path.
+ This program can be found in the WHDLoad package.
+ To install from a different drive than DF0: select installation mode Expert.
+
+ The installed game requires 0.5 MB ChipMem and 1.0 MB OtherMem(+3.1 MB for preload)
+ It can be quit by pressing F10 (key can be changed with Tooltype "QuitKey=").
+
+ The game requires an installed A500 Kickstart 1.3 image.
+ The kickstart image must be located in the directory "Devs:Kickstarts" and
+ must be named "kick34005.A500". The image can be extracted from a A500 with
+ tools like 'GrabKick' or similar which can be found on aminet.
+ If the image is of wrong version or altered in any way WHDLoad will quit with
+ an appropriate message.
+ Additionally the file "kick34005.A500.RTB" must be installed in the same
+ directory as the kickstart image. It can be found in the archive
+ "util/boot/skick346.lha" on aminet.
+
+
+ Features:
+ ---------
+ - Full load from HD
+ - 2 versions supported (v1.50 and v1.53)
+ - Course selection bug fixed, now all courses are displayed (see below)
+ - Bountiful and Firestone course disks supported
+ - Cache stuff disabled
+ - Intro can be skipped with CUSTOM1
+ - Manual included
+ - NewIcon (created by me)
+ - Source code included as usual
+ - Quit option that works on 68000 machines (default key is 'F10')
+
+ Here's the patch for one of the most resource hungry golf games on the
+ Amiga ever. Game has been coded in assembly but the code could have been
+ a lot faster, it's not very optimised. 
+
+
+ Update 28-Apr-2013
+ ------------------
+ 
+ Today I added support for the course disks, what I thought would be a
+ quick update of the install script turned out to be a bugfixing session
+ because the course disk support apparently was never tested with more
+ than one course. The game destroyed the FIB (FileInfoBlock) while trying
+ to read the course name so only 1 course would be displayed in the
+ course selection screen. Pretty lame bug in my opinion which is now
+ fixed, all courses are now displayed and can be selected!
+
+ Supported are the Firestone and Bountiful course disks, as far as I know
+ there are no other course disks available. You can install them using
+ the install package.
+ In case you have a different course disk just copy the course
+ (any file with .crs extension) to the course directory and the game
+ will use it. 
+ 
+ There also is a so called "v2.0" version of the game, it's the Kixx XL
+ budget release and a horribly hacked 1.53 version (file names changed
+ in a more than pathetic way to make the game run from disk), I will
+ NOT support this, please use the original v1.53 version.
+
+
+ That about wraps it up, enjoy the game!
+ Sting, 28-Apr-2013
+
+
+
+ Greetings to all in Scarab and Scoopex, the WHDLoad team, PMC,
+ Musashi5150, Skan, Slummy, Loaderror, Frequent, Wayne Kerr, Mr.Spiv,
+ CFou!, Paradroid and all the other usual suspects. :)
+
+ Special greetings to all Golf MK1 fans worldwide except those
+ lowlifes who "borrowed" my MK1 for a joyride!
+
+ Extra greetings to the usual suspects on #amigascne, see you all at
+ Revision 2014! :)
+
+
+
+ History:
+ --------
+
+ version 1.01 (28.04.2013) done by StingRay:
+ - support for Bountiful and Firestone course disks added
+ - course selection bug fixed
+ - NewIcon added
+ - note about hacked "2.0" Kixx XL release added
+
+ version 1.00 (13.04.2013) done by StingRay:
+ - initial release
+ - supports v1.50 (SPS 2010) and v1.53 (SPS 2481)
+ - source code included
+
+
+
+ Contact:
+ --------
+ If you have problems with this installation please try and get a newer
+ version of this package from the WHDLoad WWW-Page. If that doesn't help try
+ some Tooltypes like NOCACHE, NOAUTOVEC, EXPCHIP, NOMMU, PAL or NTSC. If
+ that also fails, please inform the author via the Bug-Report-Form which
+ can be accessed on the WHDLoad WWW-Page.
+
+ For the full WHDLoad package, other installs and updates refer to:
+	http://www.whdload.de/
+ or	aminet:dev/misc/whdload#?
+ and	aminet:game/patch/
+

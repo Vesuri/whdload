@@ -1,0 +1,8 @@
+# "<sha256>  <file name>" per original archive or disk image (shasum -a 256).
+# The installed games first (SPS 2481 is v1.53, SPS 2010 is the NTSC v1.50), then the
+# whdload.de install package, which ships the slave's source.
+288e368f961f21092b2200d9792863c865a6c0f31e29060be693362730799496  Links_v1.01_2481.lha
+4c529ea65df7d2d5a262c49c8c3852b572d51dcb03d145094ba068daadcc464a  Links_v1.01_NTSC_2010.lha
+c299bc3fb6b2bee768f70346c8e40f0728c2ba729aac6ed6dda9ddb2ec9de08f  Links&DataDisks_v1.01_2481.lha
+76c42213bf2e9c4456de9beefcfbca731960aae64417d8122d694df0843f0891  Links&DataDisks_v1.01_NTSC_2010.lha
+5bf672abde2bf2d8430202033cc006319175671e0bc33d584972da5ce27e97ab  Links.lha

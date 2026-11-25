@@ -28,7 +28,7 @@
 ; 13-Apr-2013	- work started
 
 
-	INCDIR	SOURCES:Include/
+	;INCDIR	SOURCES:Include/	; vasm: the build passes the include paths
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
 	;INCLUDE	lvo/dos.i
@@ -55,7 +55,7 @@ BOOTDOS
 ;CBDOSLOADSEG
 ;CBDOSREAD
 CACHE
-DEBUG
+;DEBUG		; vasm: the shipped slave was built without it (no debug strings)
 ;DISKSONBOOT
 ;DOSASSIGN
 FONTHEIGHT	= 8
@@ -84,7 +84,7 @@ slv_keyexit	= $59	; F10
 
 ;============================================================================
 
-	INCLUDE	Sources:whdload/kick13.s
+	INCLUDE	whdload/kick13.s	; vasm: was Sources:whdload/kick13.s
 
 ;============================================================================
 
@@ -186,9 +186,9 @@ _bootdos
 	move.l	a5,a0
 .find	move.w	(a0)+,d0
 	beq.b	.wrongver
-	cmp.w	#-1,d0
+	cmpi.w	#-1,d0			; cmpi: the shipped encoding
 	beq.b	.out
-	cmp.w	#-2,d0			; don't care about CRC
+	cmpi.w	#-2,d0			; don't care about CRC (cmpi: the shipped encoding)
 	beq.b	.found
 	cmp.w	d0,d2
 	beq.b	.found
@@ -215,7 +215,7 @@ _bootdos
 	bra.b	EXIT
 
 
-.cmd	dc.b	"",10,0			; fake command line
+.cmd	dc.b	0,10,0			; fake command line (vasm: was "",10,0; the shipped slave has the 0)
 .cmdlen	= *-.cmd
 .title	dc.b	"title",0
 .game	dc.b	"golf",0
