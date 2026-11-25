@@ -1,0 +1,5 @@
+# "<sha256>  <file name>" per original archive or disk image (shasum -a 256).
+# The installed game (Retroplay 0013), then the whdload.de install package, which ships
+# the slave's source and both slaves.
+d60234666ea7ff57eb83289ee0ec4163133cd8f780a4bac0e424d97f76f8a467  MarbleMadness_v2.3_0013.lha
+086975f9bf1fdd1419ee3a8775653ba89b1ff64375768d2df5b5fba3a13734b4  MarbleMadness.lha

@@ -76,7 +76,8 @@ slv_Version=17
 slv_Flags	= WHDLF_NoError|WHDLF_Examine|WHDLF_EmulTrap
 slv_keyexit	= $5D	; num '*'
 
-	include 	kick13.s
+	; vasm: kick13.s is under whdload/ in the shared WHDLoad Src/sources
+	include 	whdload/kick13.s
 
 
 ;============================================================================

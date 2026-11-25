@@ -1,0 +1,24 @@
+{
+  "archives": [
+    {
+      "input": "MarbleMadness.lha",
+      "output": "MarbleMadnessEnhanced-{version}-{date}.lha",
+      "replace": {
+        "MarbleMadnessHD/MarbleMadness.slave": "build:MarbleMadness",
+        "MarbleMadnessHD/MarbleMadnessImage.slave": "build:MarbleMadnessImage",
+        "MarbleMadnessHD/README": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {
+        "dir": "MarbleMadnessHD/source",
+        "variants": [
+          "MarbleMadness"
+        ],
+        "keep": [
+          "Makefile"
+        ]
+      }
+    }
+  ]
+}
