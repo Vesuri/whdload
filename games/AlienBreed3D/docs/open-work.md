@@ -21,7 +21,9 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
    fight, pause, a death, its end). Steps 0-6 are done
    ([internals](internals.md#the-1x1-renderer)); the costs are in
    [performance](performance.md).
-2. A heavy scene for the baseline (many aliens and objects), when one is found.
+2. A heavy scene for the baseline: in level 1, through the first door, turn left or right,
+   and shoot a barrel close by; a near explosion is the most taxing (the user's). Not yet
+   scripted.
 3. Plan step 7: speed; filling the step-edge holes is for its own writers.
 
 ## Releases

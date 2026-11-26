@@ -20,15 +20,18 @@ was found, running or stopped):
     frames [N [SCRIPT]]   run N fields (default 500) one at a time, playing SCRIPT, and count
                           the frames shown: swaps of drawPt (offset $5dd40), which the main
                           loop makes once a frame after a vertical-blank wait. Reports fps
-                          and fields a frame (p50, p95, max, histogram)
+                          and fields a frame (p50, p95, max, histogram). N `turn`: hold
+                          the right arrow until the view has turned a full circle (angle
+                          at $61d78; keyboard control, `key 27`, K)
     aprof N OUT [SCRIPT]  the same with an aprof capture of every field (FSUAE=$FSUAE_APROF):
                           OUT.json holds each field's time by category (CATEGORIES), whether
                           drawPt swapped, and the time per game offset; tools/frametime.py
                           reports it
     play SCRIPT           run an input script: steps separated by ';', each
-                          `F [mx MX] [my MY] [fire]`: F fields with the mouse moved MX, MY a
-                          field (forward is my -N) and the button held; or a name from
-                          SCRIPTS (`play walk`, the baseline's scripted walk)
+                          `F [mx MX] [my MY] [fire] [key CODE]`: F fields with the mouse
+                          moved MX, MY a field (forward is my -N), the button held and raw
+                          key CODE (hex) held; or a name from SCRIPTS (`play walk`, the
+                          baseline's scripted walk)
     copper [WHAT]         decode a live copper list: `template` (default, game offset
                           $9a07c, the field's start to the jump into the view), `panel`
                           ($9a262, the panel split) or `view [LINE]` (line LINE of the list
@@ -317,16 +320,21 @@ SCRIPTS = {
     # tools/census.sh's: turning and walking with the gun firing
     'fight': '60 mx 40 fire; 120 my -12 fire; 60 mx -40 fire; 120 my -12 fire; '
              '60 mx 40 fire; 120 my -12 fire; 60 mx 40 fire; 120 my -12 fire',
+    # level 1 with keyboard control (K): to the middle of the start room (tools/turn.sh)
+    'centre': '30 key 4c',
 }
+KEY_K, KEY_UP, KEY_RIGHT = 0x27, 0x4c, 0x4e
+ANGLE = 0x61d78         # player 1's view angle (word, 0-8191 a full circle; right adds)
+TURN_MAX = 4000         # `turn`'s limit, in fields
 
 
 def script_fields(text):
-    """A script as one (mx, my, fire) per field."""
+    """A script as one (mx, my, fire, key) per field."""
     text = SCRIPTS.get(text.strip(), text)
     out = []
     for step in filter(None, (s.strip() for s in text.split(';'))):
         w = step.split()
-        fields, mx, my, fire = int(w[0]), 0, 0, False
+        fields, mx, my, fire, key = int(w[0]), 0, 0, False, None
         i = 1
         while i < len(w):
             if w[i] == 'mx':
@@ -335,40 +343,69 @@ def script_fields(text):
                 my, i = int(w[i + 1]), i + 2
             elif w[i] == 'fire':
                 fire, i = True, i + 1
+            elif w[i] == 'key':
+                key, i = int(w[i + 1], 16), i + 2
             else:
                 raise ValueError(f'unknown word {w[i]!r} in {step!r}')
-        out += [(mx, my, fire)] * fields
+        out += [(mx, my, fire, key)] * fields
     return out
 
 
-def run_fields(g, n, inputs=(), after=None):
+def run_fields(g, n, inputs=(), after=None, until=None):
     """Run n fields one at a time, feeding inputs[i] before field i (none past its end), and
-    call after(i) once each field has run. Releases the button at the end."""
-    held = False
+    call after(i) once each field has run; stop early once until() is true. Releases the
+    button and the key at the end. Returns the fields run."""
+    held, down, i = False, None, -1
     for i in range(n):
-        mx, my, fire = inputs[i] if i < len(inputs) else (0, 0, False)
+        mx, my, fire, key = inputs[i] if i < len(inputs) else (0, 0, False, None)
         if fire != held:
             g.cmd(f'monitor input JOY1_FIRE_BUTTON {int(fire)}')
             held = fire
+        if key != down:
+            if down is not None:
+                g.cmd(f'monitor key {down:x} 0')
+            if key is not None:
+                g.cmd(f'monitor key {key:x} 1')
+            down = key
         if mx or my:
             g.cmd(f'monitor mouse {mx} {my}')
         g.cmd('monitor fields 1')
         if after:
             after(i)
+        if until and until():
+            break
     if held:
         g.cmd('monitor input JOY1_FIRE_BUTTON 0')
+    if down is not None:
+        g.cmd(f'monitor key {down:x} 0')
+    return i + 1
 
 
-def _split(rest, n_default):
-    """'N [SCRIPT]' -> (N, inputs)."""
-    w = rest.strip().split(None, 1)
-    n = int(w[0]) if w else n_default
-    return n, script_fields(w[1]) if len(w) > 1 else []
+def _turn(g, text):
+    """'N [SCRIPT]', or `turn`: the right arrow held until the angle has gone a full circle
+    (keyboard control, K; at most TURN_MAX fields). (n, inputs, until)."""
+    w = text.strip().split(None, 1)
+    if not w or w[0] != 'turn':
+        n = int(w[0]) if w else 500
+        return n, script_fields(w[1]) if len(w) > 1 else [], None
+    a = addr(g, ANGLE)
+    st = {'last': _angle(g, a), 'gone': 0}
+
+    def until():
+        now = _angle(g, a)
+        st['gone'] += (now - st['last']) & 8191
+        st['last'] = now
+        return st['gone'] >= 8192
+    return TURN_MAX, script_fields(f'{TURN_MAX} key {KEY_RIGHT:x}'), until
+
+
+def _angle(g, a):
+    return struct.unpack('>H', _bytes(g, a, 2))[0] & 8191
 
 
 def cmd_frames(server, g, rest):
-    n, inputs = _split(rest, 500)
     with Halted(g):
+        n, inputs, until = _turn(g, rest)
         a = addr(g, DRAWPT)
         st = {'last': _long(g, a), 'at': None}
         gaps = []
@@ -379,7 +416,9 @@ def cmd_frames(server, g, rest):
                 if st['at'] is not None:
                     gaps.append(i - st['at'])
                 st['at'], st['last'] = i, p
-        run_fields(g, n, inputs, after)
+        n = run_fields(g, n, inputs, after, until)
+    if until and n == TURN_MAX:
+        raise RuntimeError(f'no full turn in {n} fields (keyboard control, K?)')
     if not gaps:
         return f'{n} fields: no complete frame'
     frames = len(gaps)
@@ -731,11 +770,11 @@ def cmd_aprof(server, g, rest):
     sys.path.insert(0, str(Path.home() / '.local/share/amiga/pylib'))
     from amigaxdev.aprof import parse_profile
     w = rest.split(None, 2)
-    n, out = int(w[0]), Path(w[1]).resolve()
-    inputs = script_fields(w[2]) if len(w) > 2 else []
+    out = Path(w[1]).resolve()
     prof = out.with_suffix('.prof')
     fields, pcs, spcs = [], {}, {}
     with Halted(g):
+        n, inputs, until = _turn(g, ' '.join([w[0]] + w[2:]))
         lay = _layout(g)
         classify = classifier(lay)
         a = addr(g, DRAWPT)
@@ -767,9 +806,11 @@ def cmd_aprof(server, g, rest):
                            'swap': d != st['last'], 'vsyncs': h['vsyncs']})
             st['last'] = d
             st['header'] = h
-        run_fields(g, n, inputs, after)
+        n = run_fields(g, n, inputs, after, until)
         g.cmd(f'monitor aprof stop {prof}', timeout=120)
         prof.unlink(missing_ok=True)
+    if until and n == TURN_MAX:
+        raise RuntimeError(f'no full turn in {n} fields (keyboard control, K?)')
     h = st['header']
     meta = {k: h[k] for k in ('cycleunit', 'CYCLE_UNIT', 'colorclock_hz', 'cpu_model', 'cacr')}
     out.write_text(json.dumps({'meta': meta, 'layout': lay, 'fields': fields,

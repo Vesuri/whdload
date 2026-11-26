@@ -222,9 +222,39 @@ brackets, DERIVED):
 - Full screen at 1x1 costs 2.4x (68020) and 2.3x (68030) its 3x3 frame; on the 68040 it
   is 2.0x, and as in step 5 nearly all of it is charged to gap ([What gap is](#what-gap-is)).
 
+## The turn scene (step 7's start)
+
+From step 7 on, measured with `tools/baseline.sh aprof MACHINE OUT turn` (WHD_ARGS=CUSTOM5=1),
+26.11.2026, the build after step 6:
+- **Setup:** one boot into level 1, keyboard control (K), then 30 fields on the up arrow
+  to the middle of the start room.
+- **Measured:** a full turn on the right arrow (`ab3d.py aprof turn`: until the angle at
+  $61d78 has gone 8192) in the small view, then another in full screen.
+- **Length:** the game turns by time, so a turn is about 120-140 fields on every CPU. On
+  the 68020 in full screen that is only 6 frames.
+
+Frames a second and work a frame in ms (mean, MEASURED):
+
+| CPU | View | fps | work | walls | floors | convert | c2p | slave (sky) | objects |
+|---|---|---|---|---|---|---|---|---|---|
+| 68020 | full | 2.63 | 372.5 | 113.5 | 56.5 | 79.2 | 65.4 | 30.9 (20.7) | 10.6 |
+| 68020 | small | 4.46 | 213.0 | 60.1 | 28.4 | 34.5 | 30.3 | 16.8 (7.3) | 9.1 |
+| 68030 | full | 8.77 | 106.2 | 31.7 | 15.1 | 21.3 | 22.0 | 8.2 (4.6) | 2.8 |
+| 68030 | small | 12.18 | 72.7 | 16.9 | 8.6 | 10.0 | 10.2 | 4.6 (1.9) | 2.4 |
+| 68040 | full | 7.39 | 128.0 | | | | 13.0 | | |
+| 68040 | small | 13.75 | 65.5 | | | | 5.0 | | |
+
+- **68040:** 86-87% of its time is gap ([What gap is](#what-gap-is)), so only its frame
+  rates and the c2p count.
+- **Hottest code:** the wall strips `drawwallPACK0-2` and `simplewallPACK0-2`
+  ($1ca80-$1cb6e), then the Gouraud floor spans `backbeforegour` and `acrossscrngour`
+  ($20fd2, $20ff4).
+- **Sky:** the turn shows more of it than the start does: 20.7 ms a frame on the 68020 in
+  full screen.
+
 ## Not measured
 
-- The heaviest scene. The level 1 route and the starts of levels 2-6 (reached with
-  CUSTOM1=4 and F1) had nothing heavier than level 1's start corridor, so the baseline has
-  two scenes. A later step may add a saved position with many aliens.
+- The heaviest scene: a barrel shot close by, through level 1's first door and to the
+  left or right (the user's). Not yet scripted. The starts of levels 2-6 (reached with
+  CUSTOM1=4 and F1) had nothing heavier than level 1's start corridor.
 - A real 68030 or 68040, and the a1200 without fast memory (it cannot run the game).

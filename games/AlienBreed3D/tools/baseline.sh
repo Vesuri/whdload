@@ -1,27 +1,31 @@
 #!/bin/bash
 # The original's baseline (resolution plan step 1): both views, two scenes, one machine.
 #
-#   tools/baseline.sh MODE MACHINE OUT
+#   tools/baseline.sh MODE MACHINE OUT [SCENE]
 #     MODE     frames: frame counts on the normal FS-UAE and the machine's own setup;
 #              aprof: per-field cycle profiles on $FSUAE_APROF (no MMU: the cycle-exact CPU
 #              on the a1200-fast base, as aprof requires)
 #     MACHINE  a1200-fast (the 68020 reference: the plain a1200's 2 MB cannot hold the
 #              slave's 1.4 MB ExpMem), a1200-030 or a1200-040
 #     OUT      directory for the results (under tmp/)
+#     SCENE    walk (default) or turn
 #
-# Two boots, each deterministic (WARP=1 DETERMINISTIC=1 JOY0=none) into level 1 with mouse
-# control: the first measures standing at the start in the small view, then in full screen,
-# then the scripted walk (ab3d.py SCRIPTS) in the small view; the second the walk in full
-# screen. Each measurement is FIELDS fields (default 500; the walk is 550).
+# Each boot is deterministic (WARP=1 DETERMINISTIC=1 JOY0=none) into level 1 with mouse
+# control. walk: two boots, the first measures standing at the start in the small view,
+# then in full screen, then the scripted walk (ab3d.py SCRIPTS) in the small view; the
+# second the walk in full screen. Each measurement is FIELDS fields (default 500; the walk
+# is 550). turn: one boot, keyboard control (K), 30 fields forward to the middle of the
+# start room, then a full turn on the right arrow (ab3d.py `turn`) in the small view and
+# another in full screen.
 set -eu
-mode=$1 machine=$2 out=$3
+mode=$1 machine=$2 out=$3 scene=${4:-walk}
 game=$(cd "$(dirname "$0")/.." && pwd)
 cd "$game"
 . ../../common/env.sh
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
 fields=${FIELDS:-500}
-export INSTANCE=baseline-$mode-$machine WARP=1 WINDOW=none DETERMINISTIC=1 JOY0=none
+export INSTANCE=baseline-$mode-$machine-$scene WARP=1 WINDOW=none DETERMINISTIC=1 JOY0=none
 case $mode in
   frames) export SETUP=$machine ;;
   aprof)
@@ -68,6 +72,14 @@ boot() {
 trap 'ab3d quit > /dev/null 2>&1 || true' EXIT
 echo "$mode $machine: SETUP=$SETUP FSUAE=${FSUAE:-default} EXTRA_ARGS=${EXTRA_ARGS:-}" | tee "$out/log.txt"
 boot
+if [ "$scene" = turn ]; then
+  ab3d key 27 > /dev/null
+  ab3d play centre > /dev/null
+  measure turn-small turn
+  ab3d full 1 | tee -a "$out/log.txt"
+  measure turn-full turn
+  exit 0
+fi
 measure start-small "$fields"
 ab3d full 1 | tee -a "$out/log.txt"
 measure start-full "$fields"
