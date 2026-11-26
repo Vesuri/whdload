@@ -8,7 +8,7 @@
  CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
  PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
 
- Marble Madness Enhanced 3.0b (25.11.2026)
+ Marble Madness Enhanced 3.0b (26.11.2026)
  Original install: JOTD. Version 3.0b: Vesuri.
 
  This install applies to "Marble Madness" © 1985 Electronic Arts.
@@ -41,13 +41,16 @@
  or	aminet:dev/misc/whdload#?
  and	aminet:game/patch/
 
- version 3.0b (25.11.2026) done by Vesuri:
+ version 3.0b (26.11.2026) done by Vesuri:
  - on 68020+ machines the game runs at its original NTSC speed, also on PAL
    (CUSTOM4)
  - on 68020+ machines it is drawn at 50 or 60 frames a second, with the
    movement smoothed between the game's steps (CUSTOM4)
  - music and sound effects play at their original tempo on PAL (CUSTOM5)
- - the installed icon sets CUSTOM4, CUSTOM5 and CACHE
+ - the Red Player's port and input device for the options menu can be
+   chosen in the splash window (CUSTOM5)
+ - the installed icon sets CUSTOM4, CUSTOM5 (with Mouse Port and Mouse) and
+   CACHE
  - no more pops at the end of notes, and the practice race's rumble loops
    without a click
  - fast mouse moves no longer send the marble the wrong way

@@ -48,7 +48,8 @@ and faster have a wide margin.
   since all five CUSTOM values are taken. WHDLoad 20.1 shows it in the splash window
   (Type M); with older versions the value still works from the tooltype.
 
-The installed icon sets `CUSTOM4=1`, `CUSTOM5=1` and `CACHE`. With both off, the patch list is the
+The installed icon sets `CUSTOM4=1`, `CUSTOM5=15` (the tempo, and the Red Player on the
+Mouse Port with a Mouse) and `CACHE`. With both off, the patch list is the
 original plus the always-on sound and mouse fixes (`docs/internals.md`, "Sound
 fixes", "Mouse").
 
@@ -151,6 +152,7 @@ Steps, each verified before the next:
    come first and draws are skipped; cap the step debt at 2. If the `a1200` drops draws,
    make the copper rebuild cheaper first: `$86B4` rebuilds the whole list, but per field
    only the plane pointers and the wrap split change.
-10. **Release.** Done: 3.0b (25.11.2026). The ReadMe credits JOTD and has the 3.0b entry;
-    the Install script sets `CUSTOM4=1`, `CUSTOM5=1` and `CACHE` in the installed icon (the
-    shipped icons have no tooltypes for `release.json` to add to).
+10. **Release.** Done: 3.0b (26.11.2026). The ReadMe credits JOTD and has the 3.0b entry;
+    the Install script sets `CUSTOM4=1`, `CUSTOM5=15` (the tempo, and Mouse Port / Mouse) and
+    `CACHE` in the installed icon (the shipped icons have no tooltypes for `release.json`
+    to add to).

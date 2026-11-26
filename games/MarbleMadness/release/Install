@@ -286,11 +286,12 @@
   (setstack 10240)
   (noposition)
 )
-; 3.0b: the enhanced framerate (68020+), the NTSC tempo on PAL and the caches
+; 3.0b: the enhanced framerate (68020+), the NTSC tempo on PAL with the Red Player
+; on the Mouse Port with a Mouse (bits 1-3: 7), and the caches
 (tooltype
   (dest (tackon #dest #prefix))
   (settooltype "CUSTOM4" "1")
-  (settooltype "CUSTOM5" "1")
+  (settooltype "CUSTOM5" "15")
   (settooltype "CACHE" "")
 )
 (set #copy-file #readme-file)
