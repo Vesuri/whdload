@@ -7,10 +7,14 @@ Game commands (game offsets as in docs/internals.md, $c4dc version; the CPU is l
 was found, running or stopped):
     base                  where the hunks are: hunk 0 and the chip hunks' runtime addresses
     peek OFF [N]          N bytes (default 4) at game offset OFF, hex
-    level                 from the main menu into level 1: RETURN every 100 fields until the
-                          first frames, then M until mouse control is on (PLR1MOUSE)
+    level                 from the main menu into the level: once no frame has been drawn for
+                          50 fields (a death's or a level end's last frames), RETURN every
+                          100 fields until the first frames, then M until mouse control is
+                          on (PLR1MOUSE)
     next                  F1 (WHD_ARGS=CUSTOM1=4: F1 skips the level), then into the next
                           level the same way
+    end                   F1 (WHD_ARGS=CUSTOM1=4) and run until the level's last frame stays
+                          (no frame for 25 fields, while the tune plays)
     full [0|1]            the view: print it, or press keypad Enter until it is the one asked
                           (0 small, 1 full screen)
     frames [N [SCRIPT]]   run N fields (default 500) one at a time, playing SCRIPT, and count
@@ -35,6 +39,14 @@ was found, running or stopped):
                           96x80 big-endian 12-bit colour words, read from the view list
     tables DIR            the loaded walls (DIR/wallNN: shade table, then texels) and the
                           floor texture (DIR/floortile), which tools/colours.py reads
+    key CODE [N]          press raw key CODE (hex; P, 19, pauses) for N fields (default 10),
+                          then release it for N
+    frame OUT             the frame on screen (oldDrawPt) into OUT as `grab` writes one, then
+                          the view byte (0 small, 1 full screen); drawPt's into OUT.alt
+                          when it holds a view too (the game swaps the pointers a little
+                          before it shows the list, so either may be on screen)
+    die N [SCRIPT]        play SCRIPT (default `fight`) for up to N fields until player 1's
+                          energy ($61d70) is 0 or less: the death's last frame then shows
     palette OUT [N]       from the boot (WHD_ARGS=CUSTOM5=1), field by field for up to N
                           (default 3000): wait for the slave's palette build (src/palette.s)
                           to finish, print the fields it took (each step's, from the state
@@ -60,6 +72,7 @@ DRAWPT = 0x5dd40        # drawPt, the copper list being drawn; oldDrawPt follows
 FULL = 0x40279          # nonzero in full screen (flipped by keypad Enter)
 PLR1MOUSE = 0x5d82      # nonzero with mouse control (M; Plr1Control's key test at $401ee)
 KEY_RETURN, KEY_M, KEY_ENTER, KEY_F1 = 0x44, 0x37, 0x43, 0x50
+ENERGY = 0x61d70        # player 1's energy (word); quitGame copies it to $8bfa
 LEVEL_LETTER = 0x2a29   # the level's letter in 'ab3d2:levels/level_a/twolev.bin', set per level
 # what the colour census reads (tools/colours.py; all loaded once, before the menu)
 WALLTILES = 0x42a66     # walltiles: a pointer to each loaded wall file (LoadWalls)
@@ -186,17 +199,37 @@ def _letter(g):
     return chr(_bytes(g, addr(g, LEVEL_LETTER), 1)[0])
 
 
+def _quiet(g, fields, limit):
+    """Run until drawPt has not swapped for `fields` fields; the fields run, or None after
+    `limit`."""
+    last, still = _drawpt(g), 0
+    for n in range(1, limit + 1):
+        g.cmd('monitor fields 1')
+        d = _drawpt(g)
+        still = still + 1 if d == last else 0
+        last = d
+        if still >= fields:
+            return n
+    return None
+
+
 def _enter_level(g):
-    """RETURN every 100 fields (the menu, then the text screen once it has loaded) until
+    """Wait until no frame is drawn (a death's or a level end's frames can still swap),
+    then RETURN every 100 fields (the menu, then the text screen once it has loaded) until
     drawPt swaps; then M until PLR1MOUSE is set."""
+    if _quiet(g, 50, 3000) is None:
+        raise RuntimeError('frames still drawn after 3000 fields')
     first, presses = _drawpt(g), 0
     for n in range(0, 4000, 10):
         if n % 100 == 0:
             _key(g, KEY_RETURN)
             presses += 1
-        # field by field: 10 fields can hold an even number of swaps
+        # field by field: 10 fields can hold an even number of swaps; a death's last
+        # frames (energy 0 or less) are not the level's
         if _swapped(g, first, 10):
-            break
+            if struct.unpack('>h', _bytes(g, addr(g, ENERGY), 2))[0] > 0:
+                break
+            first = _drawpt(g)
     else:
         raise RuntimeError('no frame drawn within 4000 fields')
     # M until PLR1MOUSE is set: the level's start can clear it after the first frames
@@ -233,6 +266,20 @@ def cmd_next(server, g, rest):
         return _enter_level(g)
 
 
+def cmd_end(server, g, rest):
+    """F1 (with CUSTOM1 bit 2) ends the level; run until its last frame stays (no swap for
+    25 fields, as the tune plays)."""
+    with Halted(g):
+        was = _letter(g)
+        _key(g, KEY_F1)
+        n = _quiet(g, 25, 1000)
+        if n is None:
+            raise RuntimeError('frames still drawn 1000 fields after F1 (CUSTOM1=4 in WHD_ARGS?)')
+        if _letter(g) != was:
+            raise RuntimeError('the next level loaded before the last frame was seen')
+        return f'level {was.upper()} ended, its last frame still after {n + 20} fields'
+
+
 def cmd_full(server, g, rest):
     with Halted(g):
         def state():
@@ -258,6 +305,9 @@ def _percentile(xs, p):
 SCRIPTS = {
     # level 1: down the start corridor, through the door, round the room, back out
     'walk': '200 my -10; 50 mx 20; 100 my -10; 50 mx -20; 100 my -10; 50 mx 30',
+    # tools/census.sh's: turning and walking with the gun firing
+    'fight': '60 mx 40 fire; 120 my -12 fire; 60 mx -40 fire; 120 my -12 fire; '
+             '60 mx 40 fire; 120 my -12 fire; 60 mx 40 fire; 120 my -12 fire',
 }
 
 
@@ -379,6 +429,61 @@ def cmd_grab(server, g, rest):
         return f'level {_letter(g).upper()}: {st["frames"]} frames into {out}'
 
 
+def cmd_frame(server, g, rest):
+    out = Path(rest.strip()).resolve()
+    with Halted(g):
+        lists = []
+        for at in (4, 0):           # oldDrawPt, the one shown, then drawPt
+            try:
+                lists.append(view_words(_dump(g, _long(g, addr(g, DRAWPT) + at),
+                                              VIEW_H * VIEW_LINE,
+                                              out.with_name(out.name + '.list'))))
+            except RuntimeError:
+                lists.append(None)
+        full = _bytes(g, addr(g, FULL), 1)[0] != 0
+    out.with_name(out.name + '.list').unlink(missing_ok=True)
+    alt = out.with_name(out.name + '.alt')
+    alt.unlink(missing_ok=True)
+    if lists[0] is None and lists[1] is None:
+        raise RuntimeError('neither list holds a view')
+    if lists[0] is None:
+        lists = lists[1:]
+    out.write_bytes(lists[0] + bytes([full]))
+    if len(lists) > 1 and lists[1] is not None:
+        alt.write_bytes(lists[1] + bytes([full]))
+    return f'the frame on screen ({"full screen" if full else "small view"}) into {out}'
+
+
+def cmd_key(server, g, rest):
+    w = rest.split()
+    with Halted(g):
+        _key(g, int(w[0], 16), int(w[1]) if len(w) > 1 else 10)
+    return f'key {w[0]}'
+
+
+def cmd_die(server, g, rest):
+    w = rest.split(None, 1)
+    n = int(w[0])
+    inputs = script_fields(w[1] if len(w) > 1 else 'fight')
+    inputs = (inputs * (n // len(inputs) + 1))[:n]
+
+    class Dead(Exception):
+        pass
+
+    with Halted(g):
+        a = addr(g, ENERGY)
+
+        def after(i):
+            if struct.unpack('>h', _bytes(g, a, 2))[0] <= 0:
+                raise Dead(i + 1)
+        try:
+            run_fields(g, n, inputs, after)
+        except Dead as e:
+            g.cmd('monitor input JOY1_FIRE_BUTTON 0')
+            return f'energy 0 after {e.args[0]} fields'
+    raise RuntimeError(f'still alive after {n} fields')
+
+
 def cmd_tables(server, g, rest):
     """tables DIR: the loaded walls (DIR/wallNN, each its 2048-byte shade table then texels)
     and the floor texture (DIR/floortile), for tools/colours.py."""
@@ -450,6 +555,26 @@ CATEGORIES = [
     ('interrupts', [(0x3fefa, 0x3ff5a), (0x415d8, 0x41800), (0x9b2dc, 0xad9e8)]),
 ]
 WAITVBL_CALL = 0x3e58   # the main loop's jsr to the slave's _waitvbl (PL_PS)
+# Enhanced resolution's display (src/display.s), by the release build's labels: the slave
+# offsets come from its listing, the runtime base from _waitvbl
+SLAVE_LST = Path(__file__).resolve().parents[1] / 'tmp/build/release/AlienBreed3D.lst'
+SLAVE_CATEGORIES = [
+    ('c2p', 'c2p1x1_8_c5_030_2', 'c2p1x1_8_c5_030_2_scroffs'),
+    ('convert', '_ds_small', '_ds_hunk0'),       # the frame to pens, 2x2 or 3x3
+    ('wait', '_ds_wait', '_ds_build'),          # until the back screen is not shown
+    ('present', '_p_show', '_ds_small'),        # the rest: heads, c2p calls, the switch
+]
+
+
+def _slave_labels():
+    if not SLAVE_LST.exists():
+        return {}
+    out = {}
+    for line in SLAVE_LST.read_text(errors='replace').splitlines():
+        m = re.match(r'^([0-9A-F]{8}) (\w+)$', line)
+        if m:
+            out[m.group(2)] = int(m.group(1), 16)
+    return out
 
 
 def _layout(g):
@@ -458,7 +583,13 @@ def _layout(g):
     call = _bytes(g, addr(g, WAITVBL_CALL), 6)
     if call[:2] != b'\x4e\xb9':
         raise RuntimeError(f'no jsr at ${WAITVBL_CALL:x}: {call.hex()}')
-    return {'hunks': bases(g), 'waitvbl': struct.unpack('>I', call[2:])[0]}
+    lay = {'hunks': bases(g), 'waitvbl': struct.unpack('>I', call[2:])[0]}
+    labels = _slave_labels()
+    if '_p_show' in labels:
+        base = lay['waitvbl'] - labels['_waitvbl']
+        lay['slave'] = [(name, base + labels[a], base + labels[b])
+                        for name, a, b in SLAVE_CATEGORIES]
+    return lay
 
 
 def classifier(layout):
@@ -479,6 +610,9 @@ def classifier(layout):
                     if any(a <= o < b for a, b in ranges):
                         return name, o
                 return 'logic', o
+        for name, lo, hi in layout.get('slave', ()):
+            if lo <= pc < hi:
+                return name, None
         return ('rom' if pc >= 0xf80000 and pc < 0x1000000 else 'slave'), None
     return classify
 
@@ -623,7 +757,8 @@ server = game_server('ab3d', commands={
     'base': cmd_base, 'peek': cmd_peek, 'level': cmd_level, 'full': cmd_full,
     'frames': cmd_frames, 'play': cmd_play, 'aprof': cmd_aprof, 'copper': cmd_copper,
     'batch': cmd_batch, 'next': cmd_next, 'grab': cmd_grab, 'tables': cmd_tables,
-    'palette': cmd_palette})
+    'palette': cmd_palette, 'frame': cmd_frame, 'key': cmd_key, 'die': cmd_die,
+    'end': cmd_end})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])

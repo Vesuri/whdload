@@ -11,7 +11,9 @@ $c4dc version.
 A direct slave (WHDLoad 18, 68020 and AGA required): 576 KB chip (428 KB without
 music) and $158000 bytes of ExpMem, so a 2 MB a1200 without fast memory cannot run it
 ("Can't allocate ExpMem"); the a1200-fast setup is the smallest that does. Ours asks for
-$180000: the top $28000 is Enhanced resolution's ([below](#the-1x1-palette)).
+$190000 of ExpMem, whose top $38000 is Enhanced resolution's area
+([below](#the-1x1-palette)), and $27000 more chip (732 KB; 584 KB without music) for its
+screens ([below](#the-1x1-display)), with the option off too.
 
 - Stacks: SSP at ExpMem+$157e00, USP 1 KB below.
 - Caches (`resload_SetCPU`): instruction and data cache on; on a 68040/060 also copyback for
@@ -58,10 +60,20 @@ ExpMem+$153000, the level 13 access fault fixed in 1.3); `prefs` saved by
 (`_endpart`: a copper list of its own, scrolled until a button, then quit); music on and off around the end part (`_p_musicon`,
 `_p_musicoff`, not in the no-music slave). Item by item: the `PL_` lists in the source.
 
-Ours adds, with CUSTOM5 and in `_pl_v3` only, `_p_loaded`: a `PL_PS` at $44aa4, the jsr to
-`LoadObjects` ($436d6, the last of the game's loads before the menu), which runs the load
-and then builds the 1x1 palette ([below](#the-1x1-palette)). Without `-DORIGINAL` the
-source assembles these; with it (`BUILD=original`), Psygore's bytes.
+Ours adds, with CUSTOM5 and in `_pl_v3` only (a `PL_IFC5` block):
+
+- `_p_loaded`, a `PL_PS` at $44aa4, the jsr to `LoadObjects` ($436d6, the last of the
+  game's loads before the menu): the load, then the 1x1 palette ([below](#the-1x1-palette));
+- `_p_coplists` at $4463e (`InitCopperScrn`, with a `PL_S` past both AllocMems to $44672):
+  the two copper lists in the area instead of chip, and `PL_R` at $43c40, their FreeMem;
+- `_p_cop1` at $31a0 (the level start's `COP1LC` = template, a `PL_S` past its last 4
+  bytes): the new display's heads instead ([below](#the-1x1-display));
+- `_p_show` at $32d2, $3e42 and $8e5e, each swap's `move.l d0,$dff084`: the finished frame
+  onto the new screens.
+
+Without `-DORIGINAL` the source assembles these; with it (`BUILD=original`), Psygore's
+bytes. Outside the `PL_IFC5` block both slaves' lists patch the same offsets the same way
+(`python3 -m amigaxdev.patchlist`, which stops at `PL_IFC5`).
 
 ## Display
 
@@ -221,8 +233,8 @@ waits for the tune with the last frame shown ($8e9e, $8efa).
 ### The 1x1 palette
 
 Enhanced resolution's palette and pen tables (plan step 3, `src/palette.s`; the method is
-in the [plan](resolution-plan.md#colour)). `_p_loaded` builds them once into the top
-$28000 of ExpMem (ExpMem+$158000, above the stacks). Everything the view can show comes
+in the [plan](resolution-plan.md#colour)). `_p_loaded` builds them once into the area,
+the top $38000 of ExpMem (ExpMem+$158000, above the stacks). Everything the view can show comes
 from these shade tables (game offsets; a table's rows are brightness, row 0 the brightest):
 
 | Table | Where | Shape | Texel counts from |
@@ -248,4 +260,52 @@ The area, by offset from its start:
 | 27392 | 18 x 480 | each `Objects` entry's pal |
 | 36032 | 16416 | the sky |
 | 52448 | 5632 | `brightentab` |
-| 58080 | | the build's scratch to $28000 (histogram, every colour's CIELAB, the sorted pens, a table of squares), free once the build is done |
+| 58080 | to 156412 | the build's scratch (histogram, every colour's CIELAB, the sorted pens, a table of squares), free once the build is done |
+| 58080 | 69120 + 16 | after the build: the display's chunky buffer, 288x240 pens at most ([below](#the-1x1-display)) |
+| 127216 | 144 | the c2p's scratch, half a row |
+| 156416 | 2 x 33296 | the game's two copper lists (`InitCopperScrn`, allocated in chip by the original), to 223008 |
+
+### The 1x1 display
+
+Enhanced resolution's display (plan step 4, `src/display.s`, with Kalms' c2p in
+`src/c2p.s`). The renderer is still the original's: it draws its 96x80 frame of colour
+words into its two copper lists, which are now in the area and never shown. At each swap
+(`_p_show`; the main loop $32d2, the pause screen $3e42, `quitGame` $8e5e) the finished
+list (the new `oldDrawPt`) is converted through the palette's map to pens, 2x2 or 3x3
+into the chunky buffer, then a row at a time through `c2p1x1_8_c5_030_2` into the back
+screen, and shown from the next field by writing that screen's head to `COP1LCL`.
+
+- **Chip**, above the slave's chip pool ($90000, or $6b000 without music): two screens of
+  76800 bytes, 8 planes of 240 rows of 40 bytes (320 pixels, the full view's fetch at
+  FMODE 3), then two copper heads of $800, to $b6800 ($91800). Only `COP1LCL` is
+  switched, so the heads share a high word (an assembly check).
+- **A head**: DMACON $8020, INTREQ $8013 (the game's frame flag and COPER as the template
+  sets them, and DSKBLK, ours), FMODE $000f, the template's window and fetch, pens 0-15
+  (both nibbles) and sprite pointers copied from the template, the 240 pens (12-bit, LOCT
+  clear) in banks 0-7, COLOR00 = the damage flash (`hitcol`, copied each frame), BPLCON0
+  $0211, BPLCON1, BPLCON4 0, the modulos, 8 plane pointers, WAIT $10 and INTREQ $0011.
+  Then in the small view pen 15 from `HealthPal` at the end of lines $2b, $2d, ... (the
+  bars), and both views jump into the game's panel list ($9a262), whose `COP1LC` words
+  (set at the level start, $2ea6) `_p_cop1` and each switch point at the head shown.
+- **Small view**: the template's window and fetch (DIW $2cb1-$2c91, DDF $48-$88), 192 of
+  each row (modulo 16), BPLCON1 0. The panel's list from the end of line $c9 (WAIT
+  $c9df), right after the last bar, where the game's view list reaches it: chunky row 79
+  is never shown, as in the original. On line $ca the panel's list rewrites the frame
+  sprites' colours, and the original's view list, paced by its moves (it has no WAITs),
+  reaches it at a time no WAIT matches: 88 pixels of the frame sprites on that line differ
+  (`tools/display.py` leaves the line out).
+- **Full screen**: DIW $2c81-$2cc1, DDF $38-$b8. The game's pattern has its 288 pixels 16
+  in from the left, so BPLCON1 $4400 delays the planes 16 pixels and pen 0 (the border)
+  shows on either side, as in the original. The game's full-screen rows are 3 rasters from
+  line $2b and its list turns the display off at $118, so the planes start one row in and
+  the head waits for $118: rows 0-78 shown, as in the original.
+- **The field flag**: the copper sets INTREQ DSKBLK at the top of each field, and no
+  interrupt is enabled for it. A switch clears it after writing `COP1LCL`, and the next
+  frame waits until it is set again (or about two fields) before converting into the other
+  screen, which by then is no longer shown.
+- **Keypad Enter**: each head remembers the view it was built for, and the back head is
+  rebuilt from the template when the view differs.
+- `_p_cop1` clears both screens and builds both heads at each level start.
+- Pixels that flicker every other frame while standing still (level 1, seen on the
+  a1200-030) are the game's own: the original slave shows them too, and the frames ours
+  shows equal the renderer's (`HOLES` finds no unwritten pixel).

@@ -38,7 +38,7 @@ hunk files (`VASM_FLAGS`: `-m68020 -no-opt` keeps the shipped encodings); `make 
 compares both with the installed ones (`game.sh`). Named labels are ours; `Lxxxx` labels
 are the code-hunk offsets in `AlienBreed3D.slave` (the no-music slave's are lower after the
 first `IFND NOMUSIC` block). The release build adds Enhanced resolution (CUSTOM5,
-`src/palette.s`, the larger ExpMem); `release/slaves.sha256` records its two slaves.
+`src/palette.s`, `src/display.s`, `src/c2p.s`; the larger chip and ExpMem); `release/slaves.sha256` records its two slaves.
 
 ## Driving it
 
@@ -111,6 +111,32 @@ check the slave against them, boot with CUSTOM5=1 and dump its area:
 `ab3d.py palette` reads memory, not the CPU's data cache, so right after the build a
 68040's copyback cache can still hold its last writes (the effect tables), and they show
 as differences.
+
+## The display skeleton
+
+Enhanced resolution's display ([internals](internals.md#the-1x1-display)) is checked by
+screenshots, all in ignored `tmp/display/`:
+
+    tools/display.sh [OUT [SETUP]]          # both slaves through the same scenes, then checks
+    python3 tools/display.py check SHOT FRAME [AREA]
+    python3 tools/display.py compare ORIG.png OURS.png AREA
+
+`display.sh` boots the release slave with the option off (CUSTOM1=4: the original's
+display, the same patches as Psygore's) and then on (CUSTOM5=1 too)
+through level 1's start, the pause screen and a level end (`ab3d.py end`: F1, then the
+last frame) in both views; with the option on also a death in both (level 2's aliens;
+`ab3d.py die`) and level 2's end. Each
+scene keeps a screenshot and the frame on screen (`ab3d.py frame`, and the other list:
+a stop can fall between the game's pointer swap and the screen's switch). `check` renders the frame where the original shows
+its view, in 12-bit colour or through the area's palette, and compares; `compare` takes
+each pixel of ours as the original's or its colour through the palette, leaving out line
+$ca of the small view and line $ff of full screen (internals). The deaths and level 2's
+end after them are only checked against their own frames: game time follows the frame
+rate, so after a fight the two runs would differ. A machine takes about 10 minutes, most
+of it the two deaths, stepped a field at a time.
+
+Assembling with `VASM_EXTRA=-DHOLES` fills the list the game draws next with $f0f at each
+swap, so a pixel the renderer does not write in a frame shows as $f0f in `ab3d.py grab`.
 
 ## Finding routines
 

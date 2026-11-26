@@ -15,14 +15,16 @@
 	INCLUDE	whdload.i
 
 	IFND	NOMUSIC
-CHIPMEM		= $90000		;576 KB
+CHIPPOOL	= $90000		;576 KB: the slave's chip pool ends here
 	ELSE
-CHIPMEM		= $6b000		;428 KB: no HackAB3D
+CHIPPOOL	= $6b000		;428 KB: no HackAB3D
 	ENDC
 	IFD	ORIGINAL
+CHIPMEM		= CHIPPOOL
 EXPMEM		= $158000		;the game, its fast memory pool, the stacks
 	ELSE
-EXPMEM		= $180000		;and Enhanced resolution's area (palette.s)
+CHIPMEM		= CHIPPOOL+$27000	;and Enhanced resolution's screens (display.s)
+EXPMEM		= $190000		;and its area (palette.s, display.s)
 	ENDC
 SSP_OFF		= $157e00		;from ExpMem; USP 1 KB below
 
@@ -551,7 +553,15 @@ _pl_v3
 	PL_PS	$9b67c,_p_waitlines
 	IFND	ORIGINAL
 	PL_IFC5
-	PL_PS	$44aa4,_p_loaded
+	PL_PS	$44aa4,_p_loaded	;the palette (palette.s)
+	PL_PS	$4463e,_p_coplists	;the display (display.s): the game's lists in fast
+	PL_S	$44644,$2e
+	PL_R	$43c40			;and not freed
+	PL_PS	$31a0,_p_cop1		;the new screens' heads instead of the template
+	PL_S	$31a6,4
+	PL_PS	$32d2,_p_show		;each swap: the frame onto a screen
+	PL_PS	$3e42,_p_show
+	PL_PS	$8e5e,_p_show
 	PL_ENDIF
 	ENDC
 	PL_END
@@ -1413,4 +1423,5 @@ _resload
 	IFND	ORIGINAL
 	CNOP	0,4
 	INCLUDE	palette.s
+	INCLUDE	display.s
 	ENDC

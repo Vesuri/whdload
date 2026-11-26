@@ -3,8 +3,9 @@
 Psygore's slave 1.3, reconstructed (both slaves byte for byte with `BUILD=original`). The
 AlienBreed3D variant boots on the a1200-030 into the first level with both the Aminet
 8-channel ($c4dc, AGA drawer) and the CD32 ($fd78) version; in the first, mouse control
-(M) turns and moves. Enhanced resolution (CUSTOM5) so far builds the 1x1 palette and the
-pen tables before the menu ($c4dc only); the view is still the original's.
+(M) turns and moves. Enhanced resolution (CUSTOM5, $c4dc only) builds the 1x1 palette and the
+pen tables before the menu and shows the game on 8-plane screens through a c2p; the image
+is still the original renderer's 96x80, scaled 2x2 or 3x3.
 
 ## Goal
 
@@ -15,10 +16,10 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
 
 ## Next
 
-1. Plan step 4: the display skeleton, with the original renderer's frame converted to
-   pens through the area's map and shown on the new screens. Steps 0-3 are done: the
-   baseline is in [performance](performance.md), the display inventory and the palette's
-   tables in [internals](internals.md#display-inventory), the palette decision in the
+1. Plan step 5: the 1x1 renderer, writer by writer, walls and floors first. Steps 0-4 are
+   done: the baseline and the skeleton's cost are in [performance](performance.md), the
+   display inventory, the palette's tables and the new display in
+   [internals](internals.md#display-inventory), the palette decision in the
    [plan](resolution-plan.md#colour).
 2. A heavy scene for the baseline (many aliens and objects), when one is found.
 

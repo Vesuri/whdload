@@ -113,6 +113,44 @@ The pixel writers spend most of their time waiting for the Chip bus: about 40% o
 the register-only loops cost nothing charged to their PCs: their time is in gap. Every view pixel is a word write into the copper
 list. That supports the plan's chunky buffer in fast memory; step 4's measurements test it.
 
+## The display skeleton
+
+Enhanced resolution's step 4 (plan, [internals](internals.md#the-1x1-display)), measured
+26.11.2026 the same way: `WHD_ARGS=CUSTOM5=1 tools/baseline.sh aprof MACHINE OUT`. The
+renderer is still the original's, now drawing into copper lists in fast memory; each frame
+is then converted to pens 2x2 or 3x3 (`convert`) and through `c2p1x1_8_c5_030_2` a row at a
+time (`c2p`) onto the new screens. `ab3d.py SLAVE_CATEGORIES` names the slave's routines
+from the release build's listing.
+
+Frames a second, and work a frame in ms (mean), against step 1's:
+
+| CPU | Start, small | Start, full | Walk, small | Walk, full |
+|---|---|---|---|---|
+| 68020 | 7.14 (139.2; was 10.00, 98.4) | 5.56 (168.4) | 7.04 (134.7; was 9.96, 92.9) | 5.79 (164.3; was 9.95, 92.8) |
+| 68030 | 16.67 (48.6; was 16.67, 42.7) | 16.67 (52.1) | 17.40 (47.2; was 19.71, 42.9) | 16.70 (51.2; was 19.65, 41.2) |
+| 68040 | 16.67 (45.2; was 25.00, 32.2) | 12.50 (67.6) | 19.22 (43.3; was 25.00, 31.5) | 12.68 (66.8) |
+
+ms a frame standing at the start, charged to the routines' PCs (MEASURED), and with gap
+shared by instructions (DERIVED, in brackets):
+
+| CPU | c2p, small | c2p, full | convert, small | convert, full | walls + floors, small (step 1) |
+|---|---|---|---|---|---|
+| 68020 | 30.2 (34.5) | 64.9 (65.3) | 13.0 (14.6) | 18.6 (18.7) | 55.8 (60.4), was 58.1 (67.0) |
+| 68030 | 10.2 (13.8) | 22.1 (22.4) | 3.7 (5.0) | 5.2 (5.3) | 16.3 (20.3), was 20.3 (29.3) |
+| 68040 | 5.1 (17.2) | 12.9 (38.8) | 0 (4.6) | 0 (6.0) | 3.3 (16.0), was 9.4 (22.5) |
+
+- The c2p is the largest new cost: 30720 pixels a frame in the small view, 69120 in full
+  screen. Full screen costs about twice the small view, not the 2.25 of its pixels.
+- With the lists in fast memory, walls and floors on the 68030 take 20.3 ms (DERIVED)
+  where they took 29.3 with every pixel a chip write, and on the 68040 16.0 where they
+  took 22.5. On the 14 MHz 68020 they change less (60.4 DERIVED, was 67.0): its fast
+  memory is not much faster than chip for these writes.
+- On the 68040 most of the time is in aprof's gap, so its DERIVED figures carry the most
+  uncertainty, and this machine's fast memory is Zorro II. Choosing the c2p per CPU
+  (`c2p1x1_8_c5_040` on the 68040) is step 7's.
+- The conversion and the 2x2 or 3x3 copy go away at step 5, where the writers draw pens at
+  1x1, and their place is taken by drawing 4x or 9x the pixels.
+
 ## Not measured
 
 - The heaviest scene. The level 1 route and the starts of levels 2-6 (reached with

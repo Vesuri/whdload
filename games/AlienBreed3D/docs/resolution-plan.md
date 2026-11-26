@@ -19,18 +19,22 @@ the design and the steps, in order.
 
 ### Screens
 
-- Two chip buffers of the full view's size, 288x240 in 8 planes (69120 bytes each); the
-  small view uses 192x160 of them. Double-buffered: the c2p writes one while the other shows,
-  and the copper list swaps them at a vertical blank.
-- The slave builds the copper lists: bitplane pointers, each view's window and modulos,
-  the view's palette, and in the small view the original's sprites (the frame) and its
-  panel section below the view. Both stay as they are
-  ([inventory](internals.md#display-inventory)).
+- Two chip screens of 8 planes of 240 rows of 40 bytes (76800 bytes each; built at step 4).
+  A row is 320 pixels, the full view's fetch at FMODE 3, which needs whole 64-pixel
+  fetches: full screen shows 288 of them, delayed 16 pixels by BPLCON1 to where the
+  original has its view, and the small view 192 (modulo 16). Double-buffered: the c2p
+  writes one while the other shows, and `COP1LCL` switches between their copper heads,
+  taking effect at the next vertical blank.
+- The slave builds the copper heads: bitplane pointers, each view's window and modulos
+  (the template's), the palette, and in the small view the original's sprites (the frame)
+  and pen 15 a line pair (the bars), then the game's own panel list below the view
+  ([internals](internals.md#the-1x1-display)).
 - The panel loads all 256 colours at its split, so the view's palette is loaded again
   every field above the view, in the vertical blank. 256 MOVEs with LOCT clear set both
   nibbles (12-bit) in about 4.7 raster lines; 24-bit needs 512 and about 9.4 (DERIVED: a
   MOVE is 4 memory cycles, 227 a line).
-- The c2p converts only the view rectangle (AmigaXDev's Kalms rectangle adapter).
+- The c2p converts only the view rectangle, a row at a time (as AmigaXDev's Kalms
+  rectangle adapter does), so full screen's rows convert 288 pixels, not 320.
 
 ### Colour
 
@@ -117,11 +121,14 @@ Which Kalms routine runs is chosen per CPU by measurement:
 
 ### Memory
 
-Chip grows by the two screens, 138 KB (ws_BaseMemSize from 576 KB to about 720 KB).
-ExpMem grows by $28000, from $158000 to $180000, for the option's area at its top, above
-the stacks (step 3). The first 58080 bytes keep the palette and the pen tables. The rest is
-the palette build's scratch, free once it is done, which the chunky buffer (up to 69120
-bytes) and the larger per-column tables can use. It is not allocated: the slave's fast pool has 136936
+Chip grows by $27000 for the two screens and their heads (ws_BaseMemSize from 576 KB to
+732 KB, 428 to 584 KB without music), above the slave's chip pool. ExpMem grows by $38000,
+from $158000 to $190000, for the option's area at its top, above the stacks (steps 3 and
+4). The first 58080 bytes keep the palette and the pen tables. Then the palette build's
+scratch, free once it is done, where the chunky buffer (up to 69120 bytes) and the c2p's
+half row go, and the larger per-column tables can. Past the scratch are the game's two
+copper lists (2 x 33296 bytes), which the original allocates in chip
+([internals](internals.md#the-1x1-palette)). It is not allocated: the slave's fast pool has 136936
 bytes free once the game has loaded, too little, and an area above the stacks leaves the
 game's pool and hunk offsets as they were. WHDLoad asks for it with the option off too.
 Anything further is allocated at install; when that fails, the option's patches are
@@ -172,15 +179,24 @@ just step further, up to 15 fields.
      speed). The nearest-pen searches go through the pens sorted by CIELAB a, with a table
      of squares: 461 fields on the a1200-fast before that.
    - The game plays with CUSTOM5=1, and CUSTOM5=0 adds no patch.
-4. **Display skeleton** behind CUSTOM5, with the original renderer unchanged. Point it at
-   a fast-memory buffer in the copper-slot layout, convert the words to pens, scale 2x2
-   or 3x3 into the chunky buffer, c2p, and show the new screens, with keypad Enter
-   switching.
-   - This proves the whole new display path (palette, c2p, swap, sprites, panel) with the
-     original's own image, and measures the c2p per view.
-   - Done when both views match the original's screenshots up to the palette, through
-     pause, level end and death, on a1200-030 and a1200-040, and CUSTOM5=0 leaves the
-     game's patched code identical to the original slave's.
+4. **Display skeleton** (done; [internals](internals.md#the-1x1-display),
+   [performance](performance.md#the-display-skeleton), `tools/display.sh`). The game's two
+   copper lists are in fast memory; at each swap the finished one is converted to pens,
+   2x2 or 3x3 into the chunky buffer, through `c2p1x1_8_c5_030_2` onto two new 8-plane
+   screens, and shown from the next field. Keypad Enter switches.
+   - On the a1200-030 and a1200-040, each scene (level 1's start, the pause screen in both
+     views, level 1's end, and with the option on a death in level 2 in both views and
+     level 2's end) shows its frame, through the palette with the option on, with no pixel
+     different. Against the original's screenshots every pixel is
+     the same or its colour through the palette, but for line $ca of the small view (88
+     pixels of the frame sprites, where the panel's list loads its colours) and line $ff
+     of the original's full screen (its early row 71). The deaths and level 2's end
+     follow different game time and are checked against their own frames only.
+   - CUSTOM5=0: the patch list is unchanged, and the ORIGINAL build is still Psygore's
+     slaves byte for byte.
+   - The c2p a frame (MEASURED): 30 / 10 / 5 ms in the small view and 65 / 22 / 13 ms in
+     full screen on the 68020 / 68030 / 68040; the frame rate standing at the start is
+     7.1 / 16.7 / 16.7 fps in the small view (the original 10 / 16.7 / 25).
 5. **The 1x1 renderer, writer by writer**, in the order of step 1's shares (walls and
    floors first are expected).
    - Prove each writer at 96x80 with an in-process differential (VERIFY): on the same

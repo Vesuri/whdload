@@ -48,7 +48,7 @@ FLIN_B		= 37025580
 
 ; the area: what stays
 PA_OFF		= $156000	;from _expmem, which _start moves past the exec and dos
-PA_SIZE		= $28000
+PA_SIZE		= $38000
 PA_NPENS	= 0		;word: pens built, set last
 PA_STATE	= 2		;word: 2 done; while building $10 + the step (1-7)
 PA_PALETTE	= 4		;words: pen PEN0 + k's 12-bit colour
