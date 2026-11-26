@@ -171,7 +171,9 @@ exactly on any CPU and build; keys go by time. `pendiff.py` counts the differing
 of each frame (line 0 left out) and draws them with PNGDIR. With `HOLES=2` in both
 builds, holes are pen 16 (black, exact in the palette) rather than an older frame's pixel,
 so the holes, which follow the frame rate, do not differ. In a level with moving aliens
-(level 4) the two builds' game time differs and so do the frames.
+(level 4) the two builds' game time differs and so do the frames. The water's animation
+and scroll advance a frame drawn, so on level 3 compare builds with `-DWATERFREEZE` in
+both.
 
 ## Finding routines
 

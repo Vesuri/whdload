@@ -287,6 +287,7 @@ change (`tools/baseline.sh aprof MACHINE OUT turn`):
 | Step 6 (`BUILD=words`) | 372.5 / 213.0 | 106.2 / 72.7 | 128.0 / 65.5 | |
 | Pen bytes | 292.4 / 173.1 | 84.4 / 59.9 | 102.8 / 54.7 | the convert gone |
 | The sky a line at a time | 275.1 / 171.2 | 81.2 / 58.6 | 102.0 / 54.1 | sky 17.5 to 8.1 ms (68020, full), 4.7 to 2.1 (68030) |
+| Spans store with `(a3)+`; the gun's S pens at once | 268.5 / 167.3 | 81.0 / 57.7 | 100.9 / 53.2 | gun 5.0 to 2.6 ms, floors 50.9 to 47.2 (68020, full) |
 
 On the 68040 FS-UAE counts instructions, not cycles (AmigaXDev's `measurement-method.md`):
 a change that only moves memory traffic, such as a line stride whose columns spread over

@@ -358,10 +358,15 @@ itself (`DA_INFO`'s pens pointer and row stride). `_p_show` fills line 0, which 
 draws, with black's pen (pen 0 is the border, which the damage flash turns red).
 
 - **Stores**: each `move.w (table),(a3)` becomes `move.b` from a table of pens, and each
-  `addq.w #4` after it `#1` (walls $1ca8c-$1cefe, floors $20f54-$2100a, water
-  $21106-$21132, bitmaps $21a18-$21a6c, polygons $221dc-$22752; the list in
+  `addq.w #4` after it `#1` (walls $1ca8c-$1cefe, bitmaps $21a18-$21a6c, polygons $221dc-$22752; the list in
   `src/AlienBreed3D.s`). Glass ($215fc-$2165c) and light beams ($8aea) are patched too,
   though no level is seen to draw them.
+- **Spans**: the floors', Gouraud floors' and water's span loops ($20f52-$20f7c,
+  $20fe0-$21014, $2110a-$2113e, two of each, whose branches choose the next step by the x
+  error's carry) store with `move.b (a1,d0.w),(a3)+`, one instruction in place of the
+  store and the `addq`. Rewritten in place: each loop is a word shorter, its branches are
+  retargeted, and a `nop` past each pair takes the spare word, so every entry stays where
+  it was.
 - **Tables**: the walls' through `_t_wallpal` (`PA_WALLS`, 32 rows of 32 pens a wall); the
   objects' pal pointers ($2974a + 12) to `PA_OBJS`; the sky through `PA_SKY`, the water
   tint through `PA_TINT`, the pause screen through `PA_MAP` and `PA_PAUSE`; the
@@ -373,10 +378,11 @@ draws, with black's pen (pen 0 is the border, which the damage flash turns red).
   build there too.
 - **Water** (`texturedwater` $2107e): the reflection's index is the water texel's high byte
   and the reflected pixel's low byte, into `brightentab`. Its table (`DA_WATER`, 22 rows of
-  256) is the pen of `brightentab`'s colour for the low byte of each pen's colour. The
-  reference build reads the exact colour word on screen, so where that is not a palette
-  colour (a reflected Gouraud floor or water) the pen differs by about one shade: 500-2500
-  pixels in a few of level 3's frames. Its far row is clamped at 12 by a signed compare,
+  256) is the pen of `brightentab`'s colour for the low byte of each pen's colour (the
+  words build reads the exact colour word on screen, which can be a colour the palette
+  does not hold). The main loop advances its animation and scroll every frame drawn
+  ($3338-$3376), so builds of different speed show it at different phases;
+  `-DWATERFREEZE` stops them for comparing. Its far row is clamped at 12 by a signed compare,
   where the original's doubled distance turns negative from $4000 and reads before
   `brightentab`.
 - **Halved**: four tables of brightness row offsets into the colour tables ($1a4f0,
@@ -386,8 +392,9 @@ draws, with black's pen (pen 0 is the border, which the damage flash turns red).
 `tools/pencheck.sh` grabs still frames of each build's pens (`ab3d.py chunky`) at level
 starts and 40 fields in, turned 8 times in both views, and `tools/pendiff.py` compares two
 runs (the release against `BUILD=words`). With `-DHOLES=2` in both (holes filled with pen 16, black, which the palette maps
-exactly) levels 1 and 2 are equal; level 3 differs only in the water above; level 4's
-aliens move differently between the builds' timings.
+exactly) levels 1 and 2 are equal; level 3 too with `-DWATERFREEZE` in both, but for 1-8
+pixels in 6 of its frames, at x = 96, 160 and 256 (the words build's bank seams); level
+4's aliens move differently between the builds' timings.
 
 ### The 1x1 display
 

@@ -628,6 +628,9 @@ _pl_v3
 	PL_W	$226c6,-EDGE_STRIDE+2
 	PL_W	$226ca,-EDGE_STRIDE+4
 	PL_P	$1fbf6,_t_split		;FloorLine: a span over any number of banks
+	IFD	WATERFREEZE		;debug: the water's animation and scroll stopped (the
+	PL_W	$3338,$603e		;main loop advances them a frame drawn, so builds of
+	ENDC				;different speed show different phases): bra.s $3378
 	IFD	PENS			;pen bytes (hires.s), the walls:
 	PL_PS	$1d0e8,_t_wallpal	;the wall's pen table
 	PL_L	$1ca8c,$16b21000	;move.b (0,a2,d1.w),(a3), from move.w (0,a2,d1.w*2)
@@ -657,24 +660,44 @@ _pl_v3
 	PL_W	$1ce50,$1683
 	PL_W	$1ce96,$1683
 	PL_W	$1cede,$1683
-	PL_L	$20f54,$16b10000	;floors: move.b (0,a1,d0.w),(a3), from move.w
-	PL_W	$20f58,$524b		;(0,a1,d0.w*2), and addq.w #1,a3 from #4
-	PL_L	$20f6e,$16b10000
-	PL_W	$20f72,$524b
-	PL_L	$20fe2,$16b10000	;Gouraud floors
-	PL_W	$20fe6,$524b
-	PL_L	$21006,$16b10000
-	PL_W	$2100a,$524b
+	PL_L	$20f52,$16f10000	;floors: move.b (0,a1,d0.w),(a3)+ (from move.w (0,a1,d0.w*2),(a3)
+					;and addq.w #4,a3), then add.w a4,d3, addx, the
+					;branches retargeted; the spare word a nop past them
+	PL_L	$20f56,$d64cdb86
+	PL_L	$20f5a,$55cf000a
+	PL_L	$20f5e,$54cfffec
+	PL_L	$20f62,$601a4e71
+	PL_L	$20f6c,$16f10000
+	PL_L	$20f70,$d64cdb82
+	PL_L	$20f74,$55cffff0
+	PL_L	$20f78,$54cfffd2
+	PL_W	$20f7c,$4e71
+	PL_L	$20fe0,$16f10000	;Gouraud floors
+	PL_L	$20fe4,$d64cdb86
+	PL_L	$20fe8,$55cf000a
+	PL_L	$20fec,$54cfffe2
+	PL_L	$20ff0,$60244e71
+	PL_L	$21004,$16f10000
+	PL_L	$21008,$d64cdb82
+	PL_L	$2100c,$55cfffe6
+	PL_L	$21010,$54cfffbe
+	PL_W	$21014,$4e71
 	PL_W	$21092,$4e71		;water: rows of 256 pens (no add.w d0,d0),
 	PL_W	$21096,$0c00		;the last row 12 (signed: the original's d0*2 goes
 					;negative from $4000 and reads before brightentab)
 	PL_W	$2109c,$0c00
 	PL_L	$21106,$1033e800	;the reflected pen: move.b (0,a3,a6.l),d0
 	PL_L	$2112a,$1033e800
-	PL_L	$2110a,$16b10000
-	PL_W	$2110e,$524b
-	PL_L	$2112e,$16b10000
-	PL_W	$21132,$524b
+	PL_L	$2110a,$16f10000
+	PL_L	$2110e,$d64cdb86
+	PL_L	$21112,$55cf0010
+	PL_L	$21116,$54cfffe8
+	PL_W	$2111a,$4e71
+	PL_L	$2112e,$16f10000
+	PL_L	$21132,$d64cdb82
+	PL_L	$21136,$55cfffec
+	PL_L	$2113a,$54cfffc4
+	PL_W	$2113e,$4e71
 	PL_L	$21a18,$1cb40000	;bitmaps: move.b (0,a4,d0.w),(a6)
 	PL_L	$21a42,$1cb40000
 	PL_L	$21a6c,$1cb40000

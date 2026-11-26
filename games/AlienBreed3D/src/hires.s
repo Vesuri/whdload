@@ -385,6 +385,39 @@ _t_split
 	move.w	d3,d7
 	JMPG	$1fcb0
 
+; _t_gun's rows of a column, PENS: \1 the packing (0 the low 5 bits, 1 the middle, 2 the
+; high), \2 = S
+GUNROWS	MACRO
+.r\@
+	IFEQ	\1
+	move.w	(a1)+,d1
+	ENDC
+	IFEQ	\1-1
+	move.w	(a1)+,d1
+	lsr.w	#5,d1
+	ENDC
+	IFEQ	\1-2
+	move.b	(a1),d1
+	addq.w	#2,a1
+	lsr.b	#2,d1
+	ENDC
+	andi.w	#31,d1
+	beq.s	.s\@
+	move.b	(a4,d1.w),d1		;(the objects' pens, _t_pens)
+	move.w	(a2,d1.w*2),d5
+	move.w	d5,(a3)
+	move.w	d5,DS_STRIDE(a3)
+	IFEQ	\2-3
+	move.b	d5,2(a3)
+	move.b	d5,DS_STRIDE+2(a3)
+	move.w	d5,2*DS_STRIDE(a3)
+	move.b	d5,2*DS_STRIDE+2(a3)
+	ENDC
+.s\@	lea	\2*DS_STRIDE(a3),a3
+	dbf	d3,.r\@
+	bra.w	.next
+	ENDM
+
 ; Our gun and sky draw from images of a fixed size, 96 texels across, stored a column at a
 ; time: each texel goes S x S into the list, at the slots of its S pixels (DA_SLOT; at S = 3
 ; a texel may span a bank boundary).
@@ -404,6 +437,41 @@ _t_gun
 	mulu.w	_ds_scale(pc),d6
 	mulu.w	#DS_STRIDE,d6
 	adda.l	d6,a6			;line S * top
+	IFD	PENS
+	; a texel's S pens at once: a word from DA_SKYTAB (and a byte at S = 3; not a long,
+	; whose 4th byte might be a transparent texel's), in one of 6 loops: packing x view
+	movea.l	_expmem(pc),a2
+	adda.l	#PA_OFF+DA_SKYTAB,a2
+	move.w	_ds_scale(pc),d6
+	moveq	#0,d4			;the column's x
+	moveq	#96-1,d0		;the columns left
+.col	move.b	(a5),d2			;how its texels are packed
+	move.l	(a5)+,d1		;0: an empty column
+	beq.w	.next
+	andi.l	#$ffffff,d1
+	lea	(a0,d1.l),a1
+	lea	(a6,d4.w),a3
+	moveq	#78,d3
+	sub.w	d7,d3
+	tst.b	_ds_gview(pc)
+	bne.w	.three
+	cmp.b	#1,d2
+	bgt.w	.a2
+	beq.s	.a1
+	GUNROWS	0,2
+.a1	GUNROWS	1,2
+.a2	GUNROWS	2,2
+.three	cmp.b	#1,d2
+	bgt.w	.b2
+	beq.s	.b1
+	GUNROWS	0,3
+.b1	GUNROWS	1,3
+.b2	GUNROWS	2,3
+.next	add.w	d6,d4
+	dbf	d0,.col
+	move.l	(sp)+,d4
+	rts
+	ELSE
 	movea.l	_ds_slot(pc),a2
 	moveq	#96-1,d0		;the columns left
 .col	move.w	(a2)+,d4		;its pixels' slots
@@ -457,6 +525,7 @@ _t_gun
 .next	dbf	d0,.col
 	move.l	(sp)+,d4
 	rts
+	ENDC
 
 ; PL_P at $1933e (the sky, over move.l a0,-(sp) and the angle's read). The game's draws 96
 ; columns of 38 words from lines 1 on (y + 1, as the walls), one sky column each; ours
