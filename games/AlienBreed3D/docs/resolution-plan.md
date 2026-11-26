@@ -129,12 +129,12 @@ Which Kalms routine runs is chosen per CPU by measurement:
 ### Memory
 
 Chip grows by $27000 for the two screens and their heads (ws_BaseMemSize from 576 KB to
-732 KB, 428 to 584 KB without music), above the slave's chip pool. ExpMem grows by $66000,
-from $158000 to $1be000, for the option's area at its top, above the stacks (steps 3 and
-4). The first 58080 bytes keep the palette and the pen tables. Then the palette build's
-scratch, free once it is done, where the chunky buffer (up to 69120 bytes) and the c2p's
-half row go, and the larger per-column tables can. Past the scratch are the game's two
-copper lists (2 x 128800 bytes: 161 lines of 800, room for the 192x160 view), which the
+732 KB, 428 to 584 KB without music), above the slave's chip pool. ExpMem grows by $b2000,
+from $158000 to $20a000, for the option's area at its top, above the stacks (steps 3 to
+6). The first 58080 bytes keep the palette and the pen tables. Then the palette build's
+scratch, free once it is done, where the chunky buffer (up to 69120 bytes), the c2p's
+half row and the 1x1 renderer's tables go. Past the scratch are the game's two copper
+lists (2 x 286308 bytes: 241 lines of 1188, room for the 288x240 view), which the
 original allocates in chip (2 x 33296 bytes)
 ([internals](internals.md#the-1x1-palette)). It is not allocated: the slave's fast pool has 136936
 bytes free once the game has loaded, too little, and an area above the stacks leaves the
@@ -228,8 +228,28 @@ just step further, up to 15 fields.
      Still to play: level 2 (walk, fight, pause, a death, its end).
    - Speed, the small view standing at the start: 3.85 / 10.00 / 12.50 fps on the 68020 /
      68030 / 68040 (step 4 7.14 / 16.67 / 16.67; the original 10 / 16.67 / 25).
-6. **Full screen at 288x240**: the same writers at the second size, with the projection
-   scaled 3x from 96x80 in both directions: the original's field of view and aspect.
+6. **Full screen at 288x240** (done; [internals](internals.md#the-1x1-renderer),
+   [performance](performance.md#full-screen-at-288x240)): the same writers at S = 3, with
+   the projection scaled 3x from 96x80 in both directions: the original's field of view
+   and aspect.
+   - Every site has a third value (linear in S: 2 x the 192x160 one less the original's).
+     What step 5 did with a shift count (x times 2, steps halved) is code that multiplies
+     or divides by S, and our writers (gun, sky, pause letters) draw S x S, each texel at
+     its S pixels' slots. The lists have lines of 1188 bytes on 241 lines; the floors' per-line
+     edge tables (180 lines in the game) are 256 lines in the area.
+   - `tools/display.sh`: each scene shows its frame, through the palette; against the
+     original's frames 89.9% (level 1's start) and 94.7% (the pause screen) of the pixels
+     are found at 3x3; the small view's figures are unchanged. With `-DLORES` every scene
+     equals the original's.
+   - Holes (`-DHOLES`): on level 1's walk in full screen 83 of 123 frames, at most 438
+     pixels (the original's 96x80: 59 of 200, at most 28), at a step's near edge, up to a
+     few lines thick. None standing still at the same place. Once on the fight a 16-column
+     strip at the small view's right edge, below the horizon (1328 pixels). Not yet
+     explained.
+   - Speed: full screen 2.38 / 7.14 / 7.14 fps standing at the start on the 68020 / 68030 /
+     68040 (step 5's 3x3 5.56 / 16.67 / 12.50); the small view as step 5's (3.85 / 10.00 /
+     12.50).
+   - Not yet play-tested by hand.
 7. **Speed, as fast as possible.** Our own pen writers (Renderer above) in place of the
    patched originals, writer by writer in the order of the shares, each proven at 96x80
    against the original's with an in-process differential (VERIFY) before it replaces it;

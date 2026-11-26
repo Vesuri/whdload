@@ -186,6 +186,42 @@ ms a frame standing at the start in the small view, charged to the routines' PCs
   `convert` then turns into pens. Step 7's own pen writers remove both the conversion and
   the word writes.
 
+## Full screen at 288x240
+
+Step 6 (plan, [internals](internals.md#the-1x1-renderer)), measured 26.11.2026 the same
+way. The game's writers draw full screen at 288x240 into the lists (9x the original's
+pixels), `_ds_one` converts it 1x1, and the c2p is the full screen one as before.
+
+Frames a second and work a frame in ms (mean), against step 5's (full screen still the
+96x80 one drawn 3x3, the same as step 4):
+
+| CPU | View | Start | Walk |
+|---|---|---|---|
+| 68020 | full | 2.38 (413.5; step 5 5.56, 172.8) | 2.27 (435.0; 5.60, 169.4) |
+| 68020 | small | 3.85 (250.4; 3.85, 245.5) | 3.77 (257.1; 3.85, 251.2) |
+| 68030 | full | 7.14 (121.4; 16.67, 53.1) | 7.33 (127.4; 16.70, 52.3) |
+| 68030 | small | 10.00 (84.7; 10.00, 82.9) | 10.68 (87.4; 10.73, 86.1) |
+| 68040 | full | 7.14 (138.7; 12.50, 68.4) | 6.53 (145.9; 12.59, 67.7) |
+| 68040 | small | 12.50 (73.5; 12.50, 72.7) | 11.54 (76.1; 11.66, 75.3) |
+
+ms a frame standing at the start in full screen (MEASURED; gap shared by instructions in
+brackets, DERIVED):
+
+| CPU | walls + floors | convert | c2p | slave | objects |
+|---|---|---|---|---|---|
+| 68020 | 205.2 (206.1) | 77.7 (78.1) | 65.5 (65.9) | 36.6 (36.7) | 11.1 (11.2) |
+| 68030 | 58.9 (59.7) | 21.9 (22.2) | 21.7 (22.1) | 10.1 (10.2) | 3.1 (3.2) |
+| 68040 | 5.4 (60.6) | 0 (24.6) | 13.1 (38.7) | 1.1 (8.3) | 0.1 (3.0) |
+
+- Walls and floors cost 1.8x the small view's for 2.25x the pixels; `convert` 2.25x, as
+  its pixels. The c2p is the same as step 5's full screen.
+- `slave` at 288x240 on the 68020: our sky 15.5 ms (`_t_sky`, 288 columns of 240 lines
+  at most), the rest the writers' patches. In the small view the slave's share grew from
+  step 5's 17.5 to 20.8 ms (68030 4.9 to 5.8): our sky (6.6 ms) in place of the game's,
+  which cannot step a 1188-byte line. The frame rates are the same as step 5's.
+- Full screen at 1x1 costs 2.4x (68020) and 2.3x (68030) its 3x3 frame; on the 68040 it
+  is 2.0x, and as in step 5 nearly all of it is charged to gap ([What gap is](#what-gap-is)).
+
 ## Not measured
 
 - The heaviest scene. The level 1 route and the starts of levels 2-6 (reached with

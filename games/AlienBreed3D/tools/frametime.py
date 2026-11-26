@@ -17,6 +17,7 @@ routines. Prints:
 - the routines with the most time.
 """
 import bisect
+import re
 import json
 import os
 import sys
@@ -137,6 +138,22 @@ def main():
           ' chip-bus share of its time):')
     for name, (u, c) in sorted(by.items(), key=lambda kv: -kv[1][0])[:20]:
         print(f'  {100 * u / allpc:5.1f}%  chip {100 * c / max(u, 1):3.0f}%  {name}')
+    # the slave's own code by the release build's labels (ab3d.py aprof's slave_pcs)
+    spcs = d.get('slave_pcs')
+    lst = os.path.join(GAME, 'tmp/build/release/AlienBreed3D.lst')
+    if spcs and os.path.exists(lst):
+        slab = sorted((int(m.group(1), 16), m.group(2)) for m in
+                      (re.match(r'^([0-9A-F]{8}) (\w+)$', l.rstrip()) for l in open(lst, errors='replace'))
+                      if m and m.group(2)[0] in '_c')
+        soffs = [o for o, _ in slab]
+        sby = {}
+        for k, (units, execs, chip, cat) in spcs.items():
+            i = bisect.bisect_right(soffs, int(k, 16)) - 1
+            name = f'{cat:9} {slab[i][1]}' if i >= 0 else f'{cat:9} ${k}'
+            sby[name] = sby.get(name, 0) + units
+        print('the slave\'s routines, ms a frame (category, nearest label at or below):')
+        for name, u in sorted(sby.items(), key=lambda kv: -kv[1])[:12]:
+            print(f'  {u * ms / n:8.2f}  {name}')
 
 
 if __name__ == '__main__':

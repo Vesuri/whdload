@@ -44,11 +44,17 @@ FULL_W		= 288
 FULL_H		= 240
 
 ; The game's lists keep the copper-slot layout (a pixel's colour word at fromPt + 4x + 4 more
-; at each 32-pixel bank), with lines of DS_STRIDE bytes in place of 416: room for the
-; small view's 192 pixels (6 banks of 132 bytes) on 160 lines, and one more: the writers
-; draw row y at line y + 1.
+; at each 32-pixel bank), with lines of DS_STRIDE bytes in place of 416: room for full
+; screen's 288 pixels (9 banks of 132 bytes) on 240 lines, and one more: the writers draw
+; row y at line y + 1. With LORES (both views 96x80) the small view's 192 and 160: the
+; game's own sky runs there, whose unrolled displacements must fit a word.
+	IFND	LORES
+DS_STRIDE	= 9*132			;(pixel 287's word ends at 1182)
+LIST_LINES	= FULL_H+1
+	ELSE
 DS_STRIDE	= 800
 LIST_LINES	= SMALL_H+1
+	ENDC
 
 ; the area, past the palette's tables
 DA_CHUNKY	= PA_END		;FULL_W * FULL_H pens; the c2p reads 4 bytes past a row
@@ -199,18 +205,22 @@ _p_show
 	move.w	_ds_back(pc),d6
 	bsr.w	_ds_build
 	bsr.w	_ds_info
-	tst.b	d7
-	bne.s	.full
 	IFND	LORES
 	bsr.w	_ds_one
 	ELSE
+	tst.b	d7
+	bne.s	.lfull
 	bsr.w	_ds_small
+	bra.s	.lsmall
+.lfull	bsr.w	_ds_full
+.lsmall
 	ENDC
+	tst.b	d7
+	bne.s	.full
 	move.l	#SMALL_W,d5
 	move.w	#SMALL_H-1,d4
 	bra.s	.c2p
-.full	bsr.w	_ds_full
-	move.l	#FULL_W,d5
+.full	move.l	#FULL_W,d5
 	move.w	#FULL_H-1,d4
 .c2p	lea	c2p1x1_8_c5_030_2_pixels(pc),a0
 	move.l	d5,(a0)
@@ -399,10 +409,11 @@ _ds_info
 	move.w	#DS_STRIDE,(a0)+
 	move.l	#96<<16|80,(a0)
 	IFND	LORES
-	tst.b	d7
-	bne.s	.full
 	move.l	#SMALL_W<<16|SMALL_H,(a0)
-.full
+	tst.b	d7
+	beq.s	.small
+	move.l	#FULL_W<<16|FULL_H,(a0)
+.small
 	ENDC
 	rts
 
@@ -412,6 +423,11 @@ _ds_geom
 	movem.l	d0-d1/a0-a2,-(sp)
 	lea	_ds_gview(pc),a0
 	move.b	d7,(a0)
+	IFND	LORES
+	lea	_ds_scale(pc),a0
+	move.w	#2,(a0)
+	add.w	d7,(a0)			;S
+	ENDC
 	lea	_ds_sites(pc),a0
 .site	move.l	(a0)+,d0		;size << 24 | game offset; 0 ends
 	beq.s	.done
@@ -438,6 +454,7 @@ _ds_geom
 	movem.l	(sp)+,d0-d1/a0-a2
 	rts
 
+	IFD	LORES
 ; The frame at a6 + 10 (the first colour word; a line is DS_STRIDE bytes, a pixel 4, and 4
 ; more at each 32-pixel bank) to pens, each 2x2 or 3x3, into the chunky buffer.
 _ds_small
@@ -490,16 +507,22 @@ _ds_full
 	dbf	d6,.dup
 	dbf	d4,.line
 	rts
+	ELSE
 
-	IFND	LORES
-; The small view at 1x1: 192x160 words to pens.
+; d7 = the view: its frame at 1x1, 192x160 or 288x240 words, to pens.
 _ds_one
 	lea	10(a6),a0
 	PALEA	DA_CHUNKY,a1
 	lea	PA_MAP(a4),a2
-	moveq	#0,d3			;line 0 black, as the original's: no writer draws
-	move.w	#SMALL_H-1,d4		;it, and its banks 3-5 hold the list's moves
-.line	moveq	#SMALL_W/32-1,d5
+	moveq	#SMALL_W/32-1,d2
+	move.w	#SMALL_H-1,d4
+	tst.b	d7
+	beq.s	.go
+	moveq	#FULL_W/32-1,d2
+	move.w	#FULL_H-1,d4
+.go	moveq	#0,d3			;line 0 black, as the original's: no writer draws
+.line	movea.l	a0,a5			;it, and the builders' moves are in it
+	move.w	d2,d5
 .bank	moveq	#32-1,d6
 .px	move.w	(a0),d0
 	addq.l	#4,a0
@@ -508,7 +531,7 @@ _ds_one
 	dbf	d6,.px
 	addq.l	#4,a0
 	dbf	d5,.bank
-	lea	DS_STRIDE-SMALL_W/32*132(a0),a0
+	lea	DS_STRIDE(a5),a0
 	move.w	#$0fff,d3
 	dbf	d4,.line
 	rts
@@ -522,16 +545,15 @@ _ds_gview	dc.b	0		;the view the game's geometry is set for
 	EVEN
 
 ; The geometry sites: where the game's code has the view's size, and each view's value.
-; SITE SIZE (1, 2, 4), game offset, the 192x160 value, the 96x80 value (the original's);
-; the small view takes the first but with LORES (the 96x80 small view, the original's).
+; SITE SIZE (1, 2, 4), game offset, the 192x160 value, the 288x240 value, the 96x80 value
+; (the original's), which both views take with LORES.
 SITE	MACRO
 	dc.l	\1<<24|\2
 	IFND	LORES
-	dc.l	\3
+	dc.l	\3,\4
 	ELSE
-	dc.l	\4
+	dc.l	\5,\5
 	ENDC
-	dc.l	\4
 	ENDM
 _ds_sites
 	INCLUDE	sites.s			;(with LORES both views take the 96x80 values)

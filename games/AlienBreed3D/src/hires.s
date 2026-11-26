@@ -1,23 +1,27 @@
 ;----------------------------------------------------------------------
-; The 1x1 renderer (resolution plan step 5): the game's own writers draw the small view at
-; 192x160. Most of the geometry is in _ds_sites (sites.s: each view's value of an
-; immediate or an opcode); what a constant cannot express is here, patched at the game
-; offsets given (AlienBreed3D.s): the writers' row and column addressing for any width
-; (both views), and in the small view the doubling of every height above or below the
-; eye before its divide, the walls' texture step halved, and 2x2 writers of our own for
-; the gun, the sky and the water tint, which draw from fixed-size images.
+; The 1x1 renderer (resolution plan steps 5 and 6): the game's own writers draw the small
+; view at 192x160 and full screen at 288x240, S = 2 and 3 times the original's 96x80 in
+; both directions. Most of the geometry is in _ds_sites (sites.s: each view's value of an
+; immediate); what a constant cannot express is here, patched at the game offsets given
+; (AlienBreed3D.s): the writers' row and column addressing for any width, every height
+; above or below the eye and every x times S before its divide, the texture steps divided
+; by S, and S x S writers of our own for the gun, the sky and the pause screen's letters,
+; which draw from fixed-size images, and the water tint.
 
-; the area, past DA_INFO: tables for 192 columns and 161 lines, both views
-DA_SLOT		= DA_INFO+DI_SIZE	;192 words: a pixel's offset in its line, 4x + 4(x / 32)
-DA_YTAB		= DA_SLOT+2*SMALL_W	;161 longs: (y + 1) lines
-DA_ACROSS	= DA_YTAB+4*(SMALL_H+1)	;doacrossline for 192: move.w d0,n(a3) each, then rts
-DA_EDGES	= (DA_ACROSS+4*SMALL_W+2+3)&-4	;the polygons' edges, top then bottom,
+; the area, past DA_INFO: tables for 288 columns and 241 lines, both views
+DA_SLOT		= DA_INFO+DI_SIZE	;288 words: a pixel's offset in its line, 4x + 4(x / 32)
+DA_YTAB		= DA_SLOT+2*FULL_W	;241 longs: (y + 1) lines
+DA_ACROSS	= DA_YTAB+4*(FULL_H+1)	;doacrossline for 288: move.w d0,n(a3) each, then rts
+DA_EDGES	= (DA_ACROSS+4*FULL_W+2+3)&-4	;the polygons' edges, top then bottom,
 					;8 bytes a column, EDGE_STRIDE apart
-EDGE_STRIDE	= 8*200			;(the game's are $28b46 and $29146, 1536 apart: at
+EDGE_STRIDE	= 8*300			;(the game's are $28b46 and $29146, 1536 apart: at
 					;192 columns its writes of column 192, past the
 					;right clip, land on the bottom's column 0 and on
 					;the objects' graphics table at $2974a)
-DA_END		= DA_EDGES+2*EDGE_STRIDE
+DA_SIDES	= DA_EDGES+2*EDGE_STRIDE	;the floors' leftsidetab, rightsidetab,
+SIDE_STRIDE	= 2*256			;leftbrighttab, rightbrighttab: a word a line, each
+					;(the game's at $1db5a, 180 lines, 360 bytes apart)
+DA_END		= DA_SIDES+4*SIDE_STRIDE
 	IFGT	DA_END-DA_LISTS
 	FAIL	the 1x1 tables overlap the copper lists
 	ENDC
@@ -30,11 +34,34 @@ G_WALLBOT	= $1ca2c
 G_RIGHT		= $1f9f4		;FloorLine: the span's right edge (word)
 G_ANGLE		= $18ff2		;the view's angle (word; the sky's column)
 G_SKYEND	= $5dd40		;the sky's end (G_SKY, palette.s)
+G_XSHIFT	= $5d8c			;the eye's x shift, added to x * 128 (long)
 
 G_FONT		= $4414			;the pause screen's letters, 8x8 colour words each
 G_PAUSETEXT	= $433c			;its text, 12 letters a row
 G_PAUSESRC	= $41aa			;pointers: the frame shown, the list drawn into
 G_PAUSEDST	= $41ae
+
+; \1 (a data register, long) times S: 2 in the small view, 3 in full screen. Flags not kept.
+TIMESS	MACRO
+	tst.b	_ds_gview(pc)
+	bne.s	.\@f
+	add.l	\1,\1
+	bra.s	.\@e
+.\@f	move.l	\1,-(sp)
+	add.l	\1,\1
+	add.l	(sp)+,\1
+.\@e
+	ENDM
+
+; \1 (a data register, long, signed) divided by S. Flags not kept.
+BYS	MACRO
+	tst.b	_ds_gview(pc)
+	bne.s	.\@f
+	asr.l	#1,\1
+	bra.s	.\@e
+.\@f	divs.l	#3,\1
+.\@e
+	ENDM
 
 ; Jump to a game offset, every register and the flags kept.
 JMPG	MACRO
@@ -65,6 +92,9 @@ _ds_tables
 	movea.l	a5,a1
 	adda.l	#G_EYE,a1
 	move.l	a1,(a0)
+	lea	_ds_slot(pc),a0
+	PALEA	DA_SLOT,a1
+	move.l	a1,(a0)
 	PALEA	DA_SLOT,a0
 	moveq	#0,d0
 .slot	move.w	d0,d1
@@ -74,17 +104,17 @@ _ds_tables
 	add.w	d1,d1
 	move.w	d1,(a0)+
 	addq.w	#1,d0
-	cmp.w	#SMALL_W,d0
+	cmp.w	#FULL_W,d0
 	blo.s	.slot
 	PALEA	DA_YTAB,a0
 	move.l	#DS_STRIDE,d0
-	move.w	#SMALL_H,d1
+	move.w	#FULL_H,d1
 .ytab	move.l	d0,(a0)+
 	addi.l	#DS_STRIDE,d0
 	dbf	d1,.ytab
 	PALEA	DA_ACROSS,a0
 	PALEA	DA_SLOT,a1
-	move.w	#SMALL_W-1,d1
+	move.w	#FULL_W-1,d1
 .across	move.w	#$3740,(a0)+		;move.w d0,n(a3)
 	move.w	(a1)+,(a0)+
 	dbf	d1,.across
@@ -109,6 +139,11 @@ _ds_tables
 	dc.l	$2203e,DA_EDGES+EDGE_STRIDE	;and #the bottom ($29146), the drawers'
 	dc.l	$22a24,DA_EDGES+EDGE_STRIDE	;(which read the top at -EDGE_STRIDE: the
 	dc.l	$22cc6,DA_EDGES+EDGE_STRIDE	;displacements are AlienBreed3D.s's)
+	dc.l	$1d676,DA_SIDES		;floors' edges: movea.l #leftsidetab ($1db5a),a3
+	dc.l	$1d8da,DA_SIDES
+	dc.l	$1f0b2,DA_SIDES		;(a4)
+	dc.l	$1d660,DA_SIDES+SIDE_STRIDE	;#rightsidetab ($1dcc2); the displacements
+	dc.l	$1d8c0,DA_SIDES+SIDE_STRIDE	;to the others are AlienBreed3D.s's
 	dc.l	0
 
 ; PL_PS at $1a616 and $1a3ac (walls, see-through walls), over movea.l fromPt,a3 and adda.w
@@ -125,8 +160,8 @@ _t_column
 	rts
 
 ; PL_PS at $1cb8a and $1cf18 (a wall strip), over adda.l (timeslarge,pc,d5.w*4),a3, move.w
-; d5,d4 and the two consttab reads: line d5 + 1, and in the small view half the texture
-; step (16.16) for twice the lines; the start is the same.
+; d5,d4 and the two consttab reads: line d5 + 1, and the texture step (16.16) divided by S
+; for S times the lines; the start is the same.
 _t_strip
 	move.w	d5,d4
 	addq.w	#1,d4
@@ -135,13 +170,11 @@ _t_strip
 	move.w	d5,d4
 	move.l	4(a1,d2.w*8),d0
 	move.l	(a1,d2.w*8),d2
-	tst.b	_ds_gview(pc)
-	bne.s	.full
-	asr.l	#1,d2
-.full	rts
+	BYS	d2
+	rts
 
 ; PL_PS at $1d13a, $1b3b0 (sub.l d6,top) and $1d146, $1b3b6 (sub.l d6,bottom): a wall's
-; top and bottom less the eye (d6), doubled in the small view
+; top and bottom less the eye (d6), times S
 _t_walltop
 	move.l	a0,-(sp)
 	HUNK	G_WALLTOP,a0
@@ -151,41 +184,36 @@ _t_wallbot
 	HUNK	G_WALLBOT,a0
 _t_wallh
 	sub.l	d6,(a0)
-	tst.b	_ds_gview(pc)
-	bne.s	.full
 	move.l	d6,-(sp)
 	move.l	(a0),d6
-	add.l	d6,(a0)
+	TIMESS	d6
+	move.l	d6,(a0)
 	move.l	(sp)+,d6
-.full	movea.l	(sp)+,a0
+	movea.l	(sp)+,a0
 	rts
 
 ; PL_PS over sub.l eye,d6 (glass and bitmaps' zone clips, $2142e $21452 $21770 $21794) and
-; sub.l eye,d2 (their height, $2147a $21864; a polygon's, $21e28): doubled in the small view
+; sub.l eye,d2 (their height, $2147a $21864; a polygon's, $21e28): times S
 _t_eye6
 	move.l	a0,-(sp)
 	movea.l	_ds_eye(pc),a0
 	sub.l	(a0),d6
 	movea.l	(sp)+,a0
-	tst.b	_ds_gview(pc)
-	bne.s	.full
-	add.l	d6,d6
-.full	rts
+	TIMESS	d6
+	rts
 _t_eye2
 	move.l	a0,-(sp)
 	movea.l	_ds_eye(pc),a0
 	sub.l	(a0),d2
 	movea.l	(sp)+,a0
-	tst.b	_ds_gview(pc)
-	bne.s	.full
-	add.l	d2,d2
-.full	rts
+	TIMESS	d2
+	rts
 
 ; PL_PS at $2149a and $21884 (glass, bitmaps; over asl.w #7,d3, asl.w #7,d4 and their
-; divs.w d1 by the distance): the half sizes, doubled in the small view after the divide
-; (an 8-bit size shifted 8 would be negative in the word). The game doubles them again
-; into the width and height, a word: an object so close that they do not fit (the
-; original's at under half our distance) is dropped, a half width of -$1000 putting its
+; divs.w d1 by the distance): the half sizes, times S after the divide (an 8-bit size
+; shifted 8 would be negative in the word). The game doubles them into the width and
+; height, a word: an object so close that they do not fit (the original's at under 1/S
+; of our distance) is dropped, a half width of -$1000 putting its
 ; left edge past the right clip, which the game's next check skips. Else the width wraps,
 ; the column loop runs on for thousands of columns and its writes land anywhere in memory
 ; (a corpse walked over overwrote its own graphics).
@@ -196,14 +224,85 @@ _t_size
 	divs.w	d1,d4
 	tst.b	_ds_gview(pc)
 	bne.s	.full
+	cmp.w	#$3fff/2,d3		;(unsigned: a negative one is dropped too)
+	bhi.s	.drop
+	cmp.w	#$3fff/2,d4
+	bhi.s	.drop
 	add.w	d3,d3
 	add.w	d4,d4
-	cmp.w	#$3fff,d3		;(unsigned: a negative one is dropped too)
+	rts
+.full	cmp.w	#$3fff/3,d3
 	bhi.s	.drop
-	cmp.w	#$3fff,d4
-	bls.s	.full
+	cmp.w	#$3fff/3,d4
+	bhi.s	.drop
+	move.w	d3,-(sp)
+	add.w	d3,d3
+	add.w	(sp)+,d3
+	move.w	d4,-(sp)
+	add.w	d4,d4
+	add.w	(sp)+,d4
+	rts
 .drop	move.w	#-$1000,d3
-.full	rts
+	rts
+
+; PL_PS at $84aa and $8a76 (the level's and the objects' points, over asl.l #7,d2 and
+; add.l $5d8c,d2): x * 128 * S, then the eye's x shift as the game's.
+_t_x128
+	asl.l	#7,d2
+	TIMESS	d2
+	move.l	a0,-(sp)
+	HUNK	G_XSHIFT,a0
+	add.l	(a0),d2
+	movea.l	(sp)+,a0
+	rts
+
+; PL_PS at $1fb96 (FloorLine, over muls.l d6,d3:d1, asr.l #6,d1, add.l d1,d4 and the same
+; for d2 and d5; PL_S past them): the span's start at its left edge d6, the steps (the
+; change over 96 pixels / 64) divided by S for S times the pixels.
+_t_fstep
+	muls.l	d6,d3:d1
+	asr.l	#6,d1
+	BYS	d1
+	add.l	d1,d4
+	muls.l	d6,d3:d2
+	asr.l	#6,d2
+	BYS	d2
+	add.l	d2,d5
+	rts
+
+; PL_PS at $1fbc4 (over asr.l #6,d1, asr.l #6,d2 and movea.w d1,a4): the steps a pixel
+_t_fstep2
+	asr.l	#6,d1
+	asr.l	#6,d2
+	BYS	d1
+	BYS	d2
+	movea.w	d1,a4
+	rts
+
+; PL_PS at $214dc $214f6 (glass) and $218f8 $21914 (bitmaps), over swap d7, clr.w d7, swap
+; d7 after the divide: the index into the step table (consttab, linear: step ~ (index + 1)
+; / 256) divided by S, for S times the size.
+_t_index
+	andi.l	#$ffff,d7
+	divu.w	_ds_scale(pc),d7
+	andi.l	#$ffff,d7
+	rts
+
+; PL_PS at $21dd6 (a polygon object's vertices, over asr.l #8,d2, move.l d2,(a4)+ and ext.l
+; d3; PL_S past asl.l #7,d3 and move.l d3,(a4)+): x / 256 and y * 128, each times S.
+_t_pvert
+	asr.l	#7,d2			;(x / 256) * 2
+	tst.b	_ds_gview(pc)
+	beq.s	.x
+	move.l	d2,-(sp)		;* 3/2
+	asr.l	#1,d2
+	add.l	(sp)+,d2
+.x	move.l	d2,(a4)+
+	ext.l	d3
+	asl.l	#7,d3
+	TIMESS	d3
+	move.l	d3,(a4)+
+	rts
 
 ; PL_PS at $221c6 and $2271c (dopoly, dopolyh; over adda.l (rows,pc,d1.w*4),a3 and move.w
 ; #$3f3f,d1) and $22466 (dopolyg; and move.w -1530(a4),d1, the top edge's): line d1 (+ 1)
@@ -250,26 +349,34 @@ _t_split
 	move.w	d3,d7
 	JMPG	$1fcb0
 
-; PL_PS at $5826 (DrawInGun, over move.w d7,d6 and muls.w #416,d6; d7 = its top row): full
-; screen as the game's. The small view's gun is ours, 2x2: the game's draws 96 columns of
-; rows d7-78 from a fixed-size image. From there a0 = the image, a2 and a5 its frame's
-; columns (d0 the frame, d5 its offset), a4 the colours, a6 = fromPt.
+; Our gun and sky draw from images of a fixed size, 96 texels across, stored a column at a
+; time: each texel goes S x S into the list, at the slots of its S pixels (DA_SLOT; at S = 3
+; a texel may span a bank boundary).
+
+; PL_PS at $5826 (DrawInGun, over move.w d7,d6 and muls.w #416,d6; d7 = its top row). The
+; game's draws 96 columns of rows d7-78 from a fixed-size image, ours S x S from line
+; S * d7. From there a0 = the image, a2 and a5 its frame's columns (d0 the frame, d5 its
+; offset), a4 the colours, a6 = fromPt.
 _t_gun
-	tst.b	_ds_gview(pc)
-	beq.s	.small
-	move.w	d7,d6
-	muls.w	#DS_STRIDE,d6
-	rts
-.small	addq.l	#4,sp			;not back: this draws the gun and returns for it
+	addq.l	#4,sp			;not back: this draws the gun and returns for it
+	move.l	d4,-(sp)		;(the game's keeps d4)
 	asl.w	#2,d0
 	add.w	d5,d0
 	move.w	(a2,d0.w*4),d1
 	lea	(a5,d1.w),a5
 	move.w	d7,d6
-	mulu.w	#2*DS_STRIDE,d6
-	adda.l	d6,a6
-	moveq	#0,d0			;the column
-.col	move.b	(a5),d2			;how its texels are packed
+	mulu.w	_ds_scale(pc),d6
+	mulu.w	#DS_STRIDE,d6
+	adda.l	d6,a6			;line S * top
+	movea.l	_ds_slot(pc),a2
+	moveq	#96-1,d0		;the columns left
+.col	move.w	(a2)+,d4		;its pixels' slots
+	move.w	(a2)+,d5
+	moveq	#0,d6
+	tst.b	_ds_gview(pc)
+	beq.s	.two
+	move.w	(a2)+,d6
+.two	move.b	(a5),d2			;how its texels are packed
 	move.l	(a5)+,d1		;0: an empty column
 	beq.w	.next
 	andi.l	#$ffffff,d1
@@ -277,66 +384,45 @@ _t_gun
 	movea.l	a6,a3
 	moveq	#78,d3
 	sub.w	d7,d3
-	cmp.b	#1,d2
+.row	cmp.b	#1,d2
 	bgt.s	.m2
 	beq.s	.m1
-.m0	move.w	(a1)+,d1		;the low 5 bits
-	andi.w	#31,d1
-	beq.s	.n0
-	move.w	(a4,d1.w*2),d1
-	move.w	d1,(a3)
-	move.w	d1,4(a3)
-	move.w	d1,DS_STRIDE(a3)
-	move.w	d1,DS_STRIDE+4(a3)
-.n0	lea	2*DS_STRIDE(a3),a3
-	dbf	d3,.m0
-	bra.s	.next
+	move.w	(a1)+,d1		;the low 5 bits
+	bra.s	.got
 .m1	move.w	(a1)+,d1		;the middle 5
 	lsr.w	#5,d1
-	andi.w	#31,d1
-	beq.s	.n1
-	move.w	(a4,d1.w*2),d1
-	move.w	d1,(a3)
-	move.w	d1,4(a3)
-	move.w	d1,DS_STRIDE(a3)
-	move.w	d1,DS_STRIDE+4(a3)
-.n1	lea	2*DS_STRIDE(a3),a3
-	dbf	d3,.m1
-	bra.s	.next
+	bra.s	.got
 .m2	move.b	(a1),d1			;the high 5
 	addq.w	#2,a1
 	lsr.b	#2,d1
-	andi.w	#31,d1
-	beq.s	.n2
+.got	andi.w	#31,d1
+	beq.s	.skip
 	move.w	(a4,d1.w*2),d1
-	move.w	d1,(a3)
-	move.w	d1,4(a3)
-	move.w	d1,DS_STRIDE(a3)
-	move.w	d1,DS_STRIDE+4(a3)
-.n2	lea	2*DS_STRIDE(a3),a3
-	dbf	d3,.m2
-.next	addq.w	#8,a6			;two pixels
-	addq.w	#1,d0
-	moveq	#15,d1
-	and.w	d0,d1
-	bne.s	.same
-	addq.w	#4,a6			;the next bank
-.same	cmp.w	#96,d0
-	blo.w	.col
+	move.w	d1,(a3,d4.w)
+	move.w	d1,(a3,d5.w)
+	move.w	d1,DS_STRIDE(a3,d4.w)
+	move.w	d1,DS_STRIDE(a3,d5.w)
+	tst.b	_ds_gview(pc)
+	beq.s	.skip2
+	move.w	d1,(a3,d6.w)
+	move.w	d1,DS_STRIDE(a3,d6.w)
+	move.w	d1,2*DS_STRIDE(a3,d4.w)
+	move.w	d1,2*DS_STRIDE(a3,d5.w)
+	move.w	d1,2*DS_STRIDE(a3,d6.w)
+.skip	tst.b	_ds_gview(pc)
+	beq.s	.skip2
+	lea	DS_STRIDE(a3),a3
+.skip2	lea	2*DS_STRIDE(a3),a3
+	dbf	d3,.row
+.next	dbf	d0,.col
+	move.l	(sp)+,d4
 	rts
 
-; PL_P at $1933e (the sky, over move.l a0,-(sp) and the angle's read): full screen as the
-; game's. The small view's is ours, 2x2: the game's draws 96 columns of 38 words from
-; lines 1 on (y + 1, as the walls), one sky column each.
+; PL_P at $1933e (the sky, over move.l a0,-(sp) and the angle's read). The game's draws 96
+; columns of 38 words from lines 1 on (y + 1, as the walls), one sky column each; ours
+; S x S from line 1.
 _t_sky
-	tst.b	_ds_gview(pc)
-	beq.s	.small
-	move.l	a0,-(sp)
-	HUNK	G_ANGLE,a0
-	move.w	(a0),d5
-	movea.l	(sp),a0
-	JMPG	$19346
-.small	movem.l	d0-d7/a0-a6,-(sp)
+	movem.l	d0-d7/a0-a6,-(sp)
 	HUNK	G_ANGLE,a0
 	move.w	(a0),d5
 	andi.w	#8191,d5
@@ -348,126 +434,172 @@ _t_sky
 	lea	(a2,d5.l),a1
 	movea.l	_ds_frompt(pc),a0
 	movea.l	(a0),a0
-	lea	DS_STRIDE(a0),a0
-	moveq	#0,d0			;the column
-.col	movea.l	a0,a4
+	lea	DS_STRIDE(a0),a0	;line 1
+	movea.l	_ds_slot(pc),a4
+	moveq	#96-1,d0		;the columns left
+	tst.b	_ds_gview(pc)
+	bne.s	.col3
+.col2	move.w	(a4)+,d4		;S = 2: the two pixels are in one bank
+	addq.w	#2,a4
+	lea	(a0,d4.w),a6
 	movea.l	a1,a5
 	moveq	#38-1,d3
-.row	move.w	(a5)+,d1
-	move.w	d1,(a4)
-	move.w	d1,4(a4)
-	move.w	d1,DS_STRIDE(a4)
-	move.w	d1,DS_STRIDE+4(a4)
-	lea	2*DS_STRIDE(a4),a4
-	dbf	d3,.row
-	lea	76(a1),a1
+.row2	move.w	(a5)+,d1
+	move.w	d1,(a6)
+	move.w	d1,4(a6)
+	move.w	d1,DS_STRIDE(a6)
+	move.w	d1,DS_STRIDE+4(a6)
+	lea	2*DS_STRIDE(a6),a6
+	dbf	d3,.row2
+	bsr.s	.step
+	dbf	d0,.col2
+	bra.s	.done
+.col3	move.w	(a4)+,d4		;S = 3
+	move.w	(a4)+,d5
+	move.w	(a4)+,d6
+	movea.l	a0,a6
+	movea.l	a1,a5
+	moveq	#38-1,d3
+.row3	move.w	(a5)+,d1
+	move.w	d1,(a6,d4.w)
+	move.w	d1,(a6,d5.w)
+	move.w	d1,(a6,d6.w)
+	move.w	d1,DS_STRIDE(a6,d4.w)
+	move.w	d1,DS_STRIDE(a6,d5.w)
+	move.w	d1,DS_STRIDE(a6,d6.w)
+	move.w	d1,2*DS_STRIDE(a6,d4.w)
+	move.w	d1,2*DS_STRIDE(a6,d5.w)
+	move.w	d1,2*DS_STRIDE(a6,d6.w)
+	lea	3*DS_STRIDE(a6),a6
+	dbf	d3,.row3
+	bsr.s	.step
+	dbf	d0,.col3
+.done	movem.l	(sp)+,d0-d7/a0-a6
+	rts
+.step	lea	76(a1),a1		;the next sky column, wrapping
 	cmpa.l	a3,a1
 	blt.s	.in
 	movea.l	a2,a1
-.in	addq.w	#8,a0
-	addq.w	#1,d0
-	moveq	#15,d1
-	and.w	d0,d1
-	bne.s	.same
-	addq.w	#4,a0
-.same	cmp.w	#96,d0
-	blo.s	.col
-	movem.l	(sp)+,d0-d7/a0-a6
-	rts
+.in	rts
 
-; PL_P at $6900 (the water tint, over movea.l #brightentab,a2): full screen as the game's.
-; The small view's is ours: the game's clears the red of lines 0-79 (d5 = 3) or 40-79
-; (d5 = 1) of 96 pixels; here lines 0-159 or 80-159 of 192.
+; PL_P at $6900 (the water tint, over movea.l #brightentab,a2): the game's clears the red of
+; lines 0-79 (d5 = 3) or 40-79 (d5 = 1) of 96 pixels; ours of S times the lines, of the
+; view's width.
 _t_water
-	tst.b	_ds_gview(pc)
-	beq.s	.small
-	HUNK	G_BRIGHTEN,a2
-	JMPG	$6906
-.small	movea.l	_ds_frompt(pc),a0
+	movem.l	d0-d4/d6/a0-a1,-(sp)
+	movea.l	_ds_frompt(pc),a0
 	movea.l	(a0),a0
+	move.w	_ds_scale(pc),d6
 	moveq	#3,d0
 	sub.w	d5,d0
-	mulu.w	#40*DS_STRIDE,d0
+	mulu.w	#20,d0
+	mulu.w	d6,d0			;the first line
+	mulu.w	#DS_STRIDE,d0
 	adda.l	d0,a0
-	moveq	#SMALL_W/32-1,d0
-.bank	moveq	#32-1,d1
-.col	movea.l	a0,a1
 	move.w	d5,d2
 	addq.w	#1,d2
-	mulu.w	#40,d2
-	subq.w	#1,d2
+	mulu.w	#20,d2
+	mulu.w	d6,d2
+	subq.w	#1,d2			;the lines - 1
+	moveq	#SMALL_W/32-1,d0
+	tst.b	_ds_gview(pc)
+	beq.s	.bank
+	moveq	#FULL_W/32-1,d0
+.bank	moveq	#32-1,d1
+.col	movea.l	a0,a1
+	move.w	d2,d3
 .line	andi.w	#$ff,(a1)
 	lea	DS_STRIDE(a1),a1
-	dbf	d2,.line
+	dbf	d3,.line
 	addq.w	#4,a0
 	dbf	d1,.col
 	addq.w	#4,a0
 	dbf	d0,.bank
+	movem.l	(sp)+,d0-d4/d6/a0-a1
 	HUNK	G_BRIGHTEN,a2
 	moveq	#0,d2
 	rts
 
-; PL_P at $41b2 (DRAWPAUSESCRN, over movea.l #font,a0): full screen as the game's. The
-; small view's is ours, 2x2: the game's draws a grid of 12x10 blocks of 8x8 over 96x80,
-; each a letter of the option text (its font's colour words, 0 see-through) or the frame
-; shown (G_PAUSESRC) at half brightness, into the other list (G_PAUSEDST).
+; PL_P at $41b2 (DRAWPAUSESCRN, over movea.l #font,a0). The game's draws a grid of 12x10
+; blocks of 8x8 over 96x80, each a letter of the option text (its font's colour words, 0
+; see-through) or the frame shown (G_PAUSESRC) at half brightness, into the other list
+; (G_PAUSEDST); ours the letters S x S, the frame at 1x1.
 _t_pause
-	tst.b	_ds_gview(pc)
-	beq.s	.small
-	HUNK	G_FONT,a0
-	JMPG	$41b8
-.small	movem.l	d0-d7/a0-a6,-(sp)
+	movem.l	d0-d7/a0-a6,-(sp)
 	HUNK	G_FONT,a0
 	HUNK	G_PAUSETEXT,a1
 	HUNK	G_PAUSEDST,a2
 	movea.l	(a2),a2
 	HUNK	G_PAUSESRC,a3
 	movea.l	(a3),a3
-	moveq	#0,d7			;y
+	movea.l	_ds_slot(pc),a4
+	move.w	#SMALL_W,a5		;the view's width and height
+	move.w	#SMALL_H,d7
+	tst.b	_ds_gview(pc)
+	beq.s	.go
+	move.w	#FULL_W,a5
+	move.w	#FULL_H,d7
+.go	subq.w	#1,d7			;the lines left
+	moveq	#0,d5			;the texel row
+	move.w	_ds_scale(pc),a6
+	subq.w	#1,a6			;its lines left
+	moveq	#0,d4			;the line's offset
 .y	moveq	#0,d6			;x
-.x	move.w	d6,d0			;the pixel's offset: its slot and line
-	lsr.w	#5,d0
-	add.w	d6,d0
-	add.w	d0,d0
-	add.w	d0,d0
-	move.w	d7,d1
-	mulu.w	#DS_STRIDE,d1
-	add.l	d0,d1
-	move.w	d7,d2			;its block's letter
-	lsr.w	#4,d2
-	mulu.w	#12,d2
-	move.w	d6,d3
-	lsr.w	#4,d3
-	add.w	d3,d2
-	move.b	(a1,d2.w),d3
-	subi.b	#65,d3			;as the game's: below A, none
+	moveq	#0,d3			;the texel column
+	move.w	_ds_scale(pc),d2
+	subq.w	#1,d2
+	swap	d2			;(high: the pixels left in it)
+.x	move.w	d5,d0			;its block's letter
+	lsr.w	#3,d0
+	mulu.w	#12,d0
+	move.w	d3,d1
+	lsr.w	#3,d1
+	add.w	d1,d0
+	move.b	(a1,d0.w),d1
+	move.w	(a4,d6.w*2),d0		;the pixel's offset
+	ext.l	d0
+	add.l	d4,d0
+	subi.b	#65,d1			;as the game's: below A, none
 	blt.s	.dim
-	andi.w	#$ff,d3
-	lsl.w	#7,d3			;128 bytes a letter
-	move.w	d7,d2
-	lsr.w	#1,d2
+	andi.w	#$ff,d1
+	lsl.w	#7,d1			;128 bytes a letter
+	move.w	d5,d2
 	andi.w	#7,d2
 	lsl.w	#4,d2			;16 a row
-	add.w	d2,d3
-	move.w	d6,d2
-	lsr.w	#1,d2
+	add.w	d2,d1
+	move.w	d3,d2
 	andi.w	#7,d2
 	add.w	d2,d2
-	add.w	d2,d3
-	move.w	(a0,d3.w),d2
+	add.w	d2,d1
+	move.w	(a0,d1.w),d1
 	bne.s	.put
-.dim	move.w	(a3,d1.l),d2
-	andi.w	#$0eee,d2
-	lsr.w	#1,d2
-.put	move.w	d2,(a2,d1.l)
+.dim	move.w	(a3,d0.l),d1
+	andi.w	#$0eee,d1
+	lsr.w	#1,d1
+.put	move.w	d1,(a2,d0.l)
+	swap	d2
+	subq.w	#1,d2
+	bpl.s	.same
+	move.w	_ds_scale(pc),d2
+	subq.w	#1,d2
+	addq.w	#1,d3
+.same	swap	d2
 	addq.w	#1,d6
-	cmp.w	#SMALL_W,d6
+	cmp.w	a5,d6
 	blo.s	.x
-	addq.w	#1,d7
-	cmp.w	#SMALL_H,d7
-	blo.s	.y
+	addi.l	#DS_STRIDE,d4
+	subq.w	#1,a6
+	move.w	a6,d0
+	bpl.s	.ysame
+	move.w	_ds_scale(pc),a6
+	subq.w	#1,a6
+	addq.w	#1,d5
+.ysame	dbf	d7,.y
 	movem.l	(sp)+,d0-d7/a0-a6
 	rts
 
+
 _ds_frompt	dc.l	0	;game addresses of G_FROMPT and G_EYE
 _ds_eye		dc.l	0
+_ds_slot	dc.l	0	;DA_SLOT's address
+_ds_scale	dc.w	2	;S: 2 in the small view, 3 in full screen (_ds_geom)

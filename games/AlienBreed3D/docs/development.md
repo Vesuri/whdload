@@ -135,13 +135,12 @@ end after them are only checked against their own frames: game time follows the 
 rate, so after a fight the two runs would differ. A machine takes about 10 minutes, most
 of it the two deaths, stepped a field at a time.
 
-The release build draws the small view at 192x160 (plan step 5), so there `compare` takes
-the two frames instead (`display.py scale`): it counts the original's pixels, but the
-border's, found among the four at their place in ours (columns 2x and 2x + 1, lines 2y - 1
-and 2y), and at least `SCALE_MIN` of them must be. Level 1's start, pause and end find
-88-94%. Full screen is still the original's frame 3x3 and compared pixel by pixel. A build
-with `VASM_EXTRA=-DLORES` draws both views at 96x80, and every scene of it is compared
-pixel by pixel as in step 4.
+The release build draws both views at 1x1, 192x160 and 288x240 (plan steps 5 and 6), so
+there `compare` takes the two frames instead (`display.py scale`): it counts the
+original's pixels, but the border's, found among the S x S at their place in ours
+(columns Sx to Sx + S - 1, lines S(y - 1) + 1 to Sy), and at least `SCALE_MIN` of them
+must be. Level 1's start, pause and end find 88-95%. A build with `VASM_EXTRA=-DLORES`
+draws both views at 96x80, and every scene of it is compared pixel by pixel as in step 4.
 
 Assembling with `VASM_EXTRA=-DHOLES` fills the list the game draws next with $f0f at each
 swap, so a pixel the renderer does not write in a frame shows as $f0f in `ab3d.py grab`.

@@ -48,7 +48,11 @@ FLIN_B		= 37025580
 
 ; the area: what stays
 PA_OFF		= $156000	;from _expmem, which _start moves past the exec and dos
+	IFND	LORES
+PA_SIZE		= $b2000
+	ELSE
 PA_SIZE		= $66000
+	ENDC
 	IFND	ORIGINAL
 	IFNE	EXPMEM-$158000-PA_SIZE
 	FAIL	EXPMEM must be the game's $158000 and the area

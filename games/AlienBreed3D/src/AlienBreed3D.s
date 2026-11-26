@@ -24,7 +24,11 @@ CHIPMEM		= CHIPPOOL
 EXPMEM		= $158000		;the game, its fast memory pool, the stacks
 	ELSE
 CHIPMEM		= CHIPPOOL+$27000	;and Enhanced resolution's screens (display.s)
-EXPMEM		= $1be000		;and its area, PA_SIZE (palette.s, display.s)
+	IFND	LORES
+EXPMEM		= $20a000		;and its area, PA_SIZE (palette.s, display.s)
+	ELSE
+EXPMEM		= $1be000
+	ENDC
 	ENDC
 SSP_OFF		= $157e00		;from ExpMem; USP 1 KB below
 
@@ -605,10 +609,32 @@ _pl_v3
 	PL_W	$226c6,-EDGE_STRIDE+2
 	PL_W	$226ca,-EDGE_STRIDE+4
 	PL_P	$1fbf6,_t_split		;FloorLine: a span over any number of banks
-	PL_PS	$5826,_t_gun		;gun: its first row; the small view's 2x2
-	PL_P	$1933e,_t_sky		;the small view's sky 2x2
-	PL_P	$6900,_t_water		;the small view's water tint
-	PL_P	$41b2,_t_pause		;the small view's pause screen 2x2
+	PL_PS	$84aa,_t_x128		;x * 128 * S: the level's points
+	PL_NOP	$84b0,2
+	PL_PS	$8a76,_t_x128		;the objects'
+	PL_NOP	$8a7c,2
+	PL_PS	$1fb96,_t_fstep		;FloorLine: the steps / S
+	PL_S	$1fb9c,10
+	PL_PS	$1fbc4,_t_fstep2
+	PL_PS	$214dc,_t_index		;glass and bitmaps: the texture step / S
+	PL_PS	$214f6,_t_index
+	PL_PS	$218f8,_t_index
+	PL_PS	$21914,_t_index
+	PL_PS	$21dd6,_t_pvert		;a polygon object's vertices times S
+	PL_S	$21ddc,4
+	PL_W	$1d8e8,2*SIDE_STRIDE	;the floors' edges: leftbrighttab from
+	PL_W	$1d9cc,2*SIDE_STRIDE	;leftsidetab (hires.s DA_SIDES),
+	PL_W	$1f17c,SIDE_STRIDE	;rightsidetab,
+	PL_W	$1f226,SIDE_STRIDE
+	PL_W	$1f320,SIDE_STRIDE
+	PL_W	$1f276,2*SIDE_STRIDE	;leftbrighttab,
+	PL_W	$1f342,2*SIDE_STRIDE
+	PL_W	$1f28c,3*SIDE_STRIDE	;rightbrighttab
+	PL_W	$1f358,3*SIDE_STRIDE
+	PL_PS	$5826,_t_gun		;gun: ours SxS
+	PL_P	$1933e,_t_sky		;the sky SxS
+	PL_P	$6900,_t_water		;the water tint
+	PL_P	$41b2,_t_pause		;the pause screen SxS
 	ELSE
 	PL_W	$582a,DS_STRIDE		;gun: muls #416, its first row
 	ENDC

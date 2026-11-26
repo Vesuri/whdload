@@ -29,14 +29,15 @@ lines too). Exit status 1 when any pixel is neither.
 
 FRAME.alt, when `ab3d.py frame` found a view in the other list too, is that list: check
 passes if either is on the screen (a stop can fall between the game's pointer swap and the
-switch of the screen). At 192x160 line 0 is black, as `_ds_one` shows it.
+switch of the screen). At 1x1 (192x160, 288x240) line 0 is black, as `_ds_one` shows it.
 
-scale: OURS is the same moment as ORIG at twice its width and height (the small view at
-1x1): the share of ORIG's pixels (lines 1-78, columns 1-94) whose colour is in the 2x2
-block of OURS that covers them, rows 2y - 1 and 2y, columns 2x and 2x + 1 (the writers draw
-row y at line y + 1). The rest is mostly texture sampled at other points where a texture is
-shrunk (far or slanted walls). Exit status 1 below SCALE_MIN. `compare` does this when
-OURS.frame, next to OURS, is twice ORIG.frame's width, with either side's FRAME.alt too.
+scale: OURS is the same moment as ORIG at S times its width and height (S = 2: the small
+view at 1x1, 3: full screen): the share of ORIG's pixels (lines 1-78, columns 1-94) whose
+colour is in the S x S block of OURS that covers them, rows S(y - 1) + 1 to Sy, columns Sx
+to Sx + S - 1 (the writers draw row y at line y + 1). The rest is mostly texture sampled
+at other points where a texture is shrunk (far or slanted walls). Exit status 1 below
+SCALE_MIN. `compare` does this when OURS.frame, next to OURS, is S times ORIG.frame's
+width, with either side's FRAME.alt too.
 """
 import os
 import sys
@@ -61,7 +62,7 @@ def box(mask):
 
 
 # (left, top) in a screenshot, png pixels a chunky pixel at 96x80, first and last png row
-# shown; at 1x1 (192 wide) 2 png pixels a pixel
+# shown; at 1x1 2 png pixels a pixel
 GEOMETRY = {0: (202, 36, 4, 36, 36 + 4 * 79), 1: (106, 34, 6, 36, 36 + 2 * (0x118 - 0x2c))}
 
 
@@ -106,7 +107,7 @@ def check1(shot, frame, area=None, quiet=False):
     rgb = np.stack([(words >> 8) * 17, ((words >> 4) & 15) * 17, (words & 15) * 17], -1)
     x0, y0, k, top, bottom = GEOMETRY[view]
     if words.shape[1] != 96:
-        y0, k = 36, 2
+        k = 2
     want = np.repeat(np.repeat(rgb, k, 0), k, 1)
     if view and not area:
         want[EARLY - y0:EARLY - y0 + 2] = want[(71 * k):(71 * k) + 2]
@@ -124,8 +125,9 @@ def check1(shot, frame, area=None, quiet=False):
 def compare(orig, ours, area):
     fo, fu = orig[:-4] + '.frame', ours[:-4] + '.frame'
     if (os.path.exists(fo) and os.path.exists(fu)
-            and read_frame(fu)[0].shape[1] == 2 * read_frame(fo)[0].shape[1]):
-        # the small view at 1x1: scale, with whichever list each side showed
+            and read_frame(fu)[0].shape[1] in (2 * 96, 3 * 96)
+            and read_frame(fo)[0].shape[1] == 96):
+        # a view at 1x1: scale, with whichever list each side showed
         pairs = [(o, u) for o in (fo, fo + '.alt') for u in (fu, fu + '.alt')
                  if os.path.exists(o) and os.path.exists(u)]
         o, u = next(((o, u) for o, u in pairs if scale(o, u, quiet=True) == 0), (fo, fu))
@@ -160,25 +162,26 @@ def compare(orig, ours, area):
     return 1 if wrong.any() else 0
 
 
-SCALE_MIN = 0.80    # level 1's start, pause and end gave 88-94% (26.11.2026)
+SCALE_MIN = 0.80    # level 1's start, pause and end gave 88-94% at 2x2 (26.11.2026)
 
 
 def scale(orig, ours, quiet=False):
     a, _ = read_frame(orig)
     b, _ = read_frame(ours)
     h, w = a.shape
-    if b.shape != (2 * h, 2 * w):
-        sys.exit('%s is %s, %s is %s: not twice' % (orig, a.shape, ours, b.shape))
+    f = b.shape[1] // w
+    if f not in (2, 3) or b.shape != (f * h, f * w):
+        sys.exit('%s is %s, %s is %s: not 2 or 3 times' % (orig, a.shape, ours, b.shape))
     v = a[1:h - 1, 1:w - 1]
     found = np.zeros(v.shape, bool)
-    for j in (-1, 0):
-        for i in (0, 1):
-            found |= b[2 + j:2 * (h - 1) + j:2, 2 + i:2 * (w - 1) + i:2] == v
+    for j in range(-(f - 1), 1):
+        for i in range(f):
+            found |= b[f + j:f * (h - 1) + j:f, f + i:f * (w - 1) + i:f] == v
     share = found.mean()
     if quiet:
         return 0 if share >= SCALE_MIN else 1
-    print('%s against %s at 2x2: %.1f%% of the pixels found (at least %.0f%%)'
-          % (ours, orig, 100 * share, 100 * SCALE_MIN))
+    print('%s against %s at %dx%d: %.1f%% of the pixels found (at least %.0f%%)'
+          % (ours, orig, f, f, 100 * share, 100 * SCALE_MIN))
     return 0 if share >= SCALE_MIN else 1
 
 

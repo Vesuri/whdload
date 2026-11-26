@@ -419,7 +419,7 @@ def view_words(raw, geom=None):
     stride, w, h = geom or (VIEW_LINE, VIEW_W, VIEW_H)
     out = bytearray()
     for y in range(h):
-        line = raw[y * stride:(y + 1) * stride]
+        line = raw[y * stride:y * stride + 12 + (w - 1) // 32 * 132 + (w - 1) % 32 * 4]
         for x in range(w):
             o = 8 + (x // 32) * 132 + (x % 32) * 4
             if stride == VIEW_LINE and struct.unpack_from('>H', line, o)[0] != 0x180 + 2 * (x % 32):
@@ -464,7 +464,7 @@ def cmd_holes(server, g, rest):
                 return
             st['last'] = p
             geom = geometry(g)
-            words = view_words(_dump(g, _long(g, a + 4), geom[0] * geom[2], scratch), geom)
+            words = view_words(_dump(g, _long(g, a + 4), geom[0] * geom[2] + 16, scratch), geom)
             # not line 0: no writer draws it, in the original either (display.s _ds_one)
             k = sum(1 for (v,) in struct.iter_unpack('>H', words[2 * geom[1]:]) if v == 0x0f0f)
             st['frames'] += 1
@@ -491,7 +491,7 @@ def cmd_frame(server, g, rest):
         for at in (4, 0):           # oldDrawPt, the one shown, then drawPt
             try:
                 lists.append(view_words(_dump(g, _long(g, addr(g, DRAWPT) + at),
-                                              geom[0] * geom[2],
+                                              geom[0] * geom[2] + 16,
                                               out.with_name(out.name + '.list')), geom))
             except RuntimeError:
                 lists.append(None)
@@ -644,7 +644,11 @@ def _layout(g):
     labels = _slave_labels()
     if '_p_show' in labels:
         base = lay['waitvbl'] - labels['_waitvbl']
-        lay['slave'] = [(name, base + labels[a], base + labels[b])
+        # the conversion starts at _ds_small with LORES, else at _ds_one
+        conv = '_ds_small' if '_ds_small' in labels else '_ds_one'
+        lay['slave_base'] = base
+        lay['slave'] = [(name, base + labels[a.replace('_ds_small', conv)],
+                         base + labels[b.replace('_ds_small', conv)])
                         for name, a, b in SLAVE_CATEGORIES]
     return lay
 
@@ -711,7 +715,7 @@ def cmd_aprof(server, g, rest):
     n, out = int(w[0]), Path(w[1]).resolve()
     inputs = script_fields(w[2]) if len(w) > 2 else []
     prof = out.with_suffix('.prof')
-    fields, pcs = [], {}
+    fields, pcs, spcs = [], {}, {}
     with Halted(g):
         lay = _layout(g)
         classify = classifier(lay)
@@ -733,6 +737,11 @@ def cmd_aprof(server, g, rest):
                     t[0] += units
                     t[1] += execs
                     t[2] += chip
+                elif 'slave_base' in lay and c not in ('wait', 'rom'):
+                    t = spcs.setdefault(pc - lay['slave_base'], [0, 0, 0, c])
+                    t[0] += units
+                    t[1] += execs
+                    t[2] += chip
             d = _long(g, a)
             fields.append({'units': h['units'], 'gap': h['gap'], 'high': h.get('high', 0),
                            'tail': h['tail'], 'chip': h['chip_units'], 'cats': cats, 'execs': execs_by,
@@ -745,7 +754,8 @@ def cmd_aprof(server, g, rest):
     h = st['header']
     meta = {k: h[k] for k in ('cycleunit', 'CYCLE_UNIT', 'colorclock_hz', 'cpu_model', 'cacr')}
     out.write_text(json.dumps({'meta': meta, 'layout': lay, 'fields': fields,
-                               'pcs': {f'{k:x}': v for k, v in sorted(pcs.items())}}))
+                               'pcs': {f'{k:x}': v for k, v in sorted(pcs.items())},
+                               'slave_pcs': {f'{k:x}': v for k, v in sorted(spcs.items())}}))
     return f'{n} fields captured into {out} ({sum(f["swap"] for f in fields)} swaps)'
 
 
