@@ -17,11 +17,15 @@ in three ways:
 - the `kick13.s` is the newer one from the WHDLoad developer package, where JOTD's build
   used an older copy;
 - the PC-relative displacements into it change accordingly;
-- `$VER` and `slv_info` carry no build date (`DECL_VERSION` adds one only under Barfly or
-  with `DATETIME`).
+- `$VER` and `slv_info` carry the release's fixed date (`DECL_VERSION`), never a build date.
 
 The shipped slave (`SLAVE=original`) reaches the options menu on `a500-1.5m` after about
 1800 fields. Our build reaches the race on `a500-1.5m`, `a1200` and `a1200-030`.
+
+`make run` (the default instance) adds `CUSTOM4=1 CUSTOM5=15`, as the installed icon does:
+the enhanced framerate, the NTSC tempo on PAL and the Red Player on the Mouse Port with a
+Mouse (`game.conf`). Runs with their own `INSTANCE`, and a `WHD_ARGS` that sets any CUSTOM,
+keep the game's defaults, which the harness's `menu` expects.
 
 ## Driving it
 
