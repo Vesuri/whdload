@@ -149,9 +149,9 @@ writers.
 | Writer | Routines (game offsets) |
 |---|---|
 | Walls | `itsawalldraw` $1d0b2, `CalcAndDraw` $1b660, `CurveDraw` $1b322 (curved walls), `screendivide` $1a592; strips `ScreenWallstripdraw` $1ca32 with `drawwallPACK0-2` $1ca80, $1ca9c, $1cab8 and `simplewallPACK0-2` $1cb10, $1cb3e, $1cb6e; see-through strips `ScreenWallstripdrawthru` $1cd24 with `drawwall[dim]thruPACK0-2` $1cd58-$1cdf0 and `maybeholePACK0-2` $1ce58, $1ce9e, $1cee6 |
-| Floors and ceilings | `itsafloordraw` $1d440, `dofloor` $1f172, `dofloorGOUR` $1f21c, `FloorLine` $1f9fe; spans `backbefore`/`acrossscrn` $20f4c/$20f66, Gouraud `backbeforegour`/`acrossscrngour` $20fd2/$20ff4, water `texturedwater` $2107e with spans $21100/$21124; `SimpleFloorLine` $1f3d8, which patches `rts` into the unrolled fill `doacrossline` ($1f870) and calls it (the slave's `_p_flushjsr` at $1f452) |
-| Bump-mapped floors | `BumpMap` $1fce2 with `OneBelow`-`TwelveBelow` $1fd4c-$20458 and `OneAbove`-`EightAbove` $2054a-$20956; smooth `SmoothMap` $20a0a with `OneBelowS`-`SevenBelowS` $20a4c-$20e58 |
-| Objects | `DrawtheObject` $213cc, `glassobj` $2140e, `BitMapObj` $2174a, `PolygonObj` $21d06; textured polygons, drawn in columns: `dopoly` $220d2 (one brightness), `dopolyg` $22390 (Gouraud), `dopolyh` $22688 (with transparent texels); edges `putinlines` $228da |
+| Floors and ceilings | `itsafloordraw` $1d440, `dofloor` $1f172, `dofloorGOUR` $1f21c, `FloorLine` $1f9fc; spans `backbefore`/`acrossscrn` $20f4c/$20f66, Gouraud `backbeforegour`/`acrossscrngour` $20fd0/$20ff4, water `texturedwater` $2107e with spans $21100/$21124; `SimpleFloorLine` $1f3d8, which patches `rts` into the unrolled fill `doacrossline` ($1f870) and calls it (the slave's `_p_flushjsr` at $1f452) |
+| Bump-mapped floors | `BumpMap` $1fce0 with `OneBelow`-`TwelveBelow` $1fd4c-$20458 and `OneAbove`-`EightAbove` $2054a-$20956; smooth `SmoothMap` $20a0a with `OneBelowS`-`SevenBelowS` $20a4c-$20e58 |
+| Objects | `DrawtheObject` $213cc, `glassobj` $2140e, `BitMapObj` $21748, `PolygonObj` $21d06; textured polygons, drawn in columns: `dopoly` $220d2 (one brightness), `dopolyg` $22390 (Gouraud), `dopolyh` $22688 (with transparent texels); edges `putinlines` $228da |
 | Gun | `DrawInGun` $57f4 |
 
 The rest of what writes into the view is in the [inventory](#display-inventory).
@@ -345,6 +345,47 @@ leaves at 1x1 too (`ab3d.py holes`, with `-DHOLES`). On level 1's walk: 3500 pix
 351 frames of 7680 at 96x80; 9497 in 288 of 30720 at 192x160; in full screen, 224 in 200
 frames of 7680 at 96x80, 2735 in 129 frames of 69120 at 288x240, one or two lines thick
 (a diagonal where the edge is seen at an angle). None standing still at the same place.
+
+### Pen bytes
+
+`BUILD=pens` (`-DPENS`, plan step 7's first stage): the game's writers write pen bytes
+straight into the lists, and the convert (`_ds_one`) is gone. A list's pixel x is at
+`fromPt` + x (no banks; `DA_SLOT` is linear), lines of 288 bytes in both views, from 2
+bytes into the list so that `fromPt` is long-aligned for the c2p, which reads the list
+itself (`DA_INFO`'s pens pointer and row stride). `_p_show` clears line 0, which no writer
+draws.
+
+- **Stores**: each `move.w (table),(a3)` becomes `move.b` from a table of pens, and each
+  `addq.w #4` after it `#1` (walls $1ca8c-$1cefe, floors $20f54-$2100a, water
+  $21106-$21132, bitmaps $21a18-$21a6c, polygons $221dc-$22752; the list in
+  `src/AlienBreed3D.s`). Glass ($215fc-$2165c) and light beams ($8aea) are patched too,
+  though no level is seen to draw them.
+- **Tables**: the walls' through `_t_wallpal` (`PA_WALLS`, 32 rows of 32 pens a wall); the
+  objects' pal pointers ($2974a + 12) to `PA_OBJS`; the sky through `PA_SKY`, the water
+  tint through `PA_TINT`, the pause screen through `PA_MAP` and `PA_PAUSE`; the
+  SimpleFloorLine colours ($1f46c) and its black ($1f3d5) as pens.
+- **Floor and polygon rows**: the floors' and textured polygons' shade rows, 15 of 256 in
+  the game, are read past row 14 when far away (into whatever follows `floorScaleCols`
+  and `TexturePal`). `_t_pens` copies 24 rows of each, the game's memory as it is,
+  through `PA_MAP` into the area (`DA_FLOOR`, `DA_POLY`), so the pens match the reference
+  build there too.
+- **Water** (`texturedwater` $2107e): the reflection's index is the water texel's high byte
+  and the reflected pixel's low byte, into `brightentab`. Its table (`DA_WATER`, 22 rows of
+  256) is the pen of `brightentab`'s colour for the low byte of each pen's colour. The
+  reference build reads the exact colour word on screen, so where that is not a palette
+  colour (a reflected Gouraud floor or water) the pen differs by about one shade: 500-2500
+  pixels in a few of level 3's frames. Its far row is clamped at 12 by a signed compare,
+  where the original's doubled distance turns negative from $4000 and reads before
+  `brightentab`.
+- **Halved**: four tables of brightness row offsets into the colour tables ($1a4f0,
+  $1a772, $1faae, $217ca), halved once by `_t_pens`: a row of pens is half a row of
+  words.
+
+`tools/pencheck.sh` grabs still frames of each build's pens (`ab3d.py chunky`) at level
+starts and 40 fields in, turned 8 times in both views, and `tools/pendiff.py` compares two
+runs. With `-DHOLES=2` in both (holes filled with pen 16, black, which the palette maps
+exactly) levels 1 and 2 are equal; level 3 differs only in the water above; level 4's
+aliens move differently between the builds' timings.
 
 ### The 1x1 display
 

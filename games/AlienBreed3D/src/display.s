@@ -48,12 +48,25 @@ FULL_H		= 240
 ; screen's 288 pixels (9 banks of 132 bytes) on 240 lines, and one more: the writers draw
 ; row y at line y + 1. With LORES (both views 96x80) the small view's 192 and 160: the
 ; game's own sky runs there, whose unrolled displacements must fit a word.
+; With PENS (resolution plan step 7) the writers write pen bytes instead, pixel x at
+; fromPt + x, lines of FULL_W bytes in both views; the c2p reads the frame from the list,
+; and fromPt is on a long (the list starts 2 bytes in).
+	IFD	PENS
+DS_STRIDE	= FULL_W
+LIST_LINES	= FULL_H+1
+	ELSE
 	IFND	LORES
 DS_STRIDE	= 9*132			;(pixel 287's word ends at 1182)
 LIST_LINES	= FULL_H+1
 	ELSE
 DS_STRIDE	= 800
 LIST_LINES	= SMALL_H+1
+	ENDC
+	ENDC
+	IFD	PENS
+LIST_OFF	= 2
+	ELSE
+LIST_OFF	= 0
 	ENDC
 
 ; the area, past the palette's tables
@@ -62,11 +75,13 @@ DA_C2PBUF	= DA_CHUNKY+FULL_W*FULL_H+16	;the c2p's FULL_W / 2 bytes
 DA_INFO		= DA_C2PBUF+FULL_W/2	;for the tools: the frame last shown's
 DI_STRIDE	= 0			;word: line stride of the list,
 DI_W		= 2			;word: pixels a line,
-DI_H		= 4			;word: lines
-DI_SIZE		= 8
+DI_H		= 4			;word: lines,
+DI_PENS		= 6			;long: its pens' first line (line 0),
+DI_PROW		= 10			;word: and their line stride
+DI_SIZE		= 12
 DA_LISTS	= (PA_SQ+2*SQ_C+4+7)&-8	;past the palette build's scratch: the game's lists
 LIST_SIZE	= DS_STRIDE*LIST_LINES	;each (InitCopperScrn's are 33296 bytes)
-	IFGT	DA_LISTS+2*LIST_SIZE-PA_SIZE
+	IFGT	DA_LISTS+LIST_OFF+2*LIST_SIZE-PA_SIZE
 	FAIL	the area is too small for the copper lists
 	ENDC
 	IFGT	DA_INFO+DI_SIZE-DA_LISTS
@@ -102,7 +117,7 @@ _p_coplists
 	subi.l	#G_COPLISTS+6,d0
 	movea.l	d0,a0			;hunk 0
 	movea.l	_expmem(pc),a1
-	adda.l	#PA_OFF+DA_LISTS,a1
+	adda.l	#PA_OFF+DA_LISTS+LIST_OFF,a1
 	move.l	a1,d0
 	adda.l	#G_LIST1,a0
 	move.l	d0,(a0)+		;G_LIST1, G_LIST2
@@ -205,6 +220,12 @@ _p_show
 	move.w	_ds_back(pc),d6
 	bsr.w	_ds_build
 	bsr.w	_ds_info
+	IFD	PENS
+	lea	10(a6),a0		;line 0 black: no writer draws it
+	moveq	#DS_STRIDE/4-1,d0
+.black	clr.l	(a0)+
+	dbf	d0,.black
+	ELSE
 	IFND	LORES
 	bsr.w	_ds_one
 	ELSE
@@ -214,6 +235,7 @@ _p_show
 	bra.s	.lsmall
 .lfull	bsr.w	_ds_full
 .lsmall
+	ENDC
 	ENDC
 	tst.b	d7
 	bne.s	.full
@@ -227,7 +249,12 @@ _p_show
 	lea	c2p1x1_8_c5_030_2_fastbuf(pc),a0
 	PALEA	DA_C2PBUF,a1
 	move.l	a1,(a0)
+	IFD	PENS
+	lea	10(a6),a2		;the frame itself
+	move.l	#DS_STRIDE,d5
+	ELSE
 	PALEA	DA_CHUNKY,a2
+	ENDC
 	move.w	_ds_back(pc),d6
 	bsr.w	_ds_addr
 	movea.l	a1,a6
@@ -254,20 +281,38 @@ _p_show
 	bsr.w	_ds_geom
 .same
 	IFD	HOLES			;debug: $f0f in every pixel of the list drawn next
-	movea.l	_ds_hunk0(pc),a5
-	GLEA	$5dd40,a0
-	movea.l	(a0),a0
+	movea.l	_ds_hunk0(pc),a5	;(HOLES=2: pen PEN0's colour, which is its pen's
+	GLEA	$5dd40,a0		;exactly, for comparing with PENS: the water reads
+	movea.l	(a0),a0			;pixels not yet drawn)
 	lea	10(a0),a0
+	movea.l	_expmem(pc),a4
+	adda.l	#PA_OFF,a4
+	IFD	PENS			;(its pen)
+	IFEQ	HOLES-2
+	moveq	#PEN0,d0
+	ELSE
+	move.b	PA_MAP+$f0f(a4),d0
+	ENDC
+	move.l	#LIST_LINES*DS_STRIDE,d4
+.hl	move.b	d0,(a0)+
+	subq.l	#1,d4
+	bne.s	.hl
+	ELSE
+	move.w	#$0f0f,d0
+	IFEQ	HOLES-2
+	move.w	PA_PALETTE(a4),d0
+	ENDC
 	move.w	#LIST_LINES-1,d4
 .hl	moveq	#DS_STRIDE/132-1,d5
 .hb	moveq	#32-1,d6
-.hp	move.w	#$0f0f,(a0)
+.hp	move.w	d0,(a0)
 	addq.l	#4,a0
 	dbf	d6,.hp
 	addq.l	#4,a0
 	dbf	d5,.hb
 	lea	DS_STRIDE-DS_STRIDE/132*132(a0),a0
 	dbf	d4,.hl
+	ENDC
 	ENDC
 	movem.l	(sp)+,d0-d7/a0-a6
 	rts
@@ -404,6 +449,7 @@ _ds_build
 .done	rts
 
 ; d7 = the view: its frame's geometry into DA_INFO, for the tools
+; (a6 = its list)
 _ds_info
 	PALEA	DA_INFO,a0
 	move.w	#DS_STRIDE,(a0)+
@@ -414,6 +460,15 @@ _ds_info
 	beq.s	.small
 	move.l	#FULL_W<<16|FULL_H,(a0)
 .small
+	ENDC
+	IFD	PENS
+	lea	10(a6),a1
+	move.l	a1,4(a0)
+	move.w	#DS_STRIDE,8(a0)
+	ELSE
+	PALEA	DA_CHUNKY,a1
+	move.l	a1,4(a0)
+	move.w	(a0),8(a0)		;DI_W
 	ENDC
 	rts
 

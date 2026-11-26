@@ -51,6 +51,8 @@ was found, running or stopped):
                           or playing again (a swap within 60 fields), at most 3 times
     key CODE [N]          press raw key CODE (hex; P, 19, pauses) for N fields (default 10),
                           then release it for N
+    chunky OUT            the pens of the frame last shown (CUSTOM5=1, the slave's chunky
+                          buffer): width, height (words), then W x H bytes
     frame OUT             the frame on screen (oldDrawPt) into OUT: its colour words, the
                           view byte (0 small, 1 full screen), width and height (words;
                           96x80, or with CUSTOM5=1 the slave's DA_INFO); drawPt's into OUT.alt
@@ -440,8 +442,10 @@ def _dump(g, a, n, path):
 
 VIEW_W, VIEW_H = 96, 80
 # Enhanced resolution's lists (src/display.s): the same slot layout, lines of DS_STRIDE
-# bytes, and the frame's size in the area's DA_INFO (stride, width, height words)
-DA_INFO = 58080 + 288 * 240 + 16 + 144
+# bytes, and the frame's size in the area's DA_INFO (stride, width, height words; then
+# where its pens are, a long, and their line stride, a word)
+DA_CHUNKY = 58080                       # PA_END: the pens the c2p reads, W x H
+DA_INFO = DA_CHUNKY + 288 * 240 + 16 + 144
 
 
 def geometry(g):
@@ -522,6 +526,21 @@ def cmd_holes(server, g, rest):
         return (f'level {_letter(g).upper()}: {st["frames"]} frames, {st["holed"]} with holes, '
                 f'{st["total"]} hole pixels; the most, {st["most"]}, at field {st["at"][0]} '
                 f'({st["at"][1]}x{st["at"][2]}) into {out}')
+
+
+def cmd_chunky(server, g, rest):
+    """chunky OUT: the pens of the frame last shown (WHD_ARGS=CUSTOM5=1), which the c2p
+    reads: where DA_INFO says (DI_PENS, DI_PROW: the slave's chunky buffer, or with PENS the
+    list itself). OUT is its width and height (big-endian words), then the pens row by
+    row."""
+    out = Path(rest.strip()).resolve()
+    with Halted(g):
+        area = _long(g, 4) - 0x1000 + PALETTE_AREA
+        _, w, h, pens, row = struct.unpack('>HHHIH', _bytes(g, area + DA_INFO, 12))
+        raw = _dump(g, pens, row * h, out.with_suffix('.tmp'))
+    out.with_suffix('.tmp').unlink()
+    out.write_bytes(struct.pack('>HH', w, h) + b''.join(raw[y * row:y * row + w] for y in range(h)))
+    return f'{w}x{h} pens into {out}'
 
 
 def cmd_frame(server, g, rest):
@@ -664,15 +683,16 @@ CATEGORIES = [
     # the sky: putinbackdrop, and the unrolled writer MAKEBACKROUT copies into backrout
     ('backdrop', [(0x18ffa, 0x1947e)]),
     ('walls', [(0x19af4, 0x1d27a)]),
-    ('floors', [(0x1d27a, 0x1fce2), (0x20f4c, 0x21160)]),
-    ('bump', [(0x1fce2, 0x20f4c)]),
+    ('floors', [(0x1d27a, 0x1fce0), (0x20f4c, 0x21160)]),
+    ('bump', [(0x1fce0, 0x20f4c)]),
     ('objects', [(0x21160, 0x3fefa)]),
     ('interrupts', [(0x3fefa, 0x3ff5a), (0x415d8, 0x41800), (0x9b2dc, 0xad9e8)]),
 ]
 WAITVBL_CALL = 0x3e58   # the main loop's jsr to the slave's _waitvbl (PL_PS)
 # Enhanced resolution's display (src/display.s), by the release build's labels: the slave
-# offsets come from its listing, the runtime base from _waitvbl
-SLAVE_LST = Path(__file__).resolve().parents[1] / 'tmp/build/release/AlienBreed3D.lst'
+# offsets come from its listing (the run's BUILD), the runtime base from _waitvbl
+SLAVE_LST = (Path(__file__).resolve().parents[1] / 'tmp/build' / os.environ.get('BUILD', 'release')
+             / 'AlienBreed3D.lst')
 SLAVE_CATEGORIES = [
     ('c2p', 'c2p1x1_8_c5_030_2', 'c2p1x1_8_c5_030_2_scroffs'),
     ('convert', '_ds_small', '_ds_hunk0'),       # the frame to pens, 1x1, 2x2 or 3x3
@@ -884,7 +904,7 @@ server = game_server('ab3d', commands={
     'base': cmd_base, 'peek': cmd_peek, 'level': cmd_level, 'full': cmd_full,
     'frames': cmd_frames, 'play': cmd_play, 'aprof': cmd_aprof, 'copper': cmd_copper,
     'batch': cmd_batch, 'next': cmd_next, 'grab': cmd_grab, 'holes': cmd_holes, 'tables': cmd_tables,
-    'palette': cmd_palette, 'frame': cmd_frame, 'key': cmd_key, 'pause': cmd_pause, 'die': cmd_die,
+    'palette': cmd_palette, 'frame': cmd_frame, 'key': cmd_key, 'pause': cmd_pause, 'die': cmd_die, 'chunky': cmd_chunky,
     'end': cmd_end})
 
 if __name__ == '__main__':

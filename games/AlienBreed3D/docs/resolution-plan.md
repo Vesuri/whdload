@@ -262,6 +262,15 @@ just step further, up to 15 fields.
    stop by AmigaXDev's `reference/measurement-method.md` §9: when the profile is flat
    and experiments move the totals by about 1% or less, change the structure or close the
    scope.
+   - The measure is the turn scene ([performance](performance.md#the-turn-scene-step-7s-start)):
+     30 fields forward into level 1's start room, then a full turn on the right arrow, in
+     both views on each CPU.
+   - First stage (`BUILD=pens`, [internals](internals.md#pen-bytes)): the game's writers
+     write pen bytes in place of colour words, and the convert is gone. Every pen equals
+     the release build's on levels 1 and 2 (`tools/pencheck.sh`, holes filled with black
+     in both); level 3's water differs by a shade where it reflects a colour that is not
+     in the palette. The work a frame is 17-22% less: 372 to 292 ms in full screen on the
+     68020, 106 to 84 on the 68030, 128 to 103 on the 68040. Not yet the release build.
 8. **Machines and play.** a1200-fast, a1200-030 and a1200-040, plus an ACA1221-class 28 MHz
    68020 (`EXTRA_ARGS`), both variants, two-player link at least not broken, and CUSTOM5
    off unchanged. Decide from the measurements which CPUs the option applies on; below

@@ -248,9 +248,32 @@ Frames a second and work a frame in ms (mean, MEASURED):
   rates and the c2p count.
 - **Hottest code:** the wall strips `drawwallPACK0-2` and `simplewallPACK0-2`
   ($1ca80-$1cb6e), then the Gouraud floor spans `backbeforegour` and `acrossscrngour`
-  ($20fd2, $20ff4).
+  ($20fd0, $20ff4).
 - **Sky:** the turn shows more of it than the start does: 20.7 ms a frame on the 68020 in
   full screen.
+
+### Pen bytes (BUILD=pens)
+
+The game's writers write pen bytes in place of colour words (`-DPENS`,
+[internals](internals.md#pen-bytes)), so the convert is gone. The same scene, 26.11.2026
+(MEASURED):
+
+| CPU | View | fps | work | walls | floors | c2p | slave (sky) | objects |
+|---|---|---|---|---|---|---|---|---|
+| 68020 | full | 3.31 | 292.4 | 117.5 | 55.2 | 64.5 | 29.1 (17.5) | 10.6 |
+| 68020 | small | 5.56 | 173.1 | 60.3 | 27.9 | 30.4 | 15.9 (7.7) | 9.1 |
+| 68030 | full | 10.59 | 84.4 | 31.9 | 15.1 | 22.0 | 7.8 (4.7) | 2.8 |
+| 68030 | small | 15.13 | 59.9 | 17.3 | 8.4 | 10.5 | 4.4 (1.9) | 2.4 |
+| 68040 | full | 8.97 | 102.8 | | | 12.9 | | |
+| 68040 | small | 15.68 | 54.7 | | | 5.0 | | |
+
+- **Against the build after step 6:** the work a frame is 20-22% less in full screen and
+  17-19% less in the small view on every CPU, about the convert's share (16-21%). The
+  writers themselves cost what they did: a byte store takes as long as a word store.
+- **Sampling:** keys turn by time, so each run sees the turn at different angles, and with 7
+  or 8 frames a turn on the 68020 in full screen a routine's ms a frame moves by about 20%
+  between runs of the same build (floors 44.5 and 55.2).
+- **Now:** walls 38-40%, c2p 17-26%, floors 16-19%; on the 68040 still 83-84% gap.
 
 ## Not measured
 

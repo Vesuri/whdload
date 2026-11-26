@@ -145,6 +145,30 @@ draws both views at 96x80, and every scene of it is compared pixel by pixel as i
 Assembling with `VASM_EXTRA=-DHOLES` fills the list the game draws next with $f0f at each
 swap, so a pixel the renderer does not write in a frame shows as $f0f in `ab3d.py grab`.
 
+## Pen bytes
+
+`BUILD=pens` (`-DPENS`, [internals](internals.md#pen-bytes)) is checked against the
+release build by still frames of the pens each shows, all in ignored `tmp/`:
+
+    make build BUILD=refholes VASM_EXTRA=-DHOLES=2
+    make build BUILD=pensholes VASM_EXTRA='-DPENS -DHOLES=2'
+    BUILD=refholes tools/pencheck.sh tmp/pc-ref [LEVELS]    # default 3 levels
+    BUILD=pensholes tools/pencheck.sh tmp/pc-pens
+    python3 tools/pendiff.py tmp/pc-ref tmp/pc-pens [PNGDIR]
+
+`pencheck.sh` boots its own instance (CUSTOM5=1 CUSTOM1=4) on the a1200-030 and does not
+rebuild. In each level, at its start and 40 fields forward, it turns 8 times by about 45
+degrees with the mouse in both views, and `ab3d.py chunky` keeps each frame's pens: the
+c2p's input, the convert's output in the release build. Mouse moves place the player
+exactly on any CPU and build; keys go by time. `pendiff.py` counts the differing pixels
+of each frame (line 0 left out) and draws them with PNGDIR. With `HOLES=2` in both
+builds, holes are pen 16 (black, exact in the palette) rather than an older frame's pixel,
+so the holes, which follow the frame rate, do not differ. In a level with moving aliens
+(level 4) the two builds' game time differs and so do the frames.
+
+`display.sh`, `ab3d.py frame`, `grab` and `holes` read the lists as colour words, so they
+need a build without PENS.
+
 ## Finding routines
 
 `python3 tools/srcmatch.py tmp/ab3d1-src/*.s` matches the published AB3D I source's labels

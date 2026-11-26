@@ -619,6 +619,70 @@ _pl_v3
 	PL_W	$226c6,-EDGE_STRIDE+2
 	PL_W	$226ca,-EDGE_STRIDE+4
 	PL_P	$1fbf6,_t_split		;FloorLine: a span over any number of banks
+	IFD	PENS			;pen bytes (hires.s), the walls:
+	PL_PS	$1d0e8,_t_wallpal	;the wall's pen table
+	PL_L	$1ca8c,$16b21000	;move.b (0,a2,d1.w),(a3), from move.w (0,a2,d1.w*2)
+	PL_L	$1caaa,$16b21000
+	PL_L	$1cac2,$16b21000
+	PL_L	$1cd80,$16b21000	;(see-through)
+	PL_L	$1cdbe,$16b21000
+	PL_L	$1cdfe,$16b21000
+	PL_L	$1cd64,$16b41000	;move.b (0,a4,d1.w),(a3)
+	PL_L	$1cd9e,$16b41000
+	PL_L	$1cdde,$16b41000
+	PL_L	$1cb0c,$16321000	;move.b (0,a2,d1.w),d3
+	PL_L	$1cb24,$16321000
+	PL_L	$1cb3a,$16321000
+	PL_L	$1cb54,$16321000
+	PL_L	$1cb6a,$16321000
+	PL_L	$1cb80,$16321000
+	PL_L	$1ce4c,$16321000
+	PL_L	$1ce66,$16321000
+	PL_L	$1ce92,$16321000
+	PL_L	$1ceae,$16321000
+	PL_L	$1ceda,$16321000
+	PL_L	$1cef6,$16321000
+	PL_W	$1cb10,$1683		;move.b d3,(a3)
+	PL_W	$1cb3e,$1683
+	PL_W	$1cb6e,$1683
+	PL_W	$1ce50,$1683
+	PL_W	$1ce96,$1683
+	PL_W	$1cede,$1683
+	PL_L	$20f54,$16b10000	;floors: move.b (0,a1,d0.w),(a3), from move.w
+	PL_W	$20f58,$524b		;(0,a1,d0.w*2), and addq.w #1,a3 from #4
+	PL_L	$20f6e,$16b10000
+	PL_W	$20f72,$524b
+	PL_L	$20fe2,$16b10000	;Gouraud floors
+	PL_W	$20fe6,$524b
+	PL_L	$21006,$16b10000
+	PL_W	$2100a,$524b
+	PL_W	$21092,$4e71		;water: rows of 256 pens (no add.w d0,d0),
+	PL_W	$21096,$0c00		;the last row 12 (signed: the original's d0*2 goes
+					;negative from $4000 and reads before brightentab)
+	PL_W	$2109c,$0c00
+	PL_L	$21106,$1033e800	;the reflected pen: move.b (0,a3,a6.l),d0
+	PL_L	$2112a,$1033e800
+	PL_L	$2110a,$16b10000
+	PL_W	$2110e,$524b
+	PL_L	$2112e,$16b10000
+	PL_W	$21132,$524b
+	PL_L	$21a18,$1cb40000	;bitmaps: move.b (0,a4,d0.w),(a6)
+	PL_L	$21a42,$1cb40000
+	PL_L	$21a6c,$1cb40000
+	PL_L	$221dc,$16b10000	;dopoly
+	PL_L	$221f8,$16b10000
+	PL_L	$22626,$16b10000	;dopolyg
+	PL_L	$2264c,$16b10000
+	PL_L	$22734,$16b10000	;dopolyh,
+	PL_L	$22752,$16b10000
+	PL_L	$22684,$43f11000	;its row: lea (0,a1,d1.w),a1
+	PL_L	$215fc,$703f7600	;glass (no level has it; as the game's, no
+	PL_W	$2161a,$1616		;darken table): bytes
+	PL_L	$2165c,$1cb23000
+	PL_PS	$8aea,_t_light		;light beams (no level has them): pen to pen
+	PL_W	$8b10,$1e12
+	PL_L	$8b12,$14b47000
+	ENDC
 	PL_PS	$84aa,_t_x128		;x * 128 * S: the level's points
 	PL_NOP	$84b0,2
 	PL_PS	$8a76,_t_x128		;the objects'

@@ -138,9 +138,9 @@ def main():
           ' chip-bus share of its time):')
     for name, (u, c) in sorted(by.items(), key=lambda kv: -kv[1][0])[:20]:
         print(f'  {100 * u / allpc:5.1f}%  chip {100 * c / max(u, 1):3.0f}%  {name}')
-    # the slave's own code by the release build's labels (ab3d.py aprof's slave_pcs)
+    # the slave's own code by the profiled build's labels (BUILD, as ab3d.py aprof's slave_pcs)
     spcs = d.get('slave_pcs')
-    lst = os.path.join(GAME, 'tmp/build/release/AlienBreed3D.lst')
+    lst = os.path.join(GAME, 'tmp/build', os.environ.get('BUILD', 'release'), 'AlienBreed3D.lst')
     if spcs and os.path.exists(lst):
         slab = sorted((int(m.group(1), 16), m.group(2)) for m in
                       (re.match(r'^([0-9A-F]{8}) (\w+)$', l.rstrip()) for l in open(lst, errors='replace'))
