@@ -91,13 +91,19 @@ just step further, up to 15 fields.
    ([development](development.md#driving-it)). `tools/srcmatch.py` matched the published
    source's routines to game offsets; the renderer's are in
    [internals](internals.md#renderer-routines).
-1. **Baseline the original**, both views, on a1200-030 and a1200-040 (a1200 for
-   reference). Scenes: standing at level 1's start, a scripted walk, and the heaviest
-   place found (many aliens and objects).
-   - Frame rate from `ab3d.py frames` over at least 500 fields.
-   - An aprof profile split into geometry and visibility, walls, floors, bump mapping,
-     objects, gun, game logic and interrupts.
-   - Report ms per frame with p50 and p95 (AmigaXDev `reference/measurement-method.md`).
+1. **Baseline the original** (done; [performance](performance.md), `tools/baseline.sh`).
+   Both views, standing at level 1's start and on the scripted walk, on the 68020 (the
+   a1200-fast: the plain a1200 cannot run the game), 68030 and 68040. Each had frame
+   counts over 500-550 fields, and aprof profiles with ms of work a frame (p50, p95) by
+   category.
+   - Walk, small view, 68020 / 68030 / 68040 on aprof: 9.96 / 19.7 / 25 fps, 93 / 43 /
+     32 ms of work a frame. Walls take 42-43% and floors 25-27%, then objects, geometry
+     and the sky. The view's pixel writers spend 35-44%, 69% and 100% of their time on
+     the Chip bus.
+   - Both views cost the same: both draw 96x80.
+   - The a1200-030 and a1200-040 setups' own frame rates come from their MMU models,
+     not the CPUs: speed comparisons use the aprof machines.
+   - No scene heavier than level 1's start was found; the heaviest place is still to add.
 2. **Inventory the display.** Read all of the copper template: the panel split, the
    sprites' pens, and the colour effects (damage and pickup flashes, fades, level text,
    pause, messages). List every routine that writes into the view, with its game offset.
@@ -133,7 +139,7 @@ just step further, up to 15 fields.
    stop by AmigaXDev's `reference/measurement-method.md` §9: when the profile is flat
    and experiments move the totals by about 1% or less, change the structure or close the
    scope.
-8. **Machines and play.** a1200, a1200-030 and a1200-040, plus an ACA1221-class 28 MHz
+8. **Machines and play.** a1200-fast, a1200-030 and a1200-040, plus an ACA1221-class 28 MHz
    68020 (`EXTRA_ARGS`), both variants, two-player link at least not broken, and CUSTOM5
    off unchanged. Decide from the measurements which CPUs the option applies on; below
    that it is ignored.

@@ -17,7 +17,10 @@ Read `docs/open-work.md` first.
 | `docs/development.md` | what differs from the shared workflow: inputs, the build, driving it |
 | `docs/internals.md` | how it loads, memory, every slave patch, the display, limitations |
 | `docs/resolution-plan.md` | Enhanced resolution: the design, the steps, the open decisions |
+| `docs/performance.md` | the original's measured frame rates and where a frame's time goes |
 
 The slave source is `src/`; `tools/` is the development harness and never ships
 (`tools/exe.py` unpacks the game executable for analysis, `tools/ab3d.py` drives the game on
-the shared server, `tools/srcmatch.py` finds the published source's routines).
+the shared server, `tools/srcmatch.py` finds the published source's routines,
+`tools/baseline.sh` and `tools/frametime.py` measure the frame rate and where a frame's time
+goes).

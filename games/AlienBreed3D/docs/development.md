@@ -58,6 +58,24 @@ same machine. Keys need holding for 10 fields: at 3 the game misses them.
 most once a field. `base` prints where the hunks were loaded and `peek OFF N` reads by game
 offset.
 
+## Measuring
+
+`tools/baseline.sh frames|aprof MACHINE OUT` is the baseline: both views, standing and on
+the walk, as [performance](performance.md) describes; MACHINE is a1200-fast, a1200-030 or
+a1200-040. `frames` counts swaps on the machine's own setup; `aprof` profiles every field
+(`ab3d.py aprof`) on `$FSUAE_APROF` and writes a report beside each capture with
+`python3 tools/frametime.py OUT.json`: frames, work a frame (mean, p50, p95), the shares by
+category and the hot routines by source label.
+
+- aprof runs only a CPU without an MMU model, so the profile machines are the a1200-fast
+  setup with `EXTRA_ARGS` (`baseline.sh` has them). The a1200-030 setup's
+  `uae_uaeboard=full+indirect` also hangs the older aprof builds.
+- The a1200-030 and a1200-040 setups' frame rates are not the CPUs' own (the MMU models;
+  [performance](performance.md#frame-rates)): compare speed on the aprof machines.
+- The shared aprof reader rejects a stop tail over one `CYCLE_UNIT`, which the 14 MHz
+  68020 exceeds (6.5 colour clocks). `ab3d.py _parse` checks such a capture's accounting
+  itself and accepts a tail under 16.
+
 By hand: in the menu RETURN (raw `44`) selects PLAY GAME; RETURN again on the text screen
 starts the level. In the game M (`37`) switches to mouse control: mouse left/right turns,
 up/down moves, the left button fires (`gdb monitor mouse DX DY`, `gdb monitor input

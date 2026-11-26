@@ -9,7 +9,8 @@ $c4dc version.
 ## How it loads
 
 A direct slave (WHDLoad 18, 68020 and AGA required): 576 KB chip (428 KB without
-music) and $158000 bytes of ExpMem.
+music) and $158000 bytes of ExpMem, so a 2 MB a1200 without fast memory cannot run it
+("Can't allocate ExpMem"); the a1200-fast setup is the smallest that does.
 
 - Stacks: SSP at ExpMem+$157e00, USP 1 KB below.
 - Caches (`resload_SetCPU`): instruction and data cache on; on a 68040/060 also copyback for
@@ -95,7 +96,28 @@ table, `(a1,d0.w*2)`, the word goes to `(a3)` and `a3` steps 4, with the extra 4
 brightness levels of 12-bit words ahead of its texels (the source's `walltiles` and
 `PaletteAddr`). Game time does not depend on the frame rate: each frame advances the game
 by the fields since the last one (`TempFrames`, at most 15), which the interrupt counts
-(`FramesToDraw`).
+(`FramesToDraw`, $aece).
+
+### The frame
+
+- The single-player main loop waits for a vertical blank by polling INTREQR bit 0
+  (`btst #0,$1f(a6)` at $32fe; the other loops at $8e9e and $8efa). The copper list sets
+  INTREQ bits 4 and 0 at the top of the field (`009c 8011` at $9a084) and clears them at
+  line $10 (`009c 0011` at $9a24c). The slave's `_waitvbl` (`PL_PS` at $3e58) serves another
+  loop.
+- After the wait comes the swap of `drawPt`, then the frame is drawn. It shows at the
+  next swap, at most once a field.
+- The VBL handler is $415d8 (`is_Code` of the IntServer at $2ad0) and counts
+  `FramesToDraw`. The keyboard handler is $3fefa (its struct at $2ae6). The music,
+  `mt_music` $9b2fe and `mt_end` $9b2dc, is in chip hunk 3.
+- Mouse control is the byte `PLR1MOUSE` at $5d82 (player 2's at $5d86), toggled by M in
+  the key test at $401ee.
+- The sky: `MAKEBACKROUT` ($1931c) copies the unrolled writer `fromback` into `backrout`
+  ($18ffa-$1931a, entered at $19000), which draws the backdrop into the view each frame.
+- The object pass `ObjDraw3` starts at about $21160; its object search is the loop at
+  $211f0-$21234.
+
+Where a frame's time goes is in [performance](performance.md).
 
 ### Renderer routines
 
