@@ -89,7 +89,7 @@ slv_keyexit	= $5D	; num '*'
 ;============================================================================
 
 DECL_VERSION:MACRO
-	dc.b	"3.0b (26.11.2026)"
+	dc.b	"3.0b (27.11.2026)"
 	ENDM
 
 slv_name		dc.b	"Marble Madness"

@@ -152,7 +152,7 @@ Steps, each verified before the next:
    come first and draws are skipped; cap the step debt at 2. If the `a1200` drops draws,
    make the copper rebuild cheaper first: `$86B4` rebuilds the whole list, but per field
    only the plane pointers and the wrap split change.
-10. **Release.** Done: 3.0b (26.11.2026). The ReadMe credits JOTD and has the 3.0b entry;
+10. **Release.** Done: 3.0b (27.11.2026). The ReadMe credits JOTD and has the 3.0b entry;
     the Install script sets `CUSTOM4=1`, `CUSTOM5=15` (the tempo, and Mouse Port / Mouse) and
     `CACHE` in the installed icon (the shipped icons have no tooltypes for `release.json`
     to add to).
