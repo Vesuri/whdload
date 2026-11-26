@@ -62,7 +62,17 @@ _name		dc.b	"Alien Breed 3D (no music)",0
 	ENDC
 _copy		dc.b	"1995 Team 17",0
 _info		dc.b	"Installed & fixed by Psygore",10
+	IFD	ORIGINAL
 		dc.b	"Version 1.3 (08 Jan 2020)",0
+	ELSE
+		dc.b	"Enhanced by Vesuri",10,10
+		dc.b	"Version 2.0b (26.11.2026)",0
+	IFND	NOMUSIC
+		dc.b	"$VER: AlienBreed3D.slave 2.0b (26.11.2026)",0
+	ELSE
+		dc.b	"$VER: AlienBreed3D_nomusic.slave 2.0b (26.11.2026)",0
+	ENDC
+	ENDC
 _data		dc.b	"data",0
 _config		dc.b	"C1:X:Unlimited Energy:0;"
 		dc.b	"C1:X:Unlimited Shots:1;"

@@ -1,17 +1,32 @@
-Short : HD-Installer for Alien Breed 3D
+Short : HD-Installer for Alien Breed 3D Enhanced
 Type : game/patch
-Author : Psygore (psygore@whdload.de)
+Author : Psygore (psygore@whdload.de), Vesuri (version 2.0b)
 
+
+Alien Breed 3D Enhanced 2.0b (26.11.2026)
+Original install: Psygore. Version 2.0b improvements: Vesuri.
 
 That install applies to "Alien Breed 3D" © 1995 Team 17
 It supports floppy disks, CD32 and aminet (8ch sound patch) version.
 
 It requires:
  - WHDLoad 18+
- - 576 KB ChipMem & 1.3 MB OtherMem (+2.0 MB extra mem for preload)
+ - 732 KB ChipMem (584 KB without music) & 2.0 MB OtherMem (+2.0 MB extra
+   mem for preload)
  - AGA chipset and a 68020 processor (at least)
  - XFD package must be installed to depack some files
+ - Enhanced resolution (CUSTOM5) is best on a 68030 or better with fast
+   memory
 
+
+Version 2.0b (26.11.2026) by Vesuri:
+ - Enhanced resolution (CUSTOM5): the game is drawn at 1x1 pixels, 192x160
+   in the small view and 288x240 in full screen, on 256-colour screens
+   (the installed and the Aminet 8-channel version)
+ - the installed icon sets CUSTOM5=1; remove it for the original display
+ - about 10 frames a second in the small view and 7 in full screen on a
+   50 MHz 68030
+ - the slave's source is included, a reconstruction of Psygore's slave
 
 Version 1.3 (08.01.2020) by Psygore:
  - An access fault removed (level 13), thanks to Angus for the bug report

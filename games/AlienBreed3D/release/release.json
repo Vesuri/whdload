@@ -10,6 +10,23 @@
       },
       "add": {},
       "remove": [],
+      "tooltypes": {
+        "AlienBreed3DHD/AlienBreed3D.colbox": [
+          "CUSTOM5=1"
+        ],
+        "AlienBreed3DHD/AlienBreed3D.colbox2": [
+          "CUSTOM5=1"
+        ],
+        "AlienBreed3DHD/AlienBreed3D.colexot": [
+          "CUSTOM5=1"
+        ],
+        "AlienBreed3DHD/AlienBreed3D.colicon": [
+          "CUSTOM5=1"
+        ],
+        "AlienBreed3DHD/AlienBreed3D.newicon": [
+          "CUSTOM5=1"
+        ]
+      },
       "source": {
         "dir": "AlienBreed3DHD/src",
         "variants": [

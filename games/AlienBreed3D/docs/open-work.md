@@ -30,11 +30,11 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
    should wait until the pause is over (or check it) before the script goes on.
 5. Plan step 7: speed.
 
-## Before a first release
+## Releases
 
-- A dated `$VER` string in both slaves and a ReadMe entry above Psygore's.
-- The release ships `src/AlienBreed3D.s` in place of the encrypted
-  `src/AlienBreed3DHD_src.lzx` (decided 26.11.2026; `release.json` `source`). The first
-  `make dist` is its first test.
-- Boot both variants on every machine in `SETUPS` (only AlienBreed3D on the a1200-030 so
-  far).
+2.0b (26.11.2026), `make dist`: both slaves with Enhanced resolution and `$VER`; the
+ReadMe's entry above Psygore's; the five game icons add CUSTOM5=1 (`release.json`
+`tooltypes`); the source drawer holds `src/` in place of the encrypted
+`AlienBreed3DHD_src.lzx`. Both variants boot with CUSTOM5=1 into level 1 in both views on
+the a1200-fast, a1200-030 and a1200-040. Not published (`make release PUBLISH=1`). The next
+version: the `$VER` and `_info` strings in `src/AlienBreed3D.s` and a new ReadMe entry.
