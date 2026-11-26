@@ -343,9 +343,8 @@ sites at each switch. The projection is x = X * 128 / Z + 47 and y = (H - eye) /
 Lines the original leaves undrawn, one-line gaps at the near edges of floor steps, it
 leaves at 1x1 too (`ab3d.py holes`, with `-DHOLES`). On level 1's walk: 3500 pixels in
 351 frames of 7680 at 96x80; 9497 in 288 of 30720 at 192x160; in full screen, 224 in 200
-frames of 7680 at 96x80, 3182 in 123 frames of 69120 at 288x240, where they are up to a
-few lines thick at a step's near edge. None standing still at the same place. Once on the
-fight a 16-column strip at the small view's right edge, below the horizon (1328 pixels).
+frames of 7680 at 96x80, 2735 in 129 frames of 69120 at 288x240, one or two lines thick
+(a diagonal where the edge is seen at an angle). None standing still at the same place.
 
 ### The 1x1 display
 

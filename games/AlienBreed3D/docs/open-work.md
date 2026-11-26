@@ -21,14 +21,12 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
    fight, pause, a death, its end). Steps 0-6 are done
    ([internals](internals.md#the-1x1-renderer)); the costs are in
    [performance](performance.md).
-2. The holes larger than the original's ([plan](resolution-plan.md) step 6): a step's near
-   edge in full screen, a strip at the small view's right edge once.
-3. A heavy scene for the baseline (many aliens and objects), when one is found.
-4. `tools/display.sh` once failed on level 1's end with CUSTOM5=0: the original's frame
+2. A heavy scene for the baseline (many aliens and objects), when one is found.
+3. `tools/display.sh` once failed on level 1's end with CUSTOM5=0: the original's frame
    was still the pause screen (its option text, SFX QUALITY, FLOOR DETAIL), so the second
    P had not ended the pause. Same slave bytes passed before and after. `ab3d.py key 19`
    should wait until the pause is over (or check it) before the script goes on.
-5. Plan step 7: speed.
+4. Plan step 7: speed; filling the step-edge holes is for its own writers.
 
 ## Releases
 

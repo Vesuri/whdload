@@ -241,11 +241,13 @@ just step further, up to 15 fields.
      original's frames 89.9% (level 1's start) and 94.7% (the pause screen) of the pixels
      are found at 3x3; the small view's figures are unchanged. With `-DLORES` every scene
      equals the original's.
-   - Holes (`-DHOLES`): on level 1's walk in full screen 83 of 123 frames, at most 438
-     pixels (the original's 96x80: 59 of 200, at most 28), at a step's near edge, up to a
-     few lines thick. None standing still at the same place. Once on the fight a 16-column
-     strip at the small view's right edge, below the horizon (1328 pixels). Not yet
-     explained.
+   - Holes (`-DHOLES`), with the gun and sky's column writers: on level 1's walk in full
+     screen 92 of 129 frames, 2735 pixels, at most 180 (the original's 96x80: 59 of 200,
+     224, at most 28). The same kind as step 5's: each is one or two lines between a step's
+     floor and the surface below its near edge, a diagonal where the edge is seen at an
+     angle; 30 pixels a frame with holes against the original's 3.8 x 9 = 34. A 16-column
+     strip at the small view's right edge (1328 pixels, once, on the fight) came with the
+     earlier grid writers and has not been seen since.
    - Speed: full screen 2.38 / 7.14 / 7.14 fps standing at the start on the 68020 / 68030 /
      68040 (step 5's 3x3 5.56 / 16.67 / 12.50); the small view as step 5's (3.85 / 10.00 /
      12.50).
