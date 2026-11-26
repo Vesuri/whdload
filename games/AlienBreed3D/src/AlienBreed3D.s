@@ -24,7 +24,7 @@ CHIPMEM		= CHIPPOOL
 EXPMEM		= $158000		;the game, its fast memory pool, the stacks
 	ELSE
 CHIPMEM		= CHIPPOOL+$27000	;and Enhanced resolution's screens (display.s)
-EXPMEM		= $190000		;and its area (palette.s, display.s)
+EXPMEM		= $1bd000		;and its area, PA_SIZE (palette.s, display.s)
 	ENDC
 SSP_OFF		= $157e00		;from ExpMem; USP 1 KB below
 
@@ -562,6 +562,10 @@ _pl_v3
 	PL_PS	$32d2,_p_show		;each swap: the frame onto a screen
 	PL_PS	$3e42,_p_show
 	PL_PS	$8e5e,_p_show
+	INCLUDE	stride.s		;lines of DS_STRIDE bytes (display.s)
+	PL_W	$582a,DS_STRIDE		;gun: muls #416, its first row
+	PL_L	$6910,60*DS_STRIDE	;water tint: adda.l #24960, 60 lines
+	PL_W	$1935e,DS_STRIDE	;sky: adda.w #416, its first row
 	PL_ENDIF
 	ENDC
 	PL_END

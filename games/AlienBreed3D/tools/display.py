@@ -5,7 +5,8 @@
     python3 tools/display.py compare ORIG.png OURS.png AREA
 
 check: SHOT (an FS-UAE screenshot, 2 pixels a lores pixel and a raster) must show FRAME
-(`ab3d.py frame`: 96x80 colour words and the view byte) where the view is, in 12-bit
+(`ab3d.py frame`: colour words, the view byte, the width and height; 96x80, or 192x160
+for the small view at 1x1) where the view is, in 12-bit
 colour, or with AREA through the slave's palette. Where the original shows it: the small
 view's chunky rows 2 rasters each from line $2c, rows 0-78 (the panel's list starts at
 $ca); full screen's 3 rasters each from line $2b, shown from $2c to $117 (rows 0-78), 288
@@ -51,8 +52,17 @@ def box(mask):
     return 'x %d-%d, y %d-%d' % (xs.min(), xs.max(), ys.min(), ys.max())
 
 
-# (left, top) in a screenshot, png pixels a chunky pixel, first and last png row shown
+# (left, top) in a screenshot, png pixels a chunky pixel at 96x80, first and last png row
+# shown; at 1x1 (192 wide) 2 png pixels a pixel
 GEOMETRY = {0: (202, 36, 4, 36, 36 + 4 * 79), 1: (106, 34, 6, 36, 36 + 2 * (0x118 - 0x2c))}
+
+
+def read_frame(path):
+    """`ab3d.py frame`'s file: (words as an H x W array, view byte)."""
+    raw = open(path, 'rb').read()
+    w, h = int.from_bytes(raw[-4:-2], 'big'), int.from_bytes(raw[-2:], 'big')
+    words = np.frombuffer(raw[:w * h * 2], '>u2').reshape(h, w).astype(np.int64) & 0xfff
+    return words, raw[w * h * 2]
 EARLY = 36 + 2 * (0xff - 0x2c)          # the original's full screen: line $ff shows row 71
 PANEL = 36 + 2 * (0xca - 0x2c)          # the small view: the panel's colours load on line $ca
 
@@ -77,19 +87,19 @@ def check(shot, frame, area=None):
 
 def check1(shot, frame, area=None, quiet=False):
     img = load(shot)
-    raw = open(frame, 'rb').read()
-    words = np.frombuffer(raw[:96 * 80 * 2], '>u2').reshape(80, 96).astype(np.int64) & 0xfff
-    view = raw[96 * 80 * 2]
+    words, view = read_frame(frame)
     if area:
         pal, cmap = palette(area)
         lut = np.array([pal[cmap[c] - PEN0] for c in range(4096)])
         words = lut[words]
     rgb = np.stack([(words >> 8) * 17, ((words >> 4) & 15) * 17, (words & 15) * 17], -1)
     x0, y0, k, top, bottom = GEOMETRY[view]
+    if words.shape[1] != 96:
+        y0, k = 36, 2
     want = np.repeat(np.repeat(rgb, k, 0), k, 1)
     if view and not area:
         want[EARLY - y0:EARLY - y0 + 2] = want[(71 * k):(71 * k) + 2]
-    got = img[top:bottom, x0:x0 + 96 * k]
+    got = img[top:bottom, x0:x0 + words.shape[1] * k]
     want = want[top - y0:bottom - y0]
     bad = (got != want).any(2)
     if quiet and bad.any():
@@ -119,7 +129,7 @@ def compare(orig, ours, area):
     wrong = ~same & ~mapped
     frame = ours[:-4] + '.frame'
     try:
-        full = open(frame, 'rb').read()[96 * 80 * 2]
+        full = read_frame(frame)[1]
     except OSError:
         full = 0
     if full:

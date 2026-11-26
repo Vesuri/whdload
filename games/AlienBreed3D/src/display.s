@@ -43,15 +43,26 @@ SMALL_H		= 160
 FULL_W		= 288
 FULL_H		= 240
 
+; The game's lists keep the copper-slot layout (a pixel's colour word at fromPt + 4x + 4 more
+; at each 32-pixel bank), with lines of DS_STRIDE bytes in place of 416: room for the
+; small view's 192 pixels (6 banks of 132 bytes) on 160 lines.
+DS_STRIDE	= 800
+LIST_LINES	= SMALL_H
+
 ; the area, past the palette's tables
 DA_CHUNKY	= PA_END		;FULL_W * FULL_H pens; the c2p reads 4 bytes past a row
 DA_C2PBUF	= DA_CHUNKY+FULL_W*FULL_H+16	;the c2p's FULL_W / 2 bytes
+DA_INFO		= DA_C2PBUF+FULL_W/2	;for the tools: the frame last shown's
+DI_STRIDE	= 0			;word: line stride of the list,
+DI_W		= 2			;word: pixels a line,
+DI_H		= 4			;word: lines
+DI_SIZE		= 8
 DA_LISTS	= (PA_SQ+2*SQ_C+4+7)&-8	;past the palette build's scratch: the game's lists
-LIST_SIZE	= 33296			;each, as InitCopperScrn allocates them
+LIST_SIZE	= DS_STRIDE*LIST_LINES	;each (InitCopperScrn's are 33296 bytes)
 	IFGT	DA_LISTS+2*LIST_SIZE-PA_SIZE
 	FAIL	the area is too small for the copper lists
 	ENDC
-	IFGT	DA_C2PBUF+FULL_W/2-DA_LISTS
+	IFGT	DA_INFO+DI_SIZE-DA_LISTS
 	FAIL	the chunky buffer overlaps the copper lists
 	ENDC
 
@@ -93,6 +104,35 @@ _p_coplists
 	movea.l	(4).w,a6		;as after AllocMem
 	rts
 
+; From _p_loaded, once (a5 = hunk 0): the writers' row tables, lines of 416 bytes, to
+; lines of DS_STRIDE (the immediates are stride.s's, in the patch list).
+_ds_stride
+	lea	.tables(pc),a1
+.table	move.l	(a1)+,d0		;game offset; 0 ends
+	beq.s	.done
+	lea	(a5,d0.l),a0
+	move.w	(a1)+,d1		;longs
+	subq.w	#1,d1
+.entry	move.l	(a0),d0
+	divu.w	#416,d0
+	mulu.w	#DS_STRIDE,d0
+	move.l	d0,(a0)+
+	dbf	d1,.entry
+	bra.s	.table
+.done	movea.l	_resload(pc),a2
+	jmp	resload_FlushCache(a2)
+.tables	dc.l	$1cbe2			;timeslarge: walls, (y + 1) lines
+	dc.w	80
+	dc.l	$1cf6a			;timeslargethru: see-through walls
+	dc.w	80
+	dc.l	$22214			;dopoly's rows, (y + 1) lines; glass and bitmaps too
+	dc.w	90
+	dc.l	$224b6			;dopolyg's
+	dc.w	90
+	dc.l	$2276e			;dopolyh's, y lines
+	dc.w	90
+	dc.l	0
+
 ; PL_PS at $31a0 (level start; PL_S past the rest): the heads instead of the template.
 ; Both screens cleared, both heads built, head 0 shown.
 _p_cop1
@@ -117,6 +157,7 @@ _p_cop1
 	lea	_ds_hview(pc),a0
 	move.w	#-1,(a0)
 	bsr.w	_ds_view
+	bsr.w	_ds_geom
 	moveq	#0,d6
 	bsr.w	_ds_build
 	moveq	#1,d6
@@ -142,12 +183,18 @@ _p_show
 	movea.l	_expmem(pc),a4
 	adda.l	#PA_OFF,a4
 	bsr.w	_ds_wait
-	bsr.w	_ds_view
+	moveq	#0,d7
+	move.b	_ds_gview(pc),d7	;the view this frame was drawn for
 	move.w	_ds_back(pc),d6
 	bsr.w	_ds_build
+	bsr.w	_ds_info
 	tst.b	d7
 	bne.s	.full
+	IFD	HIRES
+	bsr.w	_ds_one
+	ELSE
 	bsr.w	_ds_small
+	ENDC
 	move.l	#SMALL_W,d5
 	move.w	#SMALL_H-1,d4
 	bra.s	.c2p
@@ -179,20 +226,26 @@ _p_show
 	move.w	#$0002,$dff09c		;DSKBLK, which the head sets
 	lea	_ds_back(pc),a0
 	eori.w	#1,(a0)
+	movea.l	_ds_hunk0(pc),a5	;(the convert uses a5)
+	bsr.w	_ds_view		;the next frame is drawn for the view now asked
+	cmp.b	_ds_gview(pc),d7
+	beq.s	.same
+	bsr.w	_ds_geom
+.same
 	IFD	HOLES			;debug: $f0f in every pixel of the list drawn next
 	movea.l	_ds_hunk0(pc),a5
 	GLEA	$5dd40,a0
 	movea.l	(a0),a0
 	lea	10(a0),a0
-	moveq	#80-1,d4
-.hl	moveq	#3-1,d5
+	move.w	#LIST_LINES-1,d4
+.hl	moveq	#DS_STRIDE/132-1,d5
 .hb	moveq	#32-1,d6
 .hp	move.w	#$0f0f,(a0)
 	addq.l	#4,a0
 	dbf	d6,.hp
 	addq.l	#4,a0
 	dbf	d5,.hb
-	lea	416-3*(4+32*4)(a0),a0
+	lea	DS_STRIDE-DS_STRIDE/132*132(a0),a0
 	dbf	d4,.hl
 	ENDC
 	movem.l	(sp)+,d0-d7/a0-a6
@@ -329,8 +382,53 @@ _ds_build
 	move.l	#$fffffffe,(a0)+
 .done	rts
 
-; The frame at a6 + 10 (the first colour word; a line is 416 bytes, a pixel 4, and 4 more
-; at each 32-pixel bank) to pens, each 2x2 or 3x3, into the chunky buffer.
+; d7 = the view: its frame's geometry into DA_INFO, for the tools
+_ds_info
+	PALEA	DA_INFO,a0
+	move.w	#DS_STRIDE,(a0)+
+	move.l	#96<<16|80,(a0)
+	IFD	HIRES
+	tst.b	d7
+	bne.s	.full
+	move.l	#SMALL_W<<16|SMALL_H,(a0)
+.full
+	ENDC
+	rts
+
+; d7 = the view the next frame is drawn for: each geometry site of _ds_sites gets its value
+; for it, in the game's code, and the caches are flushed (a5 = hunk 0)
+_ds_geom
+	movem.l	d0-d1/a0-a2,-(sp)
+	lea	_ds_gview(pc),a0
+	move.b	d7,(a0)
+	lea	_ds_sites(pc),a0
+.site	move.l	(a0)+,d0		;size << 24 | game offset; 0 ends
+	beq.s	.done
+	move.l	d0,d1
+	andi.l	#$ffffff,d1
+	lea	(a5,d1.l),a1
+	rol.l	#8,d0
+	move.l	(a0)+,d1		;the small view's value
+	tst.b	d7
+	beq.s	.small
+	move.l	(a0),d1			;full screen's
+.small	addq.l	#4,a0
+	subq.b	#2,d0
+	bcs.s	.byte
+	beq.s	.word
+	move.l	d1,(a1)
+	bra.s	.site
+.word	move.w	d1,(a1)
+	bra.s	.site
+.byte	move.b	d1,(a1)
+	bra.s	.site
+.done	movea.l	_resload(pc),a2
+	jsr	resload_FlushCache(a2)
+	movem.l	(sp)+,d0-d1/a0-a2
+	rts
+
+; The frame at a6 + 10 (the first colour word; a line is DS_STRIDE bytes, a pixel 4, and 4
+; more at each 32-pixel bank) to pens, each 2x2 or 3x3, into the chunky buffer.
 _ds_small
 	lea	10(a6),a0
 	PALEA	DA_CHUNKY,a1
@@ -348,7 +446,7 @@ _ds_small
 	dbf	d6,.px
 	addq.l	#4,a0
 	dbf	d5,.bank
-	lea	416-3*(4+32*4)(a0),a0
+	lea	DS_STRIDE-3*(4+32*4)(a0),a0
 	lea	-SMALL_W(a1),a5
 	moveq	#SMALL_W/4-1,d6
 .dup	move.l	(a5)+,(a1)+
@@ -374,7 +472,7 @@ _ds_full
 	dbf	d6,.px
 	addq.l	#4,a0
 	dbf	d5,.bank
-	lea	416-3*(4+32*4)(a0),a0
+	lea	DS_STRIDE-3*(4+32*4)(a0),a0
 	lea	-FULL_W(a1),a5
 	move.w	#2*FULL_W/4-1,d6
 .dup	move.l	(a5)+,(a1)+
@@ -382,11 +480,49 @@ _ds_full
 	dbf	d4,.line
 	rts
 
+	IFD	HIRES
+; The small view at 1x1: 192x160 words to pens.
+_ds_one
+	lea	10(a6),a0
+	PALEA	DA_CHUNKY,a1
+	lea	PA_MAP(a4),a2
+	move.w	#$0fff,d3
+	move.w	#SMALL_H-1,d4
+.line	moveq	#SMALL_W/32-1,d5
+.bank	moveq	#32-1,d6
+.px	move.w	(a0),d0
+	addq.l	#4,a0
+	and.w	d3,d0
+	move.b	(a2,d0.w),(a1)+
+	dbf	d6,.px
+	addq.l	#4,a0
+	dbf	d5,.bank
+	lea	DS_STRIDE-SMALL_W/32*132(a0),a0
+	dbf	d4,.line
+	rts
+	ENDC
+
 _ds_hunk0	dc.l	0
 _ds_template	dc.l	0
 _ds_back	dc.w	0		;the screen and head to convert into next
 _ds_hview	dc.b	-1,-1		;the view each head was built for
+_ds_gview	dc.b	0		;the view the game's geometry is set for
 	EVEN
+
+; The geometry sites: where the game's code has the view's size, and each view's value.
+; SITE SIZE (1, 2, 4), game offset, the 192x160 value, the 96x80 value (the original's);
+; the small view takes the first only with HIRES (the 1x1 renderer, plan step 5).
+SITE	MACRO
+	dc.l	\1<<24|\2
+	IFD	HIRES
+	dc.l	\3
+	ELSE
+	dc.l	\4
+	ENDC
+	dc.l	\4
+	ENDM
+_ds_sites
+	dc.l	0
 
 BPLSIZE		= DS_PLANE
 CHUNKYXMAX	= FULL_W

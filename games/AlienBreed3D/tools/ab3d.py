@@ -41,8 +41,9 @@ was found, running or stopped):
                           floor texture (DIR/floortile), which tools/colours.py reads
     key CODE [N]          press raw key CODE (hex; P, 19, pauses) for N fields (default 10),
                           then release it for N
-    frame OUT             the frame on screen (oldDrawPt) into OUT as `grab` writes one, then
-                          the view byte (0 small, 1 full screen); drawPt's into OUT.alt
+    frame OUT             the frame on screen (oldDrawPt) into OUT: its colour words, the
+                          view byte (0 small, 1 full screen), width and height (words;
+                          96x80, or with CUSTOM5=1 the slave's DA_INFO); drawPt's into OUT.alt
                           when it holds a view too (the game swaps the pointers a little
                           before it shows the list, so either may be on screen)
     die N [SCRIPT]        play SCRIPT (default `fight`) for up to N fields until player 1's
@@ -57,6 +58,7 @@ was found, running or stopped):
 
 The 8-channel ($c4dc) version only, which the AGA drawer installs.
 """
+import os
 import re
 import struct
 import sys
@@ -391,17 +393,31 @@ def _dump(g, a, n, path):
 
 
 VIEW_W, VIEW_H = 96, 80
+# Enhanced resolution's lists (src/display.s): the same slot layout, lines of DS_STRIDE
+# bytes, and the frame's size in the area's DA_INFO (stride, width, height words)
+DA_INFO = 58080 + 288 * 240 + 16 + 144
 
 
-def view_words(raw):
-    """A view list's 96x80 colour words (big-endian, row by row): pixel x of a line is the
-    data word of COLOR move x % 32 in bank x // 32 (fromPt is the list + 10)."""
+def geometry(g):
+    """(stride, width, height) of the frame in the lists: the original's 416, 96, 80, or
+    with WHD_ARGS CUSTOM5=1 what the slave last showed."""
+    if 'CUSTOM5=1' not in os.environ.get('WHD_ARGS', ''):
+        return VIEW_LINE, VIEW_W, VIEW_H
+    area = _long(g, 4) - 0x1000 + PALETTE_AREA
+    return struct.unpack('>HHH', _bytes(g, area + DA_INFO, 6))
+
+
+def view_words(raw, geom=None):
+    """A view list's colour words (big-endian, row by row): pixel x of a line is the data
+    word of COLOR move x % 32 in bank x // 32 (fromPt is the list + 10). The original's
+    lists are checked to hold COLOR moves there; ours are never shown as copper lists."""
+    stride, w, h = geom or (VIEW_LINE, VIEW_W, VIEW_H)
     out = bytearray()
-    for y in range(VIEW_H):
-        line = raw[y * VIEW_LINE:(y + 1) * VIEW_LINE]
-        for x in range(VIEW_W):
+    for y in range(h):
+        line = raw[y * stride:(y + 1) * stride]
+        for x in range(w):
             o = 8 + (x // 32) * 132 + (x % 32) * 4
-            if struct.unpack_from('>H', line, o)[0] != 0x180 + 2 * (x % 32):
+            if stride == VIEW_LINE and struct.unpack_from('>H', line, o)[0] != 0x180 + 2 * (x % 32):
                 raise RuntimeError(f'line {y} pixel {x}: not a COLOR move')
             out += line[o + 2:o + 4]
     return bytes(out)
@@ -433,11 +449,12 @@ def cmd_frame(server, g, rest):
     out = Path(rest.strip()).resolve()
     with Halted(g):
         lists = []
+        geom = geometry(g)
         for at in (4, 0):           # oldDrawPt, the one shown, then drawPt
             try:
                 lists.append(view_words(_dump(g, _long(g, addr(g, DRAWPT) + at),
-                                              VIEW_H * VIEW_LINE,
-                                              out.with_name(out.name + '.list'))))
+                                              geom[0] * geom[2],
+                                              out.with_name(out.name + '.list')), geom))
             except RuntimeError:
                 lists.append(None)
         full = _bytes(g, addr(g, FULL), 1)[0] != 0
@@ -448,10 +465,12 @@ def cmd_frame(server, g, rest):
         raise RuntimeError('neither list holds a view')
     if lists[0] is None:
         lists = lists[1:]
-    out.write_bytes(lists[0] + bytes([full]))
+    tail = bytes([full]) + struct.pack('>HH', geom[1], geom[2])
+    out.write_bytes(lists[0] + tail)
     if len(lists) > 1 and lists[1] is not None:
-        alt.write_bytes(lists[1] + bytes([full]))
-    return f'the frame on screen ({"full screen" if full else "small view"}) into {out}'
+        alt.write_bytes(lists[1] + tail)
+    return (f'the frame on screen ({"full screen" if full else "small view"}, '
+            f'{geom[1]}x{geom[2]}) into {out}')
 
 
 def cmd_key(server, g, rest):
@@ -560,7 +579,7 @@ WAITVBL_CALL = 0x3e58   # the main loop's jsr to the slave's _waitvbl (PL_PS)
 SLAVE_LST = Path(__file__).resolve().parents[1] / 'tmp/build/release/AlienBreed3D.lst'
 SLAVE_CATEGORIES = [
     ('c2p', 'c2p1x1_8_c5_030_2', 'c2p1x1_8_c5_030_2_scroffs'),
-    ('convert', '_ds_small', '_ds_hunk0'),       # the frame to pens, 2x2 or 3x3
+    ('convert', '_ds_small', '_ds_hunk0'),       # the frame to pens, 1x1, 2x2 or 3x3
     ('wait', '_ds_wait', '_ds_build'),          # until the back screen is not shown
     ('present', '_p_show', '_ds_small'),        # the rest: heads, c2p calls, the switch
 ]

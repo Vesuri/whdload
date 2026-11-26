@@ -48,7 +48,12 @@ FLIN_B		= 37025580
 
 ; the area: what stays
 PA_OFF		= $156000	;from _expmem, which _start moves past the exec and dos
-PA_SIZE		= $38000
+PA_SIZE		= $65000
+	IFND	ORIGINAL
+	IFNE	EXPMEM-$158000-PA_SIZE
+	FAIL	EXPMEM must be the game's $158000 and the area
+	ENDC
+	ENDC
 PA_NPENS	= 0		;word: pens built, set last
 PA_STATE	= 2		;word: 2 done; while building $10 + the step (1-7)
 PA_PALETTE	= 4		;words: pen PEN0 + k's 12-bit colour
@@ -98,6 +103,7 @@ _p_loaded
 	movea.l	_expmem(pc),a4
 	adda.l	#PA_OFF,a4
 	bsr.w	_pal_build
+	bsr.w	_ds_stride
 	movem.l	(sp)+,d0-d7/a0-a6
 	rts
 
