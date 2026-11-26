@@ -361,6 +361,9 @@ draws, with black's pen (pen 0 is the border, which the damage flash turns red).
   `addq.w #4` after it `#1` (walls $1ca8c-$1cefe, bitmaps $21a18-$21a6c, polygons $221dc-$22752; the list in
   `src/AlienBreed3D.s`). Glass ($215fc-$2165c) and light beams ($8aea) are patched too,
   though no level is seen to draw them.
+- **The frame flag**: with the option the main loop no longer waits for the game's frame
+  flag after a frame ($32fe, `PL_S`): `_p_show` paces the switches (one a field at most,
+  into a screen no longer shown), and the game times its moves itself.
 - **Wall strips** ($1caf4, $1cbd4, after the game's `cmpi.b` of the packing, whose flags
   choose the loop): ours (`_t_wsimple`, `_t_wdraw`), 8 pixels a pass at displacements
   k * `DS_STRIDE`, entered at the pixel that leaves whole passes; each pass is under the

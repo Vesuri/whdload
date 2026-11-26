@@ -290,6 +290,15 @@ change (`tools/baseline.sh aprof MACHINE OUT turn`):
 | Spans store with `(a3)+`; the gun's S pens at once | 268.5 / 167.3 | 81.0 / 57.7 | 100.9 / 53.2 | gun 5.0 to 2.6 ms, floors 50.9 to 47.2 (68020, full) |
 | Our wall strip loops | 259.7 / 169.2 | 78.0 / 57.1 | 93.8 / 51.0 | strip loops' instructions 20% fewer, their time 8-12% less |
 
+- **The frame flag:** after showing a frame the game waited for its frame flag, which
+  the copper sets at the top of each field ($32fe; not as the link's second player), so
+  each frame took a whole number of fields: about half a field of waiting a frame (10.3 ms
+  on the 68030 in full screen). `_p_show` already holds a switch until the screen it
+  draws into is no longer shown, so the option skips that wait. The work is the same; the
+  frame rates (fps, full screen / small view, MEASURED) went from 3.74 / 5.56 to 3.81 /
+  6.00 on the 68020, 11.34 / 15.29 to 12.81 / 18.03 on the 68030 and 9.82 / 16.24 to
+  10.78 / 20.25 on the 68040. A full turn on the keys still takes 121-135 fields: the
+  game's speed follows time.
 - **Wall strips:** 8 pixels a pass at displacements, no `adda` or `dbf` a pixel: the
   instructions executed fall by a fifth, the time by 8-12% (68020 and 68030), since a pixel
   still reads a texel and a pen and writes one. The 68020's small view measured 1% slower

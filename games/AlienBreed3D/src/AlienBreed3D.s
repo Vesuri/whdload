@@ -628,6 +628,9 @@ _pl_v3
 	PL_W	$226c6,-EDGE_STRIDE+2
 	PL_W	$226ca,-EDGE_STRIDE+4
 	PL_P	$1fbf6,_t_split		;FloorLine: a span over any number of banks
+	PL_S	$32fe,8			;no wait for the frame flag after a frame (but as
+					;the link's second player): _p_show already holds
+					;a switch until the screen it draws is not shown
 	IFD	WATERFREEZE		;debug: the water's animation and scroll stopped (the
 	PL_W	$3338,$603e		;main loop advances them a frame drawn, so builds of
 	ENDC				;different speed show different phases): bra.s $3378
