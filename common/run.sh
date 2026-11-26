@@ -12,6 +12,7 @@
 #   SLAVE=path           any slave file (relative to where make or this script was started)
 #   NOBUILD=1            run the existing build without rebuilding
 #   WHD_ARGS='...'       WHDLoad options added after the game's WHD_DEFAULTS
+#                        (NTSC also adds the NTSC monitor, with the Workbench floppy)
 #   COREDUMP=0           do not pass COREDUMP. By default WHDLoad writes a register and memory
 #                        dump on every exit; the next boot moves it to tmp/dumps/<time>/
 # The machine:
@@ -131,6 +132,11 @@ if [ "${WB:-1}" = 1 ]; then
   printf '%s\n' 'DF0:C/Assign C: DF0:C' 'DF0:C/Assign LIBS: DF0:Libs' 'DF0:C/Assign DEVS: DH0:devs' \
     >> "$DH0/s/startup-sequence"
 fi
+# WHDLoad's NTSC option opens its screen in NTSC, which needs the NTSC monitor (as Workbench
+# 2.04's Extras:MonitorStore/NTSC adds it); without it WHDLoad cannot open a screen.
+case " ${WHD_ARGS:-} ${WHD_DEFAULTS:-} " in
+  *" NTSC "*) [ "${WB:-1}" = 1 ] && echo 'DF0:System/AddMonitor NUM=1 NAME=ntsc.monitor' >> "$DH0/s/startup-sequence" ;;
+esac
 coredump=" COREDUMP"; [ "${COREDUMP:-1}" = 1 ] || coredump=""
 printf '%s\n' 'Stack 16384' 'FailAt 999' 'CD DH1:' \
   "WHDLoad $SLAVE_FILE ${WHD_DEFAULTS-PRELOAD SPLASHDELAY=0 NOREQ}$coredump ${WHD_ARGS:-}" >> "$DH0/s/startup-sequence"
