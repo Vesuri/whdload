@@ -277,6 +277,22 @@ long writes a frame):
   between runs of the same build (floors 44.5 and 55.2).
 - **Now:** walls 38-40%, c2p 17-26%, floors 16-19%; on the 68040 still 83-84% gap.
 
+### Step 7, change by change
+
+The turn scene's work a frame in ms (mean, MEASURED), full screen / small view, after each
+change (`tools/baseline.sh aprof MACHINE OUT turn`):
+
+| Build | 68020 | 68030 | 68040 | What moved |
+|---|---|---|---|---|
+| Step 6 (`BUILD=words`) | 372.5 / 213.0 | 106.2 / 72.7 | 128.0 / 65.5 | |
+| Pen bytes | 292.4 / 173.1 | 84.4 / 59.9 | 102.8 / 54.7 | the convert gone |
+| The sky a line at a time | 275.1 / 171.2 | 81.2 / 58.6 | 102.0 / 54.1 | sky 17.5 to 8.1 ms (68020, full), 4.7 to 2.1 (68030) |
+
+On the 68040 FS-UAE counts instructions, not cycles (AmigaXDev's `measurement-method.md`):
+a change that only moves memory traffic, such as a line stride whose columns spread over
+the data cache's sets (`VASM_EXTRA=-DPSTRIDE=304`), measures nothing there; it measured
+the same on the 68030 (84.5 / 59.1) and the 68040 (102.3 / 54.3). Not tried on hardware.
+
 ## Not measured
 
 - The heaviest scene: a barrel shot close by, through level 1's first door and to the

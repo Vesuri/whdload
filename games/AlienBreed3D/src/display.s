@@ -53,7 +53,10 @@ FULL_H		= 240
 ; fromPt + x, lines of FULL_W bytes in both views; the c2p reads the frame from the list,
 ; and fromPt is on a long (the list starts 2 bytes in).
 	IFD	PENS
-DS_STRIDE	= FULL_W
+	IFND	PSTRIDE
+PSTRIDE		= FULL_W
+	ENDC
+DS_STRIDE	= PSTRIDE
 LIST_LINES	= FULL_H+1
 	ELSE
 	IFND	LORES

@@ -333,8 +333,9 @@ sites at each switch. The projection is x = X * 128 / Z + 47 and y = (H - eye) /
   column 0 and the objects' graphics table at $2974a (aliens, corpses and blood then drew
   from address 2).
 - **Ours, S x S**: the gun (`DrawInGun` $5826, a fixed-size image) and the sky ($1933e, 96
-  of its 432 columns, as the original's field of view), a column at a time from their
-  images, each texel at the slots of its S pixels (at S = 3 a texel can span a 32-pixel
+  of its 432 columns, as the original's field of view; with pen bytes a line a texel row,
+  each texel's S pens in one word or long from `DA_SKYTAB`, then the line copied S - 1
+  times), a column at a time from their images, each texel at the slots of its S pixels (at S = 3 a texel can span a 32-pixel
   bank boundary); the pause screen's letters ($41b2; its dimmed frame at 1x1); the water
   tint over the view ($6900).
 - The list's line 0 is drawn by no writer, as in the original (black there); `_ds_one`

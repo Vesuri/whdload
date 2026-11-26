@@ -469,15 +469,95 @@ _t_sky
 	muls.w	#432,d5
 	divs.w	#8192,d5
 	IFD	PENS
+	; a line a texel row: each texel its S pens at once from DA_SKYTAB (a word of 2, or a
+	; long of 3 whose 4th byte the next texel or the line's copy overwrites), the 96
+	; columns in two runs split where the 432 wrap; then the line copied S - 1 times
+	move.w	#432,d6
+	sub.w	d5,d6			;columns before the wrap
+	cmp.w	#96,d6
+	ble.s	.run
+	moveq	#96,d6
+.run	moveq	#96,d7
+	sub.w	d6,d7			;columns after it
+	subq.w	#1,d6
+	subq.w	#1,d7
+	movea.l	_expmem(pc),a2
+	adda.l	#PA_OFF,a2
+	lea	DA_SKYTAB(a2),a4
+	lea	PA_SKY(a2),a2		;the sky's pens (palette.s), 38 a column
 	muls.w	#38,d5
-	movea.l	_expmem(pc),a2		;the sky's pens (palette.s)
-	adda.l	#PA_OFF+PA_SKY,a2
-	lea	SKY_WORDS(a2),a3
+	lea	(a2,d5.l),a1		;row 0 of the first column
+	movea.l	a2,a3			;row 0 of column 0
+	movea.l	_ds_frompt(pc),a0
+	movea.l	(a0),a0
+	lea	DS_STRIDE(a0),a0	;line 1
+	moveq	#0,d1
+	moveq	#38-1,d3
+	tst.b	_ds_gview(pc)
+	bne.s	.row3
+.row2	movea.l	a0,a6
+	movea.l	a1,a5
+	move.w	d6,d4
+.a2	move.b	(a5),d1
+	move.w	(a4,d1.w*2),(a6)+
+	lea	38(a5),a5
+	dbf	d4,.a2
+	movea.l	a3,a5
+	move.w	d7,d4
+	bmi.s	.c2
+.b2	move.b	(a5),d1
+	move.w	(a4,d1.w*2),(a6)+
+	lea	38(a5),a5
+	dbf	d4,.b2
+.c2	movea.l	a0,a5
+	lea	DS_STRIDE(a0),a6
+	moveq	#SMALL_W/16-1,d4
+.k2	move.l	(a5)+,(a6)+
+	move.l	(a5)+,(a6)+
+	move.l	(a5)+,(a6)+
+	move.l	(a5)+,(a6)+
+	dbf	d4,.k2
+	lea	2*DS_STRIDE(a0),a0
+	addq.l	#1,a1
+	addq.l	#1,a3
+	dbf	d3,.row2
+	bra.s	.done
+.row3	movea.l	a0,a6
+	movea.l	a1,a5
+	move.w	d6,d4
+.a3	move.b	(a5),d1
+	move.l	512(a4,d1.w*4),(a6)
+	addq.l	#3,a6
+	lea	38(a5),a5
+	dbf	d4,.a3
+	movea.l	a3,a5
+	move.w	d7,d4
+	bmi.s	.c3
+.b3	move.b	(a5),d1
+	move.l	512(a4,d1.w*4),(a6)
+	addq.l	#3,a6
+	lea	38(a5),a5
+	dbf	d4,.b3
+.c3	movea.l	a0,a5
+	lea	DS_STRIDE(a0),a6
+	lea	2*DS_STRIDE(a0),a2
+	moveq	#FULL_W/16-1,d4
+.k3	REPT	4
+	move.l	(a5)+,d0
+	move.l	d0,(a6)+
+	move.l	d0,(a2)+
+	ENDR
+	dbf	d4,.k3
+	lea	3*DS_STRIDE(a0),a0
+	addq.l	#1,a1
+	addq.l	#1,a3
+	dbf	d3,.row3
+.done	movem.l	(sp)+,d0-d7/a0-a6
+	rts
 	ELSE
 	muls.w	#76,d5
 	HUNK	G_SKY,a2		;the first column
 	HUNK	G_SKYEND,a3
-	ENDC
 	lea	(a2,d5.l),a1
 	movea.l	_ds_frompt(pc),a0
 	movea.l	(a0),a0
@@ -523,15 +603,12 @@ _t_sky
 	dbf	d0,.col3
 .done	movem.l	(sp)+,d0-d7/a0-a6
 	rts
-	IFD	PENS
-.step	lea	38(a1),a1		;the next sky column, wrapping
-	ELSE
 .step	lea	76(a1),a1		;the next sky column, wrapping
-	ENDC
 	cmpa.l	a3,a1
 	blt.s	.in
 	movea.l	a2,a1
 .in	rts
+	ENDC
 
 ; PL_P at $6900 (the water tint, over movea.l #brightentab,a2): the game's clears the red of
 ; lines 0-79 (d5 = 3) or 40-79 (d5 = 1) of 96 pixels; ours of S times the lines, of the
@@ -703,6 +780,7 @@ DA_WATER	= DA_CHUNKY		;the water's pens (the chunky buffer is unused):
 DA_FLOOR	= DA_WATER+22*256	;the floors' and textured polygons' pens: their 15
 DA_POLY		= DA_FLOOR+XROWS*256	;rows, then what follows the game's table, as a
 XROWS		= 24			;Gouraud row past 14 reads it (zeros: black)
+DA_SKYTAB	= DA_POLY+XROWS*256	;256 words: pen p twice, then 256 longs: 3 times (_t_sky)
 
 ; From _ds_tables (a5 = hunk 0, a4 = the area), once: the game's tables for pens. Its
 ; colour tables' pointers to the pen tables; the row offsets into them halved (a row of
@@ -753,6 +831,20 @@ _t_pens
 	bsr.w	.rows
 	; the water: row k, pen p: the pen of brightentab's colour k * 256 + p's colour's low
 	; byte, which texturedwater's reflection read takes from the colour word
+	lea	DA_SKYTAB(a4),a0	;the sky's pens, 2 and 3 at once
+	lea	512(a0),a1
+	moveq	#0,d1
+.sky	move.l	d1,d0
+	lsl.w	#8,d0
+	move.b	d1,d0
+	move.w	d0,(a0)+
+	swap	d0
+	move.w	d1,d0
+	lsl.w	#8,d0
+	move.b	d1,d0
+	move.l	d0,(a1)+
+	addq.b	#1,d1
+	bne.s	.sky
 	lea	G_BRIGHTEN(a5),a0
 	lea	DA_WATER(a4),a1
 	moveq	#22-1,d2
