@@ -41,7 +41,7 @@ was found, running or stopped):
     grab N OUT [SCRIPT]   run N fields playing SCRIPT and append each frame shown to OUT:
                           96x80 big-endian 12-bit colour words, read from the view list
     holes N OUT [SCRIPT]  with a HOLES build (VASM_EXTRA=-DHOLES: the list drawn next is $f0f
-                          in every pixel): N fields playing SCRIPT, and in each frame shown
+                          in every pixel; in pen lists pen 1, read as $f0f): N fields playing SCRIPT, and in each frame shown
                           (its size from the slave's DA_INFO) the pixels no writer drew but
                           on line 0, which none draws in the original either. The
                           frame with the most goes to OUT (as `frame`'s, no .alt)
@@ -51,9 +51,10 @@ was found, running or stopped):
                           or playing again (a swap within 60 fields), at most 3 times
     key CODE [N]          press raw key CODE (hex; P, 19, pauses) for N fields (default 10),
                           then release it for N
-    chunky OUT            the pens of the frame last shown (CUSTOM5=1, the slave's chunky
-                          buffer): width, height (words), then W x H bytes
-    frame OUT             the frame on screen (oldDrawPt) into OUT: its colour words, the
+    chunky OUT            the pens of the frame last shown (CUSTOM5=1: the list itself, or a
+                          WORDS build's chunky buffer): width, height (words), then W x H bytes
+    frame OUT             the frame on screen (oldDrawPt) into OUT: its colour words (a pen
+                          list's pens through the area's palette), the
                           view byte (0 small, 1 full screen), width and height (words;
                           96x80, or with CUSTOM5=1 the slave's DA_INFO); drawPt's into OUT.alt
                           when it holds a view too (the game swaps the pointers a little
@@ -449,12 +450,34 @@ DA_INFO = DA_CHUNKY + 288 * 240 + 16 + 144
 
 
 def geometry(g):
-    """(stride, width, height) of the frame in the lists: the original's 416, 96, 80, or
-    with WHD_ARGS CUSTOM5=1 what the slave last showed."""
+    """(stride, width, height, palette) of the frame in the lists: the original's 416, 96, 80
+    and None, or with WHD_ARGS CUSTOM5=1 what the slave last showed; palette is None when the
+    lists hold colour words (a WORDS or LORES build), else each pen's colour word (the
+    writers write pens, which the c2p reads from the list itself)."""
     if 'CUSTOM5=1' not in os.environ.get('WHD_ARGS', ''):
-        return VIEW_LINE, VIEW_W, VIEW_H
+        return VIEW_LINE, VIEW_W, VIEW_H, None
     area = _long(g, 4) - 0x1000 + PALETTE_AREA
-    return struct.unpack('>HHH', _bytes(g, area + DA_INFO, 6))
+    stride, w, h, pens = struct.unpack('>HHHI', _bytes(g, area + DA_INFO, 10))
+    if pens == area + DA_CHUNKY:
+        return stride, w, h, None
+    n = struct.unpack('>H', _bytes(g, area, 2))[0]          # PA_NPENS
+    cols = struct.unpack(f'>{n}H', _bytes(g, area + 4, 2 * n))
+    # pens 0-15 are no writer's: 0 is line 0's black, 1 a HOLES build's hole
+    return stride, w, h, [0, 0x0f0f] + [0] * (PEN0 - 2) + list(cols) + [0] * (256 - PEN0 - n)
+
+
+PEN0 = 16
+
+
+def list_words(g, at, geom, scratch):
+    """The frame in the list at runtime address at as colour words (view_words'), from
+    either kind of list."""
+    stride, w, h, pal = geom
+    if pal is None:
+        return view_words(_dump(g, at, stride * h + 16, scratch), geom[:3])
+    raw = _dump(g, at + 10, stride * h, scratch)
+    return b''.join(struct.pack(f'>{w}H', *(pal[p] for p in raw[y * stride:y * stride + w]))
+                    for y in range(h))
 
 
 def view_words(raw, geom=None):
@@ -509,7 +532,7 @@ def cmd_holes(server, g, rest):
                 return
             st['last'] = p
             geom = geometry(g)
-            words = view_words(_dump(g, _long(g, a + 4), geom[0] * geom[2] + 16, scratch), geom)
+            words = list_words(g, _long(g, a + 4), geom, scratch)
             # not line 0: no writer draws it, in the original either (display.s _ds_one)
             k = sum(1 for (v,) in struct.iter_unpack('>H', words[2 * geom[1]:]) if v == 0x0f0f)
             st['frames'] += 1
@@ -550,9 +573,8 @@ def cmd_frame(server, g, rest):
         geom = geometry(g)
         for at in (4, 0):           # oldDrawPt, the one shown, then drawPt
             try:
-                lists.append(view_words(_dump(g, _long(g, addr(g, DRAWPT) + at),
-                                              geom[0] * geom[2] + 16,
-                                              out.with_name(out.name + '.list')), geom))
+                lists.append(list_words(g, _long(g, addr(g, DRAWPT) + at), geom,
+                                        out.with_name(out.name + '.list')))
             except RuntimeError:
                 lists.append(None)
         full = _bytes(g, addr(g, FULL), 1)[0] != 0

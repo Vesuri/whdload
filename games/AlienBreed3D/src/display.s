@@ -48,7 +48,8 @@ FULL_H		= 240
 ; screen's 288 pixels (9 banks of 132 bytes) on 240 lines, and one more: the writers draw
 ; row y at line y + 1. With LORES (both views 96x80) the small view's 192 and 160: the
 ; game's own sky runs there, whose unrolled displacements must fit a word.
-; With PENS (resolution plan step 7) the writers write pen bytes instead, pixel x at
+; With PENS (resolution plan step 7; the release build, AlienBreed3D.s, but for WORDS,
+; LORES and ORIGINAL) the writers write pen bytes instead, pixel x at
 ; fromPt + x, lines of FULL_W bytes in both views; the c2p reads the frame from the list,
 ; and fromPt is on a long (the list starts 2 bytes in).
 	IFD	PENS
@@ -221,10 +222,20 @@ _p_show
 	bsr.w	_ds_build
 	bsr.w	_ds_info
 	IFD	PENS
-	lea	10(a6),a0		;line 0 black: no writer draws it
-	moveq	#DS_STRIDE/4-1,d0
-.black	clr.l	(a0)+
-	dbf	d0,.black
+	lea	10(a6),a0		;line 0 black: no writer draws it (black's pen, not
+	movea.l	_expmem(pc),a1		;pen 0, the border, which the damage flash sets)
+	adda.l	#PA_OFF,a1
+	moveq	#0,d0
+	move.b	PA_MAP(a1),d0
+	move.l	d0,d1
+	lsl.l	#8,d1
+	or.l	d1,d0
+	move.l	d0,d1
+	swap	d1
+	or.l	d1,d0
+	moveq	#DS_STRIDE/4-1,d1
+.black	move.l	d0,(a0)+
+	dbf	d1,.black
 	ELSE
 	IFND	LORES
 	bsr.w	_ds_one
@@ -281,17 +292,17 @@ _p_show
 	bsr.w	_ds_geom
 .same
 	IFD	HOLES			;debug: $f0f in every pixel of the list drawn next
-	movea.l	_ds_hunk0(pc),a5	;(HOLES=2: pen PEN0's colour, which is its pen's
-	GLEA	$5dd40,a0		;exactly, for comparing with PENS: the water reads
-	movea.l	(a0),a0			;pixels not yet drawn)
-	lea	10(a0),a0
+	movea.l	_ds_hunk0(pc),a5	;(with PENS pen 1, which no writer writes: ab3d.py
+	GLEA	$5dd40,a0		;shows it as $f0f; HOLES=2: pen PEN0's colour, which
+	movea.l	(a0),a0			;is its pen's exactly, for comparing with WORDS: the
+	lea	10(a0),a0		;water reads pixels not yet drawn)
 	movea.l	_expmem(pc),a4
 	adda.l	#PA_OFF,a4
-	IFD	PENS			;(its pen)
+	IFD	PENS
 	IFEQ	HOLES-2
 	moveq	#PEN0,d0
 	ELSE
-	move.b	PA_MAP+$f0f(a4),d0
+	moveq	#1,d0
 	ENDC
 	move.l	#LIST_LINES*DS_STRIDE,d4
 .hl	move.b	d0,(a0)+

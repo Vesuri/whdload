@@ -19,6 +19,15 @@ CHIPPOOL	= $90000		;576 KB: the slave's chip pool ends here
 	ELSE
 CHIPPOOL	= $6b000		;428 KB: no HackAB3D
 	ENDC
+	IFND	ORIGINAL		;the writers write pen bytes (display.s, hires.s),
+	IFND	LORES			;but with WORDS: colour words, which display.s
+	IFND	WORDS			;converts (resolution plan steps 5 and 6)
+	IFND	PENS
+PENS		= 1
+	ENDC
+	ENDC
+	ENDC
+	ENDC
 	IFD	ORIGINAL
 CHIPMEM		= CHIPPOOL
 EXPMEM		= $158000		;the game, its fast memory pool, the stacks

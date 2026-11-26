@@ -252,11 +252,13 @@ Frames a second and work a frame in ms (mean, MEASURED):
 - **Sky:** the turn shows more of it than the start does: 20.7 ms a frame on the 68020 in
   full screen.
 
-### Pen bytes (BUILD=pens)
+### Pen bytes (the release build)
 
-The game's writers write pen bytes in place of colour words (`-DPENS`,
-[internals](internals.md#pen-bytes)), so the convert is gone. The same scene, 26.11.2026
-(MEASURED):
+The game's writers write pen bytes in place of colour words
+([internals](internals.md#pen-bytes); `BUILD=words` is the build before), so the convert
+is gone. The same scene, 26.11.2026
+(MEASURED; before line 0 was filled with black's pen in place of clearing it, the same 72
+long writes a frame):
 
 | CPU | View | fps | work | walls | floors | c2p | slave (sky) | objects |
 |---|---|---|---|---|---|---|---|---|

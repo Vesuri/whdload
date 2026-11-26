@@ -348,12 +348,13 @@ frames of 7680 at 96x80, 2735 in 129 frames of 69120 at 288x240, one or two line
 
 ### Pen bytes
 
-`BUILD=pens` (`-DPENS`, plan step 7's first stage): the game's writers write pen bytes
-straight into the lists, and the convert (`_ds_one`) is gone. A list's pixel x is at
+The release build (`PENS`, plan step 7's first stage; `-DWORDS` builds the colour-word
+lists of steps 5 and 6, which the next section describes): the game's writers write pen
+bytes straight into the lists, and the convert (`_ds_one`) is gone. A list's pixel x is at
 `fromPt` + x (no banks; `DA_SLOT` is linear), lines of 288 bytes in both views, from 2
 bytes into the list so that `fromPt` is long-aligned for the c2p, which reads the list
-itself (`DA_INFO`'s pens pointer and row stride). `_p_show` clears line 0, which no writer
-draws.
+itself (`DA_INFO`'s pens pointer and row stride). `_p_show` fills line 0, which no writer
+draws, with black's pen (pen 0 is the border, which the damage flash turns red).
 
 - **Stores**: each `move.w (table),(a3)` becomes `move.b` from a table of pens, and each
   `addq.w #4` after it `#1` (walls $1ca8c-$1cefe, floors $20f54-$2100a, water
@@ -383,14 +384,15 @@ draws.
 
 `tools/pencheck.sh` grabs still frames of each build's pens (`ab3d.py chunky`) at level
 starts and 40 fields in, turned 8 times in both views, and `tools/pendiff.py` compares two
-runs. With `-DHOLES=2` in both (holes filled with pen 16, black, which the palette maps
+runs (the release against `BUILD=words`). With `-DHOLES=2` in both (holes filled with pen 16, black, which the palette maps
 exactly) levels 1 and 2 are equal; level 3 differs only in the water above; level 4's
 aliens move differently between the builds' timings.
 
 ### The 1x1 display
 
 Enhanced resolution's display (plan step 4, `src/display.s`, with Kalms' c2p in
-`src/c2p.s`). The renderer draws its frame of colour words, 192x160 or 288x240 (96x80
+`src/c2p.s`), as built with `-DWORDS` or LORES (the release build's lists hold pens, which
+the c2p reads in place: [Pen bytes](#pen-bytes)). The renderer draws its frame of colour words, 192x160 or 288x240 (96x80
 with LORES), into its two copper lists, which are now in the area and never shown. At
 each swap (`_p_show`; the main loop $32d2, the pause screen $3e42, `quitGame` $8e5e) the
 finished list (the new `oldDrawPt`) is converted through the palette's map to pens into
