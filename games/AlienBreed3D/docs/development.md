@@ -40,8 +40,32 @@ code-hunk offsets in `AlienBreed3D.slave` (the no-music slave's are lower after 
 
 ## Driving it
 
-`make serve INSTANCE=<name> WARP=1 WINDOW=none &` reaches the main menu in about 25 s
-on the a1200-030. In the menu RETURN (`gdb monitor key 44 1`, then `... 44 0`) selects
-PLAY GAME; RETURN again on the text screen starts the level. In the game M (`37`)
-switches to mouse control: mouse left/right turns, up/down moves, the left button fires
-(`gdb monitor mouse DX DY`, `gdb monitor input JOY1_FIRE_BUTTON 1`). F10 quits.
+`tools/ab3d.py` is the shared game server with this game's commands (its docstring has them
+all). A repeatable run:
+
+    INSTANCE=agent WARP=1 WINDOW=none DETERMINISTIC=1 JOY0=none python3 tools/ab3d.py serve &
+    python3 tools/ab3d.py wait 20        # the main menu, from a warp boot on the a1200-030
+    python3 tools/ab3d.py level          # RETURNs into level 1, then M (mouse control)
+    python3 tools/ab3d.py play walk      # the scripted walk; or steps: '100 my -10; 50 mx 20'
+    python3 tools/ab3d.py frames 500     # frames shown over 500 fields, fps, fields a frame
+    python3 tools/ab3d.py full 1         # full screen (0: the small view)
+    python3 tools/ab3d.py quit
+
+The commands run whole fields (`monitor fields`), so with `DETERMINISTIC=1` a run repeats.
+Game time follows the frame rate, so an input script ends in the same place only on the
+same machine. Keys need holding for 10 fields: at 3 the game misses them.
+`frames` counts swaps of `drawPt` ([internals](internals.md#display)), which happen at
+most once a field. `base` prints where the hunks were loaded and `peek OFF N` reads by game
+offset.
+
+By hand: in the menu RETURN (raw `44`) selects PLAY GAME; RETURN again on the text screen
+starts the level. In the game M (`37`) switches to mouse control: mouse left/right turns,
+up/down moves, the left button fires (`gdb monitor mouse DX DY`, `gdb monitor input
+JOY1_FIRE_BUTTON 1`). Keypad Enter (`43`) switches the view; F10 quits.
+
+## Finding routines
+
+`python3 tools/srcmatch.py tmp/ab3d1-src/*.s` matches the published AB3D I source's labels
+to game offsets by instruction shape. The source is personal-use only and lives in an
+ignored `tmp/ab3d1-src/` (from `Agrigaatti/Alien-Breed-3D-I` on GitHub). The renderer's
+routines it found are in [internals](internals.md#renderer-routines).

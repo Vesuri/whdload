@@ -19,4 +19,5 @@ Read `docs/open-work.md` first.
 | `docs/resolution-plan.md` | Enhanced resolution: the design, the steps, the open decisions |
 
 The slave source is `src/`; `tools/` is the development harness and never ships
-(`tools/exe.py` unpacks the game executable for analysis).
+(`tools/exe.py` unpacks the game executable for analysis, `tools/ab3d.py` drives the game on
+the shared server, `tools/srcmatch.py` finds the published source's routines).

@@ -14,10 +14,10 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
 
 ## Next
 
-1. Plan step 0: `tools/ab3d.py` (menu to level, full-screen toggle, frame counts, input
-   scripts) and the renderer routines matched to game offsets.
-2. Plan step 1: the original's baseline, both views, on a1200-030 and a1200-040.
-3. Plan step 2: the display inventory.
+1. Plan step 1: the original's baseline, both views, on a1200-030 and a1200-040, with
+   `tools/ab3d.py` (step 0 is done).
+2. Plan step 2: the display inventory: what else writes into the view, past the renderer
+   routines in [internals](internals.md#renderer-routines).
 
 ## Before a first release
 

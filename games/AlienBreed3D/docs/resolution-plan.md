@@ -48,8 +48,8 @@ resolution.
 ### Renderer
 
 - One new pixel writer for each of the original's: wall strips, floor and ceiling spans,
-  bump-mapped floors, objects (bitmaps, glass, flat and Gouraud polygons), the gun, and
-  whatever else step 2 finds writing into the view. They are our own code. The published
+  bump-mapped floors, objects (bitmaps, glass, textured polygons plain, Gouraud and with
+  holes), the gun, and whatever else step 2 finds writing into the view. They are our own code. The published
   source is only a map of what each original routine does.
 - Each writer is assembled two ways: at 96x80 in the copper-slot layout with 12-bit words
   (VERIFY only), to prove it equal to the original, and at WxH into pen bytes for the
@@ -85,16 +85,16 @@ just step further, up to 15 fields.
 
 ## Steps
 
-0. **Tooling.** `tools/exe.py` unpacks and flattens the executable (done). Still to do:
-   - `tools/ab3d.py` on the shared game server, with named commands: menu to level, the
-     full-screen toggle, frame and field counts from `FramesToDraw`, and fixed input
-     scripts for repeatable scenes;
-   - the published source's renderer routines matched to game offsets by signature, listed
-     in internals.
+0. **Tooling** (done). `tools/exe.py` unpacks and flattens the executable;
+   `tools/ab3d.py` drives the game on the shared server: menu to level, the full-screen
+   toggle, frame counts from the `drawPt` swaps, and input scripts, `walk` the named one
+   ([development](development.md#driving-it)). `tools/srcmatch.py` matched the published
+   source's routines to game offsets; the renderer's are in
+   [internals](internals.md#renderer-routines).
 1. **Baseline the original**, both views, on a1200-030 and a1200-040 (a1200 for
    reference). Scenes: standing at level 1's start, a scripted walk, and the heaviest
    place found (many aliens and objects).
-   - Frame rate from `FramesToDraw` over at least 500 fields.
+   - Frame rate from `ab3d.py frames` over at least 500 fields.
    - An aprof profile split into geometry and visibility, walls, floors, bump mapping,
      objects, gun, game logic and interrupts.
    - Report ms per frame with p50 and p95 (AmigaXDev `reference/measurement-method.md`).

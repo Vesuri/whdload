@@ -61,8 +61,10 @@ ExpMem+$153000, the level 13 access fault fixed in 1.3); `prefs` saved by
 The 3D view is a copper chunky screen of 96x80 pixels in 12-bit colour (4096 colours, no
 palette): the renderer writes each pixel's colour word straight into a copper MOVE.
 
-- Copper lists: two, double-buffered, allocated at $44652 (pointers at $43c38 and
-  $43c3c), 80 lines of 416 bytes (the source's `widthOffset`, 104 * 4). Each line is BPLCON4
+- Copper lists: two, double-buffered, allocated at $44652 (their addresses at $43c38 and
+  $43c3c, which the level start, $30ac, copies to `drawPt` $5dd40 and `oldDrawPt` $5dd44).
+  Once a frame, after a vertical-blank wait, the main loop swaps the two and points COP2LC
+  at the new `oldDrawPt` (the swap at $32bc, $3e2c and $8e48). 80 lines of 416 bytes (the source's `widthOffset`, 104 * 4). Each line is BPLCON4
   with bit 15 flipped every line, then for palette banks 1, 2 and 3 a BPLCON3 bank
   select and 32 COLOR moves (built by $8f3a), then two words a view needs: in the small
   view BPLCON3 $0c42 and a COLOR15 from a per-line table at $93f5c, in full screen two
@@ -86,21 +88,40 @@ palette): the renderer writes each pixel's colour word straight into a copper MO
   96x80 frame.
 
 The renderer writes 12-bit colour words at a pixel stride of 4 bytes, 4 more at each
-32-pixel bank boundary (the BPLCON3 move), and 416 bytes a line. The horizontal span
-routine at $1fd4c (variants up to $20458) is typical: a texel byte, `(a0,d5.w*4)`,
-indexes a word shade table, `(a1,d0.w*2)`, and variants store the pixel down one to four
-lines. The textures carry
-their own colours: a wall tile is 32 colours at 33 brightness levels of 12-bit words
-ahead of its texels (the source's `walltiles` and `PaletteAddr`). Game time does not
-depend on the frame rate: each frame advances the game by the fields since the last one
-(`TempFrames`, at most 15), which the interrupt counts (`FramesToDraw`).
+32-pixel bank boundary (the BPLCON3 move), and 416 bytes a line. The plain floor span,
+`acrossscrn` at $20f66, is typical: a texel byte, `(a0,d5.w*4)`, indexes a word shade
+table, `(a1,d0.w*2)`, the word goes to `(a3)` and `a3` steps 4, with the extra 4 every
+32 pixels. The textures carry their own colours: a wall tile is 32 colours at 33
+brightness levels of 12-bit words ahead of its texels (the source's `walltiles` and
+`PaletteAddr`). Game time does not depend on the frame rate: each frame advances the game
+by the fields since the last one (`TempFrames`, at most 15), which the interrupt counts
+(`FramesToDraw`).
+
+### Renderer routines
+
+The published source's names at their game offsets, found by `tools/srcmatch.py` (each
+listed one matches its source instruction for instruction, or nearly; the full list is the
+tool's output). These are the routines that write into the view, grouped as the plan's
+writers.
+
+| Writer | Routines (game offsets) |
+|---|---|
+| Walls | `itsawalldraw` $1d0b2, `CalcAndDraw` $1b660, `CurveDraw` $1b322 (curved walls), `screendivide` $1a592; strips `ScreenWallstripdraw` $1ca32 with `drawwallPACK0-2` $1ca80, $1ca9c, $1cab8 and `simplewallPACK0-2` $1cb10, $1cb3e, $1cb6e; see-through strips `ScreenWallstripdrawthru` $1cd24 with `drawwall[dim]thruPACK0-2` $1cd58-$1cdf0 and `maybeholePACK0-2` $1ce58, $1ce9e, $1cee6 |
+| Floors and ceilings | `itsafloordraw` $1d440, `dofloor` $1f172, `dofloorGOUR` $1f21c, `FloorLine` $1f9fe; spans `backbefore`/`acrossscrn` $20f4c/$20f66, Gouraud `backbeforegour`/`acrossscrngour` $20fd2/$20ff4, water `texturedwater` $2107e with spans $21100/$21124; `SimpleFloorLine` $1f3d8, which patches `rts` into the unrolled fill `doacrossline` ($1f870) and calls it (the slave's `_p_flushjsr` at $1f452) |
+| Bump-mapped floors | `BumpMap` $1fce2 with `OneBelow`-`TwelveBelow` $1fd4c-$20458 and `OneAbove`-`EightAbove` $2054a-$20956; smooth `SmoothMap` $20a0a with `OneBelowS`-`SevenBelowS` $20a4c-$20e58 |
+| Objects | `DrawtheObject` $213cc, `glassobj` $2140e, `BitMapObj` $2174a, `PolygonObj` $21d06; textured polygons, drawn in columns: `dopoly` $220d2 (one brightness), `dopolyg` $22390 (Gouraud), `dopolyh` $22688 (with transparent texels); edges `putinlines` $228da |
+| Gun | `DrawInGun` $57f4 |
+
+Not yet looked for: anything else that writes into the copper lists (messages, the level
+text, flashes); step 2 of the plan.
 
 The CD32 version draws the same way, at other offsets: the small-view builder's loop at
-$501c, the full-screen builder at $5206, keypad Enter at $404c2, and byte for byte the span
-routine at $1ffcc and the colour moves at $90fe.
+$501c, the full-screen builder at $5206, keypad Enter at $404c2, and byte for byte `OneBelow` at
+$1ffcc and the colour moves at $90fe.
 
 The published AB3D I source (the 1997 Amiga Format cover CD, as
 `Agrigaatti/Alien-Breed-3D-I` on GitHub) names these routines: the view's constants are
 `widthOffset`, `rightclip` 96, `top` 80 and a centre x of 47. It is a development
-tree, not this executable's build, so its labels are a map, not offsets. It was released
-for personal use: read it in an ignored `tmp/`, never copy it into the repository.
+tree, not this executable's build, so its labels are a map, not offsets: the table above
+holds those found. It was released for personal use: read it in an ignored `tmp/`
+(`tmp/ab3d1-src/`), never copy it into the repository.
