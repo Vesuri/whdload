@@ -238,6 +238,18 @@ MEASURED (`monitor mouse` moves in a practice race, the outputs at `$195E8`/`$19
   sometimes spreads a move over two steps; the outputs then add up to it); −110 x gives
   +110 and three steps of +127 x give −127, −122, −1, −123 on `a1200`.
 
+## Input choice
+
+The options menu (hunk 90's data `$CDAC`) keeps the Red Player's device at `$CDB2` (Joy
+Stick, Trackball 1, Trackball 2, Mouse), the Blue Player's at `$CDB3` (Mouse) and the Red
+Player's port at `$CDB4` (Joy, Mouse; the Blue Player has the other). When the menu opens
+it takes the port from `$195E1` (hunk 207; set: the Red Player on the Joy Port), and GO!
+writes `$195E1` back from `$CDB4` and sets each port's reading from its device (`$C968`).
+CUSTOM5 bits 1-3 (port × 4 + device), when not 0, are written to `$CDB2`, `$CDB4` and
+`$195E1` in `patch_exe`, so the menu opens with that choice. Checked: the menu shows each of
+4 values on `a1200` (and Mouse Port / Trackball 2 on `a500-1.5m`), and with Mouse Port /
+Mouse a race started without touching the menu reads the mouse.
+
 ## Slave patches
 
 JOTD's (`pl_main`, always):
@@ -257,6 +269,7 @@ After `pl_main`, the slave makes the ExpMem non-cacheable (`WCPUF_Exp_NCS`).
 Ours:
 - `pl_sound_fix` (always, "Sound fixes");
 - `pl_mouse_fix` (always, "Mouse");
+- the Red Player's input (CUSTOM5 bits 1-3, "Input choice"; data, no patch list);
 - `pl_pal_sound` (C5, "Sound timing");
 - `pl_enhanced` (C4, below).
 

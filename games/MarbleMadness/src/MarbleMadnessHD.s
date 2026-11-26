@@ -112,6 +112,9 @@ slv_config:
 	dc.b    "C3:L:Start level:Practice,Beginner,Intermediate,Aerial,Silly,Ultimate;"			
 	dc.b	"C4:X:Enhanced framerate (68020+):0;"
 	dc.b	"C5:X:Music and sound at NTSC tempo on PAL:0;"
+	dc.b	"C5:M:Red Player input:Joy Port / Joy Stick,Joy Port / Trackball 1,"
+	dc.b	"Joy Port / Trackball 2,Joy Port / Mouse,Mouse Port / Joy Stick,"
+	dc.b	"Mouse Port / Trackball 1,Mouse Port / Trackball 2,Mouse Port / Mouse:1-3;"
 	dc.b	0
 
 ; version xx.slave works
@@ -368,6 +371,7 @@ patch_exe:
 	move.b	d0,(a0)
 
 	move.l	_pal_sound(pc),d0
+	btst	#0,d0
 	beq.b	.nosound
 	tst.b	(a0)
 	beq.b	.nosound
@@ -384,6 +388,38 @@ patch_exe:
 	move.l	d7,a1
 	jsr	(resload_PatchSeg,a2)
 .nosound
+
+	; the Red Player's input in the options menu (CUSTOM5 bits 1-3: port * 4 + device;
+	; 0, Joy Port and Joy Stick, is the game's own): $CDB2 the device (Joy Stick,
+	; Trackball 1, Trackball 2, Mouse), $CDB4 the port (Joy, Mouse), and $195E1, from
+	; which the menu takes the port when it opens (set: the Joy Port). The Blue Player
+	; has the other port.
+	move.l	_pal_sound(pc),d0
+	lsr.l	#1,d0
+	and.l	#7,d0
+	beq.b	.noinput
+	move.l	d0,-(a7)
+	move.l	d7,d1
+	add.l	d1,d1
+	add.l	d1,d1
+	moveq	#90,d2
+	bsr	get_section		; $CDAC
+	move.l	(a7),d0
+	moveq	#3,d1
+	and.w	d0,d1
+	move.b	d1,($CDB2-$CDAC,a0)
+	lsr.w	#2,d0
+	move.b	d0,($CDB4-$CDAC,a0)
+	move.l	d7,d1
+	add.l	d1,d1
+	add.l	d1,d1
+	move.l	#207,d2
+	bsr	get_section		; $195DC
+	move.l	(a7)+,d0
+	lsr.w	#2,d0
+	eor.b	#1,d0
+	move.b	d0,($195E1-$195DC,a0)
+.noinput
 
 	; sound fixes, always on: notes fade out before a cut, the practice rumble's loop
 	lea	pl_sound_fix(pc),a0

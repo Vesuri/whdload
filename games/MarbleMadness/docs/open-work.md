@@ -43,6 +43,10 @@ and faster have a wide margin.
 - `C4:X:Enhanced framerate (68020+):0`: the 30 Hz world with interpolated drawing. On a
   68000, or with it off, the game's loop is the original.
 - `C5:X:Music and sound at NTSC tempo on PAL:0`: its own toggle (step 3), on any CPU.
+- `C5:M:Red Player input:...:1-3`: the options menu's starting port and device for the Red
+  Player (bits 1-3 of CUSTOM5: port × 4 + device; 0 is the game's Joy Port and Joy Stick),
+  since all five CUSTOM values are taken. WHDLoad 20.1 shows it in the splash window
+  (Type M); with older versions the value still works from the tooltype.
 
 The installed icon sets `CUSTOM4=1`, `CUSTOM5=1` and `CACHE`. With both off, the patch list is the
 original plus the always-on sound and mouse fixes (`docs/internals.md`, "Sound
