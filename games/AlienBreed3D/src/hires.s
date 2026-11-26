@@ -201,6 +201,114 @@ _t_strip
 	BYS	d2
 	rts
 
+	IFD	PENS
+; Our wall strip loops (PL_P at $1cbd4 and $1caf4, after the game's cmpi.b #1,pack: its
+; flags choose the packing: lt the low 5 bits of a texel word, eq the middle, gt the high).
+; d6 pixels from a3 down, d4 the texel row (16.16 with d3/d2 or d2), d7 its mask, a5 the
+; texture column, a2 the wall's pens for the column's brightness, d1 = 0. Eight pixels a
+; pass at displacements k * DS_STRIDE, so no adda or dbf a pixel, entered at the pixel
+; that leaves a whole number of passes (a3 moved back to match); each pass is less than
+; the 020/030's 256-byte instruction cache. d0 and d5 are free (the game sets them for the
+; loops it replaces); d6 ends -1 and a3 a line past the strip, as the game's.
+
+; the entry: d0 = (d6 - 1) % 8, d6 = (d6 - 1) / 8, a3 back (7 - d0) lines, d5 = 7 - d0
+WENTRY	MACRO
+	move.w	d6,d0
+	subq.w	#1,d0
+	bmi.w	\1
+	move.w	d0,d6
+	lsr.w	#3,d6
+	andi.w	#7,d0
+	moveq	#7,d5
+	sub.w	d0,d5
+	move.w	d5,d0
+	mulu.w	#DS_STRIDE,d0
+	suba.l	d0,a3
+	ENDM
+
+; a texel's row d4 into d1: \1 the packing
+WTEXEL	MACRO
+	IFEQ	\1
+	move.b	1(a5,d4.w*2),d1
+	andi.b	#31,d1
+	ENDC
+	IFEQ	\1-1
+	move.w	0(a5,d4.w*2),d1
+	lsr.w	#5,d1
+	andi.w	#31,d1
+	ENDC
+	IFEQ	\1-2
+	move.b	0(a5,d4.w*2),d1
+	lsr.b	#2,d1
+	ENDC
+	ENDM
+
+; at least a texel a pixel (drawwallPACK0-2): \1 the packing, \2 the bytes a pixel
+WDRAW	MACRO
+	WENTRY	.x\@
+	mulu.w	#\2,d5
+	jmp	.l\@(pc,d5.w)
+.l\@
+K	SET	0
+	REPT	8
+	and.w	d7,d4
+	WTEXEL	\1
+	add.l	d3,d4
+	move.b	(a2,d1.w),K*DS_STRIDE(a3)
+	addx.w	d2,d4
+K	SET	K+1
+	ENDR
+.e\@	lea	8*DS_STRIDE(a3),a3
+	dbf	d6,.l\@
+.x\@	rts
+	IFNE	.e\@-.l\@-8*\2
+	FAIL	WDRAW: not \2 bytes a pixel
+	ENDC
+	ENDM
+
+; less than a texel a pixel (simplewallPACK0-2): the pen stays in d3 until the row's
+; fraction (d2) carries; \1 the packing, \2 the bytes a pixel, \3 those of the reload
+WSIMPLE	MACRO
+	WTEXEL	\1
+	move.b	(a2,d1.w),d3
+	WENTRY	.x\@
+	mulu.w	#\2,d5
+	jmp	.l\@(pc,d5.w)
+.l\@
+K	SET	0
+	REPT	8
+	move.b	d3,K*DS_STRIDE(a3)
+	add.l	d2,d4
+	bcc.s	*+2+\3
+	addq.w	#1,d4
+	and.w	d7,d4
+	WTEXEL	\1
+	move.b	(a2,d1.w),d3
+K	SET	K+1
+	ENDR
+.e\@	lea	8*DS_STRIDE(a3),a3
+	dbf	d6,.l\@
+.x\@	rts
+	IFNE	.e\@-.l\@-8*\2
+	FAIL	WSIMPLE: not \2 bytes a pixel
+	ENDC
+	ENDM
+
+_t_wdraw
+	blt.w	.p0
+	beq.w	.p1
+	WDRAW	2,18
+.p0	WDRAW	0,20
+.p1	WDRAW	1,22
+
+_t_wsimple
+	blt.w	.p0
+	beq.w	.p1
+	WSIMPLE	2,22,14
+.p0	WSIMPLE	0,24,16
+.p1	WSIMPLE	1,26,18
+	ENDC
+
 ; PL_PS at $1d13a, $1b3b0 (sub.l d6,top) and $1d146, $1b3b6 (sub.l d6,bottom): a wall's
 ; top and bottom less the eye (d6), times S
 _t_walltop

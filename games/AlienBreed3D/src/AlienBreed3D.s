@@ -633,6 +633,8 @@ _pl_v3
 	ENDC				;different speed show different phases): bra.s $3378
 	IFD	PENS			;pen bytes (hires.s), the walls:
 	PL_PS	$1d0e8,_t_wallpal	;the wall's pen table
+	PL_P	$1cbd4,_t_wdraw		;our wall strip loops, after the game's cmpi.b of
+	PL_P	$1caf4,_t_wsimple	;the packing (hires.s)
 	PL_L	$1ca8c,$16b21000	;move.b (0,a2,d1.w),(a3), from move.w (0,a2,d1.w*2)
 	PL_L	$1caaa,$16b21000
 	PL_L	$1cac2,$16b21000

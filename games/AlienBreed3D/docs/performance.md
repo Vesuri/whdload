@@ -288,6 +288,13 @@ change (`tools/baseline.sh aprof MACHINE OUT turn`):
 | Pen bytes | 292.4 / 173.1 | 84.4 / 59.9 | 102.8 / 54.7 | the convert gone |
 | The sky a line at a time | 275.1 / 171.2 | 81.2 / 58.6 | 102.0 / 54.1 | sky 17.5 to 8.1 ms (68020, full), 4.7 to 2.1 (68030) |
 | Spans store with `(a3)+`; the gun's S pens at once | 268.5 / 167.3 | 81.0 / 57.7 | 100.9 / 53.2 | gun 5.0 to 2.6 ms, floors 50.9 to 47.2 (68020, full) |
+| Our wall strip loops | 259.7 / 169.2 | 78.0 / 57.1 | 93.8 / 51.0 | strip loops' instructions 20% fewer, their time 8-12% less |
+
+- **Wall strips:** 8 pixels a pass at displacements, no `adda` or `dbf` a pixel: the
+  instructions executed fall by a fifth, the time by 8-12% (68020 and 68030), since a pixel
+  still reads a texel and a pen and writes one. The 68020's small view measured 1% slower
+  over the turn, with floors 2 ms slower in the same run: the turn's angles (Sampling
+  above).
 
 On the 68040 FS-UAE counts instructions, not cycles (AmigaXDev's `measurement-method.md`):
 a change that only moves memory traffic, such as a line stride whose columns spread over
