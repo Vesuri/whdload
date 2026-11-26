@@ -226,7 +226,8 @@ no guess) and is unchanged.
 
 The slave samples both counters every field (a VERTB server, `mouse_irq`) into 16-bit
 totals. At `$1947E`, the counter path, `mouse_read` samples again, takes the port's total,
-limits it to −128..127 and writes it as the counter word, so the game's own subtraction
+limits it to −127..127 (not −128: the game negates the mouse's x, and −(−128) is −128 in a
+byte) and writes it as the counter word, so the game's own subtraction
 gives the total; totals older than 10 fields are dropped (the race's start). The guess is
 switched off: the limits $60 and −$60 become 127 and −128.
 

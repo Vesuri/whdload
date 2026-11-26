@@ -1543,7 +1543,7 @@ pl_sound_fix
 ; in the other direction; from rest (an output of 0 counts as positive) or on a reversal,
 ; a real move of 97-127 counts goes the wrong way at full speed, and beyond 127 counts
 ; the direction is a guess. Here the counters are sampled every field into 16-bit
-; totals, and the step gets the total since the last step, limited to -128..127, as the
+; totals, and the step gets the total since the last step, limited to -127..127, as the
 ; change of a counter the game compares with its own last value; the guess is switched
 ; off (the limits $60 and -$60 become 127 and -128).
 pl_mouse_fix
@@ -1633,7 +1633,7 @@ mouse_read
 .y1	cmp.w	d1,d3
 	ble.b	.x1
 	move.w	d1,d3
-.x1	moveq	#-128,d1
+.x1	moveq	#-127,d1		; not -128: the game negates the mouse's x, and -(-128) is -128
 	cmp.w	d1,d2
 	bge.b	.y2
 	move.w	d1,d2
