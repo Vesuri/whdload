@@ -265,7 +265,8 @@ JOTD's (`pl_main`, always):
 - `$33FA`: the start level (C3);
 - `$1F384`: no music (C2).
 
-After `pl_main`, the slave makes the ExpMem non-cacheable (`WCPUF_Exp_NCS`).
+After `pl_main`, the slave makes the ExpMem non-cacheable (`WCPUF_Exp_NCS`); with CUSTOM4 on
+a 68020 or later, copyback again ("Caches").
 
 Ours:
 - `pl_sound_fix` (always, "Sound fixes");
@@ -436,7 +437,31 @@ MEASURED, PAL:
 
 ## Caches
 
-`patch_exe` calls `resload_SetCPU(WCPUF_Exp_NCS, WCPUF_Exp)` after loading the game.
-Without the MMU, WHDLoad switches both caches off when any region is non-cacheable
-(WHDLoad's `cache.html`), so the game runs uncached on a 68030 even with `CACHE`. It does
-not limit the frame rate: the CPU is idle most of each field.
+`patch_exe` calls `resload_SetCPU(WCPUF_Exp_NCS, WCPUF_Exp)` after loading the game (JOTD's;
+loading runs with ExpMem copyback). Without the MMU, WHDLoad switches both caches off when
+any region is non-cacheable (WHDLoad's `cache.html`), so the game runs uncached on a 68030
+even with `CACHE`; with the MMU (68040, 68060) ExpMem, where the game's code runs, is
+non-cacheable and serialized. A likely reason: the game loads code during play (the levels'
+`*Track` and the sounds' `*Snd` files have code hunks) with Kick 1.3's `LoadSeg`, which does
+not flush the caches. It has one `LoadSeg` call, in `$8CF0`.
+
+With CUSTOM4 on a 68020 or later, `patch_exe` sets ExpMem back to copyback, and
+`seg_loaded` (after `$8CF0`'s `LoadSeg`, always) calls `resload_FlushCache`. Drawing every
+field needs the time: on NTSC (60 draws a second) a 68020 dropped draws and stepped late,
+and a user's A4000 with a 68060 (A3660) skipped many frames with WHDLoad's `NTSC` option,
+smooth on PAL.
+
+MEASURED (release build, `CUSTOM4=1 CUSTOM5=1 CACHE`, 120 race fields after the practice
+race starts; new pictures are changes of the displayed sprite set `$5B2C`, steps of `$230`):
+
+| Setup | ExpMem non-cacheable | ExpMem copyback |
+|---|---|---|
+| `a1200`, PAL | 112 new pictures, no late step | 120, no late step |
+| `a1200`, NTSC machine (`NTSC=1`) | 99, 10 steps a field late | 118, no late step |
+| `a1200-030`, PAL and NTSC | 120 | – |
+
+WHDLoad's `NTSC` option on a PAL machine needs an NTSC monitor driver, which the test boot
+disk does not have, so that case was not run; the `a1200-060` core is not cycle-exact, so
+the 68060's speed was not measured. With copyback, a Beginner race (`CUSTOM3=1`, which loads
+`BegTrack`'s code) runs on `a1200-030`, `a1200-040` and `a1200-060`, and on `a1200-060` a
+second Beginner race after the first one's timeout (its code loaded again) runs too.

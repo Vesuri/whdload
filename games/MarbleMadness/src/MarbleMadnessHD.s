@@ -505,6 +505,13 @@ patch_exe:
 	lea	pl_enhanced(pc),a0
 	move.l	d7,a1
 	jsr	(resload_PatchSeg,a2)
+	; ExpMem, where the game's code runs, cacheable again (copyback): after pl_main, JOTD's
+	; code made it non-cacheable and serialized, which a 68060 runs slowly, and the drawing in every
+	; field needs the time. The game loads code (the levels' and sounds' files) only with
+	; the LoadSeg in $8CF0, and seg_loaded flushes the caches after it.
+	move.l	#WCPUF_Exp_CB,d0
+	move.l	#WCPUF_Exp,d1
+	jsr	(resload_SetCPU,a2)
 .noenhanced
 	rts
 .nomem
@@ -1748,7 +1755,7 @@ pl_rumble
 	PL_L	$3024,$FDFD0104		; bytes 3196-3199
 	PL_END
 
-; after the LoadSeg in $8CF0: patch prcsnd
+; after the LoadSeg in $8CF0: patch prcsnd, flush the caches
 seg_loaded
 	move.l	d0,(-4,a6)
 	beq.b	.out
@@ -1767,6 +1774,8 @@ seg_loaded
 	lea	pl_rumble(pc),a0
 	jsr	(resload_PatchSeg,a2)
 .other
+	move.l	_resload(pc),a2		; Kick 1.3's LoadSeg leaves the loaded code in the caches'
+	jsr	(resload_FlushCache,a2)	; reach (ExpMem is cacheable with CUSTOM4)
 	movem.l	(a7)+,d0-d1/a0-a2
 .out
 	move.l	(a7),(8,a7)		; the call's addq.l #8,a7
