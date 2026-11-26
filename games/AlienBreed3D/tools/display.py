@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Enhanced resolution's display skeleton (resolution plan step 4) against the original.
+"""Enhanced resolution's display (resolution plan steps 4 and 5) against the original.
 
     python3 tools/display.py check SHOT FRAME [AREA]
     python3 tools/display.py compare ORIG.png OURS.png AREA
+    python3 tools/display.py scale ORIG.frame OURS.frame
 
 check: SHOT (an FS-UAE screenshot, 2 pixels a lores pixel and a raster) must show FRAME
 (`ab3d.py frame`: colour words, the view byte, the width and height; 96x80, or 192x160
@@ -28,7 +29,14 @@ lines too). Exit status 1 when any pixel is neither.
 
 FRAME.alt, when `ab3d.py frame` found a view in the other list too, is that list: check
 passes if either is on the screen (a stop can fall between the game's pointer swap and the
-switch of the screen).
+switch of the screen). At 192x160 line 0 is black, as `_ds_one` shows it.
+
+scale: OURS is the same moment as ORIG at twice its width and height (the small view at
+1x1): the share of ORIG's pixels (lines 1-78, columns 1-94) whose colour is in the 2x2
+block of OURS that covers them, rows 2y - 1 and 2y, columns 2x and 2x + 1 (the writers draw
+row y at line y + 1). The rest is mostly texture sampled at other points where a texture is
+shrunk (far or slanted walls). Exit status 1 below SCALE_MIN. `compare` does this when
+OURS.frame, next to OURS, is twice ORIG.frame's width, with either side's FRAME.alt too.
 """
 import os
 import sys
@@ -88,6 +96,9 @@ def check(shot, frame, area=None):
 def check1(shot, frame, area=None, quiet=False):
     img = load(shot)
     words, view = read_frame(frame)
+    if words.shape[1] != 96:
+        words = words.copy()
+        words[0] = 0            # line 0 black (display.s _ds_one): no writer draws it
     if area:
         pal, cmap = palette(area)
         lut = np.array([pal[cmap[c] - PEN0] for c in range(4096)])
@@ -111,6 +122,14 @@ def check1(shot, frame, area=None, quiet=False):
 
 
 def compare(orig, ours, area):
+    fo, fu = orig[:-4] + '.frame', ours[:-4] + '.frame'
+    if (os.path.exists(fo) and os.path.exists(fu)
+            and read_frame(fu)[0].shape[1] == 2 * read_frame(fo)[0].shape[1]):
+        # the small view at 1x1: scale, with whichever list each side showed
+        pairs = [(o, u) for o in (fo, fo + '.alt') for u in (fu, fu + '.alt')
+                 if os.path.exists(o) and os.path.exists(u)]
+        o, u = next(((o, u) for o, u in pairs if scale(o, u, quiet=True) == 0), (fo, fu))
+        return scale(o, u)
     a, b = load(orig), load(ours)
     if a.shape != b.shape:
         sys.exit('%s is %s, %s is %s' % (orig, a.shape, ours, b.shape))
@@ -141,11 +160,35 @@ def compare(orig, ours, area):
     return 1 if wrong.any() else 0
 
 
+SCALE_MIN = 0.80    # level 1's start, pause and end gave 88-94% (26.11.2026)
+
+
+def scale(orig, ours, quiet=False):
+    a, _ = read_frame(orig)
+    b, _ = read_frame(ours)
+    h, w = a.shape
+    if b.shape != (2 * h, 2 * w):
+        sys.exit('%s is %s, %s is %s: not twice' % (orig, a.shape, ours, b.shape))
+    v = a[1:h - 1, 1:w - 1]
+    found = np.zeros(v.shape, bool)
+    for j in (-1, 0):
+        for i in (0, 1):
+            found |= b[2 + j:2 * (h - 1) + j:2, 2 + i:2 * (w - 1) + i:2] == v
+    share = found.mean()
+    if quiet:
+        return 0 if share >= SCALE_MIN else 1
+    print('%s against %s at 2x2: %.1f%% of the pixels found (at least %.0f%%)'
+          % (ours, orig, 100 * share, 100 * SCALE_MIN))
+    return 0 if share >= SCALE_MIN else 1
+
+
 def main(argv):
     if len(argv) in (3, 4) and argv[0] == 'check':
         return check(*argv[1:])
     if len(argv) == 4 and argv[0] == 'compare':
         return compare(*argv[1:])
+    if len(argv) == 3 and argv[0] == 'scale':
+        return scale(*argv[1:])
     sys.exit(__doc__)
 
 

@@ -24,7 +24,7 @@ CHIPMEM		= CHIPPOOL
 EXPMEM		= $158000		;the game, its fast memory pool, the stacks
 	ELSE
 CHIPMEM		= CHIPPOOL+$27000	;and Enhanced resolution's screens (display.s)
-EXPMEM		= $1bd000		;and its area, PA_SIZE (palette.s, display.s)
+EXPMEM		= $1be000		;and its area, PA_SIZE (palette.s, display.s)
 	ENDC
 SSP_OFF		= $157e00		;from ExpMem; USP 1 KB below
 
@@ -563,9 +563,55 @@ _pl_v3
 	PL_PS	$3e42,_p_show
 	PL_PS	$8e5e,_p_show
 	INCLUDE	stride.s		;lines of DS_STRIDE bytes (display.s)
-	PL_W	$582a,DS_STRIDE		;gun: muls #416, its first row
 	PL_L	$6910,60*DS_STRIDE	;water tint: adda.l #24960, 60 lines
 	PL_W	$1935e,DS_STRIDE	;sky: adda.w #416, its first row
+	IFD	HIRES			;the 1x1 renderer (hires.s)
+	PL_PS	$1a616,_t_column	;walls: a column's slot, any width
+	PL_S	$1a61c,4
+	PL_PS	$1a3ac,_t_column	;see-through walls
+	PL_S	$1a3b2,4
+	PL_PS	$1cb8a,_t_strip		;a wall strip's line and texture step
+	PL_S	$1cb90,8
+	PL_PS	$1cf18,_t_strip
+	PL_S	$1cf1e,8
+	PL_PS	$1d13a,_t_walltop	;a wall's top and bottom above the eye
+	PL_PS	$1d146,_t_wallbot
+	PL_PS	$1b3b0,_t_walltop	;a curved wall's
+	PL_PS	$1b3b6,_t_wallbot
+	PL_PS	$2142e,_t_eye6		;glass and bitmaps: zone clips above the eye
+	PL_PS	$21452,_t_eye6
+	PL_PS	$21770,_t_eye6
+	PL_PS	$21794,_t_eye6
+	PL_PS	$2147a,_t_eye2		;their heights, and a polygon object's
+	PL_PS	$21864,_t_eye2
+	PL_PS	$21e28,_t_eye2
+	PL_PS	$2149a,_t_size		;glass and bitmaps: their size
+	PL_NOP	$214a0,2
+	PL_PS	$21884,_t_size
+	PL_NOP	$2188a,2
+	PL_PS	$221c6,_t_poly		;the polygons' lines
+	PL_NOP	$221cc,2
+	PL_PS	$2271c,_t_polyh
+	PL_NOP	$22722,2
+	PL_PS	$22466,_t_polyg
+	PL_NOP	$2246c,2
+	PL_W	$220ec,-EDGE_STRIDE	;the polygons' top edges, -1536(a4) from the
+	PL_W	$22126,-EDGE_STRIDE+2	;bottom's: our edges (hires.s DA_EDGES)
+	PL_W	$2212a,-EDGE_STRIDE+4
+	PL_W	$223ac,-EDGE_STRIDE
+	PL_W	$223dc,-EDGE_STRIDE+2
+	PL_W	$223e0,-EDGE_STRIDE+4
+	PL_W	$2269a,-EDGE_STRIDE
+	PL_W	$226c6,-EDGE_STRIDE+2
+	PL_W	$226ca,-EDGE_STRIDE+4
+	PL_P	$1fbf6,_t_split		;FloorLine: a span over any number of banks
+	PL_PS	$5826,_t_gun		;gun: its first row; the small view's 2x2
+	PL_P	$1933e,_t_sky		;the small view's sky 2x2
+	PL_P	$6900,_t_water		;the small view's water tint
+	PL_P	$41b2,_t_pause		;the small view's pause screen 2x2
+	ELSE
+	PL_W	$582a,DS_STRIDE		;gun: muls #416, its first row
+	ENDC
 	PL_ENDIF
 	ENDC
 	PL_END

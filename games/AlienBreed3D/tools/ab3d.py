@@ -37,6 +37,11 @@ was found, running or stopped):
     batch CMD ;; CMD      gdb commands in one request, CPU stopped
     grab N OUT [SCRIPT]   run N fields playing SCRIPT and append each frame shown to OUT:
                           96x80 big-endian 12-bit colour words, read from the view list
+    holes N OUT [SCRIPT]  with a HOLES build (VASM_EXTRA=-DHOLES: the list drawn next is $f0f
+                          in every pixel): N fields playing SCRIPT, and in each frame shown
+                          (its size from the slave's DA_INFO) the pixels no writer drew but
+                          on line 0, which none draws in the original either. The
+                          frame with the most goes to OUT (as `frame`'s, no .alt)
     tables DIR            the loaded walls (DIR/wallNN: shade table, then texels) and the
                           floor texture (DIR/floortile), which tools/colours.py reads
     key CODE [N]          press raw key CODE (hex; P, 19, pauses) for N fields (default 10),
@@ -445,6 +450,39 @@ def cmd_grab(server, g, rest):
         return f'level {_letter(g).upper()}: {st["frames"]} frames into {out}'
 
 
+def cmd_holes(server, g, rest):
+    w = rest.split(None, 2)
+    n, out = int(w[0]), Path(w[1]).resolve()
+    inputs = script_fields(w[2]) if len(w) > 2 else []
+    scratch = out.with_name(out.name + '.list')
+    with Halted(g):
+        a = addr(g, DRAWPT)
+        st = {'last': _long(g, a), 'frames': 0, 'holed': 0, 'most': -1, 'total': 0}
+        def after(i):
+            p = _long(g, a)
+            if p == st['last']:
+                return
+            st['last'] = p
+            geom = geometry(g)
+            words = view_words(_dump(g, _long(g, a + 4), geom[0] * geom[2], scratch), geom)
+            # not line 0: no writer draws it, in the original either (display.s _ds_one)
+            k = sum(1 for (v,) in struct.iter_unpack('>H', words[2 * geom[1]:]) if v == 0x0f0f)
+            st['frames'] += 1
+            st['total'] += k
+            if k:
+                st['holed'] += 1
+            if k > st['most']:
+                st['most'] = k
+                full = _bytes(g, addr(g, FULL), 1)[0] != 0
+                out.write_bytes(words + bytes([full]) + struct.pack('>HH', geom[1], geom[2]))
+                st['at'] = (i, geom[1], geom[2])
+        run_fields(g, n, inputs, after)
+        scratch.unlink(missing_ok=True)
+        return (f'level {_letter(g).upper()}: {st["frames"]} frames, {st["holed"]} with holes, '
+                f'{st["total"]} hole pixels; the most, {st["most"]}, at field {st["at"][0]} '
+                f'({st["at"][1]}x{st["at"][2]}) into {out}')
+
+
 def cmd_frame(server, g, rest):
     out = Path(rest.strip()).resolve()
     with Halted(g):
@@ -775,7 +813,7 @@ def cmd_batch(server, g, rest):
 server = game_server('ab3d', commands={
     'base': cmd_base, 'peek': cmd_peek, 'level': cmd_level, 'full': cmd_full,
     'frames': cmd_frames, 'play': cmd_play, 'aprof': cmd_aprof, 'copper': cmd_copper,
-    'batch': cmd_batch, 'next': cmd_next, 'grab': cmd_grab, 'tables': cmd_tables,
+    'batch': cmd_batch, 'next': cmd_next, 'grab': cmd_grab, 'holes': cmd_holes, 'tables': cmd_tables,
     'palette': cmd_palette, 'frame': cmd_frame, 'key': cmd_key, 'die': cmd_die,
     'end': cmd_end})
 

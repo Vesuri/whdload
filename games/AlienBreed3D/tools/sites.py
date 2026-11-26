@@ -23,7 +23,13 @@ counts), but not those the analysis got wrong or that display.s does in code:
   instructions before (the edge's interpolation): not a scale;
 - the objects' `asl.l #7` before `sub.l eye` ($21478 $21862 $21e26): the eye height must
   double too, so `_t_eye` doubles after the subtraction instead;
-and with one more: the polygons' vertex x, `asr.l #8,d2` at $21dd6 (to #7).
+- glass and bitmaps' sizes, a byte `asl.w #7` ($2149a $2149c $21884 $21886): `#8` makes a
+  size of 128 or more negative in the word, so `_t_size` doubles after the divide;
+and with two more: the polygons' vertex x, `asr.l #8,d2` at $21dd6 (to #7), and the
+floors' first line, `adda.l #17056,a6` at $1dab2 (41 lines; 81 at 160); and glass and
+bitmaps' texture steps, the `add.w d6,d6` that doubles the index into the step table
+(linear, consttab) at $214d2 $214ec $218ec $21908: a nop halves the step, for twice the
+size.
 """
 import csv
 import sys
@@ -31,10 +37,13 @@ import sys
 STRIDE = 800
 
 
-NOT_OPS = {0x1d5dc, 0x1d622, 0x1d820, 0x1d882, 0x21478, 0x21862, 0x21e26}
+NOT_OPS = {0x1d5dc, 0x1d622, 0x1d820, 0x1d882, 0x21478, 0x21862, 0x21e26,
+           0x2149a, 0x2149c, 0x21884, 0x21886}
 MORE = [  # (size, field's game offset, 192x160 value, 96x80 value, note)
     (2, 0x21dd6, 0xee82, 0xe082, 'objects: polygon vertex x, asr.l #8,d2 -> #7'),
-]
+    (4, 0x1dab4, 81 * STRIDE, 41 * STRIDE, 'floors: a6 = fromPt + the first floor line'),
+] + [(2, at, 0x4e71, 0xdc46, 'objects: texture step index, add.w d6,d6 -> nop')
+     for at in (0x214d2, 0x214ec, 0x218ec, 0x21908)]
 
 
 def sites(path):
@@ -74,8 +83,9 @@ def main(path):
            '; that steps a whole number of lines (game offset, value; the group and what it is).']
     n = 0
     for r in rows:
-        if r['action'] != 'imm' or r['group'] == 'swap':
-            continue        # midpt ($32e8, $3e58): no reader, and $3e58 is _waitvbl's jsr
+        if r['action'] != 'imm' or r['group'] == 'swap' or r['offset'] == '$1dab2':
+            continue        # midpt ($32e8, $3e58): no reader, and $3e58 is _waitvbl's jsr;
+                            # $1dab2 is a site of each view (sites)
         old = int(r['old'], 0)
         if old == 0 or old % 416:
             continue

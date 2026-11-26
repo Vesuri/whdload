@@ -45,9 +45,10 @@ FULL_H		= 240
 
 ; The game's lists keep the copper-slot layout (a pixel's colour word at fromPt + 4x + 4 more
 ; at each 32-pixel bank), with lines of DS_STRIDE bytes in place of 416: room for the
-; small view's 192 pixels (6 banks of 132 bytes) on 160 lines.
+; small view's 192 pixels (6 banks of 132 bytes) on 160 lines, and one more: the writers
+; draw row y at line y + 1.
 DS_STRIDE	= 800
-LIST_LINES	= SMALL_H
+LIST_LINES	= SMALL_H+1
 
 ; the area, past the palette's tables
 DA_CHUNKY	= PA_END		;FULL_W * FULL_H pens; the c2p reads 4 bytes past a row
@@ -104,15 +105,25 @@ _p_coplists
 	movea.l	(4).w,a6		;as after AllocMem
 	rts
 
-; From _p_loaded, once (a5 = hunk 0): the writers' row tables, lines of 416 bytes, to
-; lines of DS_STRIDE (the immediates are stride.s's, in the patch list).
+; From _p_loaded, at each level's load (a5 = hunk 0, a4 = the area): the writers' row
+; tables, lines of 416 bytes, to lines of DS_STRIDE (a table whose step is no longer 416
+; is done; the immediates are stride.s's, in the patch list).
 _ds_stride
+	lea	_ds_hunk0(pc),a0
+	move.l	a5,(a0)
+	IFD	HIRES
+	bsr.w	_ds_tables
+	ENDC
 	lea	.tables(pc),a1
 .table	move.l	(a1)+,d0		;game offset; 0 ends
 	beq.s	.done
 	lea	(a5,d0.l),a0
 	move.w	(a1)+,d1		;longs
 	subq.w	#1,d1
+	move.l	4(a0),d0
+	sub.l	(a0),d0
+	cmp.l	#416,d0
+	bne.s	.table
 .entry	move.l	(a0),d0
 	divu.w	#416,d0
 	mulu.w	#DS_STRIDE,d0
@@ -486,8 +497,8 @@ _ds_one
 	lea	10(a6),a0
 	PALEA	DA_CHUNKY,a1
 	lea	PA_MAP(a4),a2
-	move.w	#$0fff,d3
-	move.w	#SMALL_H-1,d4
+	moveq	#0,d3			;line 0 black, as the original's: no writer draws
+	move.w	#SMALL_H-1,d4		;it, and its banks 3-5 hold the list's moves
 .line	moveq	#SMALL_W/32-1,d5
 .bank	moveq	#32-1,d6
 .px	move.w	(a0),d0
@@ -498,6 +509,7 @@ _ds_one
 	addq.l	#4,a0
 	dbf	d5,.bank
 	lea	DS_STRIDE-SMALL_W/32*132(a0),a0
+	move.w	#$0fff,d3
 	dbf	d4,.line
 	rts
 	ENDC
@@ -522,7 +534,12 @@ SITE	MACRO
 	dc.l	\4
 	ENDM
 _ds_sites
+	INCLUDE	sites.s			;(without HIRES both views take the 96x80 values)
 	dc.l	0
+
+	IFD	HIRES
+	INCLUDE	hires.s
+	ENDC
 
 BPLSIZE		= DS_PLANE
 CHUNKYXMAX	= FULL_W
