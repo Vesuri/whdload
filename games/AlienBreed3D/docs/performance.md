@@ -289,6 +289,8 @@ change (`tools/baseline.sh aprof MACHINE OUT turn`):
 | The sky a line at a time | 275.1 / 171.2 | 81.2 / 58.6 | 102.0 / 54.1 | sky 17.5 to 8.1 ms (68020, full), 4.7 to 2.1 (68030) |
 | Spans store with `(a3)+`; the gun's S pens at once | 268.5 / 167.3 | 81.0 / 57.7 | 100.9 / 53.2 | gun 5.0 to 2.6 ms, floors 50.9 to 47.2 (68020, full) |
 | Our wall strip loops | 259.7 / 169.2 | 78.0 / 57.1 | 93.8 / 51.0 | strip loops' instructions 20% fewer, their time 8-12% less |
+| No frame-flag wait | 262.6 / 166.9 | 78.2 / 55.5 | 93.0 / 49.5 | the same work; fps 13-25% more on the 68030 and 68040 |
+| Full screen's c2p in one call (below the 68040) | 264.4 / 161.6 | 75.7 / 55.4 | 93.0 / 49.5 | c2p 64.6 to 59.2 ms (68020, full), 21.7 to 19.9 (68030); at FMODE 1 the 68040's was 13.1 to 17.5 |
 
 - **The frame flag:** after showing a frame the game waited for its frame flag, which
   the copper sets at the top of each field ($32fe; not as the link's second player), so
@@ -299,6 +301,11 @@ change (`tools/baseline.sh aprof MACHINE OUT turn`):
   6.00 on the 68020, 11.34 / 15.29 to 12.81 / 18.03 on the 68030 and 9.82 / 16.24 to
   10.78 / 20.25 on the 68040. A full turn on the keys still takes 121-135 fields: the
   game's speed follows time.
+- **Full screen's c2p:** a call converts a run, so with rows of 36 bytes (FMODE 1) one call
+  takes the frame: the 240 calls' set-up was 12-15% of the c2p's time. On the 68040 the
+  c2p is Chip-bound, and FMODE 1's display takes twice FMODE 3's slots: 13.1 ms a frame
+  became 17.5, so from the 68040 on the screen keeps 40-byte rows at FMODE 3. The small
+  view's lines are 288 bytes for 192 pixels, so it still converts a row at a time.
 - **Wall strips:** 8 pixels a pass at displacements, no `adda` or `dbf` a pixel: the
   instructions executed fall by a fifth, the time by 8-12% (68020 and 68030), since a pixel
   still reads a texel and a pen and writes one. The 68020's small view measured 1% slower

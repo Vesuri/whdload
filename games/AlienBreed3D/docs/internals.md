@@ -413,29 +413,35 @@ with LORES), into its two copper lists, which are now in the area and never show
 each swap (`_p_show`; the main loop $32d2, the pause screen $3e42, `quitGame` $8e5e) the
 finished list (the new `oldDrawPt`) is converted through the palette's map to pens into
 the chunky buffer (`_ds_one`, 1x1; with LORES 2x2 or 3x3), then a row at a time through
-`c2p1x1_8_c5_030_2` into the back screen, and shown from the next field by writing that
+`c2p1x1_8_c5_030_2` into the back screen (with pen bytes, below a 68040, full screen's
+frame in one call), and shown from the next field by writing that
 screen's head to `COP1LCL`.
 
 - **Chip**, above the slave's chip pool ($90000, or $6b000 without music): two screens of
-  76800 bytes, 8 planes of 240 rows of 40 bytes (320 pixels, the full view's fetch at
-  FMODE 3), then two copper heads of $800, to $b6800 ($91800). Only `COP1LCL` is
+  76800 bytes, 8 planes in one of three layouts: the small view's rows of 24 bytes (160
+  rows), full screen's of 36 (240 rows) below a 68040, of 40 (320 pixels) from the 68040
+  on; then two copper heads of $800, to $b6800 ($91800). Only `COP1LCL` is
   switched, so the heads share a high word (an assembly check).
 - **A head**: DMACON $8020, INTREQ $8013 (the game's frame flag and COPER as the template
-  sets them, and DSKBLK, ours), FMODE $000f, the template's window and fetch, pens 0-15
+  sets them, and DSKBLK, ours), FMODE $000f ($000d for full screen's 36-byte rows), the template's window and fetch, pens 0-15
   (both nibbles) and sprite pointers copied from the template, the 240 pens (12-bit, LOCT
   clear) in banks 0-7, COLOR00 = the damage flash (`hitcol`, copied each frame), BPLCON0
   $0211, BPLCON1, BPLCON4 0, the modulos, 8 plane pointers, WAIT $10 and INTREQ $0011.
   Then in the small view pen 15 from `HealthPal` at the end of lines $2b, $2d, ... (the
   bars), and both views jump into the game's panel list ($9a262), whose `COP1LC` words
   (set at the level start, $2ea6) `_p_cop1` and each switch point at the head shown.
-- **Small view**: the template's window and fetch (DIW $2cb1-$2c91, DDF $48-$88), 192 of
-  each row (modulo 16), BPLCON1 0. The panel's list from the end of line $c9 (WAIT
+- **Small view**: the template's window and fetch (DIW $2cb1-$2c91, DDF $48-$88), rows
+  of 192 pixels (modulo 0), BPLCON1 0. The panel's list from the end of line $c9 (WAIT
   $c9df), right after the last bar, where the game's view list reaches it: chunky row 79
   is never shown, as in the original. On line $ca the panel's list rewrites the frame
   sprites' colours, and the original's view list, paced by its moves (it has no WAITs),
   reaches it at a time no WAIT matches: 88 pixels of the frame sprites on that line differ
   (`tools/display.py` leaves the line out).
-- **Full screen**: DIW $2c81-$2cc1, DDF $38-$b8. The game's pattern has its 288 pixels 16
+- **Full screen**: DIW $2c81-$2cc1, DDF $38-$b8: 320 pixels at FMODE 3, 288 at FMODE 1
+  (32-pixel fetches), both modulo 0. Below a 68040 the rows are 36 bytes, so the frame
+  is one run per plane and the c2p converts it in one call; a 68040's c2p is bound by
+  its Chip writes and FMODE 1 takes twice the display's slots, so from the 68040 on they
+  are 40 bytes at FMODE 3, converted a row at a time (`_ds_wide`). The game's pattern has its 288 pixels 16
   in from the left, so BPLCON1 $4400 delays the planes 16 pixels and pen 0 (the border)
   shows on either side, as in the original. The game's full-screen rows are 3 rasters from
   line $2b and its list turns the display off at $118, so the planes start one row in and

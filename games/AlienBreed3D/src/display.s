@@ -18,15 +18,24 @@
 ; enabled for it) at the top of each field: once it is set after a switch, the other
 ; screen is no longer shown and the next frame may be converted into it.
 ;
-; Screen rows are 40 bytes (320 pixels, the full view's fetch) in planes of 240 rows. The
-; small view shows 192 pixels of each row (modulo 16); full screen shows 288, delayed 16
-; pixels by BPLCON1 to where the game's 320-pixel pattern has them, with pen 0 (the
-; border, the flash) on either side as in the original.
+; The small view's screen rows are its 192 pixels (24 bytes, 160 rows, FMODE 3), so a
+; plane is one run (modulo 0). Full screen's 288 pixels are delayed 16 by BPLCON1 to where
+; the game's 320-pixel pattern has them, with pen 0 (the border, the flash) on either
+; side as in the original. Below a 68040 its rows are 36 bytes (240 rows), so the c2p
+; converts the frame in one call: FMODE 1, whose 32-pixel fetches make the same DDF
+; $38-$b8 fetch 288 where FMODE 3 fetched 320. A 68040's c2p is bound by its Chip
+; writes, and FMODE 1's display takes twice FMODE 3's slots (MEASURED 13.1 ms a frame
+; against 17.5), so from the 68040 on the rows are 40 bytes at FMODE 3 and the c2p
+; converts a row at a time (_ds_wide). The c2p's plane size is set for the view at each
+; switch (_ds_geom).
 
-DS_ROW		= 40			;bytes a screen row
-DS_ROWS		= 240
-DS_PLANE	= DS_ROW*DS_ROWS	;9600; the c2p's BPLSIZE
-DS_SCREEN	= DS_PLANE*8
+SMALL_ROW	= 24			;bytes a screen row, SMALL_W / 8
+FULL_ROW	= 36			;FULL_W / 8
+SMALL_PLANE	= SMALL_ROW*160		;3840
+FULL_PLANE	= FULL_ROW*240		;8640
+WIDE_ROW	= 40			;from the 68040 on: 320 pixels
+WIDE_PLANE	= WIDE_ROW*240		;9600
+DS_SCREEN	= WIDE_PLANE*8
 DS_HEAD		= $800			;a copper head
 DS_SCREENS	= CHIPPOOL		;the two screens, then the two heads, above the chip pool
 DS_HEADS	= DS_SCREENS+2*DS_SCREEN
@@ -85,6 +94,12 @@ DI_PROW		= 10			;word: and their line stride
 DI_SIZE		= 12
 DA_LISTS	= (PA_SQ+2*SQ_C+4+7)&-8	;past the palette build's scratch: the game's lists
 LIST_SIZE	= DS_STRIDE*LIST_LINES	;each (InitCopperScrn's are 33296 bytes)
+	IFD	PENS
+DA_C2PFULL	= (DA_LISTS+LIST_OFF+2*LIST_SIZE+15)&-16	;full screen's c2p scratch
+	IFGT	DA_C2PFULL+FULL_W*FULL_H/2-PA_SIZE
+	FAIL	the area is too small for full screen's c2p scratch
+	ENDC
+	ENDC
 	IFGT	DA_LISTS+LIST_OFF+2*LIST_SIZE-PA_SIZE
 	FAIL	the area is too small for the copper lists
 	ENDC
@@ -255,9 +270,14 @@ _p_show
 	bne.s	.full
 	move.l	#SMALL_W,d5
 	move.w	#SMALL_H-1,d4
+	moveq	#SMALL_ROW,d3
 	bra.s	.c2p
 .full	move.l	#FULL_W,d5
 	move.w	#FULL_H-1,d4
+	moveq	#FULL_ROW,d3
+	bsr.w	_ds_wide
+	beq.s	.c2p
+	moveq	#WIDE_ROW,d3
 .c2p	lea	c2p1x1_8_c5_030_2_pixels(pc),a0
 	move.l	d5,(a0)
 	lea	c2p1x1_8_c5_030_2_fastbuf(pc),a0
@@ -266,6 +286,15 @@ _p_show
 	IFD	PENS
 	lea	10(a6),a2		;the frame itself
 	move.l	#DS_STRIDE,d5
+	tst.b	d7			;full screen's lines are its rows (DS_STRIDE =
+	beq.s	.rows			;FULL_W): below a 68040 one call for the frame
+	bsr.w	_ds_wide
+	bne.s	.rows
+	move.l	#FULL_W*FULL_H,c2p1x1_8_c5_030_2_pixels-c2p1x1_8_c5_030_2_fastbuf(a0)
+	PALEA	DA_C2PFULL,a1
+	move.l	a1,(a0)
+	moveq	#0,d4
+.rows
 	ELSE
 	PALEA	DA_CHUNKY,a2
 	ENDC
@@ -276,7 +305,7 @@ _p_show
 	movea.l	a6,a1
 	bsr.w	c2p1x1_8_c5_030_2
 	adda.l	d5,a2
-	lea	DS_ROW(a6),a6
+	adda.w	d3,a6
 	dbf	d4,.row
 	move.w	_ds_back(pc),d6		;the switch
 	bsr.w	_ds_addr
@@ -366,6 +395,11 @@ _ds_wait
 	bra.s	.w
 .done	rts
 
+; ne from the 68040 on: full screen's rows are 40 bytes, a row converted at a time
+_ds_wide
+	btst	#AFB_68040,_attnflags+3(pc)
+	rts
+
 ; d6 = head (0, 1), d7 = view: built unless it already is for this view
 ; (a3 = template, a4 = area)
 _ds_build
@@ -376,7 +410,13 @@ _ds_build
 	bsr.w	_ds_addr
 	move.l	#$00968020,(a0)+	;DMACON: sprites on
 	move.l	#$009c8013,(a0)+	;INTREQ: the frame wait's flag, COPER, DSKBLK
-	move.l	#$01fc000f,(a0)+	;FMODE
+	move.l	#$01fc000f,d0		;FMODE: sprites 64 wide, planes 64 bits a fetch,
+	tst.b	d7
+	beq.s	.fmode
+	bsr.w	_ds_wide
+	bne.s	.fmode
+	move.w	#$000d,d0		;full screen below a 68040 32
+.fmode	move.l	d0,(a0)+
 	lea	T_DIW(a3),a2
 	moveq	#4-1,d0
 .diw	move.l	(a2)+,(a0)+
@@ -409,12 +449,17 @@ _ds_build
 	move.w	T_HITCOL(a3),(a0)+
 	move.l	#$01000211,(a0)+	;BPLCON0: 8 planes
 	move.l	#$01020000,d0		;BPLCON1
-	moveq	#DS_ROW-SMALL_W/8,d1	;the modulo
+	moveq	#0,d1			;the modulo
+	move.l	#SMALL_PLANE,d3
 	tst.b	d7
 	beq.s	.con1
 	move.w	#$4400,d0		;full screen: 16 pixels later,
-	moveq	#DS_ROW-320/8,d1
-	lea	DS_ROW(a1),a1		;and from the second row: the game's rows of three
+	lea	FULL_ROW(a1),a1		;and from the second row: the game's rows of three
+	move.l	#FULL_PLANE,d3
+	bsr.w	_ds_wide
+	beq.s	.con1
+	lea	WIDE_ROW-FULL_ROW(a1),a1
+	move.l	#WIDE_PLANE,d3
 .con1	move.l	d0,(a0)+
 	move.l	#$010c0000,(a0)+	;BPLCON4
 	move.w	#$0108,(a0)+
@@ -432,7 +477,7 @@ _ds_build
 	move.w	d1,(a0)+
 	move.w	d0,(a0)+
 	addq.w	#2,d1
-	addi.l	#DS_PLANE,d0
+	add.l	d3,d0
 	dbf	d2,.bpl
 	move.l	#$1001ff00,(a0)+	;WAIT line $10
 	move.l	#$009c0011,(a0)+	;INTREQ: the flag and COPER off
@@ -518,7 +563,44 @@ _ds_geom
 	bra.s	.site
 .byte	move.b	d1,(a1)
 	bra.s	.site
-.done	movea.l	_resload(pc),a2
+.done	move.w	#SMALL_PLANE,d0		;the c2p's plane size (c2p.s: Kalms' smcinit)
+	tst.b	d7
+	beq.s	.plane
+	move.w	#FULL_PLANE,d0
+	bsr.w	_ds_wide
+	beq.s	.plane
+	move.w	#WIDE_PLANE,d0
+.plane	lea	c2p1x1_8_c5_030_2_smc1(pc),a0
+	move.w	d0,(a0)
+	lea	c2p1x1_8_c5_030_2_smc2(pc),a0
+	move.w	d0,(a0)
+	lea	c2p1x1_8_c5_030_2_smc5(pc),a0
+	move.w	d0,(a0)
+	lea	c2p1x1_8_c5_030_2_smc8(pc),a0
+	move.w	d0,(a0)
+	lea	c2p1x1_8_c5_030_2_smc11(pc),a0
+	move.w	d0,(a0)
+	move.w	d0,d1
+	neg.w	d1
+	subq.w	#4,d1
+	lea	c2p1x1_8_c5_030_2_smc3(pc),a0
+	move.w	d1,(a0)
+	lea	c2p1x1_8_c5_030_2_smc6(pc),a0
+	move.w	d1,(a0)
+	lea	c2p1x1_8_c5_030_2_smc9(pc),a0
+	move.w	d1,(a0)
+	lea	c2p1x1_8_c5_030_2_smc12(pc),a0
+	move.w	d1,(a0)
+	add.w	d0,d0
+	lea	c2p1x1_8_c5_030_2_smc4(pc),a0
+	move.w	d0,(a0)
+	lea	c2p1x1_8_c5_030_2_smc10(pc),a0
+	move.w	d0,(a0)
+	andi.l	#$ffff,d0
+	add.l	d0,d0
+	lea	c2p1x1_8_c5_030_2_smc7(pc),a0
+	move.l	d0,(a0)
+	movea.l	_resload(pc),a2
 	jsr	resload_FlushCache(a2)
 	movem.l	(sp)+,d0-d1/a0-a2
 	rts
@@ -632,7 +714,7 @@ _ds_sites
 	INCLUDE	hires.s
 	ENDC
 
-BPLSIZE		= DS_PLANE
+BPLSIZE		= SMALL_PLANE		;(_ds_geom sets the view's)
 CHUNKYXMAX	= FULL_W
 CHUNKYYMAX	= 1
 	INCLUDE	c2p.s
