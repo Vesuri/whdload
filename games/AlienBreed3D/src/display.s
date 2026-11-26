@@ -111,7 +111,7 @@ _p_coplists
 _ds_stride
 	lea	_ds_hunk0(pc),a0
 	move.l	a5,(a0)
-	IFD	HIRES
+	IFND	LORES
 	bsr.w	_ds_tables
 	ENDC
 	lea	.tables(pc),a1
@@ -201,7 +201,7 @@ _p_show
 	bsr.w	_ds_info
 	tst.b	d7
 	bne.s	.full
-	IFD	HIRES
+	IFND	LORES
 	bsr.w	_ds_one
 	ELSE
 	bsr.w	_ds_small
@@ -398,7 +398,7 @@ _ds_info
 	PALEA	DA_INFO,a0
 	move.w	#DS_STRIDE,(a0)+
 	move.l	#96<<16|80,(a0)
-	IFD	HIRES
+	IFND	LORES
 	tst.b	d7
 	bne.s	.full
 	move.l	#SMALL_W<<16|SMALL_H,(a0)
@@ -491,7 +491,7 @@ _ds_full
 	dbf	d4,.line
 	rts
 
-	IFD	HIRES
+	IFND	LORES
 ; The small view at 1x1: 192x160 words to pens.
 _ds_one
 	lea	10(a6),a0
@@ -523,10 +523,10 @@ _ds_gview	dc.b	0		;the view the game's geometry is set for
 
 ; The geometry sites: where the game's code has the view's size, and each view's value.
 ; SITE SIZE (1, 2, 4), game offset, the 192x160 value, the 96x80 value (the original's);
-; the small view takes the first only with HIRES (the 1x1 renderer, plan step 5).
+; the small view takes the first but with LORES (the 96x80 small view, the original's).
 SITE	MACRO
 	dc.l	\1<<24|\2
-	IFD	HIRES
+	IFND	LORES
 	dc.l	\3
 	ELSE
 	dc.l	\4
@@ -534,10 +534,10 @@ SITE	MACRO
 	dc.l	\4
 	ENDM
 _ds_sites
-	INCLUDE	sites.s			;(without HIRES both views take the 96x80 values)
+	INCLUDE	sites.s			;(with LORES both views take the 96x80 values)
 	dc.l	0
 
-	IFD	HIRES
+	IFND	LORES
 	INCLUDE	hires.s
 	ENDC
 

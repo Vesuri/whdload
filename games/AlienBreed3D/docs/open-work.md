@@ -4,8 +4,8 @@ Psygore's slave 1.3, reconstructed (both slaves byte for byte with `BUILD=origin
 AlienBreed3D variant boots on the a1200-030 into the first level with both the Aminet
 8-channel ($c4dc, AGA drawer) and the CD32 ($fd78) version; in the first, mouse control
 (M) turns and moves. Enhanced resolution (CUSTOM5, $c4dc only) builds the 1x1 palette and the
-pen tables before the menu and shows the game on 8-plane screens through a c2p; the image
-is still the original renderer's 96x80, scaled 2x2 or 3x3.
+pen tables before the menu and shows the game on 8-plane screens through a c2p. The small
+view is drawn at 192x160 by the game's own writers; full screen is still 96x80, scaled 3x3.
 
 ## Goal
 
@@ -16,12 +16,16 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
 
 ## Next
 
-1. Plan step 5: the 1x1 renderer, writer by writer, walls and floors first. Steps 0-4 are
-   done: the baseline and the skeleton's cost are in [performance](performance.md), the
-   display inventory, the palette's tables and the new display in
-   [internals](internals.md#display-inventory), the palette decision in the
-   [plan](resolution-plan.md#colour).
-2. A heavy scene for the baseline (many aliens and objects), when one is found.
+1. Plan step 5's play-test: level 2 at 192x160 (walk, fight, pause, a death, its end);
+   level 1 has been played to its first fights. Steps 0-4 are done, and step 5's writers
+   ([internals](internals.md#the-1x1-renderer)); the costs are in
+   [performance](performance.md).
+2. Plan step 6: full screen at 288x240, the same patches at the second size.
+3. A heavy scene for the baseline (many aliens and objects), when one is found.
+4. `tools/display.sh` once failed on level 1's end with CUSTOM5=0: the original's frame
+   showed its option text (SFX QUALITY, FLOOR DETAIL) and the run with the option on did
+   not. Same slave bytes passed before and after. Find what reaches the original's keys
+   there, or make `ab3d.py end` wait it out.
 
 ## Before a first release
 

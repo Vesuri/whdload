@@ -94,7 +94,14 @@ resolution.
 
 ### Renderer
 
-- One new pixel writer for each of the original's: wall strips, floor and ceiling spans,
+- First (step 5, decided 26.11.2026) the game's own writers draw the 1x1 views: their
+  geometry is patched to the new size (the immediates in `_ds_sites`, the row and column
+  addressing, the heights' and texture steps' scale), and they still write colour words
+  into the copper-slot layout, which the display converts to pens. Only the gun, the sky
+  and the water tint, which draw from fixed-size images, have 2x2 writers of our own.
+  This makes the new resolution playable early and leaves the faster writers below to
+  step 7.
+- Then one new pixel writer for each of the original's: wall strips, floor and ceiling spans,
   bump-mapped floors, objects (bitmaps, glass, textured polygons plain, Gouraud and with
   holes), the gun, and whatever else step 2 finds writing into the view. They are our own code. The published
   source is only a map of what each original routine does.
@@ -122,12 +129,13 @@ Which Kalms routine runs is chosen per CPU by measurement:
 ### Memory
 
 Chip grows by $27000 for the two screens and their heads (ws_BaseMemSize from 576 KB to
-732 KB, 428 to 584 KB without music), above the slave's chip pool. ExpMem grows by $38000,
-from $158000 to $190000, for the option's area at its top, above the stacks (steps 3 and
+732 KB, 428 to 584 KB without music), above the slave's chip pool. ExpMem grows by $66000,
+from $158000 to $1be000, for the option's area at its top, above the stacks (steps 3 and
 4). The first 58080 bytes keep the palette and the pen tables. Then the palette build's
 scratch, free once it is done, where the chunky buffer (up to 69120 bytes) and the c2p's
 half row go, and the larger per-column tables can. Past the scratch are the game's two
-copper lists (2 x 33296 bytes), which the original allocates in chip
+copper lists (2 x 128800 bytes: 161 lines of 800, room for the 192x160 view), which the
+original allocates in chip (2 x 33296 bytes)
 ([internals](internals.md#the-1x1-palette)). It is not allocated: the slave's fast pool has 136936
 bytes free once the game has loaded, too little, and an area above the stacks leaves the
 game's pool and hunk offsets as they were. WHDLoad asks for it with the option off too.
@@ -197,18 +205,35 @@ just step further, up to 15 fields.
    - The c2p a frame (MEASURED): 30 / 10 / 5 ms in the small view and 65 / 22 / 13 ms in
      full screen on the 68020 / 68030 / 68040; the frame rate standing at the start is
      7.1 / 16.7 / 16.7 fps in the small view (the original 10 / 16.7 / 25).
-5. **The 1x1 renderer, writer by writer**, in the order of step 1's shares (walls and
-   floors first are expected).
-   - Prove each writer at 96x80 with an in-process differential (VERIFY): on the same
-     frame state, the original draws into the copper list and ours into a slot-layout
-     buffer. Zero differences over the scripted scenes.
-   - Then switch it to WxH bytes, with the geometry constants beside it.
-   - A VERIFY count of writes per pixel finds holes and overdraw at 1x1.
-   - Done when the small view draws everything at 192x160 with no holes, play-tested
-     through levels 1 and 2.
+5. **The small view at 192x160 by the game's writers** (decided 26.11.2026: patch the
+   originals' geometry; [internals](internals.md#the-1x1-renderer),
+   [performance](performance.md#the-192x160-small-view)). The release build draws it;
+   `VASM_EXTRA=-DLORES` builds the 96x80 small view of step 4.
+   - Each view's geometry is a table of sites (`src/sites.s`, from `tools/sites.py`),
+     written into the game's code at each switch; the row and column addressing for any
+     width, the heights' doubling, the texture steps and the objects' sizes are patches
+     in `src/hires.s`. The gun, the sky and the water tint have 2x2 writers of our own.
+   - `VASM_EXTRA=-DHOLES` marks every pixel not written in a frame (`ab3d.py holes`).
+     The original's writers leave some at 96x80 too: one line where a floor meets the
+     edge of the step below it, where the list still holds
+     an older frame's pixel. Ours are the same
+     kind, one line of 160. Level 1's walk: 115 of 351 frames with holes, at most 125
+     pixels, at 96x80 (`-DLORES`); 152 of 310, at most 289, at 192x160. The fight: 56 of
+     496, at most 28; 71 of 419, at most 191. Filling them is for our own writers
+     (step 7).
+   - `tools/display.sh`: each scene shows its frame; against the original's frames 88-94%
+     of the pixels are found at 2x2 (level 1's start, pause and end), and level 2's deaths show their frames. With `-DLORES` every
+     scene equals the original's as in step 4.
+   - Played through level 1's first fights (aliens, corpses, blood, the gun, doors).
+     Still to play: level 2 (walk, fight, pause, a death, its end).
+   - Speed, the small view standing at the start: 3.85 / 10.00 / 12.50 fps on the 68020 /
+     68030 / 68040 (step 4 7.14 / 16.67 / 16.67; the original 10 / 16.67 / 25).
 6. **Full screen at 288x240**: the same writers at the second size, with the projection
    scaled 3x from 96x80 in both directions: the original's field of view and aspect.
-7. **Speed, as fast as possible.** Profile both 1x1 views on each CPU and work down the
+7. **Speed, as fast as possible.** Our own pen writers (Renderer above) in place of the
+   patched originals, writer by writer in the order of the shares, each proven at 96x80
+   against the original's with an in-process differential (VERIFY) before it replaces it;
+   they remove step 5's conversion. Profile both 1x1 views on each CPU and work down the
    shares: the writers' inner loops (on the 030, keep them inside the 256-byte instruction
    cache), tables and textures in fast memory, the c2p choice and its overlap with
    rendering. Report each step against step 1, per view and per CPU. With no bar to meet,
@@ -231,6 +256,8 @@ just step further, up to 15 fields.
 
 - Full screen 288x240, as the original, for now (26.11.2026).
 - Performance: as fast as possible, no fixed frame rate (26.11.2026).
+- The 1x1 views first by the game's own writers, their geometry patched; our own pen
+  writers in step 7 (26.11.2026).
 - The palette: one fixed 240-pen palette for both views, popular plus farthest in CIELAB
   over the static histogram, built in the slave; every shade table remapped to pens; no
   dithering (26.11.2026; Colour).

@@ -151,6 +151,41 @@ shared by instructions (DERIVED, in brackets):
 - The conversion and the 2x2 or 3x3 copy go away at step 5, where the writers draw pens at
   1x1, and their place is taken by drawing 4x or 9x the pixels.
 
+## The 192x160 small view
+
+Step 5 (plan, [internals](internals.md#the-1x1-renderer)), measured 26.11.2026 the same
+way with the release build: `WHD_ARGS=CUSTOM5=1 tools/baseline.sh aprof MACHINE OUT`. The
+game's own writers draw the small view at 192x160 into the lists (4x the pixels), each
+frame is converted to pens 1x1 (`convert`, `_ds_one`) and through the same c2p. Full
+screen is unchanged from step 4 (5.56-5.60 / 16.67-16.70 / 12.50-12.59 fps).
+
+Small view, frames a second and work a frame in ms (mean), against step 4's and step 1's:
+
+| CPU | Start | Walk |
+|---|---|---|
+| 68020 | 3.85 (245.5; step 4 7.14, 139.2; step 1 10.00, 98.4) | 3.85 (251.2; 7.04, 134.7; 9.96, 92.9) |
+| 68030 | 10.00 (82.9; 16.67, 48.6; 16.67, 42.7) | 10.73 (86.1; 17.40, 47.2; 19.71, 42.9) |
+| 68040 | 12.50 (72.7; 16.67, 45.2; 25.00, 32.2) | 11.66 (75.3; 19.22, 43.3; 25.00, 31.5) |
+
+ms a frame standing at the start in the small view, charged to the routines' PCs
+(MEASURED), and with gap shared by instructions (DERIVED, in brackets):
+
+| CPU | walls + floors (step 4) | convert (step 4) | c2p | slave | objects |
+|---|---|---|---|---|---|
+| 68020 | 116.4 (127.4), was 55.8 (60.4) | 34.6 (38.7), was 13.0 (14.6) | 30.3 (34.6) | 17.5 (19.1) | 9.9 (10.9) |
+| 68030 | 33.7 (42.3), was 16.3 (20.3) | 9.7 (13.0), was 3.7 (5.0) | 10.3 (13.6) | 4.9 (6.1) | 2.8 (3.6) |
+| 68040 | 4.4 (34.1), was 3.3 (16.0) | 0 (11.2), was 0 (4.6) | 4.9 (16.6) | 0.7 (4.8) | 0.1 (2.7) |
+
+- Walls and floors cost about twice step 4's for 4x the pixels: the writers' per-column
+  and per-span work stays, the per-pixel work grows.
+- `convert` grows about 2.7x: it now reads 30720 words where step 4 read 7680 and
+  wrote each pixel 4 times. `slave` is the slave's other code, the writers'
+  patches (`src/hires.s`) among it; the c2p is unchanged.
+- The small view is now slower than full screen (as fast on the 68040 standing), which
+  still draws 96x80: the writers still write colour words into the copper-slot layout, which
+  `convert` then turns into pens. Step 7's own pen writers remove both the conversion and
+  the word writes.
+
 ## Not measured
 
 - The heaviest scene. The level 1 route and the starts of levels 2-6 (reached with

@@ -565,7 +565,7 @@ _pl_v3
 	INCLUDE	stride.s		;lines of DS_STRIDE bytes (display.s)
 	PL_L	$6910,60*DS_STRIDE	;water tint: adda.l #24960, 60 lines
 	PL_W	$1935e,DS_STRIDE	;sky: adda.w #416, its first row
-	IFD	HIRES			;the 1x1 renderer (hires.s)
+	IFND	LORES			;the 1x1 renderer (hires.s)
 	PL_PS	$1a616,_t_column	;walls: a column's slot, any width
 	PL_S	$1a61c,4
 	PL_PS	$1a3ac,_t_column	;see-through walls
