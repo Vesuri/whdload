@@ -24,11 +24,10 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
 2. A heavy scene for the baseline: in level 1, through the first door, turn left or right,
    and shoot a barrel close by; a near explosion is the most taxing (the user's). Not yet
    scripted.
-3. Plan step 7: speed. Its first stage, the writers writing pen bytes, is the release
-   build ([internals](internals.md#pen-bytes)): 17-22% less work a frame on the turn scene
-   ([performance](performance.md#pen-bytes-the-release-build)). Next the walls (38-40% of
-   the work), the c2p (17-26%) and the floors (16-19%), each measured on the turn scene. Filling the step-edge holes is for
-   our own writers.
+3. Plan step 8: machines and play ([resolution-plan](resolution-plan.md#steps)). Step 7
+   is closed ([performance](performance.md#step-7-change-by-change)); since it the game no
+   longer waits for its frame flag but as the link's second player, so the two-player
+   link needs a check.
 
 ## Releases
 

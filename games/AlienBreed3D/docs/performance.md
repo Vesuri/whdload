@@ -312,6 +312,11 @@ change (`tools/baseline.sh aprof MACHINE OUT turn`):
   over the turn, with floors 2 ms slower in the same run: the turn's angles (Sampling
   above).
 
+Where it stopped (68030, full screen): our wall strip loops and the game's wall set-up
+about 40% of the work, the c2p 26%, the floors 19%, objects 4%, geometry and logic the
+rest. Every other routine of ours is under 1% (`_t_strip` 0.8%, `_t_split` 0.4%, the
+floor steps 0.2% each), so the plan's step 7 is closed (§9).
+
 On the 68040 FS-UAE counts instructions, not cycles (AmigaXDev's `measurement-method.md`):
 a change that only moves memory traffic, such as a line stride whose columns spread over
 the data cache's sets (`VASM_EXTRA=-DPSTRIDE=304`), measures nothing there; it measured

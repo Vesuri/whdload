@@ -272,6 +272,18 @@ just step further, up to 15 fields.
      in both), and on level 3 with the water's animation stopped (`-DWATERFREEZE`) but
      for a few pixels at the words build's bank seams. The work a frame is 17-22% less: 372 to 292 ms in full screen on the
      68020, 106 to 84 on the 68030, 128 to 103 on the 68040.
+   - Then (done 27.11.2026; [performance](performance.md#step-7-change-by-change)): the sky
+     a line at a time, the floor spans and the gun's stores, our own wall strip loops, no
+     wait for the frame flag, and full screen's c2p in one call below the 68040. From step
+     6, full screen / small view: 372 / 213 to 264 / 162 ms a frame on the 68020, 106 / 73
+     to 76 / 55 on the 68030, 128 / 66 to 93 / 50 on the 68040; 8.77 / 12.18 to 13.22 /
+     18.07 fps on the 68030 and 7.39 / 13.75 to 10.78 / 20.17 on the 68040.
+   - Closed by §9 (27.11.2026). The wall strips (about 40% with their set-up) read a
+     texel and a pen and write a pixel each, the c2p (19-26%) is Chip-bound, the floors
+     (19-20%) store a byte a pixel; the rest is each under 1% (the per-strip and per-span
+     divides 0.2-0.8%). The one structural change left is the CPU and blitter c2p
+     (`c2p1x1_8_c3b1_030`) for full screen below the 68040: about 10% of a frame, but it
+     needs a blit chain on the blitter interrupt and a 69 KB Chip buffer. Not taken.
 8. **Machines and play.** a1200-fast, a1200-030 and a1200-040, plus an ACA1221-class 28 MHz
    68020 (`EXTRA_ARGS`), both variants, two-player link at least not broken, and CUSTOM5
    off unchanged. Decide from the measurements which CPUs the option applies on; below
