@@ -458,10 +458,11 @@ race starts; new pictures are changes of the displayed sprite set `$5B2C`, steps
 |---|---|---|
 | `a1200`, PAL | 112 new pictures, no late step | 120, no late step |
 | `a1200`, NTSC machine (`NTSC=1`) | 99, 10 steps a field late | 118, no late step |
+| `a1200`, PAL machine with WHDLoad's `NTSC` | 100, 9 late | 120, 2 late (each caught up in the next field) |
 | `a1200-030`, PAL and NTSC | 120 | – |
+| `a1200-040`, WHDLoad's `NTSC` | 120 | 120 |
 
-WHDLoad's `NTSC` option on a PAL machine needs an NTSC monitor driver, which the test boot
-disk does not have, so that case was not run; the `a1200-060` core is not cycle-exact, so
-the 68060's speed was not measured. With copyback, a Beginner race (`CUSTOM3=1`, which loads
+The `a1200-040` core has time to spare either way, and the `a1200-060` core is not
+cycle-exact, so a 68060's speed with ExpMem serialized was not measured. With copyback, a Beginner race (`CUSTOM3=1`, which loads
 `BegTrack`'s code) runs on `a1200-030`, `a1200-040` and `a1200-060`, and on `a1200-060` a
 second Beginner race after the first one's timeout (its code loaded again) runs too.
