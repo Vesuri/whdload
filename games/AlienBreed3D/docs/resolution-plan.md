@@ -24,8 +24,12 @@ the design and the steps, in order.
   and the copper list swaps them at a vertical blank.
 - The slave builds the copper lists: bitplane pointers, each view's window and modulos,
   the view's palette, and in the small view the original's sprites (the frame) and its
-  panel section below the view. Both stay as they are, so their pens stay out of the view's
-  palette.
+  panel section below the view. Both stay as they are
+  ([inventory](internals.md#display-inventory)).
+- The panel loads all 256 colours at its split, so the view's palette is loaded again
+  every field above the view, in the vertical blank. 256 MOVEs with LOCT clear set both
+  nibbles (12-bit) in about 4.7 raster lines; 24-bit needs 512 and about 9.4 (DERIVED: a
+  MOVE is 4 memory cycles, 227 a line).
 - The c2p converts only the view rectangle (AmigaXDev's Kalms rectangle adapter).
 
 ### Colour
@@ -34,9 +38,18 @@ The original shows each pixel in its own 12-bit colour, so there is no palette t
 Every texture brings its own shade table (a wall: 32 colours at 33 brightness levels),
 so the view can show thousands of colours. The 1x1 modes:
 
-- take every colour the loaded shade tables can produce, quantise them to the free pens
-  (256 less the sprites' and panel's), and remap every shade table to pen bytes once, when
-  the tables load. The renderer then writes bytes.
+- take every colour the loaded shade tables can produce, quantise them to the free pens,
+  and remap every shade table to pen bytes once, when the tables load. The renderer then
+  writes bytes.
+- The free pens: in the small view 240. The frame's two attached sprite pairs use all of
+  pens 1-15 (pen 15 changes every line, the bars' gradient), and pen 0 is the border and the
+  damage flash. BPLCON4 can move that block of 16 but not shrink it. In full screen there
+  are no sprites, so 255 (all but pen 0). The panel needs none, because it loads its own.
+- The effects that rewrite pixels' colours need pen-space versions. Light beams and glass
+  read pixels through tables (`brightentab`), which become pen-to-pen tables. The water tint
+  (red removed on all lines or the bottom half) and the pause screen's half brightness are
+  whole-palette changes, so a second palette, or a pen-to-pen table, does them. The damage
+  flash stays the border's pen 0.
 - compute the palette in the slave at run time, never as a file: it is derived from the
   game's data, which the repository must not hold.
 - dither (ordered, by pixel parity, through two tables) only if the colour census (step 3)
@@ -104,10 +117,14 @@ just step further, up to 15 fields.
    - The a1200-030 and a1200-040 setups' own frame rates come from their MMU models,
      not the CPUs: speed comparisons use the aprof machines.
    - No scene heavier than level 1's start was found; the heaviest place is still to add.
-2. **Inventory the display.** Read all of the copper template: the panel split, the
-   sprites' pens, and the colour effects (damage and pickup flashes, fades, level text,
-   pause, messages). List every routine that writes into the view, with its game offset.
-   Step 5 works from that list.
+2. **Inventory the display** (done; [internals](internals.md#display-inventory),
+   `ab3d.py copper`). The template, the view lists, the panel split, the sprites' pens and
+   every writer into the view are listed with game offsets.
+   - Beyond the renderer, the writers are the sky, glass, light beams, the gun, the water tint
+     and the pause screen.
+   - The damage flash only changes pen 0, the border. There are no pickup flashes, fades
+     or messages in the view: the level text is its own screen.
+   - The free pens: 240 in the small view, 255 in full screen (Colour above).
 3. **Colour census.** A `tools/` script reads the installed data at analysis time only:
    distinct colours per level, and the error of one palette against per-level palettes at
    the free pen count, with and without dithering. Then decide, and write the slave's

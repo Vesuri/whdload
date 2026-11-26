@@ -14,9 +14,9 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
 
 ## Next
 
-1. Plan step 2: the display inventory: what else writes into the view, past the renderer
-   routines in [internals](internals.md#renderer-routines). Steps 0 and 1 are done; the
-   baseline is in [performance](performance.md).
+1. Plan step 3: the colour census, against 240 free pens in the small view and 255 in
+   full screen. Steps 0-2 are done: the baseline is in [performance](performance.md), the
+   display inventory in [internals](internals.md#display-inventory).
 2. A heavy scene for the baseline (many aliens and objects), when one is found.
 
 ## Before a first release

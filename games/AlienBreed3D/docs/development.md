@@ -54,7 +54,8 @@ all). A repeatable run:
 The commands run whole fields (`monitor fields`), so with `DETERMINISTIC=1` a run repeats.
 Game time follows the frame rate, so an input script ends in the same place only on the
 same machine. Keys need holding for 10 fields: at 3 the game misses them.
-`frames` counts swaps of `drawPt` ([internals](internals.md#display)), which happen at
+`copper` decodes the live copper lists: the template, the panel, or a line of the view
+([internals](internals.md#display-inventory)). `frames` counts swaps of `drawPt` ([internals](internals.md#display)), which happen at
 most once a field. `base` prints where the hunks were loaded and `peek OFF N` reads by game
 offset.
 

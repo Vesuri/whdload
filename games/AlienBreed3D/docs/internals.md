@@ -134,8 +134,7 @@ writers.
 | Objects | `DrawtheObject` $213cc, `glassobj` $2140e, `BitMapObj` $2174a, `PolygonObj` $21d06; textured polygons, drawn in columns: `dopoly` $220d2 (one brightness), `dopolyg` $22390 (Gouraud), `dopolyh` $22688 (with transparent texels); edges `putinlines` $228da |
 | Gun | `DrawInGun` $57f4 |
 
-Not yet looked for: anything else that writes into the copper lists (messages, the level
-text, flashes); step 2 of the plan.
+The rest of what writes into the view is in the [inventory](#display-inventory).
 
 The CD32 version draws the same way, at other offsets: the small-view builder's loop at
 $501c, the full-screen builder at $5206, keypad Enter at $404c2, and byte for byte `OneBelow` at
@@ -147,3 +146,67 @@ The published AB3D I source (the 1997 Amiga Format cover CD, as
 tree, not this executable's build, so its labels are a map, not offsets: the table above
 holds those found. It was released for personal use: read it in an ignored `tmp/`
 (`tmp/ab3d1-src/`), never copy it into the repository.
+
+### Display inventory
+
+Read from the running game with `ab3d.py copper` in level 1 on the a1200-030, both views
+(plan step 2). The offsets are in chip hunk 1.
+
+**The template**, from $9a07c, is the start of every field:
+
+| Offset | Moves | What |
+|---|---|---|
+| $9a080-$9a098 | DMACON $8020, INTREQ $8011 (the frame wait's flag), FMODE $000f, DIW and DDF | the window: small $2cb1-$2c91, DDF $48-$88; full $2c81-$2cc1, DDF $38-$b8 |
+| $9a09c-$9a120 | BPLCON3 $0000 then $0200, COLOR00-15 | bank 0's pens 0-15, both nibbles: the frame sprites' colours (`borderpal`) |
+| $9a124-$9a160 | SPR0-7PT | small view: the frame, sprites 0-3 at $912dc + n * 2592 (64 wide, 160 lines from line $34; 0+1 and 2+3 attached); full screen and sprites 4-7: the null sprite $912d4 |
+| $9a164-$9a1ec | BPLCON3 $0c42, the same 32 colour moves again | |
+| $9a1f0-$9a1fe | BPLCON3 $8c42, COLOR00 at $9a1f4; BPLCON3 $0c42, COLOR00 at $9a1fc | the damage flash: pens 128 and 0 (the source's `hitcol2`, `hitcol`, value words $9a1f6 and $9a1fe) |
+| $9a200-$9a244 | BPLCON0 $7201, BPLCON1, the modulos (-24 small, -40 full), BPL1-7PT | 7 planes of the static pattern |
+| $9a248-$9a254 | WAIT line $10, INTREQ $0011, WAIT $2a11, COPJMP2 | into the view list `oldDrawPt` |
+
+**The view list** (two, `drawPt` and `oldDrawPt`, 80 lines of 416 bytes, then a tail):
+
+- Each line: BPLCON4 $0000 or $8000, then three banks of 32 COLOR moves. Even lines'
+  moves go to banks 5-7 (BPLCON3 $ac42, $cc42, $ec42), odd lines' to banks 1-3 ($2c42,
+  $4c42, $6c42). `fromPt`
+  ($5dd48) is the first colour word, drawPt+10. `midpt` ($1d256) is fromPt + 40 lines.
+- Then, in the small view, BPLCON3 $0c42 and COLOR15 from the line's word of `HealthPal`
+  ($93f5c, 80 words: green to yellow to red), the colour of the vitality and ammunition bars.
+  In full screen, two WAITs (from $29df and $2b01, $300 on each line) hold each line for
+  three rasters.
+- The tail at line 80: BPLCON3 $0c42, COP1LC = the panel list $9a262, COPJMP1.
+- The bitplane pattern gives the small view pens 32-127, two pixels each ($9af18). It gives
+  full screen pens 32-127, three pixels each, between 16 pixels of pen 0 at each side ($9add8).
+
+**The panel** ($9a262, small view only): COP1LC back to the template, two NOPs (in full
+screen the list ends here: BPLCON0 0 and end, written at $9a26a by the builders), BPLCON4 0, then
+all 256 colours in both nibbles (512 moves), 8 planes and the panel's window.
+
+**Pens on the view's lines in the small view.** The view shows banks 1-3 or 5-7: 96 colour
+registers rewritten every line, 192 in all. The frame is two attached sprite pairs, and
+BPLCON4's sprite bits are 0, so they draw with pens 1-15 of bank 0. They use all 15: the
+pixel data of both sides was decoded. Pen 15 is the bars' colour, rewritten every view
+line from `HealthPal`. Pen 0 is the border colour and the flash. Pens 16-31 and 129-159
+show nothing.
+
+**Everything that writes into the view**, by the source's names (game offsets; the
+renderer's own writers are in the table above). Readers of `drawPt`, `oldDrawPt` and
+`fromPt` were found by disassembly, and the baseline's profiles have no other PC with chip
+time in the view's scenes:
+
+| What | Routine | Effect |
+|---|---|---|
+| Builders | `InitCopperScrn` $4463e (allocates both lists, 33296 bytes of chip each, fills them with NOPs, writes the tail), small view $5134, full screen $534e, colour moves $8f3a | the list's structure; called at level start and by keypad Enter ($40258, $40262, $41068, $41072, $446d0) |
+| Sky | `backrout` $18ffa (written by `MAKEBACKROUT` $1931c), fromPt at $19356 | the backdrop above the horizon, each frame before the walls |
+| Walls, floors, bump, objects | see [Renderer routines](#renderer-routines); `pstit` $1a3ac, `outofcalc` $1a616, `pastsides` $1daac, `glassobj` $2153e, `objfitsonbot` $2194c, `dontusegour` $2202e take fromPt | the frame's pixels |
+| Glass | `glassobj` $2140e | reads the pixels behind and rewrites them through a table |
+| Light beams | `LightDraw` $8aa6 (a zone's light-beam element, called from $6dda) | rewrites every pixel of a column span through `brightentab` (brighter) |
+| Gun | `DrawInGun` $57f4, `DrawChunk` $5858 | the gun, last, over the bottom lines |
+| Water | $68e4 (after `noGunLook`, flag byte $6534) | head under water: `and.w #$ff` on every pixel of lines 0-79, or 40-79 half under, which leaves green and blue |
+| Pause | `PAUSEOPTS` $3e0c, `DRAWPAUSESCRN` $41b2, `DRAWPAUSEBLOCK` $41e8 | halves the shown frame's brightness (`and #$eee`, `lsr`) into the other list, draws the option text in a 12x10 grid of 8x8 letters, and swaps |
+| Damage flash | `USEPLR1` $5694, `USEPLR2` $590e set $f00; the main loop at $321e takes $100 off each frame; cleared at level start $312a | COLOR00 of banks 0 and 4: the border, and full screen's 16-pixel side strips |
+| Bars | `EnergyBar` $8c46 and the ammunition bar, `FullEnergy` $8c02 | the frame sprites' data (pen 15 rows), not the view |
+
+Not in the view: the level text is its own text screen before the level, and the panel's
+picture is in its own planes. At death or level end, `quitGame` ($8e1c) swaps once, then
+waits for the tune with the last frame shown ($8e9e, $8efa).

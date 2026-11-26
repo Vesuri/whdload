@@ -23,6 +23,11 @@ was found, running or stopped):
                           `F [mx MX] [my MY] [fire]`: F fields with the mouse moved MX, MY a
                           field (forward is my -N) and the button held; or a name from
                           SCRIPTS (`play walk`, the baseline's scripted walk)
+    copper [WHAT]         decode a live copper list: `template` (default, game offset
+                          $9a07c, the field's start to the jump into the view), `panel`
+                          ($9a262, the panel split) or `view [LINE]` (line LINE of the list
+                          drawPt points at, default 0). Runs of COLOR moves are one line each,
+                          with the bank and LOCT that BPLCON3 selected
     batch CMD ;; CMD      gdb commands in one request, CPU stopped
 
 The 8-channel ($c4dc) version only, which the AGA drawer installs.
@@ -400,6 +405,61 @@ def cmd_aprof(server, g, rest):
     return f'{n} fields captured into {out} ({sum(f["swap"] for f in fields)} swaps)'
 
 
+COPPER_REGS = {
+    0x080: 'COP1LCH', 0x082: 'COP1LCL', 0x084: 'COP2LCH', 0x086: 'COP2LCL', 0x088: 'COPJMP1',
+    0x08a: 'COPJMP2', 0x08e: 'DIWSTRT', 0x090: 'DIWSTOP', 0x092: 'DDFSTRT', 0x094: 'DDFSTOP',
+    0x096: 'DMACON', 0x09c: 'INTREQ', 0x100: 'BPLCON0', 0x102: 'BPLCON1', 0x104: 'BPLCON2',
+    0x106: 'BPLCON3', 0x108: 'BPL1MOD', 0x10a: 'BPL2MOD', 0x10c: 'BPLCON4', 0x1fc: 'FMODE',
+    0x1fe: 'NOP'}
+TEMPLATE, PANELCOP, VIEW_LINE = 0x9a07c, 0x9a262, 416
+
+
+def copper_text(data, at):
+    """Copper list `data` (from game offset or address `at`) as text, to its end or COPJMP2."""
+    out, run, bank = [], [], (0, 0)
+
+    def flush():
+        if run:
+            o, first, vals = run[0][0], run[0][1], [v for _, _, v in run]
+            out.append(f'${o:x} COLOR{first:02d}-{first + len(vals) - 1:02d} bank {bank[0]}'
+                       f'{" LOCT" if bank[1] else ""}: ' + ' '.join(f'{v:03x}' for v in vals))
+            run.clear()
+    for i in range(0, len(data) - 3, 4):
+        a, b = struct.unpack('>HH', data[i:i + 4])
+        o = at + i
+        if not a & 1 and 0x180 <= a < 0x1c0 and (not run or a == 0x180 + 2 * (run[0][1] + len(run))):
+            run.append((o, (a - 0x180) // 2, b))
+            continue
+        flush()
+        if not a & 1 and 0x180 <= a < 0x1c0:
+            run.append((o, (a - 0x180) // 2, b))
+        elif a & 1:
+            out.append(f'${o:x} {"SKIP" if b & 1 else "WAIT"} {a:04x},{b:04x}')
+        else:
+            name = COPPER_REGS.get(a) or (f'BPL{(a - 0xe0) // 4 + 1}PT{"HL"[(a // 2) & 1]}' if 0xe0 <= a < 0x100
+                                          else f'SPR{(a - 0x120) // 4}PT{"HL"[(a // 2) & 1]}' if 0x120 <= a < 0x140
+                                          else f'${a:03x}')
+            if a == 0x106:
+                bank = (b >> 13, (b >> 9) & 1)
+            out.append(f'${o:x} {name} = {b:04x}')
+        if a == 0xffff and b == 0xfffe and i or a == 0x8a:
+            break
+    flush()
+    return '\n'.join(out)
+
+
+def cmd_copper(server, g, rest):
+    w = rest.split()
+    what = w[0] if w else 'template'
+    with Halted(g):
+        if what == 'view':
+            line = int(w[1], 0) if len(w) > 1 else 0
+            a = _long(g, addr(g, DRAWPT)) + line * VIEW_LINE
+            return copper_text(_bytes(g, a, VIEW_LINE), a)
+        off = {'template': TEMPLATE, 'panel': PANELCOP}[what]
+        return copper_text(_bytes(g, addr(g, off), 0xac0 if what == 'panel' else 0x1e0), off)
+
+
 def cmd_batch(server, g, rest):
     with Halted(g):
         return ''.join(g.cmd(c, timeout=600).rstrip('\n') + '\n'
@@ -408,7 +468,8 @@ def cmd_batch(server, g, rest):
 
 server = game_server('ab3d', commands={
     'base': cmd_base, 'peek': cmd_peek, 'level': cmd_level, 'full': cmd_full,
-    'frames': cmd_frames, 'play': cmd_play, 'aprof': cmd_aprof, 'batch': cmd_batch})
+    'frames': cmd_frames, 'play': cmd_play, 'aprof': cmd_aprof, 'copper': cmd_copper,
+    'batch': cmd_batch})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])
