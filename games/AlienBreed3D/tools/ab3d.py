@@ -44,6 +44,8 @@ was found, running or stopped):
                           frame with the most goes to OUT (as `frame`'s, no .alt)
     tables DIR            the loaded walls (DIR/wallNN: shade table, then texels) and the
                           floor texture (DIR/floortile), which tools/colours.py reads
+    pause on|off          press P until the game is paused (no list swap for 60 fields)
+                          or playing again (a swap within 60 fields), at most 3 times
     key CODE [N]          press raw key CODE (hex; P, 19, pauses) for N fields (default 10),
                           then release it for N
     frame OUT             the frame on screen (oldDrawPt) into OUT: its colour words, the
@@ -78,7 +80,7 @@ HUNKS = (0x912d4, 0x9f64, 0x18, 0x12798)
 DRAWPT = 0x5dd40        # drawPt, the copper list being drawn; oldDrawPt follows
 FULL = 0x40279          # nonzero in full screen (flipped by keypad Enter)
 PLR1MOUSE = 0x5d82      # nonzero with mouse control (M; Plr1Control's key test at $401ee)
-KEY_RETURN, KEY_M, KEY_ENTER, KEY_F1 = 0x44, 0x37, 0x43, 0x50
+KEY_RETURN, KEY_M, KEY_ENTER, KEY_F1, KEY_P = 0x44, 0x37, 0x43, 0x50, 0x19
 ENERGY = 0x61d70        # player 1's energy (word); quitGame copies it to $8bfa
 LEVEL_LETTER = 0x2a29   # the level's letter in 'ab3d2:levels/level_a/twolev.bin', set per level
 # what the colour census reads (tools/colours.py; all loaded once, before the menu)
@@ -511,6 +513,23 @@ def cmd_frame(server, g, rest):
             f'{geom[1]}x{geom[2]}) into {out}')
 
 
+def cmd_pause(server, g, rest):
+    """P until the game is paused (`on`: its pause screen swapped in, then no swap for 60
+    fields, more than a frame takes) or playing again (`off`: a swap within 60 fields). The
+    pause loop ($3e64) polls the key and then waits for its release, and can miss a press."""
+    on = rest.strip() != 'off'
+    with Halted(g):
+        for tries in range(1, 4):
+            _key(g, KEY_P)
+            if on:
+                g.cmd('monitor fields 10')
+                if not _swapped(g, _drawpt(g), 60):
+                    return f'paused after {tries} P'
+            elif _swapped(g, _drawpt(g), 60):
+                return f'playing after {tries} P'
+    raise RuntimeError(f'not {"paused" if on else "playing"} after 3 P')
+
+
 def cmd_key(server, g, rest):
     w = rest.split()
     with Halted(g):
@@ -824,7 +843,7 @@ server = game_server('ab3d', commands={
     'base': cmd_base, 'peek': cmd_peek, 'level': cmd_level, 'full': cmd_full,
     'frames': cmd_frames, 'play': cmd_play, 'aprof': cmd_aprof, 'copper': cmd_copper,
     'batch': cmd_batch, 'next': cmd_next, 'grab': cmd_grab, 'holes': cmd_holes, 'tables': cmd_tables,
-    'palette': cmd_palette, 'frame': cmd_frame, 'key': cmd_key, 'die': cmd_die,
+    'palette': cmd_palette, 'frame': cmd_frame, 'key': cmd_key, 'pause': cmd_pause, 'die': cmd_die,
     'end': cmd_end})
 
 if __name__ == '__main__':

@@ -47,11 +47,11 @@ run() {     # run NAME WHD_ARGS
   case $2 in *CUSTOM5=1*) ab3d palette "$dir/area.bin" 1 ;; esac
   scene start-small
   ab3d full 1; ab3d play 20 > /dev/null; scene start-full
-  ab3d key 19 > /dev/null; ab3d play 40 > /dev/null; scene pause-full
-  ab3d key 19 > /dev/null; ab3d play 20 > /dev/null
+  ab3d pause on > /dev/null; scene pause-full
+  ab3d pause off > /dev/null
   ab3d full 0; ab3d play 20 > /dev/null
-  ab3d key 19 > /dev/null; ab3d play 40 > /dev/null; scene pause-small
-  ab3d key 19 > /dev/null; ab3d play 20 > /dev/null
+  ab3d pause on > /dev/null; scene pause-small
+  ab3d pause off > /dev/null
   ab3d end; scene end-small
   # the deaths and the end after them only with the option on (see above)
   case $2 in *CUSTOM5=1*) ;; *) ab3d quit > /dev/null; return ;; esac
