@@ -635,6 +635,7 @@ _pl_v3
 	PL_W	$1d8e8,2*SIDE_STRIDE	;the floors' edges: leftbrighttab from
 	PL_W	$1d9cc,2*SIDE_STRIDE	;leftsidetab (hires.s DA_SIDES),
 	PL_W	$1f17c,SIDE_STRIDE	;rightsidetab,
+	PL_W	$1f1d6,SIDE_STRIDE	;(flat floors, water, inside the zone)
 	PL_W	$1f226,SIDE_STRIDE
 	PL_W	$1f320,SIDE_STRIDE
 	PL_W	$1f276,2*SIDE_STRIDE	;leftbrighttab,
