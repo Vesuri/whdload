@@ -31,12 +31,14 @@ convention).
 The package's `src/AlienBreed3DHD_src.lzx` is not an LZX archive but XPK `IDEA`
 (encrypted) data, so the source cannot be read; neither JOTD's nor StingRay's repository
 holds the slave. `src/AlienBreed3D.s` is a reconstruction: each code region disassembled
-separately, the patch lists as `PL_` macros, every PC-relative and patch target a label. It
-rebuilds `AlienBreed3D.slave` and, with `NOMUSIC` (variant `AlienBreed3D_nomusic`),
-`AlienBreed3D_nomusic.slave` byte for byte as hunk files (`VASM_FLAGS`: `-m68020 -no-opt`
-keeps the shipped encodings). Named labels are ours; `Lxxxx` labels are the
-code-hunk offsets in `AlienBreed3D.slave` (the no-music slave's are lower after the first
-`IFND NOMUSIC` block). `release/slaves.sha256` records both.
+separately, the patch lists as `PL_` macros, every PC-relative and patch target a label.
+With `ORIGINAL` (`make build BUILD=original`) it rebuilds `AlienBreed3D.slave` and, with
+`NOMUSIC` (variant `AlienBreed3D_nomusic`), `AlienBreed3D_nomusic.slave` byte for byte as
+hunk files (`VASM_FLAGS`: `-m68020 -no-opt` keeps the shipped encodings); `make check`
+compares both with the installed ones (`game.sh`). Named labels are ours; `Lxxxx` labels
+are the code-hunk offsets in `AlienBreed3D.slave` (the no-music slave's are lower after the
+first `IFND NOMUSIC` block). The release build adds Enhanced resolution (CUSTOM5,
+`src/palette.s`, the larger ExpMem); `release/slaves.sha256` records its two slaves.
 
 ## Driving it
 
@@ -81,6 +83,34 @@ By hand: in the menu RETURN (raw `44`) selects PLAY GAME; RETURN again on the te
 starts the level. In the game M (`37`) switches to mouse control: mouse left/right turns,
 up/down moves, the left button fires (`gdb monitor mouse DX DY`, `gdb monitor input
 JOY1_FIRE_BUTTON 1`). Keypad Enter (`43`) switches the view; F10 quits.
+
+## The colour census and the palette
+
+The 1x1 palette ([plan](resolution-plan.md#colour), [internals](internals.md#the-1x1-palette))
+was chosen from data read at analysis time only, all in ignored `tmp/colours/`:
+
+    tools/census.sh                         # the tables, then frames of all 16 levels
+    python3 tools/colours.py census         # the report: colours, each palette's errors
+    python3 tools/colours.py images A 100 tmp/colours/a100.png   # one frame, side by side
+
+`census.sh` boots its own instance with CUSTOM1=7 (unlimited energy and shots, F1 skips the
+level). `ab3d.py tables` dumps the loaded walls and floor texture. Then in each level
+`ab3d.py grab` keeps every frame shown over 360 fields of walking and 720 of fighting, read
+from the view list as 96x80 colour words, and `ab3d.py next` goes on.
+
+`tools/colours.py`'s `build`, `remap` and `effects` are the slave's builder as integers. To
+check the slave against them, boot with CUSTOM5=1 and dump its area:
+
+    INSTANCE=agent WARP=1 WINDOW=none DETERMINISTIC=1 JOY0=none WHD_ARGS=CUSTOM5=1 \
+      python3 tools/ab3d.py serve &
+    python3 tools/ab3d.py palette tmp/pal.bin    # from the boot: the build's fields by step
+    python3 tools/ab3d.py level                  # on a 68040, dump again after some play:
+    python3 tools/ab3d.py palette tmp/pal.bin 1  # copyback can hold the last writes
+    python3 tools/colours.py check tmp/pal.bin
+
+`ab3d.py palette` reads memory, not the CPU's data cache, so right after the build a
+68040's copyback cache can still hold its last writes (the effect tables), and they show
+as differences.
 
 ## Finding routines
 

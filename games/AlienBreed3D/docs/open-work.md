@@ -1,9 +1,10 @@
 # Open work
 
-Psygore's slave 1.3, reconstructed (both slaves byte for byte); no improvement yet. The
+Psygore's slave 1.3, reconstructed (both slaves byte for byte with `BUILD=original`). The
 AlienBreed3D variant boots on the a1200-030 into the first level with both the Aminet
 8-channel ($c4dc, AGA drawer) and the CD32 ($fd78) version; in the first, mouse control
-(M) turns and moves.
+(M) turns and moves. Enhanced resolution (CUSTOM5) so far builds the 1x1 palette and the
+pen tables before the menu ($c4dc only); the view is still the original's.
 
 ## Goal
 
@@ -14,9 +15,11 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
 
 ## Next
 
-1. Plan step 3: the colour census, against 240 free pens in the small view and 255 in
-   full screen. Steps 0-2 are done: the baseline is in [performance](performance.md), the
-   display inventory in [internals](internals.md#display-inventory).
+1. Plan step 4: the display skeleton, with the original renderer's frame converted to
+   pens through the area's map and shown on the new screens. Steps 0-3 are done: the
+   baseline is in [performance](performance.md), the display inventory and the palette's
+   tables in [internals](internals.md#display-inventory), the palette decision in the
+   [plan](resolution-plan.md#colour).
 2. A heavy scene for the baseline (many aliens and objects), when one is found.
 
 ## Before a first release

@@ -38,22 +38,52 @@ The original shows each pixel in its own 12-bit colour, so there is no palette t
 Every texture brings its own shade table (a wall: 32 colours at 33 brightness levels),
 so the view can show thousands of colours. The 1x1 modes:
 
-- take every colour the loaded shade tables can produce, quantise them to the free pens,
-  and remap every shade table to pen bytes once, when the tables load. The renderer then
-  writes bytes.
+- One fixed palette for both views, built once when the game has loaded its tables, and
+  every shade table remapped to pen bytes then (`src/palette.s`). The renderer still does
+  the original's one table read a pixel and writes the byte. No colour is chosen while a
+  frame is drawn.
+- The palette (decided at step 3, from the census below): an integer histogram of every
+  shade-table entry the game can show. Each class has its share (walls 45, floors 30,
+  objects 8, gun 5, polygons 4, water 3, sky 2), each table an equal part of it, each
+  brightness row (R - r)^2 (row 0 the brightest), each entry its texel count. The 200
+  heaviest colours are pens. Then 40 more, each the colour with weight farthest in
+  CIELAB from the pens so far, which keeps rare colours near a pen. Every 12-bit colour
+  takes its nearest pen in CIELAB. The pens are 12-bit colours, so the copper loads them as
+  the original's moves do. The pens are 16-255, 240, in both views: the extra 15 of full
+  screen gain about 0.5% of pixels shown exactly, not worth a second set of tables.
 - The free pens: in the small view 240. The frame's two attached sprite pairs use all of
   pens 1-15 (pen 15 changes every line, the bars' gradient), and pen 0 is the border and the
   damage flash. BPLCON4 can move that block of 16 but not shrink it. In full screen there
   are no sprites, so 255 (all but pen 0). The panel needs none, because it loads its own.
-- The effects that rewrite pixels' colours need pen-space versions. Light beams and glass
-  read pixels through tables (`brightentab`), which become pen-to-pen tables. The water tint
-  (red removed on all lines or the bottom half) and the pause screen's half brightness are
-  whole-palette changes, so a second palette, or a pen-to-pen table, does them. The damage
-  flash stays the border's pen 0.
-- compute the palette in the slave at run time, never as a file: it is derived from the
-  game's data, which the repository must not hold.
-- dither (ordered, by pixel parity, through two tables) only if the colour census (step 3)
-  shows banding a plain palette cannot avoid.
+- The effects that rewrite pixels' colours need pen-space versions, which the build makes
+  as 256-byte pen-to-pen tables: light beams (`brightentab` by colour), the water tint (red
+  removed, on all lines or the bottom half) and the pause screen's half brightness. Glass
+  also reads pixels through a table, not yet identified (step 5). The damage flash stays
+  the border's pen 0.
+- The palette is computed in the slave at run time, never kept as a file: it is derived
+  from the game's data, which the repository must not hold.
+- No dithering: the census found no banding to fix (below).
+
+The census (step 3; `tools/census.sh`, `tools/colours.py census`) grabbed 14551 frames
+over all 16 levels, walking and fighting. They show 491 distinct colours, at most 220 in
+one level, all of them colours the static tables can produce (1744 in all). Over those
+frames' pixels:
+
+| Palette (240 pens) | Shown exactly | Mean delta E | Over 2.3 | Brightness steps kept | Max delta E |
+|---|---|---|---|---|---|
+| The slave's | 99.3% (worst level 97.9%) | 0.06 | 0.7% | 99.8% | 18.5 |
+| Wu's quantiser, each box's heaviest colour | 98.6% | 0.14 | 1.4% | 99.3% | 35.9 |
+| The same, dithered in pairs | 98.6% | 0.11 | 1.4% | 99.6% | 23.4 |
+| Wu, boxes' means (24-bit) | 55.3% | 0.41 | 3.2% | 99.4% | 22.0 |
+| A 6x8x5 RGB cube | 9.9% | 13.75 | 90.1% | 41.3% | 34.6 |
+| Wu on each level's own frames (a palette a level) | 100% | 0.00 | 0% | | 0.0 |
+
+A palette per level would show every pixel exactly, but needs the level's colours, which
+only parsing the level would give: 0.7% of pixels, mostly within one 12-bit step, is not
+worth that now. A pen cache filled while drawing was dropped: what it would need cannot be
+measured from frames, and it puts a colour choice in the drawing. k-means refinement, a
+CIELAB metric's alternatives (redmean, YUV, RGB) and the frame sprites' 14 pens as fixed
+entries measured no better.
 
 HAM8 is out: AmigaXDev's two HAM8 converters are 68040-only, and both trade away horizontal
 resolution.
@@ -88,10 +118,14 @@ Which Kalms routine runs is chosen per CPU by measurement:
 ### Memory
 
 Chip grows by the two screens, 138 KB (ws_BaseMemSize from 576 KB to about 720 KB).
-ExpMem grows by the chunky buffer (up to 69120 bytes), the remapped tables and the larger
-per-column tables. Everything is allocated at install. When an allocation fails, the
-option's patches are skipped and the game runs as the original. The ReadMe's memory line
-follows.
+ExpMem grows by $28000, from $158000 to $180000, for the option's area at its top, above
+the stacks (step 3). The first 58080 bytes keep the palette and the pen tables. The rest is
+the palette build's scratch, free once it is done, which the chunky buffer (up to 69120
+bytes) and the larger per-column tables can use. It is not allocated: the slave's fast pool has 136936
+bytes free once the game has loaded, too little, and an area above the stacks leaves the
+game's pool and hunk offsets as they were. WHDLoad asks for it with the option off too.
+Anything further is allocated at install; when that fails, the option's patches are
+skipped and the game runs as the original. The ReadMe's memory line follows.
 
 Game time is per field (`TempFrames`), so a slower frame does not slow the game; frames
 just step further, up to 15 fields.
@@ -125,10 +159,19 @@ just step further, up to 15 fields.
    - The damage flash only changes pen 0, the border. There are no pickup flashes, fades
      or messages in the view: the level text is its own screen.
    - The free pens: 240 in the small view, 255 in full screen (Colour above).
-3. **Colour census.** A `tools/` script reads the installed data at analysis time only:
+3. **Colour census** (done; Colour above, [internals](internals.md#the-1x1-palette)). A
+   `tools/` script reads the installed data at analysis time only:
    distinct colours per level, and the error of one palette against per-level palettes at
    the free pen count, with and without dithering. Then decide, and write the slave's
    palette builder and table remap, checked against the tool's figures.
+   - `tools/colours.py`'s integer model is the builder's, bit for bit. A dump of the area
+     equals it on the a1200-fast, a1200-030 and a1200-040 setups, both variants
+     (`ab3d.py palette`, `colours.py check`).
+   - The build runs once, before the menu: 119 fields on the a1200-fast setup (14 MHz
+     68EC020), 21 on the a1200-030 and 66 on the a1200-040 setup (the MMU models'
+     speed). The nearest-pen searches go through the pens sorted by CIELAB a, with a table
+     of squares: 461 fields on the a1200-fast before that.
+   - The game plays with CUSTOM5=1, and CUSTOM5=0 adds no patch.
 4. **Display skeleton** behind CUSTOM5, with the original renderer unchanged. Point it at
    a fast-memory buffer in the copper-slot layout, convert the words to pens, scale 2x2
    or 3x3 into the chunky buffer, c2p, and show the new screens, with keypad Enter
@@ -172,9 +215,11 @@ just step further, up to 15 fields.
 
 - Full screen 288x240, as the original, for now (26.11.2026).
 - Performance: as fast as possible, no fixed frame rate (26.11.2026).
+- The palette: one fixed 240-pen palette for both views, popular plus farthest in CIELAB
+  over the static histogram, built in the slave; every shade table remapped to pens; no
+  dithering (26.11.2026; Colour).
 
 ## Open decisions
 
 - The floppy version: in scope only if its executable is supplied (step 9).
 - The slowest CPU the option runs on (from steps 4 and 7).
-- The palette method (from step 3).

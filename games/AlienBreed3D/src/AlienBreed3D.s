@@ -7,7 +7,9 @@
 ;		AlienBreed3D.slave and, with NOMUSIC set,
 ;		AlienBreed3D_nomusic.slave; vasm rebuilds both byte for byte
 ;		with -no-opt. Labels and comments are ours. Lxxxx labels are
-;		code-hunk offsets in AlienBreed3D.slave.
+;		code-hunk offsets in AlienBreed3D.slave. ORIGINAL builds
+;		Psygore's bytes; without it, Enhanced resolution (CUSTOM5,
+;		palette.s) is added.
 ;---------------------------------------------------------------------------*
 
 	INCLUDE	whdload.i
@@ -17,7 +19,11 @@ CHIPMEM		= $90000		;576 KB
 	ELSE
 CHIPMEM		= $6b000		;428 KB: no HackAB3D
 	ENDC
+	IFD	ORIGINAL
 EXPMEM		= $158000		;the game, its fast memory pool, the stacks
+	ELSE
+EXPMEM		= $180000		;and Enhanced resolution's area (palette.s)
+	ENDC
 SSP_OFF		= $157e00		;from ExpMem; USP 1 KB below
 
 ;======================================================================
@@ -58,10 +64,14 @@ _config		dc.b	"C1:X:Unlimited Energy:0;"
 		dc.b	"C2:L:Mouse Control:---,LMB=fwd/RMB=fire,RMB=fwd/LMB=fire;"
 	IFND	NOMUSIC
 		dc.b	"C3:B:Load Aminet version (abd8ch);"
-		dc.b	"C4:B:Enable main music (HackAB3D) in the end part",0
+		dc.b	"C4:B:Enable main music (HackAB3D) in the end part"
 	ELSE
-		dc.b	"C3:B:Load Aminet version (abd8ch)",0
+		dc.b	"C3:B:Load Aminet version (abd8ch)"
 	ENDC
+	IFND	ORIGINAL
+		dc.b	";C5:B:Enhanced resolution"
+	ENDC
+		dc.b	0
 ; The game's files: the floppy/CD32 executable (packed or not), the Aminet 8-channel
 ; version, the Team 17 logo picture, the music for the end part, the saved settings.
 _abd		dc.b	"abd",0
@@ -72,6 +82,7 @@ _team		dc.b	"team",0
 _hackab3d	dc.b	"HackAB3D",0
 	ENDC
 _prefs		dc.b	"prefs",0
+		EVEN
 
 ;======================================================================
 ; a0 = resload. Stacks at the top of ExpMem; caches per CPU; the interrupt handlers;
@@ -538,6 +549,11 @@ _pl_v3
 	PL_W	$9b242,$200
 	PL_PS	$9b658,_p_waitlines
 	PL_PS	$9b67c,_p_waitlines
+	IFND	ORIGINAL
+	PL_IFC5
+	PL_PS	$44aa4,_p_loaded
+	PL_ENDIF
+	ENDC
 	PL_END
 _endcopper
 	lea	($1000).w,a1
@@ -1392,4 +1408,9 @@ _resload
 	dc.l	$0
 	IFND	NOMUSIC
 	dc.w	$0
+	ENDC
+
+	IFND	ORIGINAL
+	CNOP	0,4
+	INCLUDE	palette.s
 	ENDC

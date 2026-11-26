@@ -10,7 +10,8 @@ $c4dc version.
 
 A direct slave (WHDLoad 18, 68020 and AGA required): 576 KB chip (428 KB without
 music) and $158000 bytes of ExpMem, so a 2 MB a1200 without fast memory cannot run it
-("Can't allocate ExpMem"); the a1200-fast setup is the smallest that does.
+("Can't allocate ExpMem"); the a1200-fast setup is the smallest that does. Ours asks for
+$180000: the top $28000 is Enhanced resolution's ([below](#the-1x1-palette)).
 
 - Stacks: SSP at ExpMem+$157e00, USP 1 KB below.
 - Caches (`resload_SetCPU`): instruction and data cache on; on a 68040/060 also copyback for
@@ -57,6 +58,11 @@ ExpMem+$153000, the level 13 access fault fixed in 1.3); `prefs` saved by
 (`_endpart`: a copper list of its own, scrolled until a button, then quit); music on and off around the end part (`_p_musicon`,
 `_p_musicoff`, not in the no-music slave). Item by item: the `PL_` lists in the source.
 
+Ours adds, with CUSTOM5 and in `_pl_v3` only, `_p_loaded`: a `PL_PS` at $44aa4, the jsr to
+`LoadObjects` ($436d6, the last of the game's loads before the menu), which runs the load
+and then builds the 1x1 palette ([below](#the-1x1-palette)). Without `-DORIGINAL` the
+source assembles these; with it (`BUILD=original`), Psygore's bytes.
+
 ## Display
 
 The 3D view is a copper chunky screen of 96x80 pixels in 12-bit colour (4096 colours, no
@@ -92,9 +98,10 @@ The renderer writes 12-bit colour words at a pixel stride of 4 bytes, 4 more at 
 32-pixel bank boundary (the BPLCON3 move), and 416 bytes a line. The plain floor span,
 `acrossscrn` at $20f66, is typical: a texel byte, `(a0,d5.w*4)`, indexes a word shade
 table, `(a1,d0.w*2)`, the word goes to `(a3)` and `a3` steps 4, with the extra 4 every
-32 pixels. The textures carry their own colours: a wall tile is 32 colours at 33
-brightness levels of 12-bit words ahead of its texels (the source's `walltiles` and
-`PaletteAddr`). Game time does not depend on the frame rate: each frame advances the game
+32 pixels. The textures carry their own colours: a wall file is 32 rows of 32 12-bit
+colour words (2048 bytes) ahead of its texels, three 5-bit texels a word (the source's
+`walltiles`, `PaletteAddr` and `ChunkAddr`); a brightness of 0-64 picks the row through the
+source's `SCALE` table, two levels a row. Game time does not depend on the frame rate: each frame advances the game
 by the fields since the last one (`TempFrames`, at most 15), which the interrupt counts
 (`FramesToDraw`, $aece).
 
@@ -210,3 +217,35 @@ time in the view's scenes:
 Not in the view: the level text is its own text screen before the level, and the panel's
 picture is in its own planes. At death or level end, `quitGame` ($8e1c) swaps once, then
 waits for the tune with the last frame shown ($8e9e, $8efa).
+
+### The 1x1 palette
+
+Enhanced resolution's palette and pen tables (plan step 3, `src/palette.s`; the method is
+in the [plan](resolution-plan.md#colour)). `_p_loaded` builds them once into the top
+$28000 of ExpMem (ExpMem+$158000, above the stacks). Everything the view can show comes
+from these shade tables (game offsets; a table's rows are brightness, row 0 the brightest):
+
+| Table | Where | Shape | Texel counts from |
+|---|---|---|---|
+| Walls | `walltiles` $42a66, a pointer to each loaded wall file; `wallchunkdata` $42b06, (name, unpacked size) pairs ended by zeros | 32 rows of 32 | the file after its 2048 bytes of colours |
+| Floors and ceilings | `floorScaleCols` $536e6 | 15 rows of 256 | the texture at `floortile` $55cee (a pointer), 64 KB |
+| Textured polygons | `TexturePal` $3e066 | 15 rows of 256 | `TextureMaps` $2e066, 64 KB |
+| Objects | `Objects` $2974a, 18 entries of (wad, ptr, frames, pal) | a pal is 15 rows of 32 | none; the gun (entry 9) draws from its pal's first row only (`DrawInGun`) |
+| Sky | `BackPicture` $55d00 | 16416 words | none |
+| Water, light beams | `brightentab` $766d2 | 5632 words: `texturedwater` reads 13 rows of 256 by distance and texel, `LightDraw` indexes it by colour | the water's `waterfile` $812d2, 64 KB |
+
+The area, by offset from its start:
+
+| Offset | Bytes | What |
+|---|---|---|
+| 0 | 2 | pens built (240) |
+| 2 | 2 | state: 2 when done; $11-$17 while building, the step |
+| 4 | 480 | pen 16 + k's 12-bit colour, k = 0-239 |
+| 512 | 4096 | each 12-bit colour's pen |
+| 4608, 4864, 5120 | 256 each | pen to pen: light beams (`brightentab` by colour), the water tint (red removed), the pause screen (half brightness); pens 0-15 to themselves |
+| 5376 | 14 x 1024 | the walls' tables in pens (a wall not loaded stays 0) |
+| 19712, 23552 | 3840 each | floors and ceilings, textured polygons |
+| 27392 | 18 x 480 | each `Objects` entry's pal |
+| 36032 | 16416 | the sky |
+| 52448 | 5632 | `brightentab` |
+| 58080 | | the build's scratch to $28000 (histogram, every colour's CIELAB, the sorted pens, a table of squares), free once the build is done |

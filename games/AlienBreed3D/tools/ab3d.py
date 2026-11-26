@@ -9,6 +9,8 @@ was found, running or stopped):
     peek OFF [N]          N bytes (default 4) at game offset OFF, hex
     level                 from the main menu into level 1: RETURN every 100 fields until the
                           first frames, then M until mouse control is on (PLR1MOUSE)
+    next                  F1 (WHD_ARGS=CUSTOM1=4: F1 skips the level), then into the next
+                          level the same way
     full [0|1]            the view: print it, or press keypad Enter until it is the one asked
                           (0 small, 1 full screen)
     frames [N [SCRIPT]]   run N fields (default 500) one at a time, playing SCRIPT, and count
@@ -29,6 +31,17 @@ was found, running or stopped):
                           drawPt points at, default 0). Runs of COLOR moves are one line each,
                           with the bank and LOCT that BPLCON3 selected
     batch CMD ;; CMD      gdb commands in one request, CPU stopped
+    grab N OUT [SCRIPT]   run N fields playing SCRIPT and append each frame shown to OUT:
+                          96x80 big-endian 12-bit colour words, read from the view list
+    tables DIR            the loaded walls (DIR/wallNN: shade table, then texels) and the
+                          floor texture (DIR/floortile), which tools/colours.py reads
+    palette OUT [N]       from the boot (WHD_ARGS=CUSTOM5=1), field by field for up to N
+                          (default 3000): wait for the slave's palette build (src/palette.s)
+                          to finish, print the fields it took (each step's, from the state
+                          word) and dump its area to OUT, which
+                          `tools/colours.py check OUT` compares with the model. The dump
+                          reads memory: on a 68040 dump again after some play (N=1), as
+                          copyback can still hold the build's last writes
 
 The 8-channel ($c4dc) version only, which the AGA drawer installs.
 """
@@ -46,11 +59,21 @@ HUNKS = (0x912d4, 0x9f64, 0x18, 0x12798)
 DRAWPT = 0x5dd40        # drawPt, the copper list being drawn; oldDrawPt follows
 FULL = 0x40279          # nonzero in full screen (flipped by keypad Enter)
 PLR1MOUSE = 0x5d82      # nonzero with mouse control (M; Plr1Control's key test at $401ee)
-KEY_RETURN, KEY_M, KEY_ENTER = 0x44, 0x37, 0x43
+KEY_RETURN, KEY_M, KEY_ENTER, KEY_F1 = 0x44, 0x37, 0x43, 0x50
+LEVEL_LETTER = 0x2a29   # the level's letter in 'ab3d2:levels/level_a/twolev.bin', set per level
+# what the colour census reads (tools/colours.py; all loaded once, before the menu)
+WALLTILES = 0x42a66     # walltiles: a pointer to each loaded wall file (LoadWalls)
+WALLCHUNKDATA = 0x42b06  # wallchunkdata: (name, unpacked size) pairs, ended by zeros
+FLOORTILE = 0x55cee     # floortile: a pointer to the loaded floor texture
+FLOORTILE_SIZE = 65536
+# Enhanced resolution's area (src/palette.s): from ExpMem, the bytes that stay, the state word
+PALETTE_AREA, PALETTE_END, PALETTE_STATE = 0x158000, 58080, 2
 
 
 def _bytes(g, addr, n):
     out = g.cmd(f'x/{n}xb {addr:#x}')
+    if 'Cannot access memory' in out:
+        raise RuntimeError(f'cannot read {addr:#x}')
     vals = []
     for line in out.splitlines():
         # only the dump's own lines: a 68040 stop can add MMU state lines (TC=8000 ...)
@@ -150,30 +173,64 @@ def _drawpt(g):
     return _long(g, addr(g, DRAWPT))
 
 
-def cmd_level(server, g, rest):
+def _swapped(g, first, fields):
+    """Run up to `fields` fields one at a time; True once drawPt is not `first`."""
+    for _ in range(fields):
+        g.cmd('monitor fields 1')
+        if _drawpt(g) != first:
+            return True
+    return False
+
+
+def _letter(g):
+    return chr(_bytes(g, addr(g, LEVEL_LETTER), 1)[0])
+
+
+def _enter_level(g):
     """RETURN every 100 fields (the menu, then the text screen once it has loaded) until
     drawPt swaps; then M until PLR1MOUSE is set."""
+    first, presses = _drawpt(g), 0
+    for n in range(0, 4000, 10):
+        if n % 100 == 0:
+            _key(g, KEY_RETURN)
+            presses += 1
+        # field by field: 10 fields can hold an even number of swaps
+        if _swapped(g, first, 10):
+            break
+    else:
+        raise RuntimeError('no frame drawn within 4000 fields')
+    # M until PLR1MOUSE is set: the level's start can clear it after the first frames
+    for m in range(1, 11):
+        g.cmd('monitor fields 40')
+        _key(g, KEY_M)
+        if _bytes(g, addr(g, PLR1MOUSE), 1)[0]:
+            break
+    else:
+        raise RuntimeError('M did not select mouse control')
+    return (f'in level {_letter(g).upper()} after {n + 10} fields and {presses} RETURNs; '
+            f'mouse control on after {m} M')
+
+
+def cmd_level(server, g, rest):
     with Halted(g):
-        first, presses = _drawpt(g), 0
-        for n in range(0, 4000, 10):
-            if n % 100 == 0:
+        return _enter_level(g)
+
+
+def cmd_next(server, g, rest):
+    """F1 (with CUSTOM1 bit 2) ends the level; wait for the next one's name, then enter it."""
+    with Halted(g):
+        was = _letter(g)
+        _key(g, KEY_F1)
+        for n in range(0, 6000, 10):
+            if n % 100 == 50:
                 _key(g, KEY_RETURN)
-                presses += 1
             g.cmd('monitor fields 10')
-            if _drawpt(g) != first:
+            if _letter(g) != was:
                 break
         else:
-            raise RuntimeError('no frame drawn within 4000 fields')
-        # M until PLR1MOUSE is set: the level's start can clear it after the first frames
-        for m in range(1, 11):
-            g.cmd('monitor fields 40')
-            _key(g, KEY_M)
-            if _bytes(g, addr(g, PLR1MOUSE), 1)[0]:
-                break
-        else:
-            raise RuntimeError('M did not select mouse control')
-        return (f'in level 1 after {n + 10} fields and {presses} RETURNs; mouse control on '
-                f'after {m} M')
+            raise RuntimeError(f'level {was.upper()} did not end within 6000 fields of F1 '
+                               '(CUSTOM1=4 in WHD_ARGS?)')
+        return _enter_level(g)
 
 
 def cmd_full(server, g, rest):
@@ -272,6 +329,102 @@ def cmd_frames(server, g, rest):
     return (f'{n} fields: {frames} whole frames, {50 / mean:.2f} fps; fields a frame mean '
             f'{mean:.2f} p50 {_percentile(gaps, .5)} p95 {_percentile(gaps, .95)} max {max(gaps)}'
             f'; histogram {hist}')
+
+
+def _dump(g, a, n, path):
+    """n bytes from runtime address a, through gdb's dump into path (x/xb is far slower)."""
+    g.cmd(f'dump binary memory {path} {a:#x} {a + n:#x}', timeout=300)
+    data = Path(path).read_bytes()
+    if len(data) != n:
+        raise RuntimeError(f'dump of {n} bytes at {a:#x} gave {len(data)}')
+    return data
+
+
+VIEW_W, VIEW_H = 96, 80
+
+
+def view_words(raw):
+    """A view list's 96x80 colour words (big-endian, row by row): pixel x of a line is the
+    data word of COLOR move x % 32 in bank x // 32 (fromPt is the list + 10)."""
+    out = bytearray()
+    for y in range(VIEW_H):
+        line = raw[y * VIEW_LINE:(y + 1) * VIEW_LINE]
+        for x in range(VIEW_W):
+            o = 8 + (x // 32) * 132 + (x % 32) * 4
+            if struct.unpack_from('>H', line, o)[0] != 0x180 + 2 * (x % 32):
+                raise RuntimeError(f'line {y} pixel {x}: not a COLOR move')
+            out += line[o + 2:o + 4]
+    return bytes(out)
+
+
+def cmd_grab(server, g, rest):
+    """grab N OUT [SCRIPT]: N fields playing SCRIPT; append each frame shown (oldDrawPt after
+    a swap) to OUT as 96x80 big-endian colour words."""
+    w = rest.split(None, 2)
+    n, out = int(w[0]), Path(w[1]).resolve()
+    inputs = script_fields(w[2]) if len(w) > 2 else []
+    scratch = out.with_name(out.name + '.list')
+    with Halted(g):
+        a = addr(g, DRAWPT)
+        st = {'last': _long(g, a), 'frames': 0}
+        with open(out, 'ab') as fo:
+            def after(i):
+                p = _long(g, a)
+                if p != st['last']:
+                    st['last'] = p
+                    fo.write(view_words(_dump(g, _long(g, a + 4), VIEW_H * VIEW_LINE, scratch)))
+                    st['frames'] += 1
+            run_fields(g, n, inputs, after)
+        scratch.unlink(missing_ok=True)
+        return f'level {_letter(g).upper()}: {st["frames"]} frames into {out}'
+
+
+def cmd_tables(server, g, rest):
+    """tables DIR: the loaded walls (DIR/wallNN, each its 2048-byte shade table then texels)
+    and the floor texture (DIR/floortile), for tools/colours.py."""
+    d = Path(rest.strip()).resolve()
+    d.mkdir(parents=True, exist_ok=True)
+    with Halted(g):
+        names = []
+        for i in range(40):
+            size = _long(g, addr(g, WALLCHUNKDATA + 8 * i + 4))
+            if not size:
+                break
+            _dump(g, _long(g, addr(g, WALLTILES + 4 * i)), size, d / f'wall{i:02d}')
+            names.append(f'wall{i:02d} {size}')
+        _dump(g, _long(g, addr(g, FLOORTILE)), FLOORTILE_SIZE, d / 'floortile')
+    return f'{len(names)} walls and the floor texture into {d}'
+
+
+def cmd_palette(server, g, rest):
+    """palette OUT [N]: the slave's palette build, timed in fields, and its area dumped."""
+    w = rest.split()
+    out, n = Path(w[0]).resolve(), int(w[1]) if len(w) > 1 else 3000
+    with Halted(g):
+        area, steps, first = None, {}, None
+        for i in range(n):
+            state = None
+            try:        # before the game is loaded the probe can read unmapped memory
+                if area is None:
+                    bases(g)
+                    area = _long(g, 4) - 0x1000 + PALETTE_AREA
+                state = struct.unpack('>H', _bytes(g, area + PALETTE_STATE, 2))[0]
+            except RuntimeError:
+                pass
+            if state is not None:
+                if state == 2:
+                    break
+                if 0x11 <= state <= 0x17:
+                    steps[state - 0x10] = steps.get(state - 0x10, 0) + 1
+                    first = i if first is None else first
+            g.cmd('monitor fields 1')
+        else:
+            raise RuntimeError(f'no finished palette build within {n} fields (CUSTOM5=1?)')
+        _dump(g, area, PALETTE_END, out)
+    seen = (f'building for {sum(steps.values())} fields from field {first}, by step: ' +
+            ' '.join(f'{k}:{v}' for k, v in sorted(steps.items()))) if steps else \
+        'already done when first seen'
+    return f'palette done at field {i}, {seen}; area at ${area:08x} into {out}'
 
 
 def cmd_play(server, g, rest):
@@ -469,7 +622,8 @@ def cmd_batch(server, g, rest):
 server = game_server('ab3d', commands={
     'base': cmd_base, 'peek': cmd_peek, 'level': cmd_level, 'full': cmd_full,
     'frames': cmd_frames, 'play': cmd_play, 'aprof': cmd_aprof, 'copper': cmd_copper,
-    'batch': cmd_batch})
+    'batch': cmd_batch, 'next': cmd_next, 'grab': cmd_grab, 'tables': cmd_tables,
+    'palette': cmd_palette})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])

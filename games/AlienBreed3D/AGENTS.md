@@ -19,8 +19,10 @@ Read `docs/open-work.md` first.
 | `docs/resolution-plan.md` | Enhanced resolution: the design, the steps, the open decisions |
 | `docs/performance.md` | the original's measured frame rates and where a frame's time goes |
 
-The slave source is `src/`; `tools/` is the development harness and never ships
-(`tools/exe.py` unpacks the game executable for analysis, `tools/ab3d.py` drives the game on
-the shared server, `tools/srcmatch.py` finds the published source's routines,
-`tools/baseline.sh` and `tools/frametime.py` measure the frame rate and where a frame's time
-goes).
+The slave source is `src/` (`src/palette.s`: Enhanced resolution's palette builder);
+`tools/` is the development harness and never ships (`tools/exe.py` unpacks the game
+executable for analysis, `tools/ab3d.py` drives the game on the shared server,
+`tools/srcmatch.py` finds the published source's routines, `tools/baseline.sh` and
+`tools/frametime.py` measure the frame rate and where a frame's time goes,
+`tools/census.sh` and `tools/colours.py` are the colour census and the palette builder's
+model).
