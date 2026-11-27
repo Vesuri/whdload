@@ -20,7 +20,7 @@
 ;======================================================================
 
 _base		SLAVE_HEADER			;ws_Security + ws_ID
-		dc.w	10			;ws_Version
+		dc.w	17			;ws_Version
 		dc.w	WHDLF_NoError|WHDLF_EmulTrap	;ws_flags
 		dc.l	$80000			;ws_BaseMemSize
 		dc.l	0			;ws_ExecInstall
@@ -33,6 +33,10 @@ _expmem		dc.l	0			;ws_ExpMem
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
+		dc.w	0			;ws_kickname (none: a direct slave)
+		dc.l	0			;ws_kicksize
+		dc.w	0			;ws_kickcrc
+		dc.w	0			;ws_config
 
 ;============================================================================
 
@@ -111,6 +115,8 @@ _Start						;A0 = resident loader
 _PL_Game	PL_START
 		PL_PS	$175c,_Keybd
 		PL_PS	$455d6,_SaveHighs
+		PL_PS	$1806,FixVblCount	;Timing fix: count the fields
+		PL_PSS	$5dc0c,FixSwapWait,16	;Timing fix: 3 fields a frame at least
 		PL_END
 
 ;======================================================================
@@ -319,3 +325,7 @@ _WrongVersion	pea	TDREASON_WRONGVER.w
 _End		move.l	_resload(pc),-(sp)
 		addq.l	#resload_Abort,(sp)
 		rts
+
+;======================================================================
+
+		INCLUDE	EmpireStrikesBackFixes.s
