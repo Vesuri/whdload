@@ -41,8 +41,10 @@ demo race (San Marino) after about 25 s in warp on the a500.
 `tools/vmp.py serve` (with the run options in the environment, `INSTANCE=` for a run of
 one's own) adds `do` (fields, mouse and buttons, reads, waits on a long or on the VBL hook,
 breakpoints, screenshots, with the CPU stopped), `race` (the boot to the menu), `hook`,
-`bench` (fps from the next green light) and `statelog` (the race state at every frame end or
-pass, for games/Vroom's `tools/statecmp.py`). The first demo race (Adelaide, two views) is the
+`bench` (fps from the next green light), `statelog` (the race state at every frame end or
+pass, for games/Vroom's `tools/statecmp.py`), `frames` (a hash of every line of each drawn
+frame, for games/Vroom's `tools/framecmp.py`) and `shown` (frames that changed the screen on
+display). The first demo race (Adelaide, two views) is the
 same race on every machine; the second (Monaco) has one view.
 The title and the menu share the VBL hook $ADAC; a race's is $AE64. In the menu the left
 button on START, held until the hook is $AE64, starts a race (about 500 fields).
@@ -53,6 +55,7 @@ button on START, held until the hook is $AE64, starts a race (about 500 fields).
 |---|---|
 | `tools/addrmap.py VROOM.bin VMP.bin map ADDR ...` | each Vroom address's Multiplayer address (`segs`, `data`, `cmp LO HI` for the alignment itself; `internals.md`, "The program against Vroom's"). The images: chip memory at $3658 of each game, `BOOT_BREAK=0x3658` and `gdb dump binary memory`, with `SLAVE=original` |
 | `tools/blitstarts.py VMP.bin` | writes `src/blitwait.i` |
+| `tools/blitsites.py VMP.bin` | writes `src/blitsites.i`: the blitter starts the game waits after itself |
 | `tools/vmp.py` | the game server, above |
 
 Vroom's `tools/smc.py` and `tools/smcscan.py` run on this game's traces and images as they

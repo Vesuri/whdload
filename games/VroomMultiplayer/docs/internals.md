@@ -66,9 +66,9 @@ length, as in Vroom: the menu's wipes $46E0 and $5334, after a menu choice $4822
 delay routines $8978 and $1682A.
 
 Vroom's other 68020 fix, the wait before the landscape for the VBL to take the last frame
-(its flickering objects), is not ported: here the frame's drawing ($DB04) already waits for
-the next field after the swap ($EB36 against $98DE), or with two views for the beam to pass
-the top view.
+(its flickering objects), is not ported: here each view's drawing ($DB04) already waits for
+the next field after the swap ($EB36 against $98DE), or, with two views and in the large
+single view, for the beam to pass the view ("Enhanced framerate", "The screen on display").
 
 ## Self-modifying code (68020 and higher)
 
@@ -128,6 +128,7 @@ fields the debt past it is dropped and counted).
 | $BE86 (`tst.w $E53E`) | the end of a pause: the tick clock starts again |
 | $DB04 (`cmpi.w #1,$11484`) | in a pass that does not draw, each view leaves out the wait, the sky and ground clear, the road spans, the sky objects and the scaler ($DB04-$DBCF), keeping the clear's state: the horizon's scroll (`$14FA4`, per view at $15120) and the clamp of the ground's top line $12136 |
 | $D348 (`cmpi.w #$50,$C8`) | a pass that does not draw goes on at $D38C, leaving out the frame end's wait and the swap |
+| 94 blitter starts in $1309E-$1B25E (`src/blitsites.i`) | `jsr $10C`-`$124.w` (`src/blitwait.i`'s start-and-wait) become `jsr $1E0`-`$1F8.w`: start, one read of dmaconr, return |
 
 What an undrawn pass still runs: the players' steps, the landscape of every view (it follows
 the track and decides whether the car is off the road, as in Vroom), the player's timers in
@@ -135,6 +136,24 @@ $D3A6, and the rest of $DB04 (start lights, crash sequences, pit stop, the panel
 count passes. The scheduler's variables are at $1C0-$1D5 (`ENH_VARS`, as in Vroom).
 `CUSTOM3=n` (for the checks) leaves out the drawing in n of every n+1 passes. The
 Multiplayer has no link play.
+
+**Blitter waits.** As in Vroom: `src/blitwait.i` makes each blitter start in the renderer
+wait for its blit, and the game waits itself before it programs the next one.
+`tools/blitsites.py` finds the starts followed, in straight-line code, by such a wait (`btst
+#6,2(a6)`, or a `jsr` of the queue waits $11FDE, $11FA6, $11FC2) with no memory access in
+between but to the custom chips: 94 of the 138. With the option those only start the blit.
+`bench 300` on the a1200 (68020, chip memory only): 14.14 fps with 53 of 353 ticks undrawn,
+against 13.45 with 71 of 371. `frames 100` on the a1200-040 (`CUSTOM3=2`) with and without
+them (`-DENH_NOBLITSITES`): every frame the same but for lines 31-35 in 24 of them, the race
+clock (real time).
+
+**The screen on display.** `shown 40` (the screen not handed to the VBL, read at the swap and
+when the VBL takes the new one) on the a1200-040 and the a1200-030, two views and one: no
+frame changed it. With the option off the a1200-040 changes it in 5-13 of 40 frames, all from
+the original loop's design: in one view the map marker ($D010, lines 41-43), which the pass
+draws before the view's wait for a new field; with two views and in the large single view
+(layout 2) the drawing that starts once the beam has passed line $D0 or $AC ($DB1A), into the
+screen the next field replaces.
 
 Checks, from the first demo race's green light (`tools/vmp.py`):
 - *The same ticks.* `statelog 300 FILE tick` on the a500 and on the a1200-040 with

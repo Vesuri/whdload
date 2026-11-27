@@ -6,6 +6,8 @@
   hook                       what the VBL calls through $B028 (the title $ADAC, a race $AE64)
   bench [<frames>]           fps over the first frames from the next green light
   statelog <n> <file> [tick] the race state at every frame end (or pass) from the next green light
+  frames <n> <file>          a hash of each drawn frame's lines, at the swap, from the next green light
+  shown <n>                  frames whose shown screen changed between the swap and the VBL taking the next
 
 A port of games/Vroom's tools/vroom.py at the Multiplayer's (v1) addresses
 (tools/addrmap.py). Each command's docstring has the details.
@@ -39,6 +41,11 @@ ENH_VARS = 0x1C0          # src/enhanced.i: due, ticks, frames drawn, fields dro
 # $12132/$12136 and the horizon's scroll per view ($15120).
 STATE = ((0xE504, 0xE9AC), (0x1254C, 0x12964), (0x8B94, 0x8B98), (0x12130, 0x12138),
          (0x15120, 0x15140))
+PENDING = 0x972E          # the buffer handed to the VBL; -1 once the VBL has taken it
+SWAPPED = 0xD37C          # after `move.l $8F00,$972E`: the frame is handed to the VBL
+VBL_TAKEN = 0xAEC4        # the race VBL ($AE64) has taken it: `move.l #-1,$972E`
+SCREENS = 0x8EF8          # the two screens' addresses (longs)
+SCREEN_BYTES = 32000      # 4 planes of 8000 bytes
 BUTTONS = {'L': 'JOY1_FIRE_BUTTON', 'R': 'JOY1_2ND_BUTTON'}   # the port-0 mouse buttons
 
 
@@ -262,6 +269,77 @@ def state_log(server, g, rest):
     return f'{len(rows)} stops, fields {rows[0].split()[1]}..{rows[-1].split()[1]}' if rows else 'none'
 
 
+def screen_diff(a, b):
+    """Where two screen reads differ: plane, first and last line."""
+    rows = sorted({(i * 4 // 8000, i * 4 % 8000 // 40) for i in range(len(a)) if a[i] != b[i]})
+    planes = sorted({p for p, _ in rows})
+    return f'planes {planes} lines {min(r for _, r in rows)}-{max(r for _, r in rows)}'
+
+
+def frames(server, g, rest):
+    """frames <n> <file>: from the next green light, at each swap ($D37C) for <n> frames, one
+    line: the frame number, the tick (Enhanced framerate's pass count, else 0), then a short
+    hash of each of the 800 plane lines of the frame just handed to the VBL. Two builds that
+    draw the same ticks compare line for line (games/Vroom's tools/framecmp.py)."""
+    import hashlib
+    n, path = int(rest.split()[0]), rest.split()[1]
+    g.stop()
+    rows = []
+    try:
+        if not green_light(g):
+            return 'no race start within 20000 fields'
+        g.cmd(f'break *{SWAPPED:#x}')
+        for i in range(n):
+            out = g.cmd('continue', timeout=120)
+            if 'Breakpoint' not in out:
+                return f'no swap after {i}'
+            tick = longs(g, ENH_VARS + 4, 1)[0]
+            words = longs(g, longs(g, PENDING, 1)[0], SCREEN_BYTES // 4)
+            raw = b''.join(w.to_bytes(4, 'big') for w in words)
+            lines = [hashlib.sha1(raw[k:k + 40]).hexdigest()[:6] for k in range(0, SCREEN_BYTES, 40)]
+            rows.append(f'{i} {0 if tick == 0xCCCCCCCC else tick} ' + ' '.join(lines))
+    finally:
+        g.cmd('delete')
+        g.cont()
+        Path(path).write_text('\n'.join(rows) + '\n')
+    return f'{len(rows)} frames'
+
+
+def shown(server, g, rest):
+    """shown <n>: from the next green light, for <n> frames: at each swap ($D37C) read the
+    screen still on display (the one not handed to the VBL), and again when the VBL takes the
+    new one ($AEC4). A difference means the game drew into the screen on display (flicker)."""
+    n = int(rest.split()[0]) if rest.split() else 40
+    g.stop()
+    changed, bad = 0, []
+    try:
+        if not green_light(g):
+            return 'no race start within 20000 fields'
+        for i in range(n):
+            g.cmd(f'break *{SWAPPED:#x}')
+            out = g.cmd('continue', timeout=120)
+            g.cmd('delete')
+            if 'Breakpoint' not in out:
+                return f'no swap after {i}'
+            new = longs(g, PENDING, 1)[0]
+            a, b = longs(g, SCREENS, 2)
+            old = b if new == a else a
+            before = longs(g, old, SCREEN_BYTES // 4)
+            g.cmd(f'break *{VBL_TAKEN:#x}')
+            out = g.cmd('continue', timeout=120)
+            g.cmd('delete')
+            if 'Breakpoint' not in out:
+                return f'no VBL after {i}'
+            after = longs(g, old, SCREEN_BYTES // 4)
+            if after != before:
+                changed += 1
+                bad.append(f'{i}: {screen_diff(before, after)}')
+    finally:
+        g.cmd('delete')
+        g.cont()
+    return f'{n} frames, {changed} with the shown screen changed' + ''.join(f'\n  {b}' for b in bad[:20])
+
+
 def to_race(server, g, rest):
     """race [stay]: from the boot, through the title (right button in its idle loop,
     repeated until the VBL hook leaves the title) to the menu, then the left button held
@@ -303,6 +381,7 @@ def to_race(server, g, rest):
 
 
 server = game_server('vmp', commands={'do': do, 'race': to_race, 'hook': hook,
-                                     'bench': bench, 'statelog': state_log})
+                                     'bench': bench, 'statelog': state_log,
+                                     'frames': frames, 'shown': shown})
 if __name__ == '__main__':
     server.main(sys.argv[1:])

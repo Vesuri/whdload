@@ -6,16 +6,15 @@ Vroom's fixes for CPU caches and fast CPUs are in (`docs/internals.md`, "Fixes" 
 crashes in the first demo race on the a1200-040 and a1200-060 with `CACHE`, the new one runs
 there, on the a500 and the a1200, and under SNOOP. v1 only: v2 (NTSC) is not among the inputs.
 With Enhanced framerate (`CUSTOM1=1`, 68020 and up) the race runs on a fixed 16.7 Hz tick
-(`internals.md`, "Enhanced framerate"): Vroom's phase C.
+(`internals.md`, "Enhanced framerate"): Vroom's phase C, and the blitter starts the game
+waits after itself no longer wait.
 
 ## Next
 
 1. Untested: a race to its end and a second race (Vroom's reload over its program came
    there), link play, the highscore save; v2.
-2. A two-view race on the a1200-040: does a frame draw into the screen still shown (its
-   frame end waits for the beam only past the top view, `internals.md`, "Fixes")?
-3. The rest of Vroom's Enhanced framerate (games/Vroom `docs/open-work.md`, phases D and E):
-   the blitter starts that need not wait, the 64-bit fetch on AGA, the ground filled by the
+2. The rest of Vroom's Enhanced framerate (games/Vroom `docs/open-work.md`, phases D and E):
+   the 64-bit fetch on AGA, the ground filled by the
    CPU, the stack and the race block in fast memory, and the frames between ticks (the
    snapshot holds both players' state; each view mixes its own).
-4. A release: a dated `$VER`, a ReadMe entry above CFou's.
+3. A release: a dated `$VER`, a ReadMe entry above CFou's.

@@ -26,7 +26,16 @@
 ; The Multiplayer has no link play.
 ;
 ; The scheduler's variables are in low memory, where the tools can read them.
+;
+; Blitter waits: src/blitwait.i makes every blitter start in the renderer wait
+; for its blit ($10C-$124). Where the game waits itself before its next blit,
+; with nothing in between that touches memory, the start only reads dmaconr
+; once (Agnus sets the busy bit a cycle late) and returns: the CPU runs on
+; while the blitter works. src/blitsites.i lists those sites
+; (tools/blitsites.py).
 ;---------------------------------------------------------------------------
+
+	INCLUDE	blitsites.i
 
 ENH_VARS	= $1C0			; low memory, after src/fixes.i's trampolines
 ENH_DUE		= ENH_VARS+0		; long: the field the next tick is due
@@ -38,6 +47,12 @@ ENH_SKIP	= ENH_VARS+18		; byte: this pass leaves out the drawing
 ENH_SKIPS	= ENH_VARS+19		; byte: passes in a row that have left it out
 ENH_FORCE	= ENH_VARS+20		; byte: CUSTOM3, for the checks (below)
 ENH_COUNT	= ENH_VARS+21		; byte: its pass count
+
+ENH_BLT0	= $1E0			; jmp trampolines for the blitter starts,
+ENH_BLT1	= ENH_BLT0+6		; as src/fixes.i's $10C-$124
+ENH_BLT4	= ENH_BLT0+12
+ENH_BLT5	= ENH_BLT0+18
+ENH_BLT6	= ENH_BLT0+24
 
 ENH_FIELDS	= $98DE			; the VBL's field counter (long)
 
@@ -52,7 +67,7 @@ ENH_SKIPS_MAX	= 3			; passes in a row without drawing
 ; IN:	-
 ; OUT:	-	all registers preserved
 ; Called from Fix on a 68020 or higher.
-Enhanced	movem.l	d0/a0-a2,-(a7)
+Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		lea	_enh_state(pc),a2
 		tst.b	(a2)
 		bne.b	.known
@@ -79,11 +94,20 @@ Enhanced	movem.l	d0/a0-a2,-(a7)
 		bsr	enh_Rebase
 .known		tst.b	(a2)
 		bmi.b	.done
+		lea	ENH_BLT0.w,a0		; jmp enh_Blt0 ... enh_Blt6
+		lea	_enh_blt(pc),a1
+		move.l	a1,a2
+		moveq	#5-1,d0
+.tramp		move.w	#$4EF9,(a0)+		; jmp xxx.l
+		move.w	(a1)+,d1
+		pea	(a2,d1.w)
+		move.l	(a7)+,(a0)+
+		dbf	d0,.tramp
 		lea	_enh_pl(pc),a0
 		sub.l	a1,a1
 		move.l	_resload(pc),a2
 		jsr	resload_Patch(a2)
-.done		movem.l	(a7)+,d0/a0-a2
+.done		movem.l	(a7)+,d0-d1/a0-a2
 		rts
 
 _enh_pl		PL_START
@@ -92,6 +116,9 @@ _enh_pl		PL_START
 		PL_PS	$BE86,enh_Unpause	; tst.w $E53E.l: the end of a pause
 		PL_PSS	$DB04,enh_View,2	; cmpi.w #1,$11484.l: a view's drawing
 		PL_PSS	$D348,enh_Swap,2	; cmpi.w #$50,$C8.l: the frame's end
+	IFND	ENH_NOBLITSITES			; (for A/B checks)
+		ENH_BLITSITES			; jsr ENH_BLT0-6 for jsr $10C-$124
+	ENDC
 		PL_END
 
 ; The tick clock starts again: the next tick is due now.
@@ -183,6 +210,22 @@ enh_Swap	tst.b	ENH_SKIP.w
 		cmp.w	#$50,$C8.w
 		rts
 .out		move.l	#$D38C,(a7)
+		rts
+
+; A blitter start the game waits after itself: start, let Agnus set the busy
+; bit (a dummy read, as WHDLoad's BLITWAIT), return.
+_enh_blt	dc.w	enh_Blt0-_enh_blt,enh_Blt1-_enh_blt,enh_Blt4-_enh_blt
+		dc.w	enh_Blt5-_enh_blt,enh_Blt6-_enh_blt
+enh_Blt0	move.w	d0,bltsize(a6)
+		bra.b	enh_Blt
+enh_Blt1	move.w	d1,bltsize(a6)
+		bra.b	enh_Blt
+enh_Blt4	move.w	d4,bltsize(a6)
+		bra.b	enh_Blt
+enh_Blt5	move.w	d5,bltsize(a6)
+		bra.b	enh_Blt
+enh_Blt6	move.w	d6,bltsize(a6)
+enh_Blt		tst.b	_custom+dmaconr
 		rts
 
 _enh_state	dc.b	0		; 0 unknown, -1 off, 1 on
