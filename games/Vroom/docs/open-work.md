@@ -22,6 +22,13 @@ Published again 25.11.2026 under the same tag and date, now on bb868516: the pla
 its tyres again. The blitter queue fix had left a6 off the blitter before their blits
 (`internals.md`, "Fixes", $11BEA), on every CPU.
 
+Since then (not published): the fuel gauge's level marker is drawn again on AGA. The 64-bit
+fetch had moved the screens but not the gauge's table of line addresses ($12CC0), so 2.0b
+drew the marker 6 bytes past its place, at the next line's left edge (found porting the
+fetch to Vroom Multiplayer, whose gauge table is the same). Checked on the a1200-040: the
+marker is back in the screenshot, and `frames 200` (`CUSTOM3=2`) against `-DENH_NOFMODE`
+matches in lines 36-171.
+
 ## Decisions (the user's, 23.11.2026)
 
 - **Enhanced framerate** (`CUSTOM1=1`) is one toggle for the whole enhancement: the fixed

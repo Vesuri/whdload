@@ -118,7 +118,9 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		tst.l	d0
 		beq.b	.done
 		move.b	#1,(a2)			; 1: on
+	IFND	ENH_NOFMODE			; (for A/B checks)
 		bsr	enh_FmodeInit
+	ENDC
 		move.w	#3,ENH_PERIOD.w	; 16.7 Hz
 		clr.l	ENH_TICKS.w
 		clr.l	ENH_FRAMES.w
@@ -1114,8 +1116,9 @@ enh_Blt		tst.b	_custom+dmaconr
 ; $A720; the data disk's loader has a copy of the first, $1DA6E-$1DAA3), the
 ; screens' and the draw buffer's pointers $86E2/$86E6/$86EA, the screen the
 ; VBL shows next $A71C, the copper lists' initial plane pointers ($A720,
-; $A78C), and three in the race's map code ($1278C, $12A62, $12BC4); the rest
-; takes them from the pointers. Its own fetch window: the mode setting ($A4A6)
+; $A78C), three in the race's map code ($1278C, $12A62, $12BC4) and the
+; gauge's table of line addresses ($12CC0-$12D23); the rest takes them from
+; the pointers. Its own fetch window: the mode setting ($A4A6)
 ; writes DDFSTOP $D0 for FMODE 0; the 64-bit fetch of the same 320 pixels at
 ; the same place stops at $B0 (DDFSTRT $38 for both). Every lores plane
 ; pointer setting ($A32C, $A3F4: the VBL's new screen; $A4A6: a new mode) picks
@@ -1154,6 +1157,11 @@ _enh_scrc	ENH_SCR	$86E2,$1FAC6		; both programs'
 		ENH_SCR	$1278E,$1FAC6+$99A	; the race's map code
 		ENH_SCR	$12A64,$1FAC6
 		ENH_SCR	$12BC6,$1FAC6+$434
+ENH_GAUGE	SET	0			; the gauge's 25 line addresses
+		REPT	25			; ($12CC0, read at $12C06)
+		ENH_SCR	$12CC0+4*ENH_GAUGE,$203AC-40*ENH_GAUGE
+ENH_GAUGE	SET	ENH_GAUGE+1
+		ENDR
 		dc.l	0
 _enh_scro	ENH_SCR	$86EA,$1FAC6		; the draw buffer and the displayed
 		ENH_SCR	$86EA,$277C6		; screen: either (not required)

@@ -246,6 +246,7 @@ the title, the menu and a race (instruction operands and longs into $1FAC6-$2F4C
 | $86E2, $86E6, $86EA | the screens' pointers and the draw buffer |
 | $A71C; $A726-$A73E, $A792-$A7AA | the screen the VBL shows next; the copper lists' initial plane pointers (low words) |
 | $1278C, $12A62, $12BC4 (in the race block) | the race's map code: `movea.l #$20460`, `adda.l #$1FAC6`, `movea.l #$1FEFA` |
+| $12CC0-$12D23 (in the race block) | the fuel gauge's 25 line addresses on the right of the panel ($203AC down to $1FFEC), read at $12C06 |
 
 The rest takes the screens from the pointers (the loader's unpacks to $22686 are the first
 screen plus $2BC0, for example). At the first `Fix` every one of a program's references must
