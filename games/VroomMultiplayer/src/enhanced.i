@@ -1083,8 +1083,9 @@ enh_Turn	tst.b	_enh_frame(pc)
 		moveq	#0,d0
 		bsr	enh_Mix
 		move.w	d1,([ENH_BLOCK.w],$1199C)
-		movem.l	_enh_bufs(pc),a4/a1	; the tick before's objects, this
-		lea	(ENH_OSKY,a4),a4	; tick's
+		move.l	_enh_bufs(pc),a4	; the tick before's objects
+		move.l	_enh_bufs+4(pc),a1	; and this tick's
+		lea	(ENH_OSKY,a4),a4
 		lea	(ENH_OSKY,a1),a1
 		lea	ENH_SKY,a0
 		tst.w	([ENH_BLOCK.w],$1254A)			; the view
