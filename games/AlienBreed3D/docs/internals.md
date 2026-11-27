@@ -80,7 +80,7 @@ Ours adds, with CUSTOM5, to `_pl_v3` (a `PL_IFC5` block; the CD32 version's
 
 Without `-DORIGINAL` the source assembles these; with it (`BUILD=original`), Psygore's
 bytes. Outside the `PL_IFC5` block both slaves' lists patch the same offsets the same way
-(`python3 -m amigaxdev.patchlist`, which stops at `PL_IFC5`), but for one fix ours adds to
+(`python3 -m amigaxdev.patchlist`, which stops at `PL_IFC5`), but for two fixes ours adds to
 `_pl_v2` and `_pl_v3`, with or without CUSTOM5:
 
 - `_p_waitvb` at the game's four field waits ($c4dc: $2830, $317a, $49020 and $490b4;
@@ -98,6 +98,10 @@ bytes. Outside the `PL_IFC5` block both slaves' lists patch the same offsets the
   lines. Writing from line 0 the CPU trailed the copper, which read most colours' old high
   and new low nibbles: off by 16 for a frame wherever a step carried into the high
   nibble, a speckle in the dark colours (the original's).
+- The polygon objects' vertex divides ($c4dc: $21e44 and $21e46; $fd78: $220ca and $220cc),
+  line-a words for `_t_linea` ([the 1x1 renderer](#the-1x1-renderer)): a vertex close beside
+  the eye overflowed `divs.w`, and a face lay across the view, one flat colour a row. Not in
+  `_pl_v1`: no archive holds the floppy version.
 
 ## Display
 
@@ -390,24 +394,24 @@ sites at each switch. The projection is x = X * 128 / Z + 47 and y = (H - eye) /
   the fillers write one column past the right clip, which at 192 columns was the bottom's
   column 0 and the objects' graphics table at $2974a (aliens, corpses and blood then drew
   from address 2).
-- **The projections' divides**: 24 `divs.w Dz,Dn` before a centre's `addi.w` (a point's
-  x at $84de, a wall's ends, top and bottom at $1b464-$1b4d4 and $1b682-$1b69c, the floors
-  at $1d5ec-$1d892, glass and bitmaps at $21434-$21870, the polygon objects' vertices at
-  $21e44 and $21e46) put x / z or a height / z in a word. Close to the eye the quotient
-  overflows, and `divs.w` then leaves Dn as it was: the original drops or misdraws such a
-  wall. Ours scales x and the heights by S, so it happened at S times the distance: a wall
-  close by not drawn, the sky (drawn first) and the list's two-frame-old pixels showing in
-  its place, flickering between the lists. A polygon object beside the eye, its nearest
-  vertices at z 1 or 2, took x's low word for x / z and put them across the view, a face
-  filling the view's middle with one colour a row (the original's too: level 1's storage
-  room, left after the first door, player 1 at x -1529, z 1823, angle 2122: object 49,
-  vector object 7, vertices at x -99078 to -105211, z 1 and 2, on screen at x 32089 and
-  25956).
-  Each is a line-a word, $a000 | n << 9 | z (`PL_W`), and `_t_linea` (the vector $28,
-  `WHDLF_EmulLineA`) divides in 32 bits, the quotient held to +-16383 so the centre's add
-  cannot wrap; Dn's upper word the remainder, so where `divs.w` does not overflow the
-  result is its own. Turning in level 1's start: 33268 unwritten pixels to 134 (small
-  view), 19293 to 2717 (full screen; `ab3d.py holes`, `-DHOLES`).
+- **The projections' divides**: 24 `divs.w Dz,Dn` before a centre's `addi.w` (a point's x
+  at $84de, a wall's ends, top and bottom at $1b464-$1b4d4 and $1b682-$1b69c, the floors at
+  $1d5ec-$1d892, glass and bitmaps at $21434-$21870, the polygon objects' vertices at
+  $21e44 and $21e46, these two in both displays: [above](#slave-patches)) put x / z or a
+  height / z in a word. Close to the eye the quotient overflows, and `divs.w` then leaves
+  Dn as it was: the original drops or misdraws such a wall. Ours scales x and the heights
+  by S, so it happened at S times the distance: a wall close by not drawn, the sky (drawn
+  first) and the list's two-frame-old pixels showing in its place, flickering between the
+  lists. A polygon object beside the eye, its nearest vertices at z 1 or 2, took x's low
+  word for x / z and put them across the view, a face filling the view's middle with one
+  colour a row (the original's too: level 1's storage room, left after the first door,
+  player 1 at x -1529, z 1823, angle 2122: object 49, vector object 7, vertices at x -99078
+  to -105211, z 1 and 2, on screen at x 32089 and 25956). Each is a line-a word, $a000 | n
+  << 9 | z (`PL_W`), and `_t_linea` (the vector $28, `WHDLF_EmulLineA`; set at the
+  version's check, before the game starts) divides in 32 bits, the quotient held to +-16383
+  so the centre's add cannot wrap; Dn's upper word the remainder, so where `divs.w` does
+  not overflow the result is its own. Turning in level 1's start: 33268 unwritten pixels to
+  134 (small view), 19293 to 2717 (full screen; `ab3d.py holes`, `-DHOLES`).
 - **Ours, S x S**: the gun (`DrawInGun` $5826, a fixed-size image) and the sky ($1933e, 96
   of its 432 columns, as the original's field of view; with pen bytes a line a texel row,
   each texel's S pens in one word or long from `DA_SKYTAB`, then the line copied S - 1

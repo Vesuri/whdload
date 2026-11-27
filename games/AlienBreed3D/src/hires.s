@@ -648,47 +648,6 @@ _t_gun
 	rts
 	ENDC
 
-;----------------------------------------------------------------------
-; Line-a (the PL_W $a000|n<<9|z in the patch list, the vector $28; WHDLF_EmulLineA): the projections'
-; divs.w Dz,Dn before their centre's addi.w ($a000|n<<9|z, at 24 sites). The original's
-; 16-bit quotient overflows for a point close to the eye: divs.w then leaves Dn as it was,
-; and the wall or object is dropped or drawn wild. Ours scales x and the heights by S, so
-; that happened at S times the distance (walls missing close by, the old frames showing
-; there). Here a 32-bit divide, the quotient held to +-16383 so the centre's add cannot
-; wrap; Dn's upper word the remainder, so where divs.w does not overflow Dn is its result.
-; A zero divisor gives the limit of the dividend's sign.
-_t_linea
-	movem.l	d0-d7/a0,-(sp)		;Dn at n * 4(sp)
-	movea.l	36+2(sp),a0		;the stacked pc: the line-a word
-	move.w	(a0),d0
-	move.w	d0,d1
-	andi.w	#7,d0
-	lsl.w	#2,d0			;z * 4
-	lsr.w	#7,d1
-	andi.w	#7<<2,d1		;n * 4
-	move.w	2(sp,d0.w),d2		;Dz's low word
-	ext.l	d2
-	move.l	(sp,d1.w),d3		;Dn
-	move.l	#16383,d0
-	tst.l	d2
-	beq.s	.limit
-	divsl.l	d2,d4:d3
-	cmp.l	d0,d3
-	bgt.s	.held
-	neg.l	d0
-	cmp.l	d0,d3
-	blt.s	.held
-	move.w	d4,(sp,d1.w)		;the remainder, as divs.w's
-	move.w	d3,2(sp,d1.w)
-	bra.s	.out
-.limit	tst.l	d3
-	bpl.s	.held
-	neg.l	d0
-.held	move.w	d0,2(sp,d1.w)
-.out	addq.l	#2,36+2(sp)
-	movem.l	(sp)+,d0-d7/a0
-	rte
-
 ; PL_P at $1933e (the sky, over move.l a0,-(sp) and the angle's read). The game's draws 96
 ; columns of 38 words from lines 1 on (y + 1, as the walls), one sky column each; ours
 ; S x S from line 1.

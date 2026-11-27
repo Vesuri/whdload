@@ -49,7 +49,7 @@ base		moveq	#-1,d0
 		dc.w	18			;ws_Version
 		IFD	ORIGINAL
 		dc.w	WHDLF_NoError|WHDLF_Req68020|WHDLF_ReqAGA	;ws_Flags
-		ELSE				;line-a: Enhanced resolution's divides (hires.s)
+		ELSE				;line-a: the projections' divides (_t_linea)
 		dc.w	WHDLF_NoError|WHDLF_Req68020|WHDLF_ReqAGA|WHDLF_EmulLineA
 		ENDC
 		dc.l	CHIPMEM			;ws_BaseMemSize
@@ -283,6 +283,8 @@ _start
 .version
 	IFND	ORIGINAL
 	bsr.w	_port			;the CD32 version's game offsets (port.s)
+	pea	_t_linea(pc)		;line-a: the projections' divides
+	move.l	(sp)+,($28).w
 	ENDC
 	add.l	d1,(a0)
 	add.l	d2,4(a0)
@@ -489,6 +491,47 @@ _p_waitfade			;the menu's fades: the same, then to line $20. Each step writes
 .l20	cmpi.b	#$20,$dff006	;copper loads them in its first lines: from line 0 the copper
 	blo.s	.l20		;read most colours' old high and new low nibbles (off by 16
 	rts			;for a frame where a step carried, a speckle in dark colours)
+; Line-a (WHDLF_EmulLineA; the vector $28, set before the game starts): the projections'
+; divs.w Dz,Dn before their centre's addi.w, each a PL_W $a000|n<<9|z: the polygon
+; objects' vertices in both displays, 22 more with Enhanced resolution. The original's
+; 16-bit quotient overflows for a point close to the eye: divs.w then leaves Dn as it was,
+; and the wall or object is dropped or drawn wild (a polygon object beside the eye: a face
+; across the view). Enhanced resolution scales x and the heights by S, so there it happened
+; at S times the distance (walls missing close by, the old frames showing there). Here a
+; 32-bit divide, the quotient held to +-16383 so the centre's add cannot wrap; Dn's upper
+; word the remainder, so where divs.w does not overflow Dn is its result. A zero divisor
+; gives the limit of the dividend's sign.
+_t_linea
+	movem.l	d0-d7/a0,-(sp)		;Dn at n * 4(sp)
+	movea.l	36+2(sp),a0		;the stacked pc: the line-a word
+	move.w	(a0),d0
+	move.w	d0,d1
+	andi.w	#7,d0
+	lsl.w	#2,d0			;z * 4
+	lsr.w	#7,d1
+	andi.w	#7<<2,d1		;n * 4
+	move.w	2(sp,d0.w),d2		;Dz's low word
+	ext.l	d2
+	move.l	(sp,d1.w),d3		;Dn
+	move.l	#16383,d0
+	tst.l	d2
+	beq.s	.limit
+	divsl.l	d2,d4:d3
+	cmp.l	d0,d3
+	bgt.s	.held
+	neg.l	d0
+	cmp.l	d0,d3
+	blt.s	.held
+	move.w	d4,(sp,d1.w)		;the remainder, as divs.w's
+	move.w	d3,2(sp,d1.w)
+	bra.s	.out
+.limit	tst.l	d3
+	bpl.s	.held
+	neg.l	d0
+.held	move.w	d0,2(sp,d1.w)
+.out	addq.l	#2,36+2(sp)
+	movem.l	(sp)+,d0-d7/a0
+	rte
 	ENDC
 _pl_v2
 	PL_START
@@ -553,6 +596,8 @@ _pl_v2
 	PL_S	$4938e,$c
 	PL_PS	$4941c,_p_waitfade
 	PL_S	$49422,$c
+	PL_W	$220ca,$a605		;the polygon objects' vertices (convtoscr):
+	PL_W	$220cc,$a805		;line-a in both displays (_t_linea)
 	ENDC
 	IFND	ORIGINAL		;Enhanced resolution: _pl_v3's, mapped (port.s)
 	INCLUDE	cd32.s
@@ -622,6 +667,8 @@ _pl_v3
 	PL_S	$49026,$c
 	PL_PS	$490b4,_p_waitfade
 	PL_S	$490ba,$c
+	PL_W	$21e44,$a605		;the polygon objects' vertices (convtoscr):
+	PL_W	$21e46,$a805		;line-a in both displays (_t_linea)
 	ENDC
 	IFND	ORIGINAL
 	PL_IFC5
@@ -680,7 +727,7 @@ _pl_v3
 	PL_W	$226ca,-EDGE_STRIDE+4
 	PL_P	$1fbf6,_t_split		;FloorLine: a span over any number of banks
 	PL_W	$84de,$a401		;the projections' divides, divs.w Dz,Dn: line-a
-				;$a000|n<<9|z (_t_linea, hires.s)
+				;$a000|n<<9|z (_t_linea)
 	PL_W	$1b464,$a200
 	PL_W	$1b46e,$aa00
 	PL_W	$1b47e,$aa00
@@ -702,8 +749,6 @@ _pl_v3
 	PL_W	$2179a,$ac01
 	PL_W	$2186a,$a401
 	PL_W	$21870,$a001
-	PL_W	$21e44,$a605		;the polygon objects' vertices (convtoscr)
-	PL_W	$21e46,$a805
 	PL_S	$32fe,8			;no wait for the frame flag after a frame (but as
 					;the link's second player): _p_show already holds
 					;a switch until the screen it draws is not shown

@@ -136,10 +136,6 @@ _p_coplists
 	move.l	d0,(a0)+		;the two lists' pointers
 	addi.l	#LIST_SIZE,d0
 	move.l	d0,(a0)
-	IFND	LORES
-	lea	_t_linea(pc),a1		;the projections' divides (hires.s)
-	move.l	a1,($28).w
-	ENDC
 	movea.l	(4).w,a6		;as after AllocMem
 	rts
 

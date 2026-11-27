@@ -480,8 +480,6 @@
 	PL_W	$21a20,$ac01
 	PL_W	$21af0,$a401
 	PL_W	$21af6,$a001
-	PL_W	$220ca,$a605
-	PL_W	$220cc,$a805
 	PL_S	$331e,8
 	IFD	WATERFREEZE
 	PL_W	$3358,$603e
