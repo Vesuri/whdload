@@ -4,6 +4,8 @@
   do <action> ...            fields, mouse, buttons, reads, waits and screenshots, CPU stopped
   race [stay]                from the boot through the title to the menu's START and a race
   hook                       what the VBL calls through $B028 (the title $ADAC, a race $AE64)
+  bench [<frames>]           fps over the first frames from the next green light
+  statelog <n> <file> [tick] the race state at every frame end (or pass) from the next green light
 
 A port of games/Vroom's tools/vroom.py at the Multiplayer's (v1) addresses
 (tools/addrmap.py). Each command's docstring has the details.
@@ -24,6 +26,19 @@ VBL_HOOK = 0xB028         # the VBL's jsr vector (Vroom's $A56C)
 TITLE_VBL, RACE_VBL = 0xADAC, 0xAE64   # what it calls in the title and in a race
 TITLE_WAIT = (0x145E2, 0x14602)   # the title's idle loop, where it takes the click
 UNREADABLE = 0xFFFFFFFF   # what the gdb stub reads during the slave's disk loads
+CLOCK = 0xEA54            # the race clock (Vroom's $8500): +2 a field from the green light
+LIGHTS = 0xE53E           # the start lights' state (word): negative once they are out
+FRAME_FIELD = 0xEB36      # the field of the last swap (Vroom's $E258)
+FRAME_END = 0xD37C        # the swap stores the field in $EB36 (Vroom's $D510)
+TICK_END = 0xD38C         # after the swap: every pass, drawn or not
+POS = 0xE588              # the first car's distance (Vroom's $DC50; player 1 in a race)
+ENH_VARS = 0x1C0          # src/enhanced.i: due, ticks, frames drawn, fields dropped
+# The race state: the globals, the 16 cars of 64 bytes at $E586 and the car order (Vroom's
+# $DBC0-$E073 at $E504-$E9AB), the four players' blocks ($1254C, $106 bytes each), the
+# ARCADE score $8B94, and the drawing state an undrawn pass keeps: the ground's top lines
+# $12132/$12136 and the horizon's scroll per view ($15120).
+STATE = ((0xE504, 0xE9AC), (0x1254C, 0x12964), (0x8B94, 0x8B98), (0x12130, 0x12138),
+         (0x15120, 0x15140))
 BUTTONS = {'L': 'JOY1_FIRE_BUTTON', 'R': 'JOY1_2ND_BUTTON'}   # the port-0 mouse buttons
 
 
@@ -155,6 +170,98 @@ def fields_until(g, test, most, step=5):
     return None
 
 
+def green_light(g, most=20000):
+    """Run fields one at a time until the race clock leaves 0 after the start lights (their
+    state $E53E negative: the race clock can tick at a race's setup, before the lights); stops
+    at the first field with it running. False after `most` fields without one."""
+    prev = longs(g, CLOCK, 1)[0]
+    for _ in range(most):
+        g.cmd('monitor fields 1')
+        c, lights = longs(g, CLOCK, 1)[0], longs(g, LIGHTS, 1)[0] >> 16
+        if prev == 0 and 0 < c <= 4 and lights & 0x8000:
+            return True
+        prev = c
+    return False
+
+
+def bench(server, g, rest):
+    """bench [<frames>]: the fields a race takes for its first <frames> frames (default 300)
+    from the green light, one field at a time (read-only). In the first demo race, left alone
+    after the boot, that is the same simulation on every machine, so the fps compare between
+    machines and builds. Also the distance driven at the last frame's end (a breakpoint at
+    $D37C) and the fields-per-frame histogram; with Enhanced framerate the ticks (race loop
+    passes), the passes left undrawn and the fields dropped."""
+    n = int(rest.split()[0]) if rest.split() else 300
+    g.stop()
+    try:
+        if not green_light(g):
+            return 'no race start within 20000 fields'
+        last, p0 = longs(g, FRAME_FIELD, 1)[0], longs(g, POS, 1)[0]
+        e0 = longs(g, ENH_VARS, 4)
+        frames, fields, since, gaps = 0, 0, 0, {}
+        while frames < n - 1:
+            g.cmd('monitor fields 1')
+            fields += 1
+            since += 1
+            b = longs(g, FRAME_FIELD, 1)[0]
+            if b != last:
+                frames, last = frames + 1, b
+                gaps[since] = gaps.get(since, 0) + 1
+                since = 0
+            if fields > 50 * n:
+                return f'only {frames} frames in {fields} fields'
+        at = longs(g, FIELDS, 1)[0]
+        g.cmd(f'break *{FRAME_END:#x}')
+        try:
+            g.cmd('continue', timeout=600)
+        finally:
+            g.cmd('delete')
+        p, now = longs(g, POS, 1)[0], longs(g, FIELDS, 1)[0]
+        gaps[since + now - at] = gaps.get(since + now - at, 0) + 1
+        fields += now - at
+        e1 = longs(g, ENH_VARS, 4)
+    finally:
+        g.cont()
+    enh = ''
+    if e1[1] != e0[1] and UNREADABLE not in e0 + e1:
+        ticks, drawn = e1[1] - e0[1], e1[2] - e0[2]
+        enh = (f' ticks {ticks} ' + (f'undrawn {ticks - drawn}' if drawn <= ticks else
+                                     f'frames/tick {drawn / ticks:.2f}') +
+               f' dropped {e1[3] - e0[3]}')
+    return (f'bench {n} frames {fields} fields fps {50.0 * n / fields:.2f} distance {p - p0} '
+            f'fields/frame {dict(sorted(gaps.items()))}{enh}')
+
+
+def state_log(server, g, rest):
+    """statelog <n> <file> [tick]: from the next green light, stop at every frame end ($D37C),
+    or with `tick` at every race loop pass ($D38C, after the swap or the pass that left it
+    out), for <n> stops, and write one line per stop: number, field counter, race clock, then
+    the long words of STATE in hex. tools/statecmp.py compares two logs (Vroom's)."""
+    args = rest.split()
+    n, path = int(args[0]), args[1]
+    at = TICK_END if args[2:3] == ['tick'] else FRAME_END
+    g.stop()
+    rows = []
+    try:
+        if not green_light(g):
+            return 'no race start within 20000 fields'
+        g.cmd(f'break *{at:#x}')
+        for frame in range(n):
+            out = g.cmd('continue', timeout=120)
+            if 'Breakpoint' not in out:
+                return f'no stop after {frame}: {out.strip().splitlines()[-1]}'
+            f, c = longs(g, FIELDS, 1)[0], longs(g, CLOCK, 1)[0]
+            block = ''.join(f'{v:08x}' for lo, hi in STATE for v in longs(g, lo, (hi - lo) // 4))
+            rows.append(f'{frame} {f} {c} {block}')
+    finally:
+        g.cmd('delete')
+        g.cont()
+        ranges = ' '.join(f'${lo:X}-${hi - 1:X}' for lo, hi in STATE)
+        Path(path).write_text(f'# frame field clock state {ranges} (at ${at:X})\n'
+                              + '\n'.join(rows) + '\n')
+    return f'{len(rows)} stops, fields {rows[0].split()[1]}..{rows[-1].split()[1]}' if rows else 'none'
+
+
 def to_race(server, g, rest):
     """race [stay]: from the boot, through the title (right button in its idle loop,
     repeated until the VBL hook leaves the title) to the menu, then the left button held
@@ -195,6 +302,7 @@ def to_race(server, g, rest):
     return '\n'.join(log)
 
 
-server = game_server('vmp', commands={'do': do, 'race': to_race, 'hook': hook})
+server = game_server('vmp', commands={'do': do, 'race': to_race, 'hook': hook,
+                                     'bench': bench, 'statelog': state_log})
 if __name__ == '__main__':
     server.main(sys.argv[1:])

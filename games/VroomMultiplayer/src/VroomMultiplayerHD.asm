@@ -36,7 +36,7 @@ EXPMEM	= $0
 ;=============================================================================
 
 _base	SLAVE_HEADER						;ws_Security + ws_ID
-		dc.w	16					;ws_Version (16: PL_PA, PL_PSS)
+		dc.w	17					;ws_Version (16: PL_PA, PL_PSS; 17: ws_config)
 		dc.w	WHDLF_NoError|WHDLF_NoKbd|WHDLF_EmulTrap;ws_flags
 		dc.l	BASEMEM					;ws_BaseMemSize
 		dc.l	0					;ws_ExecInstall
@@ -52,6 +52,7 @@ _expmem		dc.l	EXPMEM					;ws_ExpMem
 		dc.w	0					;ws_kickname (version 16 fields)
 		dc.l	0					;ws_kicksize
 		dc.w	0					;ws_kickcrc
+		dc.w	_config-_base				;ws_config (version 17)
 
 ;============================================================================
 
@@ -59,6 +60,7 @@ _expmem		dc.l	EXPMEM					;ws_ExpMem
 	DOSCMD	"WDate	>T:date"
 	ENDC
 
+_config	dc.b	"C1:B:Enhanced framerate",0
 _data	dc.b	0
 _name	dc.b	"Vroom Multiplayer",0
 _copy	dc.b	"1993 Lankhor",0

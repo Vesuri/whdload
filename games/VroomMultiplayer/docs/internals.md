@@ -89,6 +89,62 @@ renderer's recursion missing the `rts` written at $1056A, as in Vroom.
 The decrunches from the boot through the title and three demo races all land outside the
 patched range ($3ABA-$1C631).
 
+## Frames and game time
+
+- **The race loop** ($B98A-$D394, entered at $B984 `clr.w $E54E`): one step for each player
+  ($B992-$BE18, over the list at $E566: a car table offset and a player block at $1254C,
+  $106 bytes each), the keys and the pause ($BE1C-$C016: space toggles $E542, and the loop
+  at $BE1C waits for a key), the opponents and the race order, the start lights ($D084: 30
+  passes a light, then the race clock's gate $EA58 opens at $D0D0), then for each view
+  ($D190-$D1FC: one or two, by the layout $11484 and its table at $11480) the landscape and
+  the player's timers ($D3A6: `jsr $F1BC`, fuel, tyres, damage, laps) and the view's
+  drawing ($DB04), then the frame's end and the swap ($D348-$D386).
+- **The frame's end** ($D348) waits until the field counter $98DE passes $EB36 (the last
+  swap's field) plus 0, or 2 with one view when Caps Lock has set $B1D2 (the keyboard
+  interrupt at $ACDE: the game's own speed limit, 16.7 fps with one view), then hands the
+  draw buffer $8F00 to the VBL ($972E), sets $EB36 and toggles the buffers ($145F8). Each
+  view's drawing ($DB04) first waits for a new field (one view) or, with two, for the beam
+  past the bottom view ($D0 or $AC) when no field has passed since the swap.
+- **Game time.** As in Vroom: one simulation step per pass, so the game's speed follows the
+  frame rate; the race clock $EA54 (+2 a field while $EA58 is not negative) is real time.
+  The first demo race (Adelaide, two views) draws 10.87 fps on the a500 (`bench 100`: 4-5
+  fields a frame).
+
+## Enhanced framerate (68020 and higher, `CUSTOM1=1`)
+
+`src/enhanced.i`, applied from `Fix` after the 68020 fixes when `CUSTOM1` is set (`ws_config`
+`C1:B:Enhanced framerate`, `ws_Version` 17). A 68000 or 68010, or `CUSTOM1=0`, runs the
+original loop. Vroom's design (`games/Vroom`, `docs/internals.md`), on this loop:
+
+**Every race loop pass is a tick**, due every 3 fields (16.7 Hz, Caps Lock's speed with
+one view), counted by $98DE. A pass waits while it is early; when the next tick is due
+already, it leaves out what only draws (at most 3 passes in a row; behind by more than 50
+fields the debt past it is dropped and counted).
+
+| Where | What |
+|---|---|
+| $B984 (`clr.w $E54E`) | the loop's entry: the tick clock starts now |
+| $B98A (`lea $E566(pc),a5`) | a pass starts: it waits while its tick is early; if the next is due already, it does not draw |
+| $BE86 (`tst.w $E53E`) | the end of a pause: the tick clock starts again |
+| $DB04 (`cmpi.w #1,$11484`) | in a pass that does not draw, each view leaves out the wait, the sky and ground clear, the road spans, the sky objects and the scaler ($DB04-$DBCF), keeping the clear's state: the horizon's scroll (`$14FA4`, per view at $15120) and the clamp of the ground's top line $12136 |
+| $D348 (`cmpi.w #$50,$C8`) | a pass that does not draw goes on at $D38C, leaving out the frame end's wait and the swap |
+
+What an undrawn pass still runs: the players' steps, the landscape of every view (it follows
+the track and decides whether the car is off the road, as in Vroom), the player's timers in
+$D3A6, and the rest of $DB04 (start lights, crash sequences, pit stop, the panel), which
+count passes. The scheduler's variables are at $1C0-$1D5 (`ENH_VARS`, as in Vroom).
+`CUSTOM3=n` (for the checks) leaves out the drawing in n of every n+1 passes. The
+Multiplayer has no link play.
+
+Checks, from the first demo race's green light (`tools/vmp.py`):
+- *The same ticks.* `statelog 300 FILE tick` on the a500 and on the a1200-040 with
+  `CUSTOM1=1 CUSTOM3=2`: all 299 compared passes agree (`statecmp --align 3`), leaving out
+  the map markers' positions per screen $E51C-$E52B, which follow the screen order.
+- *Speed.* `bench 300` (two views): the a1200-030 and the a1200-040 16.70 fps; the a1200
+  (68020, chip memory only) 13.45, with 71 of 371 ticks undrawn and none dropped. The second
+  demo race (Monaco, one view), `bench 200`: 16.75 on the a1200 and the a1200-030, the same
+  distance at the same frame.
+
 ## Verification
 
 The title and the demo races (one and two views) render correctly with no WHDLoad dump on
