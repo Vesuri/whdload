@@ -66,7 +66,17 @@ and the few that took two now take three.
 | $53864 | `PL_PSS FixAudioD0,2` over `move.w #$200,d0; dbf d0,*` | 11 to 12 lines |
 | $3f63e, $3f690 | `PL_PSS FixFadeStep,4` over `move.w #$800,d2; subi.w #1,d2; bne` | the pause fade's steps: 86 to 87 lines |
 
-The patches from $1806 on are `src/EmpireStrikesBackFixes.s`, always on.
+The patches from $1806 on are `src/EmpireStrikesBackFixes.s`, always on. With CUSTOM1
+on a 68020 or better (and the optional ExpMem) `_PL_Smooth` adds the enhanced
+framerate's (below, `src/EmpireStrikesBackSmooth.s`):
+
+| Address | Patch |
+|---|---|
+| $226c | `PL_PS SmTick` over `lea $90e.w,a0; move.w (a0)+,d0`: a tick begins (recording) |
+| $5dc02 | `PL_P SmSwap` over `jsr $40ac4`: the tick's frames presented |
+| $435f2, $43832, $435a0, $43d04, $3f742 | `PL_P` the line, vertical line, plot, horizontal line and clear: recorded |
+| $5c56a, $5c5ac, $5c5f2 | `PL_P` the text colour and the glyphs: recorded |
+| $47de6, $47f0a, $4630a, $494aa, $5bf90, $5c008, $5b428, $2d04, $470fa, $5c1bc | `PL_P` the sites (code that writes the screen itself): recorded with its registers |
 
 ## Fast-CPU fixes
 
@@ -113,7 +123,55 @@ The patches from $1806 on are `src/EmpireStrikesBackFixes.s`, always on.
 The high-score table is 378 bytes at $5b000, stored in `EmpireStrikesBack.highs` with each
 byte eor'd with its count down from 378 (`_Crypt`), loaded before the game starts.
 
+## Enhanced framerate
+
+CUSTOM1 (the icons set it), on a 68020 or better: 50 frames a second at the game's own
+speed, in the waves (states 0, 1, 2 and $0a; the others, the wave select, the roster and
+the attract run as without it). The slave asks for an optional ExpMem of about 88 KB
+(two recordings and a work area); without it, or on a 68000, nothing is patched.
+
+- **Recording.** Each tick (one pass of the main loop, from $226c to the swap) still runs
+  once, but the drawing routines record their calls instead of drawing (a 16-byte op:
+  type, colour, a key, four coordinates, the paired op). Code that writes the screen
+  directly is hooked as a site: its registers (screen-relative ones as offsets) and the
+  words it reads are recorded, and at replay it runs again from the hook to its `rts`
+  with them put back. A site declares its rows (or a routine that works them out from
+  the registers: the shape blits), its input registers, and a fixup for what it does
+  besides drawing when it is not run (the shield gauge sets the star colour $76a). The
+  icons at $5c008 animate after drawing, so their site is a copy of the drawing loop.
+  The cannons read the crosshair ($47db6, $47db8) as it is at the replay: they follow
+  it at 50 frames a second, as the crosshair (a sprite) does.
+- **Pairing.** Ops are keyed by the object drawn and the place in its model's display
+  list (model lines, return $3fab6/$3fb34, object $752), by the lattice cell (the star
+  field, $5c3ba), else by the code address and its count in the tick; a hash table
+  pairs each with the previous tick's op of the same key. Pairs that moved more than 40
+  pixels (96 for keyed ones) are not interpolated.
+- **Presenting.** At the swap the recording is drawn at 1/3 and 2/3 of the way from the
+  previous one, then exactly, one frame a field, each into the game's screen not on
+  display ($70000/$78000); the exact frame is left as the game's swap would leave it.
+  An in-between frame is drawn only if it makes its field (by the last frame's drawing
+  time) and leaves the exact frame its time after it. When more than half of the recent
+  ticks are late, ticks run as the default runs them (direct) until a direct tick's work
+  plus a frame fits again.
+- **Bands.** A frame is drawn only where it differs from what its screen shows: each of
+  25 bands of 8 rows has a signature (the ops drawn in it, as drawn), and only bands whose
+  signature changed are cleared (blits) and drawn again, with every band of any op drawn.
+  Anything else that draws into the screens (a direct tick, the attract's frames, a
+  draw outside the tick's screen) invalidates the signatures.
+
+Checked with the `check` and `verify` builds (`development.md`): the exact replay
+compared with what the tick drew, and each frame drawn by bands with the same frame
+drawn whole. In waves 1 to 3 (states 0, 1, 2, $0a) every compared frame matched (73 of
+73 in the last wave-3 run; 1388 in a long state-0 run). Measured on the a1200-030 and
+a1200-040 in play: 1.5 to 2.6 frames a tick depending on the scene (the frames cost 170
+to 250 raster lines on average, up to 900 with an explosion: the blitter lines and the
+chip bus, not the CPU), and the game's speed is the default's (fields a tick against
+the `direct` build: 3.13/3.38 on the 030, 3.61/3.58 on the 040, 4.07/4.06 on the
+a1200). A stock A1200 mostly stays direct.
+
 ## Limitations
 
 The game runs from chip memory as the original. The game is capped at 16.7 frames a
-second; scenes the A500 drew slower stay slower there.
+second; scenes the A500 drew slower stay slower there. The enhanced framerate covers the
+states checked (0, 1, 2, $0a); the later phases of a wave ($03, $08, $09, $0d, $15) were
+reached in play but not compared, so they run as without it.

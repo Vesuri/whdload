@@ -29,23 +29,26 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$59			;ws_keyexit = F10
-_expmem		dc.l	0			;ws_ExpMem
+_expmem		dc.l	-SM_EXPMEM		;ws_ExpMem, optional (Enhanced framerate)
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
 		dc.w	0			;ws_kickname (none: a direct slave)
 		dc.l	0			;ws_kicksize
 		dc.w	0			;ws_kickcrc
-		dc.w	0			;ws_config
+		dc.w	_config-_base		;ws_config
 
 ;============================================================================
 
 _name		dc.b	"Empire Strikes Back",0
 _copy		dc.b	"1989 Vektor Grafix/Domark",0
 _info		dc.b	"Installed by Codetapper/Action!",10
-		dc.b	"Version 1.2 (20.03.2003)",-1
+		dc.b	"Enhanced by Vesuri",10
+		dc.b	"Version 2.0b (27.11.2026)",-1
 		dc.b	"Thanks to Jan Vieten and Christian Sauer",10
 		dc.b	"for sending the originals!",0
+_config		dc.b	"C1:B:Enhanced framerate;",0
+		dc.b	"$VER: EmpireStrikesBack.Slave 2.0b (27.11.2026)",0
 _HighsName	dc.b	"EmpireStrikesBack.highs",0
 _Version	dc.b	1			;1: game at $dc00, 2: at $c800
 		EVEN
@@ -110,7 +113,19 @@ _Start						;A0 = resident loader
 		suba.l	a1,a1
 		move.l	_resload(pc),a2
 		jsr	resload_Patch(a2)
-		jmp	$500.w
+		move.l	_Custom1(pc),d0		;Enhanced framerate: a 68020 or better
+		beq.s	.Go
+		move.l	_AttnFlags(pc),d0
+		btst	#AFB_68020,d0
+		beq.s	.Go
+		move.l	_expmem(pc),d0
+		beq.s	.Go
+		bsr.w	SmInit
+		lea	_PL_Smooth(pc),a0
+		suba.l	a1,a1
+		move.l	_resload(pc),a2
+		jsr	resload_Patch(a2)
+.Go		jmp	$500.w
 
 
 ;======================================================================
@@ -309,6 +324,10 @@ _resload	dc.l	0
 _Palette	dc.l	0
 _Tags		dc.l	WHDLTAG_BUTTONWAIT_GET
 _ButtonWait	dc.l	0
+		dc.l	WHDLTAG_CUSTOM1_GET
+_Custom1	dc.l	0
+		dc.l	WHDLTAG_ATTNFLAGS_GET
+_AttnFlags	dc.l	0
 		dc.l	TAG_DONE
 
 ;======================================================================
@@ -323,6 +342,7 @@ _End		move.l	_resload(pc),-(sp)
 ;======================================================================
 
 		INCLUDE	EmpireStrikesBackFixes.s
+		INCLUDE	EmpireStrikesBackSmooth.s
 
 ;======================================================================
 
@@ -357,4 +377,7 @@ _PL_Game	PL_START
 		PL_PSS	$53864,FixAudioD0,2
 		PL_PSS	$3f63e,FixFadeStep,4	;Pause fade steps by the beam
 		PL_PSS	$3f690,FixFadeStep,4
+		IFD	VERIFY
+		PL_NOP	$462b0,2		;VERIFY: hits cost no shield
+		ENDC
 		PL_END

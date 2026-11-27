@@ -26,7 +26,25 @@ matches; the slave has no relocations.
 
 `make serve WARP=1 WINDOW=none INSTANCE=<name> &`, then `make server INSTANCE=<name> CMD=...`
 (give the server a few seconds to come up). `wait 45` reaches the attract's high-score page.
-`tools/esb.py` adds `fire`, `mouse`, `frames` (fields between frames, from a trace; the
-trace records no PCs on the 68060, so read the frame counter `mem 0x1886 2` there),
-`cover`, `mem` and `hits`. The trigger is the joystick's fire button (`JOY1_FIRE_BUTTON`);
-a game starts from the wave select (state $0b), firing at a planet.
+`tools/esb.py` adds `fire`, `mouse`, `sweep` (the crosshair swept, firing on and off:
+play goes on to the waves' later phases), `frames` (fields between swaps, from a trace;
+the trace records no PCs on the 68030 and up, so use `sm` there), `cover`, `calls`,
+`incl`, `mem`, `hits`, `gdb` and `sm` (the enhanced framerate's statistics, SmV, read by
+the build's listing: `sm release`; also the fields a tick). The trigger is the
+joystick's fire button (`JOY1_FIRE_BUTTON`); a game starts from the wave select (state
+$0b, about 1.5 s with its countdown), firing at a planet: move the mouse at once (about
+6, -5 a field for 20 fields reaches wave 3).
+
+## Enhanced framerate builds
+
+Run with `WHD_ARGS="CUSTOM1=1"` on a 68020 or better setup. game.conf defines:
+
+| BUILD | What |
+|---|---|
+| `verify` | hits cost no shield; each exact replay is compared with what the tick drew (`sv_stn`/`sv_stbad` by state; the last mismatch's two screens are kept in ExpMem at `em_tick`, `em_rep`), and each frame drawn by bands with the same frame drawn whole (`sv_pbad`) |
+| `check` | as `verify`, for every state, exact frames only (the game keeps its speed), never direct: for states not yet enabled (`SM_STATES`) |
+| `timing` | colour clocks per op type and for the stages (`sv_tcost`, `sv_tcnt`: slot 0 SmPrep, 4 the whole frame in lines, 6 the band clears) |
+| `direct` | every tick direct, hooks installed: the speed baseline for `sm`'s fields a tick |
+
+In the verify builds the cannons' crosshair words are recorded like any other (in the
+release they are read live), so a moving mouse does not show as a mismatch.

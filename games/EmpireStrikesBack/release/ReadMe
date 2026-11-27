@@ -24,6 +24,14 @@ VERSION 1.2: (20-Mar-2003)
 - Added an OS3.5 box icon (great work by Christian!)
 - Quit key changed to 'F10'
 
+VERSION 2.0b: (27-Nov-2026) done by Vesuri
+- Game speed fixed: no longer too fast on fast machines (as on an A500)
+- Enhanced framerate (CUSTOM1, set in the installed icons): the waves drawn
+  at up to 50 frames a second, interpolated, at the game's own speed
+  (68020 or better, +88k other memory; slower machines draw as before)
+- Lines, digits and colours no longer go wrong on fast CPUs
+- Sound effects and the pause fade work on fast CPUs
+
 Greetings to Jan and Christian for the originals, Christian again for the
 superb icon, Wepl for WHDLoad, all Action members, my testing crew and the
 WHDLoad team!

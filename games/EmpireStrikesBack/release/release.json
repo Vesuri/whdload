@@ -8,7 +8,24 @@
         "EmpireStrikesBackHD/ReadMe": "release/ReadMe"
       },
       "add": {},
-      "remove": []
+      "remove": [],
+      "tooltypes": {
+        "EmpireStrikesBackHD/EmpireStrikesBack.colbox": [
+          "CUSTOM1=1"
+        ],
+        "EmpireStrikesBackHD/EmpireStrikesBack.colicon": [
+          "CUSTOM1=1"
+        ],
+        "EmpireStrikesBackHD/EmpireStrikesBack.inf": [
+          "CUSTOM1=1"
+        ],
+        "EmpireStrikesBackHD/EmpireStrikesBack.newicon": [
+          "CUSTOM1=1"
+        ],
+        "EmpireStrikesBackHD/EmpireStrikesBack.romicon": [
+          "CUSTOM1=1"
+        ]
+      }
     }
   ]
 }
