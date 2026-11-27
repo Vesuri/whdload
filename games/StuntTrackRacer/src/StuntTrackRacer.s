@@ -12,8 +12,9 @@
 ;		v1.1 (Vesa Halttunen)
 ;		         - Enhanced framerate (CUSTOM3, 68020+): Stunt Track Racer
 ;		           Unleashed 1.1's 60 FPS from a relocated copy in ExpMem
-;		         - CUSTOM1 starts with infinite boost; the trainer keys move
-;		           to F6 and F7 (the game redefines its keys with F1 in pause)
+;		         - CUSTOM1 starts with infinite boost; the trainer key moves
+;		           to F6 (the game redefines its keys with F1 in pause)
+;		         - Turbo mode removed
 ; Requires:	WHDLoad 17+
 ; Info:		Reconstructed from the v1.0 slave, which shipped without source (the
 ;		import commit assembles to that slave byte for byte); the labels and
@@ -65,11 +66,9 @@ _info		dc.b	"Installed by Codetapper/Action!",10
 		dc.b	"Version 1.1"
 		dc.b	10,"Enhanced by Vesuri"
 		dc.b	-1,"Keys:   F6 - Toggle infinite boost   "
-		dc.b	10,"        F7 - Toggle turbo mode on/off"
 		dc.b	10,"      Help - Win race                "
 		dc.b	0
 _SaveName	dc.b	"StuntTrackRacer.save",0
-_TurboFlag	dc.b	0
 		EVEN
 
 ;======================================================================
@@ -149,24 +148,14 @@ _PatchMain	movea.l	#$e700,a0		;Decrypt the main program
 		move.b	#$60,4(a0)
 		move.l	_UlBase(pc),d0		;Not with the enhanced framerate:
 		bne.b	.Enhanced		;the blob fixes the 24 bit faults
-		lea	$69fec,a0		;for any memory and has no frame
-		move.w	#$4eb9,(a0)+		;delay to skip
+		lea	$69fec,a0		;for any memory
+		move.w	#$4eb9,(a0)+
 		pea	_24Bit_Ror(pc)
 		move.l	(sp)+,(a0)+
 		lea	$6a06e,a0
 		move.w	#$4eb9,(a0)+
 		pea	_24Bit_Add_2_A0(pc)
 		move.l	(sp)+,(a0)+
-		lea	$5dac0,a0		;Turbo mode
-		move.w	#$4eb9,(a0)+
-		pea	_CheckTurboMode(pc)
-		move.l	(sp)+,(a0)+
-		move.l	#$4e714e71,(a0)+
-		lea	$64516,a0
-		move.w	#$4eb9,(a0)+
-		pea	_CheckTurboMode(pc)
-		move.l	(sp)+,(a0)+
-		move.l	#$4e714e71,(a0)+
 .Enhanced
 		move.l	_Version(pc),d0
 		cmpi.b	#12,d0
@@ -213,8 +202,6 @@ _Keybd		ror.b	#1,d0			;Stolen code
 		eori.b	#$ff,d0
 		cmp.b	_keyexit(pc),d0
 		beq.w	_exit
-		cmpi.b	#$56,d0			;F7 = turbo on/off
-		beq.s	_ToggleTurbo
 		cmpi.b	#$55,d0			;F6 = infinite boost
 		beq.w	_RefreshBoost
 		cmpi.b	#$5f,d0			;Help = win the race
@@ -249,23 +236,6 @@ _Loader		movem.l	d1-d7/a0-a6,-(sp)
 		rts
 
 ;======================================================================
-
-_CheckTurboMode	move.l	d0,-(sp)
-		move.b	_TurboFlag(pc),d0
-		tst.b	d0
-		beq.s	.NormalMode
-		move.l	(sp)+,d0
-		rts
-.NormalMode	move.l	(sp)+,d0
-.Wait		tst.b	$616d8			;The game's frame delay
-		bne.s	.Wait
-		rts
-
-_ToggleTurbo	move.l	a0,-(sp)
-		lea	_TurboFlag(pc),a0
-		not.b	(a0)
-		movea.l	(sp)+,a0
-		rts
 
 _WinRace	move.l	a0,-(sp)
 		lea	$1bb20,a0

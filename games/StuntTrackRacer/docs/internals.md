@@ -24,7 +24,7 @@ framerate"): with CUSTOM3 on a 68020 or better and the ExpMem there, `_Enhance` 
 decrypted program ($e700-$722e0) to ExpMem+$1000, relocates it with Stunt Car Racer's
 `relocTable` and puts Unleashed's blob behind it, built for NTSC (`FRAMERATE_MULTIPLIER`
 7, as Stunt Track Racer Unleashed: the time step $22, the counters and cooldowns scaled by
-7). The slave's patches then go to the copy, less the turbo and the two 24-bit fixes (the
+7). The slave's patches then go to the copy, less the two 24-bit fixes (the
 blob fixes those for any memory). The copper list, the samples and the frame buffers stay
 in chip memory at $e700's addresses. On a fast machine it draws 60 frames a second at the
 original game speed: 200 frames in 200 fields on the emulated 68040, 179 on the 68030; the
@@ -41,19 +41,19 @@ program).
 | Address | Patch |
 |---|---|
 | $e716, $e71a | the checksum skipped |
-| $f036 | keyboard: quit key, F6 infinite boost, F7 turbo, Help wins the race |
+| $f036 | keyboard: quit key, F6 infinite boost, Help wins the race |
 | $1ba60 | two `nop`s (copylock) |
 | $59846 | the "insert disk" request removed |
 | $5c8f0 | the copylock: its result ($9cedcd02) in d0 and a branch past it |
-| $5dac0, $64516 | turbo: the frame delay at $616d8 skipped (not with the copy) |
 | $62e86 | the game's loader to `_Loader` (save slots in `StuntTrackRacer.save`) |
 | $69fec, $6a06e | two 24-bit address faults fixed (not with the copy) |
 
 With the copy the patches go to the same addresses in it, and the trainer and the key tables
 too. `_RefreshBoost` (F6, CUSTOM1 at the start) toggles the `bcs` at $60836 that ends the
-boost, or with the copy Unleashed's flag. Codetapper's v1.0 had the trainer on F1 and F2;
-the game redefines its keys with F1 while paused, so they moved to F6 and F7, as in his
-Stunt Car Racer slave. With WHDLoad 12 or later, `_KeyTrans` fills the game's two key tables
+boost, or with the copy Unleashed's flag. Codetapper's v1.0 had the trainer on F1 and turbo
+mode on F2; the game redefines its keys with F1 while paused, so the trainer moved to F6, as
+in his Stunt Car Racer slave. The turbo mode, which skipped the frame delay at $616d8, is
+gone: the enhanced framerate replaces it. With WHDLoad 12 or later, `_KeyTrans` fills the game's two key tables
 ($1b8a8, $1b960) from WHDLoad's rawkey table (international keyboards). ButtonWait holds the
 title picture.
 
