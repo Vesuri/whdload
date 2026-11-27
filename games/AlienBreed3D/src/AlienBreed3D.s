@@ -1099,6 +1099,10 @@ L0c1a
 	rts
 _p_setcop2
 	move.l	d0,$dff084
+	IFND	ORIGINAL		;the game's exit to the menu (d0 its blank list): blank
+	move.l	d0,$dff080	;now, not from the next field; the menu loads into the
+	move.w	d0,$dff088	;panel's freed planes while the beam may still show them
+	ENDC
 	rts
 _p_vhposr
 	move.w	$dff006,d0
