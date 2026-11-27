@@ -8,6 +8,7 @@
   statelog <n> <file> [tick] the race state at every frame end (or pass) from the next green light
   frames <n> <file>          a hash of each drawn frame's lines, at the swap, from the next green light
   shown <n>                  frames whose shown screen changed between the swap and the VBL taking the next
+  span <n> <from> <to>       the emulated time from one address to the next, n times, from the next green light
 
 A port of games/Vroom's tools/vroom.py at the Multiplayer's (v1) addresses
 (tools/addrmap.py). Each command's docstring has the details.
@@ -340,6 +341,43 @@ def shown(server, g, rest):
     return f'{n} frames, {changed} with the shown screen changed' + ''.join(f'\n  {b}' for b in bad[:20])
 
 
+def beam(g):
+    """The beam's position in raster lines since the VBL counter's field 0 (PAL: 313 a field,
+    the long frames' extra line left out)."""
+    v = longs(g, 0xDFF004, 1)[0]
+    return longs(g, FIELDS, 1)[0] * 313 + (((v >> 16) & 1) << 8 | (v >> 8) & 0xFF)
+
+
+def span(server, g, rest):
+    """span <n> <from> <to>: from the next green light, n times: run to <from>, then to <to>
+    (hex addresses), and measure the emulated time between them in raster lines (breakpoints
+    stop the emulation, so the measure is exact). For the work of a race loop pass, $B992 (after
+    Enhanced framerate's wait for the tick) to $D348 (the frame's end). Reports the mean, the
+    minimum and maximum, in fields."""
+    a = rest.split()
+    n, lo, hi = int(a[0]), int(a[1], 16), int(a[2], 16)
+    g.stop()
+    spans = []
+    try:
+        if not green_light(g):
+            return 'no race start within 20000 fields'
+        for _ in range(n):
+            for addr in (lo, hi):
+                g.cmd(f'break *{addr:#x}')
+                out = g.cmd('continue', timeout=120)
+                g.cmd('delete')
+                if 'Breakpoint' not in out:
+                    return f'no stop at {addr:#x} after {len(spans)}'
+                if addr == lo:
+                    t0 = beam(g)
+            spans.append(beam(g) - t0)
+    finally:
+        g.cmd('delete')
+        g.cont()
+    f = [x / 313 for x in spans]
+    return f'{n} spans: mean {sum(f) / n:.3f} fields, min {min(f):.3f}, max {max(f):.3f}'
+
+
 def to_race(server, g, rest):
     """race [stay]: from the boot, through the title (right button in its idle loop,
     repeated until the VBL hook leaves the title) to the menu, then the left button held
@@ -382,6 +420,6 @@ def to_race(server, g, rest):
 
 server = game_server('vmp', commands={'do': do, 'race': to_race, 'hook': hook,
                                      'bench': bench, 'statelog': state_log,
-                                     'frames': frames, 'shown': shown})
+                                     'frames': frames, 'shown': shown, 'span': span})
 if __name__ == '__main__':
     server.main(sys.argv[1:])

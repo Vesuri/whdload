@@ -129,6 +129,7 @@ fields the debt past it is dropped and counted).
 | $DB04 (`cmpi.w #1,$11484`) | in a pass that does not draw, each view leaves out the wait, the sky and ground clear, the road spans, the sky objects and the scaler ($DB04-$DBCF), keeping the clear's state: the horizon's scroll (`$14FA4`, per view at $15120) and the clamp of the ground's top line $12136 |
 | $D348 (`cmpi.w #$50,$C8`) | a pass that does not draw goes on at $D38C, leaving out the frame end's wait and the swap |
 | the screens' references, $ADEC, $AE48, $AEB4, $AF94, $AFAE | on AGA, the screens move 6 bytes up and the lores modes fetch 64 bits wide (below, "64-bit fetch") |
+| $DB36, $DB54, $DB5C (`jsr $11D2A`); $11DDA-$11E1B (the queue's ground entries) | the entries are left out: after `$11D2A` the CPU fills the ground's planes 2 and 3 (`enh_Ground`) while the blitter runs the horizon and the sky |
 | 94 blitter starts in $1309E-$1B25E (`src/blitsites.i`) | `jsr $10C`-`$124.w` (`src/blitwait.i`'s start-and-wait) become `jsr $1E0`-`$1F8.w`: start, one read of dmaconr, return |
 
 What an undrawn pass still runs: the players' steps, the landscape of every view (it follows
@@ -176,6 +177,15 @@ frames all the same but for the race clock (lines 31-35), the one-view race's to
 build missed the gauge's table, which the operand scan could not see: its piece at lines
 30-32 stayed at the old address, 6 bytes left. `bench 300` on the a1200: 15.74 fps with 17 of
 317 ticks undrawn (14.14 and 53 of 353 before).
+
+**The ground by the CPU.** As in Vroom: the queue's ground entries fill planes 2 (with 0) and
+3 (with 1) below the ground's top line $12136, as many lines as the view has left, with the
+view's width ($113D6) and modulo ($113D4); the road spans draw the other planes. The CPU fills
+them instead while the blitter runs the rest of the queue. `span 100 B992 D348` (a drawn
+pass's work, from the end of its wait for the tick to the frame's end) on the a1200-040, the
+two-view demo race: 1.534 fields against 1.576 with `-DENH_NOGROUND` (two runs of one build
+differed by 0.01). On the a1200 (chip memory only) `bench 300` gives 15.66 fps against 15.74:
+no change there. `frames 150` (`CUSTOM3=2`): every frame the same but for the race clock.
 
 **The screen on display.** `shown 40` (the screen not handed to the VBL, read at the swap and
 when the VBL takes the new one) on the a1200-040 and the a1200-030, two views and one: no

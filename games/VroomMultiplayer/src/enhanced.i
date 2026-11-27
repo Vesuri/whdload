@@ -120,6 +120,12 @@ _enh_pl		PL_START
 		PL_PS	$BE86,enh_Unpause	; tst.w $E53E.l: the end of a pause
 		PL_PSS	$DB04,enh_View,2	; cmpi.w #1,$11484.l: a view's drawing
 		PL_PSS	$D348,enh_Swap,2	; cmpi.w #$50,$C8.l: the frame's end
+	IFND	ENH_NOGROUND			; (for A/B measurements)
+		PL_PS	$DB36,enh_Clear		; jsr $11D2A: the sky and ground clear
+		PL_PS	$DB54,enh_Clear
+		PL_PS	$DB5C,enh_Clear
+		PL_S	$11DDA,$11E1C-$11DDA	; its ground entries (enh_Ground)
+	ENDC
 	IFND	ENH_NOBLITSITES			; (for A/B checks)
 		ENH_BLITSITES			; jsr ENH_BLT0-6 for jsr $10C-$124
 	ENDC
@@ -202,6 +208,67 @@ enh_View	tst.b	ENH_SKIP.w
 		ble.b	.done
 		move.l	$113C4,$12136
 .done		move.l	#$DBD0,(a7)
+		rts
+
+; The sky and ground clear ($11D2A) queues the horizon, the sky and the
+; ground, clamps the ground's top line $12136 to the view and starts the
+; queue; then the CPU fills the ground (enh_Ground) while the blitter runs the
+; horizon and the sky.
+enh_Clear	jsr	$11D2A
+		; (fall through)
+
+; The ground's fill: the two planes the queue's ground entries fill ($11DDA-
+; $11E1B: plane 2 with 0, plane 3 with 1, from the ground's top line $12136
+; down, as many lines as the view has left, the view's width $113D6 and
+; modulo $113D4; the road spans $11A1E draw the other planes). The CPU fills
+; them while the blitter runs the rest of the queue $11D2A started, which goes
+; without those entries (Vroom's enh_Ground).
+; IN:	-
+; OUT:	-	all registers preserved
+enh_Ground	movem.l	d0-d4/a0-a1,-(a7)
+		move.l	#8000,d0
+		sub.l	$12136,d0
+		ble.b	.out
+		divu.w	#40,d0			; the lines, as $11DC0-$11DD0
+		move.w	#199,d2
+		sub.w	$113C8,d2
+		cmp.w	d2,d0
+		ble.b	.lines
+		move.w	d2,d0
+.lines		subq.w	#1,d0
+		bmi.b	.out
+		moveq	#$3F,d3			; the words a line
+		and.w	$113D6,d3
+		beq.b	.out
+		move.w	$113D4,d4		; the modulo
+		ext.l	d4
+		move.l	$8F00,a0		; the view's buffer
+		add.l	#16000,a0		; plane 2: 0
+		add.l	$12136,a0
+		lea	8000(a0),a1		; plane 3: 1
+		moveq	#-1,d2
+		lsr.w	#1,d3			; in longs, with a last word
+		bcs.b	.odd
+		subq.w	#1,d3
+.line		move.w	d3,d1
+.long		clr.l	(a0)+
+		move.l	d2,(a1)+
+		dbf	d1,.long
+		add.l	d4,a0
+		add.l	d4,a1
+		dbf	d0,.line
+		bra.b	.out
+.odd		move.w	d3,d1
+		bra.b	.oddl
+.long2		clr.l	(a0)+
+		move.l	d2,(a1)+
+.oddl		dbf	d1,.long2
+		clr.w	(a0)+
+		move.w	d2,(a1)+
+		add.l	d4,a0
+		add.l	d4,a1
+		dbf	d0,.odd
+.out		movem.l	(a7)+,d0-d4/a0-a1
 		rts
 
 ; The frame's end: a pass that does not draw goes on at $D38C, leaving out the

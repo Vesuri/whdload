@@ -43,8 +43,11 @@ one's own) adds `do` (fields, mouse and buttons, reads, waits on a long or on th
 breakpoints, screenshots, with the CPU stopped), `race` (the boot to the menu), `hook`,
 `bench` (fps from the next green light), `statelog` (the race state at every frame end or
 pass, for games/Vroom's `tools/statecmp.py`), `frames` (a hash of every line of each drawn
-frame, for games/Vroom's `tools/framecmp.py`) and `shown` (frames that changed the screen on
-display). The first demo race (Adelaide, two views) is the
+frame, for games/Vroom's `tools/framecmp.py`), `shown` (frames that changed the screen on
+display) and `span` (the emulated time between two addresses, in raster lines read from the
+beam through the stub: exact, the breakpoints stop the emulation). Developer knobs for A/B
+builds (`DEFINES_x=-D... make build BUILD=x`, then `SLAVE=`): `ENH_NOBLITSITES`, `ENH_NOFMODE`,
+`ENH_NOGROUND`. The first demo race (Adelaide, two views) is the
 same race on every machine; the second (Monaco) has one view.
 The title and the menu share the VBL hook $ADAC; a race's is $AE64. In the menu the left
 button on START, held until the hook is $AE64, starts a race (about 500 fields).
