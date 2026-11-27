@@ -21,5 +21,5 @@ on both, against 16.5-16.7).
    grid crashes it at once, in the original loop too).
 3. The release 2.0b (27.11.2026) is packaged (`make dist`: `release/ReadMe`, and
    `release/Install`, which sets `CUSTOM1=1` and `CACHE` in the installed icon as Vroom's
-   does; the script itself has not been run under the Installer) and not yet published
-   (`make release PUBLISH=1`).
+   does; the script itself has not been run under the Installer) and published
+   (`VroomMultiplayerEnhanced-2.0b-20261127`).
