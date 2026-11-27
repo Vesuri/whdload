@@ -288,6 +288,24 @@ just step further, up to 15 fields.
    68020 (`EXTRA_ARGS`), both variants, two-player link at least not broken, and CUSTOM5
    off unchanged. Decide from the measurements which CPUs the option applies on; below
    that it is ignored.
+   - `tools/display.sh` on the a1200-fast, a1200-030, a1200-040 and the 28 MHz 68020
+     (`EXTRA_ARGS`), both variants: every scene shows its frame (27.11.2026). On the
+     slow machines the harness now holds keys until the game has read them (`ab3d.py`
+     `_press`, and `pause` reads the game's playing byte at $8e18).
+   - A long fight in level 2 (`CUSTOM1=5`, minutes of play in full screen) garbled the
+     screen for the rest of the level on every CPU: the heads' jump to the panel through
+     `COP1LC` (fixed: through `COP2LC`, [internals](internals.md#the-1x1-display)).
+     After the fix none in 32 rounds of 4500 fields on the a1200-fast, 8 in the small view
+     and 8 on the a1200-030; before, every run by its fourth.
+   - The two-player link (`tools/link.sh`, two emulators on a pseudo-terminal pair): master
+     and slave both play in both views with the option on.
+   - CUSTOM5 off: the option's patches are all under `PL_IFC5`; with it off the release
+     slave shows the frames of Psygore's byte for byte (level 1's start, pause and end in
+     both views, a1200-030). Only its larger ChipMem and ExpMem remain.
+   - The speeds against the original are in
+     [performance](performance.md#against-the-original-step-8).
+   - Psygore's no-music slave (and so ours) never reaches the menu on the emulated 28 MHz
+     68020; the music slave does. Not looked into.
 9. **The other versions.** The work is done on the Aminet 8-channel version ($c4dc, the
    AGA drawer), then ported to the CD32 one ($fd78, the CD32 drawer). The CD32 version
    draws the same way, with its routines byte for byte or with only their addresses changed
