@@ -63,6 +63,8 @@ _info	dc.b	"Install by Mr.Larmer Updated by CFou!",10
 	dc.b	"Version 1.6 "
 	IFD BARFLY
 	INCBIN	"T:date"
+	ELSE
+	dc.b	"(03.06.2006)"	; vasm: the date Barfly's WDate wrote
 	ENDC
 	dc.b	0
 
@@ -127,7 +129,9 @@ _start	;	A0 = resident loader
 
 dec=$8c
 _PatchV2
-	move.l	#dec,d0
+;	move.l	#dec,d0
+	moveq	#$73,d0	; ~dec; vasm: Barfly's encoding of move.l #dec,d0
+	not.b	d0
 	lea	_TrackNumAdr(pc),a0
 	sub.l	#dec,(a0)
 	lea	_TrackDestAdr(pc),a0
@@ -179,7 +183,7 @@ _Key	move.b	$bfec01,d0
 	cmp.b	_keyexit(pc),D0
 	beq	_Exit
 
-	cmp.b	#$58,d0
+	cmpi.b	#$58,d0	; vasm: cmpi is the shipped encoding
 	bne	.f9
 	move.w	#$f0,$dff180
 	move.w	#$f0,$dff180
@@ -194,7 +198,7 @@ _LoadTrack0
 	MOVE.W	$6EEDE,D0
 	SUBQ.L	#1,D0
 	MULU	#$16DC,D0
-	ADD.L	#$1600,D0
+	ADDI.L	#$1600,D0	; vasm: addi is the shipped encoding
 	MOVE.L	#$16DC,D1
 	MOVEQ	#1,D2
 	MOVE.L	$6EEC4,A0
@@ -214,7 +218,7 @@ _LoadTrackVx
 
 	SUBQ.L	#1,D0
 	MULU	#$16DC,D0
-	ADD.L	#$1600,D0
+	ADDI.L	#$1600,D0	; vasm: addi is the shipped encoding
 	MOVE.L	#$16DC,D1
 	MOVEQ	#1,D2
 
@@ -233,7 +237,7 @@ _SaveTrackVx
 	MOVE.W	$1F278,D1
 	SUBQ.L	#1,D1
 	MULU	#$16DC,D1
-	ADD.L	#$1600,D1
+	ADDI.L	#$1600,D1	; vasm: addi is the shipped encoding
 	MOVE.L	$1F252,A1
 	LEA	_SaveDiskName(PC),A0
 	MOVE.L	_resload(PC),A2
@@ -399,7 +403,7 @@ _BaseDec1=$3623e
 	CLR.B	(A4)+
 	MOVE.B	(A4)+,D2
 	MOVE.B	D2,D1
-	AND.B	#7,D1
+	ANDI.B	#7,D1	; vasm: andi is the shipped encoding
 	MOVE.B	D1,$36243-_BaseDec1(a6)
 	SUBQ.B	#1,D1
 	MOVE.B	D1,$36245-_BaseDec1(a6)
@@ -467,7 +471,7 @@ _BaseDec1=$3623e
 	BRA.b	.lbc00074
 
 .lbc000B4
-	MOVE.B	#$FF,(A0)
+	st	(A0)		; vasm: Barfly's encoding of MOVE.B #$FF,(A0)
 	MOVE.B	-(A0),D2
 	MOVE.W	D2,D7
 	LEA	$36246-_BaseDec1(a6),A1
@@ -498,7 +502,7 @@ _BaseDec1=$3623e
 	MOVE.W	#$10,D0
 .lbc00108
 	MOVE.L	D2,(A3)+
-	DBRA.b	D0,.lbc00108
+	DBRA	D0,.lbc00108	; vasm: Barfly's DBRA.b
 
 	LEA	$36846-_BaseDec1(a6),A3
 	SUB.W	$36244-_BaseDec1(a6),D7
@@ -514,7 +518,7 @@ _BaseDec1=$3623e
 	SUB.B	D1,D2
 	LSL.B	#1,D2
 	ADDQ.W	#1,0(A3,D2.W)
-	DBRA.b	D0,.lbc00134
+	DBRA	D0,.lbc00134	; vasm: Barfly's DBRA.b
 
 .lbc00144
 	LEA	$36246-_BaseDec1(a6),A1
@@ -538,14 +542,14 @@ _BaseDec1=$3623e
 	MOVE.W	-(A2),D5
 	MOVE.W	D5,2(A2)
 	MOVE.W	$200(A2),$202(A2)
-	DBRA.b	D2,.lbc0016A
+	DBRA	D2,.lbc0016A	; vasm: Barfly's DBRA.b
 
 	MOVE.W	D4,(A2)
 	MOVE.W	D6,$200(A2)
 	BRA.b	.lbc0014A
 
 .lbc00182
-	CMP.W	#$FFFF,D2
+	CMPI.W	#$FFFF,D2	; vasm: cmpi is the shipped encoding
 	BEQ.b	.lbc0014A
  ;	move.w #$0,$dff180
 	movem.l (a7)+,a5-a6
@@ -570,14 +574,14 @@ _contb
 	SWAP	D4
 .lbc00018
 	ROL.L	#1,D4
-	DBRA.b	D5,.lbc00026
+	DBRA	D5,.lbc00026	; vasm: Barfly's DBRA.b
 
 	MOVEQ	#15,D5
 	SWAP	D4
 	MOVE.W	(A0)+,D4
 	SWAP	D4
 .lbc00026
-	DBRA.b	D3,.lbc00018
+	DBRA	D3,.lbc00018	; vasm: Barfly's DBRA.b
 
 	MOVE.L	A6,A2
 	MOVE.L	A5,A3
@@ -596,14 +600,14 @@ _contb
 	BEQ.b	.lbc0006E
 	MOVE.B	D4,(A1)+
 	CLR.B	D4
-	DBRA.b	D2,.lbc00018
+	DBRA	D2,.lbc00018	; vasm: Barfly's DBRA.b
 	RTS
 
 .lbc00054
 	ADD.W	D3,A2
 .lbc00056
 	ROL.L	#1,D4
-	DBRA.b	D5,.lbc00064
+	DBRA	D5,.lbc00064	; vasm: Barfly's DBRA.b
 
 	MOVEQ	#15,D5
 	SWAP	D4
@@ -612,20 +616,20 @@ _contb
 .lbc00064
 	MOVE.W	(A3)+,D3
 	BGE.b	.lbc00030
-	CMP.W	#$FFFF,D3
+	CMPI.W	#$FFFF,D3	; vasm: cmpi is the shipped encoding
 	BEQ.b	.lbc00056
 .lbc0006E
 	CLR.B	D4
 .lbc00070
 	ROL.L	#1,D4
-	DBRA.b	D5,.lbc0007E
+	DBRA	D5,.lbc0007E	; vasm: Barfly's DBRA.b
 
 	MOVEQ	#15,D5
 	SWAP	D4
 	MOVE.W	(A0)+,D4
 	SWAP	D4
 .lbc0007E
-	DBRA.b	D3,.lbc00070
+	DBRA	D3,.lbc00070	; vasm: Barfly's DBRA.b
 
 	MOVE.L	A6,A2
 	MOVE.L	A5,A3
@@ -640,12 +644,12 @@ _contb
 .lbc00094
 	MOVE.W	D6,D3
 	MOVE.W	$1FE(A2),D4
-	CMP.W	#2,D4
+	CMPI.W	#2,D4	; vasm: cmpi is the shipped encoding
 	BGE.b	.lbc000D0
 .lbc000A0
 	MOVE.B	$36240-_BaseDec1(a4),(A1)+
 	SUBQ.L	#1,D2
-	DBRA.b	D4,.lbc000A0
+	DBRA	D4,.lbc000A0	; vasm: Barfly's DBRA.b
 
 	CLR.W	D4
 	TST.L	D2
@@ -656,7 +660,7 @@ _contb
 	ADD.W	D3,A2
 .lbc000B8
 	ROL.L	#1,D4
-	DBRA.b	D5,.lbc000C6
+	DBRA	D5,.lbc000C6	; vasm: Barfly's DBRA.b
 
 	MOVEQ	#15,D5
 	SWAP	D4
@@ -665,21 +669,21 @@ _contb
 .lbc000C6
 	MOVE.W	(A3)+,D3
 	BGE.b	.lbc00088
-	CMP.W	#$FFFF,D3
+	CMPI.W	#$FFFF,D3	; vasm: cmpi is the shipped encoding
 	BEQ.b	.lbc000B8
 .lbc000D0
 	MOVE.W	D4,D1
 	CLR.B	D4
 .lbc000D4
 	ROL.L	#1,D4
-	DBRA.b	D5,.lbc000E2
+	DBRA	D5,.lbc000E2	; vasm: Barfly's DBRA.b
 
 	MOVEQ	#15,D5
 	SWAP	D4
 	MOVE.W	(A0)+,D4
 	SWAP	D4
 .lbc000E2
-	DBRA.b	D3,.lbc000D4
+	DBRA	D3,.lbc000D4	; vasm: Barfly's DBRA.b
 
 	MOVE.L	A6,A2
 	MOVE.L	A5,A3
@@ -697,7 +701,7 @@ _contb
 .lbc000FE
 	MOVE.B	D4,(A1)+
 	SUBQ.L	#1,D2
-	DBRA.b	D1,.lbc000FE
+	DBRA	D1,.lbc000FE	; vasm: Barfly's DBRA.b
 
 	CLR.B	D4
 	TST.L	D2
@@ -708,7 +712,7 @@ _contb
 	ADD.W	D3,A2
 .lbc00112
 	ROL.L	#1,D4
-	DBRA.b	D5,.lbc00120
+	DBRA	D5,.lbc00120	; vasm: Barfly's DBRA.b
 
 	MOVEQ	#15,D5
 	SWAP	D4
@@ -717,7 +721,7 @@ _contb
 .lbc00120
 	MOVE.W	(A3)+,D3
 	BGE.b	.lbc000EC
-	CMP.W	#$FFFF,D3
+	CMPI.W	#$FFFF,D3	; vasm: cmpi is the shipped encoding
 	BEQ.b	.lbc00112
 
 _quit
@@ -726,7 +730,7 @@ _Exit
 	move.l	(_resload,pc),a2
 	jmp	(resload_Abort,a2)
 _bad_version
-	clr.l d0
+	moveq	#0,d0	; vasm: Barfly's encoding of clr.l d0
 	pea	TDREASON_WRONGVER
 	move.l	(_resload,pc),a2
 	jmp	(resload_Abort,a2)

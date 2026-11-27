@@ -1,0 +1,21 @@
+{
+  "archives": [
+    {
+      "input": "VroomMultiplayer.lha",
+      "output": "VroomMultiplayerEnhanced-{version}-{date}.lha",
+      "replace": {
+        "VroomMultiplayerHd/VroomMultiplayer.slave": "build:VroomMultiplayer",
+        "VroomMultiplayerHd/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {
+        "dir": "VroomMultiplayerHd/.src",
+        "variants": [
+          "VroomMultiplayer"
+        ],
+        "keep": []
+      }
+    }
+  ]
+}
