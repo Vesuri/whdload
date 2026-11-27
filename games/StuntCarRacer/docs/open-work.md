@@ -7,6 +7,7 @@ second at the original game speed, for the disk and the TNT version. The copy is
 through the menus and a practice race with the chip copy read- and write-protected.
 
 1. Drive more of the game on the verify build: league races, results, save and load.
-2. A cracked disk (Quartex): the slave runs a plain intro and main program, but no cracked
-   image is pinned to test it with.
+2. A cracked disk (Quartex): the slave runs a plain intro and main program. A synthetic
+   image (the original's intro and program stored decrypted, as they lie in memory) races
+   with and without the copy; the real crack is not pinned, so its intro is untested.
 3. A first release needs a dated `$VER`, a ReadMe entry and an icon tooltype for the option.
