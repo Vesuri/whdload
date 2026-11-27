@@ -16,6 +16,7 @@ on both, against 16.5-16.7).
 ## Next
 
 1. Untested: link play, the highscore save; v2.
-2. Vroom's mixing of the crash's flying wheel in the frames between ticks ($E0C4-$E131
-   here, a table of 8-byte steps) is not ported.
+2. The crash's flying wheel in the frames between ticks is reviewed, not yet seen: a test
+   needs a hard crash (`tools/vmp.py drive` does not get the car going: full throttle from the
+   grid crashes it at once, in the original loop too).
 3. A release: a dated `$VER`, a ReadMe entry above CFou's.

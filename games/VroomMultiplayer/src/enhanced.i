@@ -151,6 +151,7 @@ _enh_pl		PL_START
 		PL_PS	$F3F2,enh_Engine0	; move.w $1254A(pc),d4; beq.s $F406
 		PL_PS	$F644,enh_Engine1	; move.w $1254A(pc),d4; beq.s $F658
 		PL_PSS	$FB26,enh_Sort,2	; sub.l d7,d1; cmpi.l #$7FFF,d1
+		PL_PSS	$E10C,enh_WheelXY,18	; move.l d6,($A,a5,d5.w) ... move.l d6,(a5,d5.w)
 		PL_PSS	$808E,enh_R808E,2	; move.w $E564(pc),d0; cmp.w $7FCA(pc),d0
 		PL_PSS	$8444,enh_R8444,2	; move.b $E5C1(pc),d6; move.w #-1,d7
 		PL_PSS	$845A,enh_R8444,2
@@ -1215,6 +1216,49 @@ enh_Sort	sub.l	d7,d1
 		add.l	#$FB04,(a7)
 		rts
 .ahead		cmp.l	#$7FFF,d1
+		rts
+
+; The crash's flying wheel ($E0C4-$E131, Vroom's $D7BE-$D814): the step $3E
+; of the player's block indexes a table of positions ($EAA6: x at +2, the
+; line at +4, halved with two views), one step a pass. A frame draws the tick
+; before's step: it takes alpha of the way from the step before it.
+; IN:	d0.w = the shift (1: two views), d3.w = step*8, a3 = the table,
+;	d4.w = the side (-1 mirrored), d6.l = the x, a5, d5 = the object and
+;	the screen's offset
+; OUT:	($A,a5,d5.w) = x, (a5,d5.w) = d6.l = the line's offset
+enh_WheelXY	tst.b	_enh_frame(pc)
+		beq.b	.set
+		tst.w	d3
+		beq.b	.set			; the first step
+		movem.l	d0-d2/d7,-(a7)
+		move.w	d0,d7
+		move.w	(2-8,a3,d3.w),d0	; x: from the step before
+		tst.w	d4
+		bpl.b	.side
+		add.w	#$10,d0
+		neg.w	d0
+.side		asr.w	d7,d0
+		add.w	([ENH_BLOCK.w],$113D0),d0
+		move.w	d6,d1
+		bsr	enh_Mix
+		move.l	d1,($A,a5,d5.w)
+		move.w	(4-8,a3,d3.w),d0	; the line
+		asr.w	d7,d0
+		move.w	(4,a3,d3.w),d1
+		asr.w	d7,d1
+		bsr	enh_Mix
+		muls.w	#40,d1
+		add.l	#$1F40,d1
+		move.l	d1,(a5,d5.w)
+		move.l	d1,d6
+		movem.l	(a7)+,d0-d2/d7
+		rts
+.set		move.l	d6,($A,a5,d5.w)
+		move.w	(4,a3,d3.w),d6
+		asr.w	d0,d6
+		muls.w	#40,d6
+		add.l	#$1F40,d6
+		move.l	d6,(a5,d5.w)
 		rts
 
 _enh_an		dc.l	0		; a frame's alpha: _enh_an/_enh_ad

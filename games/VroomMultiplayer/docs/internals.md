@@ -206,6 +206,7 @@ $EA5A, the swap's field $EB36.
 | $10012 (`move.w $1187C(pc),d1`) | the landscape's pitch and height: a frame mixes the two ticks' values (kept per player) |
 | $F3F2, $F644 | the engine's pitch and the bump's sound per view: the ticks' |
 | $FB26 (`sub.l d7,d1`) | the cars ahead, sorted: a frame leaves out a car behind the camera |
+| $E10C-$E123 | the crash's flying wheel (`enh_WheelXY`; the step $3E of the player's block indexes the table $EAA6): a frame takes alpha of the way from the step before. Reviewed against the original, not yet seen in a crash: the wheel flies only in a hard one (strength $44 of 40 or more; full throttle from the grid gives 9) |
 | $DCAA, $13676, $12CB0, $D258, $D282 | a tick leaves out the cockpit, the tyres' marks, the wheel, the score's and the time's digits; it waits for the screen on display before what it still draws (the lights, the crashes, the pit stop) |
 
 A frame takes a tick's drawing plus a view's landscape, so they pay only where a frame takes
