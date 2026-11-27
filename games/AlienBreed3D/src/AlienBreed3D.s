@@ -644,8 +644,8 @@ _pl_v3
 	PL_S	$1a61c,4
 	PL_PS	$1a3ac,_t_column	;see-through walls
 	PL_S	$1a3b2,4
-	PL_PS	$1cb8a,_t_strip		;a wall strip's line and texture step
-	PL_S	$1cb90,8
+	PL_PS	$1cb8a,_t_stripw	;a wall strip's line and texture step; solid
+	PL_S	$1cb90,8		;strips S - 1 lines longer at each end (hires.s)
 	PL_PS	$1cf18,_t_strip
 	PL_S	$1cf1e,8
 	PL_PS	$1d13a,_t_walltop	;a wall's top and bottom above the eye

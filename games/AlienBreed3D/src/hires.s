@@ -176,6 +176,33 @@ _t_column
 ; PL_PS at $1cb8a and $1cf18 (a wall strip), over adda.l (timeslarge,pc,d5.w*4),a3, move.w
 ; d5,d4 and the two consttab reads: line d5 + 1, and the texture step (16.16) divided by S
 ; for S times the lines; the start is the same.
+; A solid strip (the PL_PS at $1cb8a) is S - 1 lines longer at both ends, within the
+; zone's clip lines (d5 = the line above the first, d6 the lines): the game rounds a
+; strip's ends and the edges of the floors and ceilings that meet them apart, by less than
+; its 96x80 line, so at S times its lines a strip could end up to S - 1 lines short of the
+; floor or ceiling, and the lines between were drawn by neither (along a step's edge; the
+; original's one line less). The texture continues: its row is the line's.
+_t_stripw
+	movem.l	d0/a0,-(sp)
+	moveq	#1,d0			;S - 1
+	tst.b	_ds_gview(pc)
+	beq.s	.s2
+	moveq	#2,d0
+.s2	move.w	d5,d4
+	add.w	d6,d4			;the last line
+	add.w	d0,d4
+	HUNK	G_BOTCLIP,a0
+	cmp.w	(a0),d4
+	ble.s	.b
+	move.w	(a0),d4
+.b	sub.w	d0,d5
+	HUNK	G_TOPCLIP,a0
+	cmp.w	(a0),d5
+	bge.s	.t
+	move.w	(a0),d5
+.t	move.w	d4,d6
+	sub.w	d5,d6
+	movem.l	(sp)+,d0/a0
 _t_strip
 	move.w	d5,d4
 	addq.w	#1,d4

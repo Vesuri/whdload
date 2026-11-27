@@ -25,6 +25,8 @@ _gofs
 	GOFS	EYE,$61d54		;the eye's height (long, as the objects' heights)
 	GOFS	WALLTOP,$1ca28		;a wall's top and bottom (longs)
 	GOFS	WALLBOT,$1ca2c
+	GOFS	TOPCLIP,$1d270		;the zone's clip lines (words): a wall strip draws the
+	GOFS	BOTCLIP,$1d272		;lines below the top one down to the bottom one
 	GOFS	RIGHT,$1f9f4		;FloorLine: the span's right edge (word)
 	GOFS	FILLS,$1fcb0		;FloorLine's fills, after its split at the banks
 	GOFS	ANGLE,$18ff2		;the view's angle (word; the sky's column)

@@ -411,11 +411,17 @@ sites at each switch. The projection is x = X * 128 / Z + 47 and y = (H - eye) /
 - The list's line 0 is drawn by no writer, as in the original (black there); `_ds_one`
   shows it black, since the builders' moves are in it.
 
-Lines the original leaves undrawn, one-line gaps at the near edges of floor steps, it
-leaves at 1x1 too (`ab3d.py holes`, with `-DHOLES`). On level 1's walk: 3500 pixels in
-351 frames of 7680 at 96x80; 9497 in 288 of 30720 at 192x160; in full screen, 224 in 200
-frames of 7680 at 96x80, 2735 in 129 frames of 69120 at 288x240, one or two lines thick
-(a diagonal where the edge is seen at an angle). None standing still at the same place.
+Lines the original leaves undrawn: one-line gaps along floor and ceiling steps' edges,
+where a wall strip ends a line short of the floor or ceiling that meets it (the strip
+draws the lines after its top `d5` down to its bottom, the floor its first line to the
+line before its last; each rounds its own projection). At S times the lines the gap is up
+to S - 1 lines, so `_t_stripw` (the PL_PS at $1cb8a, solid strips only) makes a strip S - 1
+lines longer at both ends within the zone's clip lines (`topclip`, `botclip`, $1d270
+and $1d272), the texture continuing (its row is linear in the start line). Unwritten
+pixels on level 1's walk (`ab3d.py holes`, `-DHOLES`, a1200-030): 10634 in 209 of 1304
+frames to 119 in 5 (192x160), 33269 in 956 of 1009 to 3 in 2 (288x240). The original
+display keeps its gaps (on the walk 3500 pixels in 351 frames of the small view, 224 in
+200 of full screen's).
 
 ### Pen bytes
 

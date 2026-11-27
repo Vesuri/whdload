@@ -423,7 +423,7 @@
 	PL_S	$1a8b4,4
 	PL_PS	$1a644,_t_column
 	PL_S	$1a64a,4
-	PL_PS	$1ce0a,_t_strip
+	PL_PS	$1ce0a,_t_stripw
 	PL_S	$1ce10,8
 	PL_PS	$1d198,_t_strip
 	PL_S	$1d19e,8
