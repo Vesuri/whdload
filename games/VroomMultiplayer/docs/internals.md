@@ -128,6 +128,7 @@ fields the debt past it is dropped and counted).
 | $BE86 (`tst.w $E53E`) | the end of a pause: the tick clock starts again |
 | $DB04 (`cmpi.w #1,$11484`) | in a pass that does not draw, each view leaves out the wait, the sky and ground clear, the road spans, the sky objects and the scaler ($DB04-$DBCF), keeping the clear's state: the horizon's scroll (`$14FA4`, per view at $15120) and the clamp of the ground's top line $12136 |
 | $D348 (`cmpi.w #$50,$C8`) | a pass that does not draw goes on at $D38C, leaving out the frame end's wait and the swap |
+| the screens' references, $ADEC, $AE48, $AEB4, $AF94, $AFAE | on AGA, the screens move 6 bytes up and the lores modes fetch 64 bits wide (below, "64-bit fetch") |
 | 94 blitter starts in $1309E-$1B25E (`src/blitsites.i`) | `jsr $10C`-`$124.w` (`src/blitwait.i`'s start-and-wait) become `jsr $1E0`-`$1F8.w`: start, one read of dmaconr, return |
 
 What an undrawn pass still runs: the players' steps, the landscape of every view (it follows
@@ -146,6 +147,35 @@ between but to the custom chips: 94 of the 138. With the option those only start
 against 13.45 with 71 of 371. `frames 100` on the a1200-040 (`CUSTOM3=2`) with and without
 them (`-DENH_NOBLITSITES`): every frame the same but for lines 31-35 in 24 of them, the race
 clock (real time).
+
+**64-bit fetch.** As in Vroom: on AGA (Lisa, $F8 in `LISAID`) the lores modes fetch their
+planes 64 bits wide (`FMODE` 3), which leaves the blitter three quarters of the display's
+chip bus slots. Every plane must be 8-byte aligned, and the screens, $21342 and $29042, are
+2 bytes past it. They cannot move down as Vroom's do: a track's data, loaded from $20000, runs
+up to $21341 (the Brazilian Grand Prix's). They move up by 6, into the fill above the second
+screen ($30D42-$30D47 holds $CC through the title and the races). That fill is the bottom of
+the stack ($30F36 down): the lowest stack write seen, through the title and five demo races
+on the a1200-040, is $30DA2, 90 bytes above the moved screen's end (96 before). Every
+reference to the screens, from memory images at the title and in a race (instruction
+operands and longs into $21342-$30D41):
+
+| Where | What |
+|---|---|
+| $3696-$36CC, $3B10-$3B40 | the startup: the first picture and its plane pointers into the copper list $9732 |
+| $8EF8, $8EFC, $8F00, $972E | the screens' pointers, the draw buffer and the screen the VBL shows next |
+| $DBEA | the panel's copy between the screens with two views: `cmpa.l #$29042,a5` |
+| $13BF4, $13C08, $14114, $14138, $142A0 | the race's map code (Vroom's $1278C, $12A62, $12BC4) |
+| $1448A-$144ED | the gauge's 25 line addresses on the right of the panel, read at $143DA (Vroom's $12CC0) |
+
+The copper lists' plane pointers hold 0 until the startup sets them. The fetch follows the
+address a lores plane pointer setting writes: the VBL's new screen ($ADEC for the copper list
+$9732, $AEB4 for $979E, the race's) and a new mode ($AF94) fetch 64 bits from an aligned
+screen with `DDFSTOP` $B0, and 16 bits from any other; the hires mode ($AE48, $AFAE) 16 bits.
+`frames 150` on the a1200-040 (`CUSTOM3=2`) against `-DENH_NOFMODE`: the two-view demo race's
+frames all the same but for the race clock (lines 31-35), the one-view race's too. A first
+build missed the gauge's table, which the operand scan could not see: its piece at lines
+30-32 stayed at the old address, 6 bytes left. `bench 300` on the a1200: 15.74 fps with 17 of
+317 ticks undrawn (14.14 and 53 of 353 before).
 
 **The screen on display.** `shown 40` (the screen not handed to the VBL, read at the swap and
 when the VBL takes the new one) on the a1200-040 and the a1200-030, two views and one: no
