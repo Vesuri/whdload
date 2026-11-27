@@ -264,7 +264,12 @@ _PatchGame	lea	_PL_Game(pc),a0
 		adda.l	#IMG_START,a1
 		move.l	_resload(pc),a2
 		jsr	resload_Patch(a2)
-
+		move.l	_UlBase(pc),d0
+		bne.b	.Enhanced
+		lea	_PL_Original(pc),a0
+		lea	IMG_START,a1
+		jsr	resload_Patch(a2)
+.Enhanced
 		move.l	_expmem(pc),d0
 		beq.b	.NoExpMem
 		addi.l	#$1000,d0
@@ -292,7 +297,7 @@ _Enhance	move.l	_Custom3(pc),d0
 		btst	#1,d0			;AFB_68020
 		beq.w	.Off
 		move.l	_expmem(pc),d0
-		beq.b	.Off
+		beq.w	.Off
 		addi.l	#IMG_COPY,d0
 		movea.l	d0,a1
 		subi.l	#IMG_START,d0
@@ -324,8 +329,31 @@ _Enhance	move.l	_Custom3(pc),d0
 		add.l	d1,(a1)
 		bra.b	.Next
 .Done
-		IFD	VERIFY			;The original's copy is write protected:
-		move.l	a3,-(sp)		;a write through a reference
+		lea	ulBlob(pc),a0		;Unleashed's routines and patches
+		movea.l	_ImgDelta(pc),a1	;behind the copy, relocated with it
+		adda.l	#IMG_END,a1
+		lea	_UlBase(pc),a2
+		move.l	a1,(a2)
+		move.w	#UL_CODE/2-1,d1
+.CopyUl		move.w	(a0)+,(a1)+
+		dbf	d1,.CopyUl
+		lea	ulRelocs(pc),a0
+		movea.l	_UlBase(pc),a1
+		subq.l	#2,a1
+		move.l	_ImgDelta(pc),d1
+.NextUl		moveq	#0,d0
+		move.w	(a0)+,d0
+		bne.b	.SiteUl
+		move.l	(a0)+,d0
+		beq.b	.DoneUl
+.SiteUl		adda.l	d0,a1
+		add.l	d1,(a1)
+		bra.b	.NextUl
+.DoneUl		movea.l	_UlBase(pc),a0
+		movea.l	(a0),a0
+		jsr	(a0)			;ulInstall
+		IFD	VERIFY			;The original's copy is read and write
+		move.l	a3,-(sp)		;protected: an access through a reference
 		lea	_Protect(pc),a3		;relocTable misses faults there
 .Range		move.l	(a3)+,d0		;(an MMU is needed)
 		beq.b	.Protected
@@ -333,7 +361,7 @@ _Enhance	move.l	_Custom3(pc),d0
 		move.l	(a3)+,d0
 		sub.l	a0,d0
 		movea.l	_resload(pc),a2
-		jsr	resload_ProtectWrite(a2)
+		jsr	resload_ProtectReadWrite(a2)
 		bra.b	.Range
 .Protected	move.l	(sp)+,a3
 		ENDC
@@ -352,15 +380,18 @@ _PL_Game	PL_START			;Offsets in the main program
 		PL_L	$5b6c2-IMG_START,$4e714e71
 		PL_PS	$5c960-IMG_START,_Copylock	;Crack in game copylock!
 		PL_S	$5c966-IMG_START,$efa-$966
+		PL_P	$5f2f8-IMG_START,_SaveTimes	;move.b ($1c947).l,(2,a1,d1.w)
+		PL_L	$62d1c-IMG_START,$7a61a		;Change load location from $7a21a to $7a61a for fastest laps/track times
+		PL_P	$62e86-IMG_START,_Loader		;Rob Northen loader
+		PL_END
+
+_PL_Original	PL_START			;Not with the enhanced framerate
+		PL_PS	$69fea-IMG_START,_24Bit_SwpMv_D0	;swap d0, move.w #$ffff,d0
+		PL_PS	$6a06e-IMG_START,_24Bit_Add_2_A0	;adda.l #2,a0
 		PL_PS	$5dac0-IMG_START,_CheckTurboMode	;Alter delay and write TURBO
 		PL_L	$5dac6-IMG_START,$4e714e71	;into the screen if turbo is
 		PL_PS	$64516-IMG_START,_CheckTurboMode	;on, otherwise clear it
 		PL_L	$6451c-IMG_START,$4e714e71
-		PL_P	$5f2f8-IMG_START,_SaveTimes	;move.b ($1c947).l,(2,a1,d1.w)
-		PL_L	$62d1c-IMG_START,$7a61a		;Change load location from $7a21a to $7a61a for fastest laps/track times
-		PL_P	$62e86-IMG_START,_Loader		;Rob Northen loader
-		PL_PS	$69fea-IMG_START,_24Bit_SwpMv_D0	;swap d0, move.w #$ffff,d0
-		PL_PS	$6a06e-IMG_START,_24Bit_Add_2_A0	;adda.l #2,a0
 		PL_END
 
 ;======================================================================
@@ -380,7 +411,16 @@ _WinRace	move.l	a0,-(sp)
 
 ;======================================================================
 
-_RefreshBoost	move.l	a0,-(sp)
+_RefreshBoost	movem.l	d0/a0,-(sp)
+		move.l	_UlBase(pc),d0		;Enhanced framerate: Unleashed's
+		beq.b	.Original		;flag, no self-modifying code
+		movea.l	d0,a0
+		movea.l	4(a0),a0
+		jsr	(a0)			;ulRefreshBoost
+		movem.l	(sp)+,d0/a0
+		rts
+.Original	movem.l	(sp)+,d0/a0
+		move.l	a0,-(sp)
 		lea	$1ca20,a0
 		adda.l	_ImgDelta(pc),a0
 		tst.b	(a0)
@@ -699,6 +739,7 @@ _AttnFlags	dc.l	0
 		dc.l	TAG_DONE
 _ImgDelta	dc.l	0			;The main program's copy - IMG_START
 _DelayPtr	dc.l	$616d8			;The game's frame delay
+_UlBase		dc.l	0			;The Unleashed blob, when it runs
 _SaveFileSize	dc.l	0
 ;======================================================================
 
@@ -773,3 +814,15 @@ Wait_Raster_Lines
 ;======================================================================
 
 		INCLUDE	relocs.s
+
+;======================================================================
+; Stunt Car Racer Unleashed 1.1's framerate (src/unleashed.s, built into tmp/include/ by
+; tools/ulblob.py): its code, then ulRelocs. It and what it reserves follow the copy.
+
+		INCLUDE	unleashed.i
+		CNOP	0,2
+ulBlob		INCBIN	unleashed.bin
+
+		IFGT	IMG_COPY+IMG_END-IMG_START+UL_SIZE-EXPMEM
+		FAIL	"ExpMem is too small for the copy and the Unleashed blob"
+		ENDC

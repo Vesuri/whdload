@@ -37,6 +37,13 @@ after changing the tool's lists:
 
 `--report` is also the list of everything Unleashed changed, beside its source lines.
 
+The Unleashed blob (`src/unleashed.s`, internals.md) is built by `tools/ulblob.py` from
+`game_build` (game.sh) into the ignored `tmp/include/`. `src/unleashed_syms.i` names the
+original's addresses with Unleashed's labels. After changing the blob, check its patch
+table against the original: `python3 -I tools/ulblob.py tmp/include --original
+tmp/scr/pal.bin` must report no problems (a patch that splits an instruction or covers a
+branch target corrupts the copy silently).
+
 ## Driving it
 
 `INSTANCE=<name> python3 tools/scr.py serve &` boots with the gdb stub (run options through
@@ -46,5 +53,6 @@ From there `keys 1:150 44:150 44:150 44:150 44:150 44:400 44:400` reaches a prac
 on the Little Ramp; hold RETURN (`44+`) to drive, S and D steer.
 
 To look for missed relocations, drive the verify build on `SETUP=a1200-030` with
-`WHD_ARGS='CUSTOM3=1 MMU'`: a write into the chip copy stops with an access fault, and the
-core dump (`python3 -m amigaxdev.whdldump tmp/run/<instance>/.run/dh1`) names the writer.
+`WHD_ARGS='CUSTOM3=1 MMU'`: a read or write of the chip copy stops with an access fault, and
+the core dump (`python3 -m amigaxdev.whdldump tmp/run/<instance>/.run/dh1`) names the
+accessor.

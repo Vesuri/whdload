@@ -18,8 +18,9 @@ original address beside the Unleashed symbol it became, which shows where Unleas
 a variable or pointed a reference elsewhere (--json).
 
 --asm writes the fast copy's relocation table (docs/internals.md, "The fast copy"): the
-matched references Unleashed relocates, and the original's own references from a linear and
-a recursive-descent scan of its code; --relocs lists every site with how it was found.
+matched references Unleashed relocates, the pointer tables of its Data section, and the
+original's own references from a linear and a recursive-descent scan of its code; --relocs
+lists every site with how it was found.
 """
 import argparse
 import bisect
@@ -205,7 +206,7 @@ def write_asm(path, sites, orig, image_end):
             d = site - prev
             assert d > 0 or site == BASE
             t = t.replace('\t', ' ')
-            t = ('%d: ' % n if n else 'original: ') + t
+            t = ('%d: ' % n if n else '' if t.startswith('Unleashed ') else 'original: ') + t
             if d < 0x10000:
                 f.write('\tdc.w\t$%04x\t\t; $%05x $%05x %s\n' % (d, site, ov, t))
             else:
@@ -213,6 +214,86 @@ def write_asm(path, sites, orig, image_end):
             prev = site
         f.write('\tdc.w\t0\n\tdc.l\t0\n')
     print('%s: %d sites' % (path, len(keep)), file=sys.stderr)
+
+
+def read_symbols(listing):
+    """[(name, section, offset)] from the listing's symbol table."""
+    rx = re.compile(r'^(\S+)\s+([0-9A-F]{2}):([0-9A-F]{8})$')
+    syms = []
+    on = False
+    for line in open(listing, encoding='latin-1'):
+        line = line.rstrip('\n')
+        if line.startswith('Symbols by name'):
+            on = True
+            continue
+        if line.startswith('Symbols by value'):
+            break
+        m = on and rx.match(line)
+        if m:
+            syms.append((m.group(1), int(m.group(2), 16), int(m.group(3), 16)))
+    return syms
+
+
+def matched_references(sites):
+    """{(Unleashed hunk, offset): {original values}} of the references the alignment matched."""
+    ref = {}
+    for site, ov, h, uv, _, how in sites:
+        if how in ('M', 'R'):
+            ref.setdefault((h, uv), set()).add(ov)
+    return ref
+
+
+def data_hunk_sites(hunks, listing, sites, orig, image_end):
+    """The relocated longwords of Unleashed's Data section (hunk 2: pointer tables such as
+    mountainSilhouetteTable) at their original addresses. A label there whose matched
+    references all hold one original value places the longwords behind it, up to the next
+    label; a site counts only if the original holds an address inside the image there."""
+    ref = matched_references(sites)
+    labels = sorted((off, min(ref[(2, off)])) for _, sec, off in read_symbols(listing)
+                    if sec == 2 and len(ref.get((2, off), ())) == 1)
+    out = []
+    for r, h in hunks[2][2]:
+        i = bisect.bisect_right([o for o, _ in labels], r) - 1
+        if i < 0:
+            continue
+        site = labels[i][1] + r - labels[i][0]
+        v = struct.unpack_from('>L', orig, site - BASE)[0]
+        if BASE <= v < image_end:
+            out.append((site, v, h, struct.unpack_from('>L', hunks[2][1], r)[0], (0, 'Unleashed Data +%05x' % r), 'H'))
+    return out
+
+
+def write_symbols(path, listing, u2o, sites):
+    """NAME ORIGINAL HOW for every label in the listing's symbol table. HOW: 'c' a matched
+    instruction of the code; 'n' between two matched instructions the same distance apart;
+    'd' Unleashed's copy of the original data ($e700 + offset - 4); 'r' a relocated
+    reference that the alignment matched to an original value; '-' none (Unleashed's own)."""
+    syms = read_symbols(listing)
+    ref = matched_references(sites)
+    keys = sorted(u2o)
+    with open(path, 'w') as f:
+        for name, sec, off in sorted(syms, key=lambda s: (s[1], s[2], s[0])):
+            if sec == 0:
+                if off in u2o:
+                    o, how = u2o[off], 'c'
+                else:
+                    i = bisect.bisect_left(keys, off)
+                    o, how = None, '-'
+                    if 0 < i < len(keys):
+                        a0, a1 = keys[i - 1], keys[i]
+                        if u2o[a1] - u2o[a0] == a1 - a0:
+                            o, how = u2o[a0] + off - a0, 'n'
+                        else:
+                            # A changed stretch: where the matched instructions on either
+                            # side put it, for a reader to settle.
+                            how = '- after $%05x+%x, before $%05x-%x' % (
+                                u2o[a0], off - a0, u2o[a1], a1 - off)
+            elif sec == 1:
+                o, how = BASE + off - 4, 'd'
+            else:
+                v = ref.get((sec, off))
+                o, how = (min(v), 'r') if v and len(v) == 1 else (None, '-')
+            f.write('%-40s %d:%05x %s %s\n' % (name, sec, off, '$%05x' % o if o is not None else '-', how))
 
 
 def reachable(orig, ranges, image_end):
@@ -265,6 +346,7 @@ def main():
     p.add_argument('--json')
     p.add_argument('--relocs', help='write the relocation sites: matched, then unmatched')
     p.add_argument('--asm', help='write the relocation table source (src/relocs.s)')
+    p.add_argument('--symbols', help='write every Unleashed label with its original address')
     p.add_argument('--image-end', type=lambda v: int(v, 16), default=0x722e0,
                    help='the end of the program image the table relocates (hex)')
     a = p.parse_args()
@@ -406,6 +488,10 @@ def main():
                 sites.append((r, v, 0, 0, (0, text), 'D'))
                 have.add(r)
                 print('recursive descent: $%05x %s' % (oa, text), file=sys.stderr)
+    data = [x for x in data_hunk_sites(hunks, a.listing, sites, orig, a.image_end) if x[0] not in have]
+    sites += data
+    have.update(x[0] for x in data)
+    print('added %d references from the Data section' % len(data), file=sys.stderr)
     for r, why in EXTRA_SITES.items():
         v = struct.unpack_from('>L', orig, r - BASE)[0]
         sites.append((r, v, 0, 0, (0, why), 'X'))
@@ -424,6 +510,8 @@ def main():
                     print('H%d +%05x %d' % (hi, r, h), file=f)
     if a.asm:
         write_asm(a.asm, sites, orig, a.image_end)
+    if a.symbols:
+        write_symbols(a.symbols, a.listing, {uaddr[j]: o for j, o in u2o.items()}, sites)
     if a.json:
         json.dump({k: sorted(vs) for k, vs in sorted(absmap.items(), key=lambda kv: int(kv[0], 16))}, open(a.json, 'w'), indent=0)
 

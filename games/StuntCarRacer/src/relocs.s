@@ -125,7 +125,11 @@ relocTable:
 	dc.w	$0006		; $1badc $593f8 817: JSR decompressRLEImage
 	dc.w	$0006		; $1bae2 $6a584 818: MOVE.L frameBuffers,A0
 	dc.w	0
-	dc.l	$3b530		; $57012 $57c3e 832: ADD.W D0,checksumAccumulator
+	dc.l	$3b51a		; $56ffc $4477c Unleashed Data +00004
+	dc.w	$0004		; $57000 $4af3e Unleashed Data +00008
+	dc.w	$0004		; $57004 $3d7b6 Unleashed Data +0000c
+	dc.w	$0004		; $57008 $50e4c Unleashed Data +00010
+	dc.w	$000a		; $57012 $57c3e 832: ADD.W D0,checksumAccumulator
 	dc.w	$0006		; $57018 $57c3e 833: ADDQ.W #$01,checksumAccumulator
 	dc.w	$0006		; $5701e $0f28e 834: JSR queueSerialByte
 	dc.w	$0010		; $5702e $5700c 842: JSR sendSerialByteWithChecksum
@@ -5907,7 +5911,59 @@ relocTable:
 	dc.w	$000e		; $69716 $69799 19683: MOVE.B D3,mountainSegmentCount
 	dc.w	$0006		; $6971c $69736 19684: MOVE.L #mountainHorizontalAngles,A0
 	dc.w	$0006		; $69722 $69766 19685: MOVE.L #mountainShapeIndices,A1
-	dc.w	$05e6		; $69d08 $69d4e 19699: JSR loadGraphicsElement
+	dc.w	$0296		; $699b8 $6979e Unleashed Data +00014
+	dc.w	$0004		; $699bc $6988a Unleashed Data +00018
+	dc.w	$0004		; $699c0 $6979e Unleashed Data +0001c
+	dc.w	$0004		; $699c4 $69894 Unleashed Data +00020
+	dc.w	$0004		; $699c8 $6979e Unleashed Data +00024
+	dc.w	$0004		; $699cc $6989e Unleashed Data +00028
+	dc.w	$0004		; $699d0 $6979e Unleashed Data +0002c
+	dc.w	$0004		; $699d4 $698a8 Unleashed Data +00030
+	dc.w	$0004		; $699d8 $6979e Unleashed Data +00034
+	dc.w	$0004		; $699dc $698b2 Unleashed Data +00038
+	dc.w	$0004		; $699e0 $6979e Unleashed Data +0003c
+	dc.w	$0004		; $699e4 $698bc Unleashed Data +00040
+	dc.w	$0004		; $699e8 $6979e Unleashed Data +00044
+	dc.w	$0004		; $699ec $698c6 Unleashed Data +00048
+	dc.w	$0004		; $699f0 $6979e Unleashed Data +0004c
+	dc.w	$0004		; $699f4 $698d0 Unleashed Data +00050
+	dc.w	$0004		; $699f8 $6979e Unleashed Data +00054
+	dc.w	$0004		; $699fc $698da Unleashed Data +00058
+	dc.w	$0004		; $69a00 $6979e Unleashed Data +0005c
+	dc.w	$0004		; $69a04 $698e4 Unleashed Data +00060
+	dc.w	$0004		; $69a08 $6979e Unleashed Data +00064
+	dc.w	$0004		; $69a0c $698ee Unleashed Data +00068
+	dc.w	$0004		; $69a10 $6979e Unleashed Data +0006c
+	dc.w	$0004		; $69a14 $698f8 Unleashed Data +00070
+	dc.w	$0004		; $69a18 $6979e Unleashed Data +00074
+	dc.w	$0004		; $69a1c $69902 Unleashed Data +00078
+	dc.w	$0004		; $69a20 $6979e Unleashed Data +0007c
+	dc.w	$0004		; $69a24 $6990c Unleashed Data +00080
+	dc.w	$0004		; $69a28 $697c0 Unleashed Data +00084
+	dc.w	$0004		; $69a2c $69902 Unleashed Data +00088
+	dc.w	$0004		; $69a30 $697c0 Unleashed Data +0008c
+	dc.w	$0004		; $69a34 $6990c Unleashed Data +00090
+	dc.w	$0004		; $69a38 $697e8 Unleashed Data +00094
+	dc.w	$0004		; $69a3c $69936 Unleashed Data +00098
+	dc.w	$0004		; $69a40 $697e8 Unleashed Data +0009c
+	dc.w	$0004		; $69a44 $69948 Unleashed Data +000a0
+	dc.w	$0004		; $69a48 $697e8 Unleashed Data +000a4
+	dc.w	$0004		; $69a4c $6995a Unleashed Data +000a8
+	dc.w	$0004		; $69a50 $697e8 Unleashed Data +000ac
+	dc.w	$0004		; $69a54 $6996c Unleashed Data +000b0
+	dc.w	$0004		; $69a58 $69832 Unleashed Data +000b4
+	dc.w	$0004		; $69a5c $6997e Unleashed Data +000b8
+	dc.w	$0004		; $69a60 $69832 Unleashed Data +000bc
+	dc.w	$0004		; $69a64 $6998c Unleashed Data +000c0
+	dc.w	$0004		; $69a68 $69832 Unleashed Data +000c4
+	dc.w	$0004		; $69a6c $6999a Unleashed Data +000c8
+	dc.w	$0004		; $69a70 $69832 Unleashed Data +000cc
+	dc.w	$0004		; $69a74 $699a8 Unleashed Data +000d0
+	dc.w	$0004		; $69a78 $69868 Unleashed Data +000d4
+	dc.w	$0004		; $69a7c $699b6 Unleashed Data +000d8
+	dc.w	$0004		; $69a80 $69a88 Unleashed Data +000dc
+	dc.w	$0004		; $69a84 $69a88 Unleashed Data +000e0
+	dc.w	$0284		; $69d08 $69d4e 19699: JSR loadGraphicsElement
 	dc.w	$001e		; $69d26 $201a4 19718: MOVE.L #imageMainGameBackground,A0
 	dc.w	$0006		; $69d2c $6a5b6 19719: MOVE.L #bitplaneMaskTable,A1
 	dc.w	$0006		; $69d32 $59450 19720: JSR decompressRLEObjectToMask
