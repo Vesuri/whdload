@@ -4,7 +4,8 @@
     python3 tools/port.py OFF...      (hex) each offset's CD32 offset and how it was found
     python3 tools/port.py check       every site Enhanced resolution uses (src/): mapped, and
                                       the bytes it patches the same in both (relocated longs
-                                      aside); prints each with its distance between the two;
+                                      aside; a PL_S: its end at the same distance); prints
+                                      each with its distance between the two;
                                       and src/cd32.s and cd32segs.s current
     python3 tools/port.py gen         write src/cd32.s (_pl_v2's CUSTOM5 block: _pl_v3's,
                                       mapped) and src/cd32segs.s (port.s's segments)
@@ -330,6 +331,15 @@ def check():
         same = all((a.mask[off + i] and b.mask[x + i]) or a.data[off + i] == b.data[x + i]
                    for i in range(n))
         note = '' if same else '  BYTES DIFFER'
+        if not same and kind == 'PL_S':
+            # a skip replaces nothing: its end maps at the same distance (the bytes between
+            # can differ, as a bsr's displacement does where the code moved)
+            try:
+                same = port(off + n)[0] - (off + n) == x - off
+            except PortError:
+                pass
+            if same:
+                note = '  skip: its end the same distance'
         bad += not same
         print(f'{where:22} {kind:6} ${off:05x} ${x:05x} {x - off:+6d}  {how}{note}')
     for name, fn in GENERATED.items():

@@ -6,6 +6,8 @@
 	PL_S	$44922,$2e
 	PL_R	$43f1e
 	PL_PS	$3198,_p_cop1
+	PL_S	$501c,$8a
+	PL_S	$5236,$aa
 	PL_S	$319e,4
 	PL_PS	$32f2,_p_show
 	PL_PS	$3e7a,_p_show
@@ -456,6 +458,28 @@
 	PL_W	$2294c,-EDGE_STRIDE+2
 	PL_W	$22950,-EDGE_STRIDE+4
 	PL_P	$1fe76,_t_split
+	PL_W	$8382,$a401
+	PL_W	$1b6fc,$a200
+	PL_W	$1b706,$aa00
+	PL_W	$1b716,$aa00
+	PL_W	$1b742,$a602
+	PL_W	$1b758,$ac02
+	PL_W	$1b76c,$ac02
+	PL_W	$1b91a,$a200
+	PL_W	$1b924,$aa00
+	PL_W	$1b934,$aa00
+	PL_W	$1d86c,$a004
+	PL_W	$1d8b2,$a405
+	PL_W	$1dab0,$a004
+	PL_W	$1db12,$a405
+	PL_W	$216b4,$ac01
+	PL_W	$216d8,$ac01
+	PL_W	$21700,$a401
+	PL_W	$21706,$a001
+	PL_W	$219fc,$ac01
+	PL_W	$21a20,$ac01
+	PL_W	$21af0,$a401
+	PL_W	$21af6,$a001
 	PL_S	$331e,8
 	IFD	WATERFREEZE
 	PL_W	$3358,$603e

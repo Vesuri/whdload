@@ -47,7 +47,11 @@ base		moveq	#-1,d0
 		rts
 		dc.b	"WHDLOADS"		;ws_ID
 		dc.w	18			;ws_Version
+		IFD	ORIGINAL
 		dc.w	WHDLF_NoError|WHDLF_Req68020|WHDLF_ReqAGA	;ws_Flags
+		ELSE				;line-a: Enhanced resolution's divides (hires.s)
+		dc.w	WHDLF_NoError|WHDLF_Req68020|WHDLF_ReqAGA|WHDLF_EmulLineA
+		ENDC
 		dc.l	CHIPMEM			;ws_BaseMemSize
 		dc.l	0			;ws_ExecInstall
 		dc.w	_start-base		;ws_GameLoader
@@ -621,6 +625,8 @@ _pl_v3
 	PL_S	$44644,$2e
 	PL_R	$43c40			;and not freed
 	PL_PS	$31a0,_p_cop1		;the new screens' heads instead of the template
+	PL_S	$5178,$8a		;the view switches (keypad Enter, the level start):
+	PL_S	$5392,$aa		;not the copper moves into the lists, which hold pens
 	PL_S	$31a6,4
 	PL_PS	$32d2,_p_show		;each swap: the frame onto a screen
 	PL_PS	$3e42,_p_show
@@ -668,6 +674,29 @@ _pl_v3
 	PL_W	$226c6,-EDGE_STRIDE+2
 	PL_W	$226ca,-EDGE_STRIDE+4
 	PL_P	$1fbf6,_t_split		;FloorLine: a span over any number of banks
+	PL_W	$84de,$a401		;the projections' divides, divs.w Dz,Dn: line-a
+				;$a000|n<<9|z (_t_linea, hires.s)
+	PL_W	$1b464,$a200
+	PL_W	$1b46e,$aa00
+	PL_W	$1b47e,$aa00
+	PL_W	$1b4aa,$a602
+	PL_W	$1b4c0,$ac02
+	PL_W	$1b4d4,$ac02
+	PL_W	$1b682,$a200
+	PL_W	$1b68c,$aa00
+	PL_W	$1b69c,$aa00
+	PL_W	$1d5ec,$a004
+	PL_W	$1d632,$a405
+	PL_W	$1d830,$a004
+	PL_W	$1d892,$a405
+	PL_W	$21434,$ac01
+	PL_W	$21458,$ac01
+	PL_W	$21480,$a401
+	PL_W	$21486,$a001
+	PL_W	$21776,$ac01
+	PL_W	$2179a,$ac01
+	PL_W	$2186a,$a401
+	PL_W	$21870,$a001
 	PL_S	$32fe,8			;no wait for the frame flag after a frame (but as
 					;the link's second player): _p_show already holds
 					;a switch until the screen it draws is not shown

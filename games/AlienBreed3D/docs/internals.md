@@ -380,6 +380,18 @@ sites at each switch. The projection is x = X * 128 / Z + 47 and y = (H - eye) /
   the fillers write one column past the right clip, which at 192 columns was the bottom's
   column 0 and the objects' graphics table at $2974a (aliens, corpses and blood then drew
   from address 2).
+- **The projections' divides**: 22 `divs.w Dz,Dn` before a centre's `addi.w` (a point's
+  x at $84de, a wall's ends, top and bottom at $1b464-$1b4d4 and $1b682-$1b69c, the floors
+  at $1d5ec-$1d892, glass and bitmaps at $21434-$21870) put x / z or a height / z in a
+  word. Close to the eye the quotient overflows, and `divs.w` then leaves Dn as it was: the
+  original drops or misdraws such a wall. Ours scales x and the heights by S, so it
+  happened at S times the distance: a wall close by not drawn, the sky (drawn first) and
+  the list's two-frame-old pixels showing in its place, flickering between the lists.
+  Each is a line-a word, $a000 | n << 9 | z (`PL_W`), and `_t_linea` (the vector $28,
+  `WHDLF_EmulLineA`) divides in 32 bits, the quotient held to +-16383 so the centre's add
+  cannot wrap; Dn's upper word the remainder, so where `divs.w` does not overflow the
+  result is its own. Turning in level 1's start: 33268 unwritten pixels to 134 (small
+  view), 19293 to 2717 (full screen; `ab3d.py holes`, `-DHOLES`).
 - **Ours, S x S**: the gun (`DrawInGun` $5826, a fixed-size image) and the sky ($1933e, 96
   of its 432 columns, as the original's field of view; with pen bytes a line a texel row,
   each texel's S pens in one word or long from `DA_SKYTAB`, then the line copied S - 1
@@ -504,7 +516,14 @@ screen's head to `COP1LCL`.
   screen, which by then is no longer shown.
 - **Keypad Enter**: each head remembers the view it was built for, and the back head is
   rebuilt from the template when the view differs.
-- `_p_cop1` clears both screens and builds both heads at each level start.
+- `_p_cop1` fills both lists with black's pen, clears both screens and builds both heads
+  at each level start: the first swap hands over a list no frame was drawn in yet.
+- **The builders**: the view switches ($5134 small, $534e full screen, at the level start
+  and at keypad Enter, which calls them as soon as the key is read, within a frame) write
+  each line's copper moves into both lists; in pen lists those are pixels, over the frame
+  being drawn and the one shown next (striped garbage for a frame or two, and the level's
+  first frame). Their loops are skipped (`PL_S` $5178 and $5392); the template writes
+  around them stay.
 - Pixels that flicker every other frame while standing still (level 1, seen on the
   a1200-030) are the game's own: the original slave shows them too, and the frames ours
   shows equal the renderer's (`HOLES` finds no unwritten pixel).

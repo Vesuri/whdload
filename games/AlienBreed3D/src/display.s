@@ -136,6 +136,10 @@ _p_coplists
 	move.l	d0,(a0)+		;the two lists' pointers
 	addi.l	#LIST_SIZE,d0
 	move.l	d0,(a0)
+	IFND	LORES
+	lea	_t_linea(pc),a1		;the projections' divides (hires.s)
+	move.l	a1,($28).w
+	ENDC
 	movea.l	(4).w,a6		;as after AllocMem
 	rts
 
@@ -180,7 +184,7 @@ _ds_stridetabs				;(port.s: game offsets)
 	dc.l	0
 
 ; PL_PS at $31a0 (level start; PL_S past the rest): the heads instead of the template.
-; Both screens cleared, both heads built, head 0 shown.
+; Both lists black, both screens cleared, both heads built, head 0 shown.
 _p_cop1
 	movem.l	d0-d7/a0-a6,-(sp)
 	movea.l	60(sp),a5
@@ -194,6 +198,23 @@ _p_cop1
 	move.l	a3,(a0)
 	movea.l	_expmem(pc),a4
 	adda.l	#PA_OFF,a4
+	moveq	#0,d0			;both lists black, or the first swap shows one
+	IFD	PENS			;not yet drawn
+	move.b	PA_MAP(a4),d0		;(black's pen, as line 0's in _p_show)
+	move.l	d0,d1
+	lsl.l	#8,d1
+	or.l	d1,d0
+	move.l	d0,d1
+	swap	d1
+	or.l	d1,d0
+	ENDC
+	GLEA	G_LIST1,a0
+	movea.l	4(a0),a1
+	movea.l	(a0),a0
+	move.w	#LIST_SIZE/4-1,d1
+.list	move.l	d0,(a0)+
+	move.l	d0,(a1)+
+	dbf	d1,.list
 	lea	DS_SCREENS,a0
 	move.w	#2*DS_SCREEN/16-1,d0
 .clr	clr.l	(a0)+
