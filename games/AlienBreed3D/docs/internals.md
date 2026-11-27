@@ -23,7 +23,11 @@ screens ([below](#the-1x1-display)), with the option off too.
   the joypad, holding Reverse+Forward+Play 1 s quits; COPER calls the game's copper
   interrupt server), level 5,
   level 6 (CIA-B timer for the end part's HackAB3D music; not in the no-music slave).
-- `team` (the Team 17 picture) is shown from chip $40000 for 4 s.
+- `team` (the Team 17 picture) is shown from chip $40000 for 4 s, through a copper list
+  at $1000 (8 planes, FMODE $f). Psygore's list sets neither `BPLCON1`, `BPLCON2`,
+  `BPLCON4` nor `DIWHIGH`, so they stay as the system left them (in FS-UAE, 0); on a real
+  A1200 (68040, MMU, Zorro III memory) the picture showed as blue garbage. Ours writes all
+  four (`BPLCON4` 0, so no bitplane XOR remaps the pens; `DIWHIGH` $2100).
 - Exec and dos are 2048 words of ILLEGAL each, at the start of ExpMem, with only what
   the game calls: exec AllocMem/FreeMem on the slave's own allocator (`_allocmem`,
   `_freemem`; a chip pool after the loaded executable, a fast pool in ExpMem), and
