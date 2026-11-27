@@ -15,6 +15,8 @@
     python3 tools/esb.py hits ADDR N EXPR... stop N times at ADDR (hex) and print each EXPR
     python3 tools/esb.py incl N FILE         profile N fields; inclusive CPU cycles of each
                                              routine called in the game image to FILE
+                                             (FILE with .excl: each one's own cycles; .pcs:
+                                             by 64-byte block)
     python3 tools/esb.py sm [BUILD]          the enhanced framerate's state and statistics
                                              (SmV, by the BUILD's listing: verify)
     python3 tools/esb.py gdb CMD...          stop, run each gdb command (separated by ;), go on
@@ -192,7 +194,7 @@ def incl(server, g, rest):
         _, trace = profile(g, int(n), target)
     finally:
         g.cont()
-    tot, cnt, total = {}, {}, 0
+    tot, cnt, ex, pcs, total = {}, {}, {}, {}, 0
     for f in trace.fields:
         stack, prev = [], None
         for pc, cost, r in trace.instructions(f):
@@ -205,6 +207,9 @@ def incl(server, g, rest):
             while stack and sp > stack[-1][1]:
                 stack.pop()
             total += cost
+            top = stack[-1][0] if stack else 0
+            ex[top] = ex.get(top, 0) + cost
+            pcs[pc & ~63] = pcs.get(pc & ~63, 0) + cost
             for e in {e for e, _ in stack}:
                 tot[e] = tot.get(e, 0) + cost
             prev = pc
@@ -212,6 +217,12 @@ def incl(server, g, rest):
     path.write_text(f'total {total}\n' + ''.join(
         f'{e:x} {c} {c * 100 / total:.1f}% calls {cnt[e]}\n'
         for e, c in sorted(tot.items(), key=lambda x: -x[1])))
+    path.with_suffix('.excl').write_text(''.join(
+        f'{e:x} {c} {c * 100 / total:.1f}%\n'
+        for e, c in sorted(ex.items(), key=lambda x: -x[1])))
+    path.with_suffix('.pcs').write_text(''.join(
+        f'{e:x} {c} {c * 100 / total:.1f}%\n'
+        for e, c in sorted(pcs.items(), key=lambda x: -x[1])))
     return f'{len(tot)} routines'
 
 
