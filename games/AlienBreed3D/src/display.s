@@ -13,8 +13,8 @@
 ; (the frame wait's flag, COPER for the game's field server), FMODE, window and fetch,
 ; pens 0-15 and the sprite pointers copied from it, then the 240 pens (PA_PALETTE), the
 ; damage flash (COLOR00), 8 planes, and in the small view pen 15 on each line pair from
-; HealthPal (the bars' colour); then they jump into the game's panel list, whose COP1LC
-; points back at the head shown. The copper also sets INTREQ DSKBLK (no interrupt is
+; HealthPal (the bars' colour); then they jump into the game's panel list (through
+; COP2LC), whose COP1LC points back at the head shown. The copper also sets INTREQ DSKBLK (no interrupt is
 ; enabled for it) at the top of each field: once it is set after a switch, the other
 ; screen is no longer shown and the next frame may be converted into it.
 ;
@@ -495,15 +495,15 @@ _ds_build
 	bra.s	.panel
 .full	move.l	#$ffdffffe,(a0)+
 	move.l	#FULL_END,(a0)+
-.panel	lea	T_PANEL(a3),a2
-	move.l	a2,d0
-	swap	d0
-	move.w	#$0080,(a0)+
+.panel	lea	T_PANEL(a3),a2		;through COP2LC, so COP1LC only ever holds a
+	move.l	a2,d0			;head and _p_show may write its low word at any
+	swap	d0			;time (between a COP1LC = panel and COPJMP1 it
+	move.w	#$0084,(a0)+		;sent the copper into the game's data)
 	move.w	d0,(a0)+
 	swap	d0
-	move.w	#$0082,(a0)+
+	move.w	#$0086,(a0)+
 	move.w	d0,(a0)+
-	move.l	#$00880000,(a0)+	;COPJMP1
+	move.l	#$008a0000,(a0)+	;COPJMP2
 	move.l	#$fffffffe,(a0)+
 .done	rts
 

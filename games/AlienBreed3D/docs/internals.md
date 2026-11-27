@@ -428,8 +428,12 @@ screen's head to `COP1LCL`.
   clear) in banks 0-7, COLOR00 = the damage flash (`hitcol`, copied each frame), BPLCON0
   $0211, BPLCON1, BPLCON4 0, the modulos, 8 plane pointers, WAIT $10 and INTREQ $0011.
   Then in the small view pen 15 from `HealthPal` at the end of lines $2b, $2d, ... (the
-  bars), and both views jump into the game's panel list ($9a262), whose `COP1LC` words
-  (set at the level start, $2ea6) `_p_cop1` and each switch point at the head shown.
+  bars), and both views jump into the game's panel list ($9a262) through `COP2LC` and
+  `COPJMP2`, whose `COP1LC` words (set at the level start, $2ea6) `_p_cop1` and each
+  switch point at the head shown. So `COP1LC` only ever holds a head's address: with the
+  jump through `COP1LC`, a switch's `COP1LCL` write between the head's `COP1LC` = panel and
+  its `COPJMP1` sent the copper into the game's data, a garbled screen for the rest of the
+  level (seen on every CPU after minutes of play).
 - **Small view**: the template's window and fetch (DIW $2cb1-$2c91, DDF $48-$88), rows
   of 192 pixels (modulo 0), BPLCON1 0. The panel's list from the end of line $c9 (WAIT
   $c9df), right after the last bar, where the game's view list reaches it: chunky row 79
