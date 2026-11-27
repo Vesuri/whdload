@@ -1,0 +1,63 @@
+Short:    HD-Installer for Stunt Track Racer V1.0
+Author:   Codetapper/Action (codetapper@hotmail.com), ICQ: 26051687
+Uploader: Codetapper/Action (codetapper@hotmail.com)
+Version:  1.0
+Type:     game/patch
+Requires: WHDLoad 10, 512k chip mem
+
+This patch applies to "Stunt Track Racer" (c) 1989 Microplay.
+Thanks to Chris Vella for the original.
+
+REQUIREMENTS:
+- Slave requires WHDLoad V10+.
+- Game requires 0.5Mb chip mem (+0.4Mb other memory for preload option)
+
+FEATURES:
+- Full load from HD
+- Loads and saves driver information to a separate file (which can be
+  unpacked back onto a disk using DiskWiz or a similar utility to play
+  from the disk version)
+- Included save file has all 4 super division tracks ready for racing!
+- Snoop problems fixed
+- 2 access faults fixed
+- Checksum removed
+- RomIcon, NewIcon and GlowIcon (created by me!)
+- Quit option (default key is '*' on keypad)
+- Turbo mode included! (Toggle with F2)
+- Trainer (F1 to toggle infinite boost, Help to win the race)
+- ButtonWait tooltype added
+- International keyboard support (requires WHDLoad 12+)
+
+This install was released because Keith's original JST install no longer
+works on JST without disabling the MMU. There is also a checksum at the
+start of the game which may cause problems later on in his version. The
+disk image size is also half his version!
+
+A few people have complained to me that the Turbo mode on my Stunt Car
+Racer install doesn't work.  I have tested it thoroughly on this version
+and it *does* work!  Watch the timer and toggle the Turbo mode on/off with
+F2 and you will see a significant difference.  If you are a real master of
+the game, try running WHDLoad with the CACHE tooltype and see how fast it
+goes in turbo mode - almost uncontrollably fast!
+
+Greetings to Galahad/Fairlight for the turbo mode code and assistance
+on several difficult installs, all Action members, my testing crew and 
+the entire WHDLoad/JST team!
+
+
+Codetapper/Action (06-Oct-2000)
+
+
+         Bug report form, full WHDLoad package and other installs:
+                          http://www.whdload.org/
+
+            ________  ________  ________  ____  ________  ________
+           _)       \_)       \_)       \_)   \_)       \_)       \
+   __ ___ /___/     /   /_____/\  /     /     /   /     /   /     /
+  /_//__// \___    /   /     /CT\/     /     /   /     /   /     /
+        /___/     /___      /   /     /_____/___      /___/     /___ __
+            \____/    \____/    \____/          \____/    \____//__//_/
+
+
+           Visit the Action website for more of our productions:
+                           http://zap.to/action/

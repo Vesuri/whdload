@@ -1,0 +1,14 @@
+{
+  "archives": [
+    {
+      "input": "StuntTrackRacer.lha",
+      "output": "StuntTrackRacerEnhanced-{version}-{date}.lha",
+      "replace": {
+        "StuntTrackRacerHD/StuntTrackRacer.slave": "build:StuntTrackRacer",
+        "StuntTrackRacerHD/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": []
+    }
+  ]
+}
