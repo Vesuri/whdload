@@ -47,8 +47,8 @@ was found, running or stopped):
                           frame with the most goes to OUT (as `frame`'s, no .alt)
     tables DIR            the loaded walls (DIR/wallNN: shade table, then texels) and the
                           floor texture (DIR/floortile), which tools/colours.py reads
-    pause on|off          press P until the game is paused (no list swap for 60 fields)
-                          or playing again (a swap within 60 fields), at most 3 times
+    pause on|off          press P until the game is paused or playing again (the byte
+                          at $8e18, which the main loop clears at P), at most 3 times
     key CODE [N]          press raw key CODE (hex; P, 19, pauses) for N fields (default 10),
                           then release it for N
     chunky OUT            the pens of the frame last shown (CUSTOM5=1: the list itself, or a
@@ -210,6 +210,21 @@ def _swapped(g, first, fields):
     return False
 
 
+def _press(g, code, limit=200):
+    """Press and release a key the game reads once a frame: held until two frames are
+    shown (at least 10 fields; a 14 MHz 68020's full-screen frame is 13 or more), released
+    until one more is shown, waiting up to `limit` fields for each frame (F1 ends the
+    level: no more frames)."""
+    g.cmd(f'monitor key {code:x} 1')
+    g.cmd('monitor fields 10')
+    for _ in range(2):
+        if not _swapped(g, _drawpt(g), limit):
+            break
+    g.cmd(f'monitor key {code:x} 0')
+    g.cmd('monitor fields 10')
+    _swapped(g, _drawpt(g), limit)
+
+
 def _letter(g):
     return chr(_bytes(g, addr(g, LEVEL_LETTER), 1)[0])
 
@@ -268,7 +283,7 @@ def cmd_next(server, g, rest):
     """F1 (with CUSTOM1 bit 2) ends the level; wait for the next one's name, then enter it."""
     with Halted(g):
         was = _letter(g)
-        _key(g, KEY_F1)
+        _press(g, KEY_F1, 40)
         for n in range(0, 6000, 10):
             if n % 100 == 50:
                 _key(g, KEY_RETURN)
@@ -286,7 +301,7 @@ def cmd_end(server, g, rest):
     25 fields, as the tune plays)."""
     with Halted(g):
         was = _letter(g)
-        _key(g, KEY_F1)
+        _press(g, KEY_F1, 40)
         n = _quiet(g, 25, 1000)
         if n is None:
             raise RuntimeError('frames still drawn 1000 fields after F1 (CUSTOM1=4 in WHD_ARGS?)')
@@ -304,7 +319,7 @@ def cmd_full(server, g, rest):
             for _ in range(3):
                 if state() == want:
                     break
-                _key(g, KEY_ENTER)
+                _press(g, KEY_ENTER)
             else:
                 raise RuntimeError('keypad Enter did not switch the view')
         return 'full screen' if state() else 'small view'
@@ -593,20 +608,36 @@ def cmd_frame(server, g, rest):
             f'{geom[1]}x{geom[2]}) into {out}')
 
 
+PLAYING = 0x8e18         # byte: 0 from the main loop's P (it waits for the release) until
+                         # the pause loop ($3e64) returns, else $ff
+
+
 def cmd_pause(server, g, rest):
-    """P until the game is paused (`on`: its pause screen swapped in, then no swap for 60
-    fields, more than a frame takes) or playing again (`off`: a swap within 60 fields). The
-    pause loop ($3e64) polls the key and then waits for its release, and can miss a press."""
+    """P until the game is paused (`on`) or playing again (`off`), read from PLAYING. The
+    main loop reads P once a frame (13 fields or more on a 14 MHz 68020 in full screen),
+    so `on` holds it until the game has seen it; the pause loop polls it all the time."""
     on = rest.strip() != 'off'
     with Halted(g):
+        a = addr(g, PLAYING)
+
+        def playing():
+            return _bytes(g, a, 1)[0] != 0
+        if playing() != on:
+            return 'paused' if on else 'playing'
         for tries in range(1, 4):
-            _key(g, KEY_P)
-            if on:
-                g.cmd('monitor fields 10')
-                if not _swapped(g, _drawpt(g), 60):
-                    return f'paused after {tries} P'
-            elif _swapped(g, _drawpt(g), 60):
-                return f'playing after {tries} P'
+            g.cmd(f'monitor key {KEY_P:x} 1')
+            for n in range(400 if on else 10):
+                g.cmd('monitor fields 1')
+                if on and not playing():
+                    break
+            g.cmd(f'monitor key {KEY_P:x} 0')
+            for n in range(1, 401):
+                g.cmd('monitor fields 1')
+                if playing() != on:
+                    break
+            if playing() != on:
+                g.cmd('monitor fields 60')     # the pause screen drawn, or a frame again
+                return f'{"paused" if on else "playing"} after {tries} P'
     raise RuntimeError(f'not {"paused" if on else "playing"} after 3 P')
 
 
