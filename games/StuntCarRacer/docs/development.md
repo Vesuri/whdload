@@ -42,7 +42,8 @@ The Unleashed blob (`src/unleashed.s`, internals.md) is built by `tools/ulblob.p
 original's addresses with Unleashed's labels. After changing the blob, check its patch
 table against the original: `python3 -I tools/ulblob.py tmp/include --original
 tmp/scr/pal.bin` must report no problems (a patch that splits an instruction or covers a
-branch target corrupts the copy silently).
+branch target corrupts the copy silently). Stunt Track Racer builds the same blob for NTSC and includes
+`src/relocs.s`: a change here changes its slave too.
 
 ## Driving it
 

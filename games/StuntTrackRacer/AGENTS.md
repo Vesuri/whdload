@@ -5,7 +5,9 @@ MicroPlay), under WHDLoad: a direct slave that loads the game from the first 468
 the disk (DIC image `Disk.1`), removes the Rob Northen encryption and copylock, and moves
 the disk loader to files. The original slave is by Codetapper (game.conf `AUTHOR`,
 `UPSTREAM`); Galahad wrote the turbo mode it carries. It shipped without source:
-`src/StuntTrackRacer.s` is a byte-identical reconstruction.
+`src/StuntTrackRacer.s` is a reconstruction (byte-identical at the import). The enhanced
+framerate (CUSTOM3) runs Stunt Track Racer Unleashed 1.1's routines, by Vesa Halttunen,
+from Stunt Car Racer's `src/unleashed.s` built for NTSC.
 The repository's rules and shared docs are in the root `AGENTS.md` and `docs/index.md`;
 this file and `docs/` here hold only what is specific to this game.
 
