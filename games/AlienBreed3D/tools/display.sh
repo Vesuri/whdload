@@ -22,7 +22,7 @@ out=${1:-tmp/display}
 [ -n "${2:-}" ] && export SETUP=$2
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
-export INSTANCE=display WARP=1 WINDOW=none DETERMINISTIC=1 JOY0=none
+export INSTANCE=${INSTANCE:-display} WARP=1 WINDOW=none DETERMINISTIC=1 JOY0=none
 sock=tmp/run/$INSTANCE/.run/ab3d.sock
 
 ab3d() { python3 tools/ab3d.py "$@"; }

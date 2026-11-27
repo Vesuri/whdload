@@ -150,6 +150,21 @@ renderer does not write in a frame shows as $f0f in `ab3d.py holes` and `frame`.
 colour words through the area's palette (pen 0, line 0, black), so `display.py` checks the
 release build as it did the colour-word one.
 
+`INSTANCE` (default `display`) lets two machines run side by side.
+
+## The two-player link
+
+    tools/link.sh [OUT [SETUP [WHD_ARGS]]]  # OUT tmp/link, WHD_ARGS CUSTOM5=1
+
+Two emulators (`INSTANCE=link1`, `link2`), whose serial ports (`--serial_port`, which FS-UAE
+opens as a file) are two pseudo-terminals that `tools/ptylink.py` joins. The second picks
+2 PLAYER SLAVE and PLAY GAME in the menu, the first 2 PLAYER MASTER and PLAY GAME (on
+the menu's top line RETURN steps 1 PLAYER, 2 PLAYER MASTER, 2 PLAYER SLAVE). Both then play
+600 fields at once in the small view and 600 in full screen, the master on the mouse and the
+slave on the arrow keys, and each one's frames are counted. It fails when either draws no
+frame or no byte crosses. The two machines run free of each other, so their frame rates
+there are not the game's.
+
 ## Pen bytes
 
 The release build's writers write pen bytes ([internals](internals.md#pen-bytes)).
