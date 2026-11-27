@@ -650,7 +650,7 @@ _t_gun
 
 ;----------------------------------------------------------------------
 ; Line-a (the PL_W $a000|n<<9|z in the patch list, the vector $28; WHDLF_EmulLineA): the projections'
-; divs.w Dz,Dn before their centre's addi.w ($a000|n<<9|z, at 22 sites). The original's
+; divs.w Dz,Dn before their centre's addi.w ($a000|n<<9|z, at 24 sites). The original's
 ; 16-bit quotient overflows for a point close to the eye: divs.w then leaves Dn as it was,
 ; and the wall or object is dropped or drawn wild. Ours scales x and the heights by S, so
 ; that happened at S times the distance (walls missing close by, the old frames showing

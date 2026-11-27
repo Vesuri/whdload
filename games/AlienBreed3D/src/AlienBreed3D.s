@@ -702,6 +702,8 @@ _pl_v3
 	PL_W	$2179a,$ac01
 	PL_W	$2186a,$a401
 	PL_W	$21870,$a001
+	PL_W	$21e44,$a605		;the polygon objects' vertices (convtoscr)
+	PL_W	$21e46,$a805
 	PL_S	$32fe,8			;no wait for the frame flag after a frame (but as
 					;the link's second player): _p_show already holds
 					;a switch until the screen it draws is not shown

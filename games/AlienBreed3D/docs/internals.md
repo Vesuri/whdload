@@ -390,13 +390,19 @@ sites at each switch. The projection is x = X * 128 / Z + 47 and y = (H - eye) /
   the fillers write one column past the right clip, which at 192 columns was the bottom's
   column 0 and the objects' graphics table at $2974a (aliens, corpses and blood then drew
   from address 2).
-- **The projections' divides**: 22 `divs.w Dz,Dn` before a centre's `addi.w` (a point's
+- **The projections' divides**: 24 `divs.w Dz,Dn` before a centre's `addi.w` (a point's
   x at $84de, a wall's ends, top and bottom at $1b464-$1b4d4 and $1b682-$1b69c, the floors
-  at $1d5ec-$1d892, glass and bitmaps at $21434-$21870) put x / z or a height / z in a
-  word. Close to the eye the quotient overflows, and `divs.w` then leaves Dn as it was: the
-  original drops or misdraws such a wall. Ours scales x and the heights by S, so it
-  happened at S times the distance: a wall close by not drawn, the sky (drawn first) and
-  the list's two-frame-old pixels showing in its place, flickering between the lists.
+  at $1d5ec-$1d892, glass and bitmaps at $21434-$21870, the polygon objects' vertices at
+  $21e44 and $21e46) put x / z or a height / z in a word. Close to the eye the quotient
+  overflows, and `divs.w` then leaves Dn as it was: the original drops or misdraws such a
+  wall. Ours scales x and the heights by S, so it happened at S times the distance: a wall
+  close by not drawn, the sky (drawn first) and the list's two-frame-old pixels showing in
+  its place, flickering between the lists. A polygon object beside the eye, its nearest
+  vertices at z 1 or 2, took x's low word for x / z and put them across the view, a face
+  filling the view's middle with one colour a row (the original's too: level 1's storage
+  room, left after the first door, player 1 at x -1529, z 1823, angle 2122: object 49,
+  vector object 7, vertices at x -99078 to -105211, z 1 and 2, on screen at x 32089 and
+  25956).
   Each is a line-a word, $a000 | n << 9 | z (`PL_W`), and `_t_linea` (the vector $28,
   `WHDLF_EmulLineA`) divides in 32 bits, the quotient held to +-16383 so the centre's add
   cannot wrap; Dn's upper word the remainder, so where `divs.w` does not overflow the
