@@ -6,7 +6,8 @@
 #              aprof: per-field cycle profiles on $FSUAE_APROF (no MMU: the cycle-exact CPU
 #              on the a1200-fast base, as aprof requires)
 #     MACHINE  a1200-fast (the 68020 reference: the plain a1200's 2 MB cannot hold the
-#              slave's 1.4 MB ExpMem), a1200-030 or a1200-040
+#              slave's 1.4 MB ExpMem), a1200-28 (the same at 28 MHz, an ACA1221-class
+#              accelerator), a1200-030 or a1200-040
 #     OUT      directory for the results (under tmp/)
 #     SCENE    walk (default) or turn
 #
@@ -27,11 +28,16 @@ out=$(cd "$out" && pwd)
 fields=${FIELDS:-500}
 export INSTANCE=baseline-$mode-$machine-$scene WARP=1 WINDOW=none DETERMINISTIC=1 JOY0=none
 case $mode in
-  frames) export SETUP=$machine ;;
+  frames)
+    case $machine in
+      a1200-28) export SETUP=a1200-fast EXTRA_ARGS=--uae_cpu_frequency=28375160 ;;
+      *) export SETUP=$machine ;;
+    esac ;;
   aprof)
     export FSUAE=$FSUAE_APROF
     case $machine in
       a1200-fast) export SETUP=a1200-fast ;;
+      a1200-28) export SETUP=a1200-fast EXTRA_ARGS=--uae_cpu_frequency=28375160 ;;
       a1200-030) export SETUP=a1200-fast
         EXTRA_ARGS='--cpu=68EC030 --uae_cpu_frequency=50000000 --uae_cpu_data_cache=true' ;;
       a1200-040) export SETUP=a1200-fast

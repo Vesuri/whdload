@@ -322,6 +322,24 @@ a change that only moves memory traffic, such as a line stride whose columns spr
 the data cache's sets (`VASM_EXTRA=-DPSTRIDE=304`), measures nothing there; it measured
 the same on the 68030 (84.5 / 59.1) and the 68040 (102.3 / 54.3). Not tried on hardware.
 
+## Against the original (step 8)
+
+The turn scene with the option off (`BUILD=original`, Psygore's slave: 96x80 in both views,
+with its wait for the frame flag) and with it on, after step 7, in fps (MEASURED,
+27.11.2026). The 28 MHz 68020 is the a1200-fast with `--uae_cpu_frequency=28375160`
+(`baseline.sh` machine `a1200-28`, an ACA1221-class accelerator):
+
+| CPU | Original | Small view | Full screen | Ours' work a frame, small / full (ms) |
+|---|---|---|---|---|
+| 68020 14 MHz | 12.50 | 6.20 | 3.79 | 161.6 / 264.4 |
+| 68020 28 MHz | 19.42 | 11.16 | 7.72 | 89.8 / 129.7 |
+| 68030 50 MHz | 23.31 | 18.07 | 13.22 | 55.4 / 75.7 |
+| 68040 25 MHz | 26.47 | 20.17 | 10.78 | 49.5 / 93.0 |
+
+The original's work a frame is 72 / 45 / 33-35 / 26 ms on the four. A 28 MHz 68020 draws the
+small view at more than half the original's rate and full screen at 40%; the 14 MHz one
+at half and 30%.
+
 ## Not measured
 
 - The heaviest scene: a barrel shot close by, through level 1's first door and to the
