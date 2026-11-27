@@ -531,9 +531,11 @@ screen's head to `COP1LCL`.
   (32-pixel fetches), both modulo 0. Below a 68040 the rows are 36 bytes, so the frame
   is one run per plane and the c2p converts it in one call; a 68040's c2p is bound by
   its Chip writes and FMODE 1 takes twice the display's slots, so from the 68040 on they
-  are 40 bytes at FMODE 3, converted a row at a time (`_ds_wide`). The game's pattern has its 288 pixels 16
-  in from the left, so BPLCON1 $4400 delays the planes 16 pixels and pen 0 (the border)
-  shows on either side, as in the original. The game's full-screen rows are 3 rasters from
+  are 40 bytes at FMODE 3, converted a row at a time (`_ds_wide`). The c2p writes 36 of
+  them, so a screen's switch to full screen clears the last 4 of each row, which would
+  otherwise still show the small view's screen at the right side. The game's pattern has
+  its 288 pixels 16 in from the left, so BPLCON1 $4400 delays the planes 16 pixels and
+  pen 0 (the border) shows on either side, as in the original. The game's full-screen rows are 3 rasters from
   line $2b and its list turns the display off at $118, so the planes start one row in and
   the head waits for $118: rows 0-78 shown, as in the original.
 - **The field flag**: the copper sets INTREQ DSKBLK at the top of each field, and no

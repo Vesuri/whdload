@@ -421,7 +421,16 @@ _ds_build
 	beq.w	.done
 	move.b	d7,(a0,d6.w)
 	bsr.w	_ds_addr
-	move.l	#$00968020,(a0)+	;DMACON: sprites on
+	tst.b	d7			;full screen's 40-byte rows: the c2p writes 36,
+	beq.s	.head			;the last 4 (shown, past the view's right side)
+	bsr.w	_ds_wide		;still hold the small view's screen: pen 0, as
+	beq.s	.head			;the original's border there
+	lea	FULL_ROW(a1),a2
+	move.w	#8*WIDE_PLANE/WIDE_ROW-1,d0
+.edge	clr.l	(a2)
+	lea	WIDE_ROW(a2),a2
+	dbf	d0,.edge
+.head	move.l	#$00968020,(a0)+	;DMACON: sprites on
 	move.l	#$009c8013,(a0)+	;INTREQ: the frame wait's flag, COPER, DSKBLK
 	move.l	#$01fc000f,d0		;FMODE: sprites 64 wide, planes 64 bits a fetch,
 	tst.b	d7

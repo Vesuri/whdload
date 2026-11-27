@@ -37,7 +37,9 @@ colour is in the S x S block of OURS that covers them, rows S(y - 1) + 1 to Sy, 
 to Sx + S - 1 (the writers draw row y at line y + 1). The rest is mostly texture sampled
 at other points where a texture is shrunk (far or slanted walls). Exit status 1 below
 SCALE_MIN. `compare` does this when OURS.frame, next to OURS, is S times ORIG.frame's
-width, with either side's FRAME.alt too.
+width, with either side's FRAME.alt too, and then checks the view's lines beside it (the
+border): each pixel must be ORIG's (from the 68040 on full screen's rows are 320 pixels,
+whose last 32 the c2p does not write).
 """
 import os
 import sys
@@ -131,7 +133,7 @@ def compare(orig, ours, area):
         pairs = [(o, u) for o in (fo, fo + '.alt') for u in (fu, fu + '.alt')
                  if os.path.exists(o) and os.path.exists(u)]
         o, u = next(((o, u) for o, u in pairs if scale(o, u, quiet=True) == 0), (fo, fu))
-        return scale(o, u)
+        return scale(o, u) | sides(orig, ours, read_frame(fu)[1])
     a, b = load(orig), load(ours)
     if a.shape != b.shape:
         sys.exit('%s is %s, %s is %s' % (orig, a.shape, ours, b.shape))
@@ -160,6 +162,18 @@ def compare(orig, ours, area):
     print('%s against %s: %d pixels, %d the same, %d through the palette (%s), %d neither (%s)'
           % (ours, orig, av.size, same.sum(), mapped.sum(), box(mapped), wrong.sum(), box(wrong)))
     return 1 if wrong.any() else 0
+
+
+def sides(orig, ours, view):
+    """The view's lines left and right of it (the border, pen 0) must be ORIG's pixels."""
+    a, b = load(orig), load(ours)
+    x0, _, k, top, bottom = GEOMETRY[view]
+    x1 = x0 + 96 * k
+    bad = (a != b).any(2)[top:bottom]
+    bad[:, x0:x1] = False
+    print('%s against %s: %d pixels beside the view, %d differ (%s)'
+          % (ours, orig, bad[:, :x0].size + bad[:, x1:].size, bad.sum(), box(bad)))
+    return 1 if bad.any() else 0
 
 
 SCALE_MIN = 0.80    # level 1's start, pause and end gave 88-94% at 2x2 (26.11.2026)
