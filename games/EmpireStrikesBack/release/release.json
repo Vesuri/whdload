@@ -1,0 +1,14 @@
+{
+  "archives": [
+    {
+      "input": "EmpireStrikesBack.lha",
+      "output": "EmpireStrikesBackEnhanced-{version}-{date}.lha",
+      "replace": {
+        "EmpireStrikesBackHD/EmpireStrikesBack.slave": "build:EmpireStrikesBack",
+        "EmpireStrikesBackHD/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": []
+    }
+  ]
+}

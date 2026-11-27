@@ -1,0 +1,47 @@
+Short:    HD-Installer for Empire Strikes Back V1.2
+Author:   Codetapper/Action (codetapper@hotmail.com), ICQ: 26051687
+Uploader: Codetapper/Action (codetapper@hotmail.com)
+Version:  1.2
+Type:     game/patch
+
+This patch applies to "Empire Strikes Back" (c) 1989 Vektor Grafix/Domark - 1 
+disk. Supported versions: - Star Wars Trilogy (Jan Vieten)
+                          - Original release (Christian Sauer)
+
+REQUIREMENTS:
+- Slave requires WHDLoad V10+ and RawDIC
+- Game requires 512k chip mem (+450k other memory for preload option)
+
+FEATURES: (27-May-2000)
+- Full load from HD
+- Saves high scores to disk
+- Added a nice fade in and out effect for the title picture
+- Added ButtonWait tooltype 
+- MagicWB, RomIcon, NewIcon and OS3.5 Colour Icon (created by me!)
+
+VERSION 1.2: (20-Mar-2003)
+- Supports another version
+- Added an OS3.5 box icon (great work by Christian!)
+- Quit key changed to 'F10'
+
+Greetings to Jan and Christian for the originals, Christian again for the
+superb icon, Wepl for WHDLoad, all Action members, my testing crew and the
+WHDLoad team!
+
+
+Codetapper/Action (20-Mar-2003)
+
+
+         Bug report form, full WHDLoad package and other installs:
+                          http://www.whdload.de/
+
+            ________  ________  ________  ____  ________  ________
+           _)       \_)       \_)       \_)   \_)       \_)       \
+   __ ___ /___/     /   /_____/\  /     /     /   /     /   /     /
+  /_//__// \___    /   /     /CT\/     /     /   /     /   /     /
+        /___/     /___      /   /     /_____/___      /___/     /___ __
+            \____/    \____/    \____/          \____/    \____//__//_/
+
+
+           Visit the Action website for more of our productions:
+                           http://zap.to/action/
