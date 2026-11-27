@@ -1,16 +1,27 @@
-Short:    HD-Installer for Stunt Track Racer V1.0
-Author:   Codetapper/Action (codetapper@hotmail.com), ICQ: 26051687
+Short:    HD-Installer for Stunt Track Racer Enhanced 2.0b
+Author:   Codetapper/Action (codetapper@hotmail.com), ICQ: 26051687, Vesuri
 Uploader: Codetapper/Action (codetapper@hotmail.com)
-Version:  1.0
+Version:  2.0b
 Type:     game/patch
-Requires: WHDLoad 10, 512k chip mem
+Requires: WHDLoad 17, 512k chip mem
+
+Stunt Track Racer Enhanced 2.0b (27.11.2026)
+Original install: Codetapper/Action. Version 2.0b: Vesuri.
 
 This patch applies to "Stunt Track Racer" (c) 1989 Microplay.
 Thanks to Chris Vella for the original.
 
 REQUIREMENTS:
-- Slave requires WHDLoad V10+.
+- Slave requires WHDLoad V17+.
 - Game requires 0.5Mb chip mem (+0.4Mb other memory for preload option)
+- Enhanced framerate requires a 68020 or later and 448Kb other memory
+
+OPTIONS:
+- CUSTOM3=1: Enhanced framerate, set in the installed icon. The game runs
+  at 60 frames a second at its original speed, using the code of Stunt
+  Track Racer Unleashed 1.1 by Vesuri. 0 or unset keeps the original frame
+  rate. A 68000 or 68010 ignores it.
+- CUSTOM1=1: start with infinite boost.
 
 FEATURES:
 - Full load from HD
@@ -23,8 +34,7 @@ FEATURES:
 - Checksum removed
 - RomIcon, NewIcon and GlowIcon (created by me!)
 - Quit option (default key is '*' on keypad)
-- Turbo mode included! (Toggle with F2)
-- Trainer (F1 to toggle infinite boost, Help to win the race)
+- Trainer (F6 to toggle infinite boost, Help to win the race)
 - ButtonWait tooltype added
 - International keyboard support (requires WHDLoad 12+)
 
@@ -33,19 +43,20 @@ works on JST without disabling the MMU. There is also a checksum at the
 start of the game which may cause problems later on in his version. The
 disk image size is also half his version!
 
-A few people have complained to me that the Turbo mode on my Stunt Car
-Racer install doesn't work.  I have tested it thoroughly on this version
-and it *does* work!  Watch the timer and toggle the Turbo mode on/off with
-F2 and you will see a significant difference.  If you are a real master of
-the game, try running WHDLoad with the CACHE tooltype and see how fast it
-goes in turbo mode - almost uncontrollably fast!
-
 Greetings to Galahad/Fairlight for the turbo mode code and assistance
 on several difficult installs, all Action members, my testing crew and 
 the entire WHDLoad/JST team!
 
 
+VERSION 2.0b (27-Nov-2026) done by Vesuri
+- Enhanced framerate (CUSTOM3=1) on 68020 and later, set in the installed
+  icon: 60 frames a second at the original game speed
+- CUSTOM1=1 starts with infinite boost
+- Trainer key moved from F1 to F6, since the game redefines keys with F1
+- Turbo mode (F2) removed: the enhanced framerate replaces it
+
 Codetapper/Action (06-Oct-2000)
+Vesuri (27-Nov-2026)
 
 
          Bug report form, full WHDLoad package and other installs:

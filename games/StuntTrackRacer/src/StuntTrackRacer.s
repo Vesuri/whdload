@@ -9,7 +9,7 @@
 ;		         - Quit option (default key is '*' on keypad)
 ;		         - Turbo mode (F2), trainer (F1 infinite boost, Help wins the race)
 ;		         - ButtonWait tooltype, international keyboard (WHDLoad 12+)
-;		v1.1 (Vesa Halttunen)
+;		27.11.26 - v2.0b (Vesuri)
 ;		         - Enhanced framerate (CUSTOM3, 68020+): Stunt Track Racer
 ;		           Unleashed 1.1's 60 FPS from a relocated copy in ExpMem
 ;		         - CUSTOM1 starts with infinite boost; the trainer key moves
@@ -63,11 +63,12 @@ _expmem		dc.l	-EXPMEM			;ws_ExpMem: optional
 _name		dc.b	"Stunt Track Racer",0
 _copy		dc.b	"1989 Microstyle",0
 _info		dc.b	"Installed by Codetapper/Action!",10
-		dc.b	"Version 1.1"
-		dc.b	10,"Enhanced by Vesuri"
+		dc.b	"Enhanced by Vesuri",10
+		dc.b	"Version 2.0b (27.11.2026)"
 		dc.b	-1,"Keys:   F6 - Toggle infinite boost   "
 		dc.b	10,"      Help - Win race                "
 		dc.b	0
+		dc.b	"$VER: StuntTrackRacer.slave 2.0b (27.11.2026)",0
 _SaveName	dc.b	"StuntTrackRacer.save",0
 		EVEN
 

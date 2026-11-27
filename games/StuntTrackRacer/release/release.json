@@ -8,7 +8,18 @@
         "StuntTrackRacerHD/ReadMe": "release/ReadMe"
       },
       "add": {},
-      "remove": []
+      "remove": [],
+      "tooltypes": {
+        "StuntTrackRacerHD/StuntTrackRacer.inf": [
+          "CUSTOM3=1"
+        ],
+        "StuntTrackRacerHD/StuntTrackRacer.newicon": [
+          "CUSTOM3=1"
+        ],
+        "StuntTrackRacerHD/StuntTrackRacer.glowicon": [
+          "CUSTOM3=1"
+        ]
+      }
     }
   ]
 }
