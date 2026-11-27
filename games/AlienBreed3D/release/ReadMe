@@ -3,7 +3,7 @@ Type : game/patch
 Author : Psygore (psygore@whdload.de), Vesuri (version 2.0b)
 
 
-Alien Breed 3D Enhanced 2.0b (26.11.2026)
+Alien Breed 3D Enhanced 2.0b (27.11.2026)
 Original install: Psygore. Version 2.0b improvements: Vesuri.
 
 That install applies to "Alien Breed 3D" © 1995 Team 17
@@ -20,7 +20,7 @@ It requires:
    the original display (without CUSTOM5) is two to three times as fast
 
 
-Version 2.0b (26.11.2026) by Vesuri:
+Version 2.0b (27.11.2026) by Vesuri:
  - Enhanced resolution (CUSTOM5): the game is drawn at 1x1 pixels, 192x160
    in the small view and 288x240 in full screen, on 256-colour screens
    (the installed, the Aminet 8-channel and the CD32 version; not the
@@ -31,8 +31,9 @@ Version 2.0b (26.11.2026) by Vesuri:
    68040 (the original display: 12, 19, 23 and 26)
  - fixed: the game could stop on a black screen before the menu (the
    no-music slave on a 28 MHz 68020), the Team 17 picture could show as
-   garbage on a real A1200, the menu's fades had off colours and a frame of
-   garbage could show on the way back to the menu
+   garbage on a real A1200, the menu's fades had off colours, a frame of
+   garbage could show on the way back to the menu, and an object right
+   beside the player could fill the view with a block of colour
  - the slave's source is included, a reconstruction of Psygore's slave
 
 Version 1.3 (08.01.2020) by Psygore:

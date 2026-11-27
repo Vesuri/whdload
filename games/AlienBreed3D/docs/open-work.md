@@ -32,7 +32,7 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
 
 ## Releases
 
-2.0b (26.11.2026), `make dist`: both slaves with Enhanced resolution and `$VER`; the
+2.0b (27.11.2026), `make dist`: both slaves with Enhanced resolution and `$VER`; the
 ReadMe's entry above Psygore's; the five game icons add CUSTOM5=1 (`release.json`
 `tooltypes`); the source drawer holds `src/` in place of the encrypted
 `AlienBreed3DHD_src.lzx`. Both variants boot with CUSTOM5=1 into level 1 in both views on

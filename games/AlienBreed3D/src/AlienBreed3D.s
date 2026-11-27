@@ -79,11 +79,11 @@ _info		dc.b	"Installed & fixed by Psygore",10
 		dc.b	"Version 1.3 (08 Jan 2020)",0
 	ELSE
 		dc.b	"Enhanced by Vesuri",10,10
-		dc.b	"Version 2.0b (26.11.2026)",0
+		dc.b	"Version 2.0b (27.11.2026)",0
 	IFND	NOMUSIC
-		dc.b	"$VER: AlienBreed3D.slave 2.0b (26.11.2026)",0
+		dc.b	"$VER: AlienBreed3D.slave 2.0b (27.11.2026)",0
 	ELSE
-		dc.b	"$VER: AlienBreed3D_nomusic.slave 2.0b (26.11.2026)",0
+		dc.b	"$VER: AlienBreed3D_nomusic.slave 2.0b (27.11.2026)",0
 	ENDC
 	ENDC
 _data		dc.b	"data",0
