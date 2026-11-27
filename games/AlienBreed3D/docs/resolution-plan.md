@@ -306,6 +306,9 @@ just step further, up to 15 fields.
      [performance](performance.md#against-the-original-step-8).
    - Psygore's no-music slave (and so ours) never reaches the menu on the emulated 28 MHz
      68020; the music slave does. Not looked into.
+   - The option applies on every CPU (decided 27.11.2026); the ReadMe gives each CPU's
+     frame rates and suggests the original display on a 14 MHz 68020. Letting the
+     installer ask is a possibility (open decisions).
 9. **The other versions.** The work is done on the Aminet 8-channel version ($c4dc, the
    AGA drawer), then ported to the CD32 one ($fd78, the CD32 drawer). The CD32 version
    draws the same way, with its routines byte for byte or with only their addresses changed
@@ -317,6 +320,7 @@ just step further, up to 15 fields.
 ## Decided
 
 - Full screen 288x240, as the original, for now (26.11.2026).
+- The option on every CPU, with the ReadMe's suggestions (27.11.2026).
 - Performance: as fast as possible, no fixed frame rate (26.11.2026).
 - The 1x1 views first by the game's own writers, their geometry patched; our own pen
   writers in step 7 (26.11.2026).
@@ -327,4 +331,6 @@ just step further, up to 15 fields.
 ## Open decisions
 
 - The floppy version: in scope only if its executable is supplied (step 9).
-- The slowest CPU the option runs on (from steps 4 and 7).
+- Whether the installer asks for Enhanced resolution (CUSTOM5=1 in the icon or not) in
+  place of the icons' fixed CUSTOM5=1: a change to Psygore's install script, to be tested
+  by an install on the emulator.

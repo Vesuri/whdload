@@ -24,11 +24,10 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
 2. A heavy scene for the baseline: in level 1, through the first door, turn left or right,
    and shoot a barrel close by; a near explosion is the most taxing (the user's). Not yet
    scripted.
-3. Plan step 8 ([resolution-plan](resolution-plan.md#steps)): the machines, both
-   variants, the two-player link and CUSTOM5 off are checked (27.11.2026); left is the
-   decision on which CPUs the option applies on (the rates against the original are in
-   [performance](performance.md#against-the-original-step-8)), then step 9, the CD32
-   version.
+3. Plan step 8 is done ([resolution-plan](resolution-plan.md#steps)): the machines, both
+   variants, the two-player link and CUSTOM5 off are checked, and the option applies on
+   every CPU with the ReadMe's suggestions (27.11.2026). Next step 9, the CD32 version;
+   open is whether the installer should ask for the option.
 4. Psygore's no-music slave never reaches the menu on the emulated 28 MHz 68020
    (`baseline.sh` machine `a1200-28`), with the option off as well; the music slave does.
    Not looked into.
