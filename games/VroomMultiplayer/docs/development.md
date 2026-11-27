@@ -46,10 +46,13 @@ pass, for games/Vroom's `tools/statecmp.py`), `frames` (a hash of every line of 
 frame, for games/Vroom's `tools/framecmp.py`), `shown` (frames that changed the screen on
 display) and `span` (the emulated time between two addresses, in raster lines read from the
 beam through the stub: exact, the breakpoints stop the emulation). `bench N now` starts at once (after
-`race`, whose lights may be out by the time the race's VBL hook is seen). Developer knobs
+`race`, whose lights may be out by the time the race's VBL hook is seen); `race menu` starts
+a race from the menu (after a race's scores and the right button). With fast memory the
+race block runs from a copy: the commands read and break at block addresses in it (the
+offset at $1D6, `internals.md`, "Fast memory"). Developer knobs
 for A/B builds (`DEFINES_x=-D... make build BUILD=x`, then `SLAVE=`): `ENH_NOBLITSITES`,
 `ENH_NOFMODE`, `ENH_NOGROUND`, `ENH_NOINTERP` (no frames between ticks). The first demo race (Adelaide, two views) is the
-same race on every machine; the second (Monaco) has one view.
+same race on every machine; the second (San Marino) has one view.
 The title and the menu share the VBL hook $ADAC; a race's is $AE64. In the menu the left
 button on START, held until the hook is $AE64, starts a race (about 500 fields).
 

@@ -183,6 +183,7 @@ fix_WaitLines	movem.l	d0-d1,-(a7)
 
 ; The program's addresses the slave's code jumps to or reads (named by their
 ; address; one place to move them from)
+_fix_blk					; (src/enhanced.i, enh_Move, adds the block's offset)
 _blk_10570	dc.l	$10570
 _blk_1062C	dc.l	$1062C
 _blk_10652	dc.l	$10652
@@ -194,6 +195,7 @@ _blk_11FDE	dc.l	$11FDE
 _blk_12032	dc.l	$12032
 _blk_1B9A0	dc.l	$1B9A0
 _blk_1B9A4	dc.l	$1B9A4
+_fix_blk_end
 
 	INCLUDE	enhanced.i
 	INCLUDE	smc.i

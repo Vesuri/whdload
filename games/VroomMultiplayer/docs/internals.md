@@ -179,8 +179,8 @@ build missed the gauge's table, which the operand scan could not see: its piece 
 30-32 stayed at the old address, 6 bytes left. `bench 300` on the a1200: 15.74 fps with 17 of
 317 ticks undrawn (14.14 and 53 of 353 before).
 
-**Frames between ticks** (with the slave's optional 8 KB ExpMem, fast or not: two snapshots
-of the race state). As in Vroom, the ticks draw nothing, and while the next tick is early a
+**Frames between ticks** (with the slave's optional 80 KB ExpMem, fast or not: two snapshots
+of the race state, after the race block's copy, below). As in Vroom, the ticks draw nothing, and while the next tick is early a
 frame shows the race between the last two ticks, mixed by alpha (fields since the last tick
 was due over fields a tick): it loads the tick before's snapshot (`_enh_r`: the globals, the
 16 cars and the order $E52C-$EA53 and $E504-$E51B, after the clock and the view's buffer to
@@ -238,6 +238,48 @@ two-view demo race: 1.534 fields against 1.576 with `-DENH_NOGROUND` (two runs o
 differed by 0.01). On the a1200 (chip memory only) `bench 300` gives 15.66 fps against 15.74:
 no change there. `frames 150` (`CUSTOM3=2`): every frame the same but for the race clock.
 
+**Fast memory.** As in Vroom (its steps 19 and 20): with the ExpMem in fast memory (at
+$200000-$BFFFFF or from $E00000), the race block $B254-$1CBAF (the race's setup and loop,
+its state, the landscape, the renderer, the objects and the scalers with their variables)
+and the scaler's pointer table after it (to $1CD13, 128 entries up to the buffers at $1CD14)
+run from a copy there, and the program's stack (set once, at $365A: `movea.l #$30F36,a7`)
+moves to $800 bytes below the copy. Chip memory is left to the screens, the blitter's and
+the copper's data and the program outside the block. The copy's bottom (`ENH_BOTTOM`, $A940
+in the copy's addresses: $100 bytes of trampolines, then the stack) is the ExpMem's start;
+the copy's offset is kept at $1D6 (`ENH_BLOCK`, 0 when the block stays). `enh_Move` copies
+the block once, in the first `Fix`, after every patch is in and before the program starts:
+
+| What | How |
+|---|---|
+| 879 long addresses into the block, in it (`RELOC_IN`, `src/reloc.i`) | the offset added in the copy |
+| 268 long addresses into the block from outside it (`RELOC_OUT`) | the offset added after each `Fix`, where the site still holds the address (a reload over the program brings back the original code) |
+| 29 PC-relative reads out of the block, $B2C0-$DE18 (`_enh_edges`) | in the copy a `bsr.w` to a trampoline below the stack, which reads the absolute address |
+| the PC-relative reads into the block at the race's end, $808E, $8444, $845A, $846A, $8538 | `jsr` to the slave, which reads the copy |
+| the slave's own references to the block (`src/enhanced.i`, `src/fixes.i`) | `([ENH_BLOCK.w],address)`, and `src/fixes.i`'s pointers moved |
+
+`tools/reloc.py` makes `src/reloc.i` from a memory image at $3658 with every patch (the
+a1200-040, `CUSTOM1=1`) and aprof profiles of the demo races and a player race: it
+disassembles from the profiled code, the tables of code addresses (the scaler's, the race
+setup's dispatch $BB18, the crash sequences' states) and the long immediates after an
+address operand's opcode, and lists every long into the block. Seven immediates fall in the
+block's range without being addresses (`NOT_ADDRS`): a speed clamp ($1B800 at $F722, $F72A)
+and the screen sizes added to or taken from a screen's pointer ($EA60 at $816E, $820C,
+$8230, $FA00 at $14350, $143B8). No load writes into $3658-$1CD13 after the program starts:
+`loads` through the boot, the title and the demo races (destinations from $1FFB8 up).
+
+Checks, from the demo races' green lights (`tools/vmp.py`, which reads and breaks at block
+addresses in the copy):
+- `statelog 300 FILE tick`, the a500 against the a1200-040 with `CUSTOM3=2`: all 298 compared
+  passes agree (`statecmp --align 3`, leaving out $E51C-$E52B); the log takes the race
+  state's pointers into the copy back to the program's addresses.
+- `bench 300` (`CACHE`), the first demo race (Adelaide, two views), then the second (San
+  Marino, one view): the a1200-040 36.95 and 50.17 fps (16.61 and 16.72 with the block in
+  chip memory, the same session), the a1200-030 39.37 and 50.17 (16.48 and 16.72). The a1200
+  (chip memory only) keeps the block in place: 15.42 two views.
+- `shown 60` (two views, a1200-040): 1 of 60 frames changed the screen on display.
+- A player race on the a1200-040 driven to its end (ARCADE, time out), the scores, the menu
+  and a second race; no WHDLoad dump. The a500 runs the original loop (10.35 fps, two views).
+
 **The screen on display.** `shown 40` (the screen not handed to the VBL, read at the swap and
 when the VBL takes the new one) on the a1200-040 and the a1200-030, two views and one: no
 frame changed it. With the option off the a1200-040 changes it in 5-13 of 40 frames, all from
@@ -252,7 +294,7 @@ Checks, from the first demo race's green light (`tools/vmp.py`):
   the map markers' positions per screen $E51C-$E52B, which follow the screen order.
 - *Speed.* `bench 300` (two views): the a1200-030 and the a1200-040 16.70 fps; the a1200
   (68020, chip memory only) 13.45, with 71 of 371 ticks undrawn and none dropped. The second
-  demo race (Monaco, one view), `bench 200`: 16.75 on the a1200 and the a1200-030, the same
+  demo race (San Marino, one view), `bench 200`: 16.75 on the a1200 and the a1200-030, the same
   distance at the same frame.
 
 ## Verification

@@ -2,7 +2,7 @@
 """Vroom Multiplayer's gdb-stub server: the shared commands (docs/running.md) plus
 
   do <action> ...            fields, mouse, buttons, reads, waits and screenshots, CPU stopped
-  race [stay]                from the boot through the title to the menu's START and a race
+  race [menu] [stay]         from the boot through the title to the menu's START and a race
   hook                       what the VBL calls through $B028 (the title $ADAC, a race $AE64)
   bench [<frames>]           fps over the first frames from the next green light
   statelog <n> <file> [tick] the race state at every frame end (or pass) from the next green light
@@ -18,6 +18,7 @@ A port of games/Vroom's tools/vroom.py at the Multiplayer's (v1) addresses
 """
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
@@ -50,8 +51,56 @@ SCREEN_BYTES = 32000      # 4 planes of 8000 bytes
 BUTTONS = {'L': 'JOY1_FIRE_BUTTON', 'R': 'JOY1_2ND_BUTTON'}   # the port-0 mouse buttons
 
 
+# With fast memory, Enhanced framerate runs the race block from a copy at an offset that
+# src/enhanced.i keeps at $1D6 (docs/internals.md, "Fast memory"): the reads and
+# breakpoints below take a block address there.
+BLOCK = (0xB254, 0x1CBB0)
+ENH_BLOCK = 0x1D6
+ENH_BOTTOM = 0xA940       # src/enhanced.i: the copy's lowest address (the trampolines)
+_block = {'off': 0, 'read': 0.0}
+
+
+def block_off(g):
+    """The race block's offset (0: in chip memory). A valid one puts the copy's bottom
+    (ENH_BOTTOM) at the start of a fast ExpMem, a multiple of $1000, above chip memory; once
+    found it is kept (it is set before the program starts). On a 68000 nothing writes $1D6."""
+    if _block['off'] or time.time() - _block['read'] < 2:
+        return _block['off']
+    out = g.cmd(f'x/1xw {ENH_BLOCK:#x}')
+    _block['read'] = time.time()
+    try:
+        v = int(out.rsplit(':', 1)[1].split()[0], 16)
+    except (IndexError, ValueError):
+        return 0
+    if (v + ENH_BOTTOM) % 0x1000 == 0 and 0x200000 <= v < 0xFF000000:
+        _block['off'] = v
+    return _block['off']
+
+
+def A(g, addr):
+    """Where the program's address addr is now: in the race block's copy, or itself."""
+    return addr + block_off(g) if BLOCK[0] <= addr < BLOCK[1] else addr
+
+
+def unmoved_words(g, data):
+    """data with each long at any even offset that points into the race block's copy as
+    the program's own address (the race state keeps pointers at word boundaries)."""
+    off = block_off(g)
+    if not off:
+        return data
+    out, i = bytearray(data), 0
+    while i + 4 <= len(out):
+        v = int.from_bytes(out[i:i + 4], 'big')
+        if BLOCK[0] + off <= v < BLOCK[1] + off:
+            out[i:i + 4] = (v - off).to_bytes(4, 'big')
+            i += 4
+        else:
+            i += 2
+    return bytes(out)
+
+
 def longs(g, addr, n):
-    out = g.cmd(f'x/{n}xw {addr:#x}')
+    out = g.cmd(f'x/{n}xw {A(g, addr):#x}')
     vals = []
     for line in out.splitlines():
         if ':' in line:
@@ -141,7 +190,7 @@ def do(server, g, rest):
                     waited += 5
                 lines.append(f'{a} after {waited} fields')
             elif a[0] == 'b':
-                g.cmd(f'break *{int(a[1:], 16):#x}')
+                g.cmd(f'break *{A(g, int(a[1:], 16)):#x}')
                 try:
                     g.cmd('continue', timeout=600)
                 finally:
@@ -225,7 +274,7 @@ def bench(server, g, rest):
             if fields > 50 * n:
                 return f'only {frames} frames in {fields} fields'
         at = longs(g, FIELDS, 1)[0]
-        g.cmd(f'break *{FRAME_END:#x}')
+        g.cmd(f'break *{A(g, FRAME_END):#x}')
         try:
             g.cmd('continue', timeout=600)
         finally:
@@ -260,7 +309,7 @@ def state_log(server, g, rest):
     try:
         if not green_light(g):
             return 'no race start within 20000 fields'
-        g.cmd(f'break *{at:#x}')
+        g.cmd(f'break *{A(g, at):#x}')
         enh = at == TICK_END and longs(g, ENH_VARS + 16, 1)[0] >> 16 == 3
         ticks = longs(g, ENH_VARS + 4, 1)[0]
         frame = 0
@@ -274,7 +323,9 @@ def state_log(server, g, rest):
                     continue
                 ticks = t
             f, c = longs(g, FIELDS, 1)[0], longs(g, CLOCK, 1)[0]
-            block = ''.join(f'{v:08x}' for lo, hi in STATE for v in longs(g, lo, (hi - lo) // 4))
+            block = ''.join(unmoved_words(g, b''.join(v.to_bytes(4, 'big') for v in
+                                                       longs(g, lo, (hi - lo) // 4))).hex()
+                            for lo, hi in STATE)
             rows.append(f'{frame} {f} {c} {block}')
             frame += 1
     finally:
@@ -305,7 +356,7 @@ def frames(server, g, rest):
     try:
         if not green_light(g):
             return 'no race start within 20000 fields'
-        g.cmd(f'break *{SWAPPED:#x}')
+        g.cmd(f'break *{A(g, SWAPPED):#x}')
         for i in range(n):
             out = g.cmd('continue', timeout=120)
             if 'Breakpoint' not in out:
@@ -333,7 +384,7 @@ def shown(server, g, rest):
         if not green_light(g):
             return 'no race start within 20000 fields'
         for i in range(n):
-            g.cmd(f'break *{SWAPPED:#x}')
+            g.cmd(f'break *{A(g, SWAPPED):#x}')
             out = g.cmd('continue', timeout=120)
             g.cmd('delete')
             if 'Breakpoint' not in out:
@@ -342,7 +393,7 @@ def shown(server, g, rest):
             a, b = longs(g, SCREENS, 2)
             old = b if new == a else a
             before = longs(g, old, SCREEN_BYTES // 4)
-            g.cmd(f'break *{VBL_TAKEN:#x}')
+            g.cmd(f'break *{A(g, VBL_TAKEN):#x}')
             out = g.cmd('continue', timeout=120)
             g.cmd('delete')
             if 'Breakpoint' not in out:
@@ -379,7 +430,7 @@ def span(server, g, rest):
             return 'no race start within 20000 fields'
         for _ in range(n):
             for addr in (lo, hi):
-                g.cmd(f'break *{addr:#x}')
+                g.cmd(f'break *{A(g, addr):#x}')
                 out = g.cmd('continue', timeout=120)
                 g.cmd('delete')
                 if 'Breakpoint' not in out:
@@ -394,17 +445,31 @@ def span(server, g, rest):
     return f'{n} spans: mean {sum(f) / n:.3f} fields, min {min(f):.3f}, max {max(f):.3f}'
 
 
+def start(g, log):
+    """In the menu: the left button held on START until a race's VBL hook runs."""
+    g.cmd('monitor input JOY1_FIRE_BUTTON 1')
+    held = fields_until(g, lambda: vbl_hook(g) == RACE_VBL, 3000, 10)
+    g.cmd('monitor input JOY1_FIRE_BUTTON 0')
+    if held is None:
+        raise TimeoutError('START did not start a race')
+    log.append(f'race after {held} fields held, field {longs(g, FIELDS, 1)[0]:#x}')
+    return '\n'.join(log)
+
+
 def to_race(server, g, rest):
-    """race [stay]: from the boot, through the title (right button in its idle loop, again
+    """race [menu] [stay]: from the boot, through the title (right button in its idle loop, again
     until the title no longer idles there: the menu shares its VBL hook) to the menu, then the
     left button held until a race's VBL hook runs: the menu's first highlight, START, with its
-    settings as they are. Run it in a fresh boot. With `stay` the CPU stays stopped in the
+    settings as they are. Run it in a fresh boot, or with `menu` in the menu (after a race's
+    scores and the right button). With `stay` the CPU stays stopped in the
     race."""
     stay = rest.split()[-1:] == ['stay']
     g.stop()
     log = []
-    idle = lambda: TITLE_WAIT[0] <= pc(g) < TITLE_WAIT[1]
+    idle = lambda: A(g, TITLE_WAIT[0]) <= pc(g) < A(g, TITLE_WAIT[1])
     try:
+        if 'menu' in rest.split():        # already in the menu (after a race's scores)
+            return start(g, log)
         w = fields_until(g, lambda: vbl_hook(g) == TITLE_VBL, 8000)
         if w is None:
             raise TimeoutError('no title')
@@ -421,19 +486,98 @@ def to_race(server, g, rest):
             raise TimeoutError('no menu after 40 clicks')
         log.append(f'menu after {click + 1} clicks, field {longs(g, FIELDS, 1)[0]:#x}')
         g.cmd('monitor fields 400')         # the menu's wipe and load
-        g.cmd('monitor input JOY1_FIRE_BUTTON 1')
-        held = fields_until(g, lambda: vbl_hook(g) == RACE_VBL, 3000, 10)
-        g.cmd('monitor input JOY1_FIRE_BUTTON 0')
-        if held is None:
-            raise TimeoutError('START did not start a race')
-        log.append(f'race after {held} fields held, field {longs(g, FIELDS, 1)[0]:#x}')
+        start(g, log)
     finally:
         if not stay:
             g.cont()
     return '\n'.join(log)
 
 
-server = game_server('vmp', commands={'do': do, 'race': to_race, 'hook': hook,
+def reg(g, r):
+    return int(g.cmd(f'info registers {r}').split()[1], 16)
+
+
+def loads(server, g, rest):
+    """loads <n> [<fields>]: the next <n> unpacks (the loader's $1F0E4, $1EEB0 and $1F094):
+    the entry, the source a0, the destination a1, and at the return the destination's end
+    ($1F25A + the length $3623A for $1F0E4). Gives up after <fields> (default 30000)."""
+    args = rest.split()
+    n = int(args[0])
+    g.stop()
+    rows = []
+    try:
+        g.cmd('maintenance flush register-cache')
+        for _ in range(n):
+            for a in (0x1F0E4, 0x1EEB0, 0x1F094):
+                g.cmd(f'break *{A(g, a):#x}')
+            out = g.cmd('continue', timeout=900)
+            g.cmd('delete')
+            if 'Breakpoint' not in out:
+                break
+            g.cmd('maintenance flush register-cache')
+            at, a0, a1, sp = pc(g), reg(g, 'a0'), reg(g, 'a1'), reg(g, 'sp')
+            ret = longs(g, sp, 1)[0]
+            g.cmd(f'break *{A(g, ret):#x}')
+            g.cmd('continue', timeout=900)
+            g.cmd('delete')
+            g.cmd('maintenance flush register-cache')
+            dest, length = longs(g, 0x1F25A, 1)[0], longs(g, 0x3623A, 1)[0]
+            rows.append(f'{at:05x} a0 {a0:06x} a1 {a1:06x} -> {reg(g, "a1"):06x} '
+                        f'$1F25A {dest:06x} len {length:06x} field {longs(g, FIELDS, 1)[0]}')
+    finally:
+        g.cmd('delete')
+        g.cont()
+    return '\n'.join(rows)
+
+
+def sword(v):
+    return v - 0x10000 if v & 0x8000 else v
+
+
+def drive(server, g, rest):
+    """drive <fields> [<gain>]: games/Vroom's test driver, for player 1 of a race with the
+    menu's MOUSE and MANUAL settings. Full throttle (the mouse's y, $8A6A+2, at -94), shift up
+    (right button) out of neutral and when the step has stopped rising, steer (the mouse's x,
+    $8A6A) against the car's lateral position (+8 of the car, $E586 + the word at $E566) times
+    gain (default 2). Player 1's block: the long at $E568 (step +4, gear +$DE). A step every
+    2 fields."""
+    args = rest.split()
+    n = int(args[0])
+    gain = float(args[1]) if len(args) > 1 else 2.0
+    g.stop()
+    best, flat, field, row = 0, 0, 0, ''
+    try:
+        while field < n:
+            xy = longs(g, 0x8A6A, 1)[0]
+            x, y = sword(xy >> 16), sword(xy & 0xFFFF)
+            car = 0xE586 + (longs(g, 0xE566, 1)[0] >> 16)
+            block = longs(g, 0xE568, 1)[0]
+            lat = sword(longs(g, car + 8, 1)[0] >> 16)
+            speed = longs(g, block + 4, 1)[0] >> 16
+            gear = longs(g, block + 0xDE, 1)[0] >> 16
+            want = max(-271, min(271, int(-gain * lat)))
+            dx = max(-64, min(64, 2 * (want - x)))
+            dy = max(-64, min(64, 2 * (-94 - y)))
+            g.cmd(f'monitor mouse {dx} {dy}')
+            if speed > best:
+                best, flat = speed, 0
+            else:
+                flat += 1
+            if gear == 0 or (flat >= 6 and gear < 6 and speed > 40):
+                g.cmd('monitor input JOY1_2ND_BUTTON 1')
+                g.cmd('monitor fields 4')
+                g.cmd('monitor input JOY1_2ND_BUTTON 0')
+                g.cmd('monitor fields 4')
+                best, flat, field = 0, 0, field + 8
+            g.cmd('monitor fields 2')
+            row = f'field {field} gear {gear} step {speed} lateral {lat} x {x} y {y}'
+            field += 2
+    finally:
+        g.cont()
+    return row
+
+
+server = game_server('vmp', commands={'loads': loads, 'drive': drive, 'do': do, 'race': to_race, 'hook': hook,
                                      'bench': bench, 'statelog': state_log,
                                      'frames': frames, 'shown': shown, 'span': span})
 if __name__ == '__main__':

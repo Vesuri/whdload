@@ -84,6 +84,7 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		move.b	12+3(a7),ENH_FORCE.w	; CUSTOM3
 		lea	20(a7),a7
 		st	(a2)			; -1: off
+		clr.l	ENH_BLOCK.w
 		tst.l	d0
 		beq.b	.done
 		move.b	#1,(a2)			; 1: on
@@ -98,6 +99,7 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 	ENDC
 		move.l	_expmem(pc),d0		; frames between ticks: the snapshots
 		beq.b	.known			; in the ExpMem, fast or not
+		add.l	#ENH_SNAP-ENH_BOTTOM,d0
 		lea	_enh_bufs(pc),a0
 		move.l	d0,(a0)+
 		add.l	#ENH_RSIZE,d0
@@ -107,6 +109,7 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		st	(a0)
 		st	_enh_avail-_enh_interp(a0)
 	ENDC
+		bsr	enh_Fast
 .known		tst.b	(a2)
 		bmi.b	.done
 		lea	ENH_BLT0.w,a0		; jmp enh_Blt0 ... enh_Blt6
@@ -123,6 +126,12 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 		sub.l	a1,a1
 		move.l	_resload(pc),a2
 		jsr	resload_Patch(a2)
+		lea	_enh_moved(pc),a0
+		tst.b	(a0)			; once, after every patch is in
+		bne.b	.moved
+		st	(a0)
+		bsr	enh_Move
+.moved		bsr	enh_RelocOut
 .done		movem.l	(a7)+,d0-d1/a0-a2
 		rts
 
@@ -142,6 +151,11 @@ _enh_pl		PL_START
 		PL_PS	$F3F2,enh_Engine0	; move.w $1254A(pc),d4; beq.s $F406
 		PL_PS	$F644,enh_Engine1	; move.w $1254A(pc),d4; beq.s $F658
 		PL_PSS	$FB26,enh_Sort,2	; sub.l d7,d1; cmpi.l #$7FFF,d1
+		PL_PSS	$808E,enh_R808E,2	; move.w $E564(pc),d0; cmp.w $7FCA(pc),d0
+		PL_PSS	$8444,enh_R8444,2	; move.b $E5C1(pc),d6; move.w #-1,d7
+		PL_PSS	$845A,enh_R8444,2
+		PL_PS	$846A,enh_R846A		; moveq #0,d7; move.b $E601(pc),d7
+		PL_PSS	$8538,enh_R8538,2	; move.l $EA5A(pc),$8F00.l
 		PL_PS	$DCAA,enh_Hud		; movea.l $E55A(pc),a5; moveq #0,d0
 		PL_PS	$13676,enh_Hud0		; movea.l $E55A.l,a5: the tyres' marks
 		PL_PS	$12CB0,enh_Wheel	; jsr $11FDE.l: the wheel's lower part
@@ -158,6 +172,239 @@ _enh_pl		PL_START
 	ENDC
 		PL_END
 
+;---------------------------------------------------------------------------
+; Fast memory (Vroom's step 19 and 20). With the ExpMem in fast memory, the
+; race block ($B254-$1CBAF: the race's setup and loop, the race state, the
+; landscape, the renderer, the objects and the scalers with their variables)
+; runs from a copy there, and the program's stack moves below the copy. The
+; copy's bottom is at the ExpMem's start (any offset works). tools/reloc.py
+; lists the long addresses into the block, in it and outside it (src/reloc.i).
+; The PC-relative references across its edges are rewritten here; the
+; slave's own references take the block's offset (ENH_BLOCK) from low memory:
+; ([ENH_BLOCK.w],address), and src/fixes.i's go through its pointers. ExpMem
+; below $200000 is chip memory, and in $C00000-$DFFFFF slow memory on the
+; chip bus: the block stays.
+;---------------------------------------------------------------------------
+
+ENH_BLOCK	= $1D6			; long: the race block's offset (0: not moved)
+
+ENH_LO		= $B254			; the race block, moved to fast memory
+ENH_HI		= $1CBB0
+ENH_MID		= ((ENH_LO+ENH_HI)/2)&-2	; RELOC_IN counts from here
+ENH_TAIL	= $1CD14		; the scaler's table ($1CB14, read PC-relative,
+					; 128 entries up to the buffers at $1CD14)
+					; runs on to here: in the copy too
+ENH_STACK	= $B240			; the stack's top, below the block in the copy
+ENH_STACKSIZE	= $800			; and its size (the race uses about 400 bytes)
+ENH_TRSIZE	= $100			; the trampolines, below the stack (bsr.w range)
+ENH_TR		= ENH_STACK-ENH_STACKSIZE-ENH_TRSIZE
+ENH_BOTTOM	= ENH_TR		; the lowest address used, in the copy
+ENH_SNAP	= ENH_BOTTOM+((ENH_TAIL-ENH_BOTTOM+$F)&-$10)	; after the copy:
+					; the two snapshots of the race state
+					; (frames between ticks), ENH_RSIZE bytes each
+ENH_EXPSIZE	= (ENH_SNAP+2*ENH_RSIZE-ENH_BOTTOM+$FFF)&$FFFFF000	; ws_ExpMem
+					; (optional; 80 KB, as Vroom's, for the 1 MB
+					; A500): the trampolines, the stack, the block
+					; and its tail, then the snapshots
+
+; The stack's one setting is at the program's start ($365A: movea.l
+; #$30F36,a7), which runs right after the first call from Patch.
+enh_Fast	move.l	_expmem(pc),d0
+		beq.b	.out
+		cmp.l	#$200000,d0
+		blo.b	.out
+		cmp.l	#$C00000,d0
+		blo.b	.fast
+		cmp.l	#$E00000,d0
+		blo.b	.out
+.fast		cmp.l	#$2E7C0003,$365A	; movea.l #$30F36,a7
+		bne.b	.out
+		cmp.w	#$0F36,$365A+4
+		bne.b	.out
+		sub.l	#ENH_BOTTOM,d0		; the copy's offset: its ENH_BOTTOM at the
+		move.l	d0,ENH_BLOCK.w		; ExpMem's start (a multiple of $1000)
+		add.l	#ENH_STACK,d0
+		move.l	d0,$365A+2
+	IFD	ENH_NOBLOCK			; for A/B measurements: the stack only
+		clr.l	ENH_BLOCK.w
+	ENDC
+.out		rts
+
+; Copy the block, relocate it and the references to it, rewrite the edges.
+enh_Move	movem.l	d0-d2/a0-a3,-(a7)
+		move.l	ENH_BLOCK.w,d2
+		beq	.out
+		lea	ENH_LO,a0		; the copy, with the table's tail
+		lea	(a0,d2.l),a1
+		move.l	#(ENH_TAIL-ENH_LO)/4-1,d0
+.copy		move.l	(a0)+,(a1)+
+		subq.l	#1,d0
+		bpl.b	.copy
+		lea	enh_Tramps(pc),a0	; the trampolines, below the stack
+		lea	ENH_TR,a1
+		add.l	d2,a1
+		move.w	#(enh_TrampsEnd-enh_Tramps)/2-1,d0
+.tramp		move.w	(a0)+,(a1)+
+		dbf	d0,.tramp
+		lea	RELOC_IN(pc),a0		; the addresses in it: (site-ENH_MID)/2
+		lea	ENH_MID,a1
+		add.l	d2,a1
+.in		move.w	(a0)+,d0
+		cmp.w	#$8000,d0
+		beq.b	.edges
+		ext.l	d0
+		add.l	d0,d0
+		add.l	d2,(a1,d0.l)
+		bra.b	.in
+.edges		lea	_enh_edges(pc),a0	; bsr.w to the trampolines
+.edge		move.w	(a0)+,d0
+		bmi.b	.ptrs
+		lea	ENH_LO,a1
+		add.l	d2,a1
+		add.w	d0,a1
+		move.w	(a0)+,(a1)+		; the opcode
+		move.w	(a0)+,(a1)+		; the displacement
+		move.w	(a0)+,d1		; and the words to fill with nop
+		bra.b	.fill
+.nop		move.w	#$4E71,(a1)+
+.fill		dbf	d1,.nop
+		bra.b	.edge
+.ptrs		lea	_fix_blk(pc),a0		; src/fixes.i's references
+		moveq	#(_fix_blk_end-_fix_blk)/4-1,d0
+.ptr		add.l	d2,(a0)+
+		dbf	d0,.ptr
+		move.l	_resload(pc),a2
+		jsr	resload_FlushCache(a2)
+.out		movem.l	(a7)+,d0-d2/a0-a3
+		rts
+
+; The addresses into the block from outside it, where the site still holds
+; the address (after each Fix: a reload over the program brings back the
+; original code, and data loaded over code must stay as it is).
+; IN:	-
+; OUT:	-	all registers preserved
+enh_RelocOut	movem.l	d0-d2/a0-a1,-(a7)
+		move.l	ENH_BLOCK.w,d2
+		beq.b	.out
+		lea	RELOC_OUT(pc),a0
+.next		moveq	#0,d0
+		move.w	(a0)+,d0
+		beq.b	.flush
+		add.l	d0,d0
+		move.l	d0,a1			; the site
+		move.l	(a0)+,d1		; the address it holds
+		cmp.l	(a1),d1
+		bne.b	.next
+		add.l	d2,(a1)
+		bra.b	.next
+.flush		move.l	_resload(pc),a1
+		jsr	resload_FlushCache(a1)
+.out		movem.l	(a7)+,d0-d2/a0-a1
+		rts
+
+; The PC-relative reads out of the block: in the copy each becomes a bsr.w to
+; a trampoline below the stack. site, opcode, displacement (the trampoline's
+; offset from the site, the same for any copy), words of nop after it.
+ENH_EDGE	MACRO	; site, opcode, trampoline, nop words
+		dc.w	\1-ENH_LO,\2,ENH_TR+(\3-enh_Tramps)-(\1+2),\4
+		ENDM
+_enh_edges	ENH_EDGE	$B2C0,$6100,enh_T8FBEd0,0	; move.w $8FBE(pc),d0
+		ENH_EDGE	$B2E8,$6100,enh_T8FBEd0,0
+		ENH_EDGE	$B310,$6100,enh_T8FBEd0,0
+		ENH_EDGE	$B3FA,$6100,enh_T9116d0,0	; move.w $9116(pc),d0
+		ENH_EDGE	$B466,$6100,enh_T927Ad7,0	; move.w $927A(pc),d7
+		ENH_EDGE	$B46C,$6100,enh_T92D2d6,0	; move.w $92D2(pc),d6
+		ENH_EDGE	$B516,$6100,enh_T8FBEd2,0	; move.w $8FBE(pc),d2
+		ENH_EDGE	$B5B6,$6100,enh_T8FBEd2,0
+		ENH_EDGE	$B7E2,$6100,enh_T9116d3,0	; move.w $9116(pc),d3
+		ENH_EDGE	$B8AA,$6100,enh_T9116d4,0	; move.w $9116(pc),d4
+		ENH_EDGE	$B8BA,$6100,enh_T9116d4,0
+		ENH_EDGE	$B9DC,$6100,enh_T8A6Cd1,0	; move.w $8A6C(pc),d1
+		ENH_EDGE	$B9E0,$6100,enh_T8A6Ad2,0	; move.w $8A6A(pc),d2
+		ENH_EDGE	$B9E4,$6100,enh_T8A69d3,0	; move.b $8A69(pc),d3
+		ENH_EDGE	$BAB0,$6100,enh_T8A68a0,0	; lea $8A68(pc),a0
+		ENH_EDGE	$D188,$6100,enh_TView,2		; move.l $8F00(pc),$EA5A.l
+		ENH_EDGE	$D1AE,$6100,enh_TE550,2		; move.w $9116(pc),$E550.l
+		ENH_EDGE	$D374,$6100,enh_TSwap,2		; move.l $8F00(pc),$972E.l
+		ENH_EDGE	$D3FA,$6100,enh_T8A7Ca0,0	; lea $8A7C(pc),a0
+		ENH_EDGE	$D57C,$6100,enh_T9114d6,0	; move.l $9114(pc),d6
+		ENH_EDGE	$D5A6,$6100,enh_T9114d6,0
+		ENH_EDGE	$D7D6,$6100,enh_T8FBEd3,0	; move.w $8FBE(pc),d3
+		ENH_EDGE	$DAE4,$6100,enh_T9114d0,0	; move.l $9114(pc),d0
+		ENH_EDGE	$DB76,$6100,enh_T8A7Ca0,0	; lea $8A7C(pc),a0
+		ENH_EDGE	$DC38,$6100,enh_T9116d0,0
+		ENH_EDGE	$DC98,$6100,enh_T9116d0,0
+		ENH_EDGE	$DDB0,$6100,enh_T7FD8d0,0	; move.w $7FD8(pc),d0
+		ENH_EDGE	$DE0E,$6100,enh_T8F00a4,0	; movea.l $8F00(pc),a4
+		ENH_EDGE	$DE18,$6100,enh_T7FD6a4,0	; adda.w $7FD6(pc),a4
+		dc.w	-1
+
+; Copied below the stack: position-independent, reached by bsr.w from the
+; copy. Each sets the condition codes its replaced instruction set.
+enh_Tramps
+enh_T8FBEd0	move.w	$8FBE,d0
+		rts
+enh_T8FBEd2	move.w	$8FBE,d2
+		rts
+enh_T8FBEd3	move.w	$8FBE,d3
+		rts
+enh_T9116d0	move.w	$9116,d0
+		rts
+enh_T9116d3	move.w	$9116,d3
+		rts
+enh_T9116d4	move.w	$9116,d4
+		rts
+enh_T927Ad7	move.w	$927A,d7
+		rts
+enh_T92D2d6	move.w	$92D2,d6
+		rts
+enh_T8A6Cd1	move.w	$8A6C,d1
+		rts
+enh_T8A6Ad2	move.w	$8A6A,d2
+		rts
+enh_T8A69d3	move.b	$8A69,d3
+		rts
+enh_T8A68a0	lea	$8A68,a0
+		rts
+enh_T8A7Ca0	lea	$8A7C,a0
+		rts
+enh_T9114d6	move.l	$9114,d6
+		rts
+enh_T9114d0	move.l	$9114,d0
+		rts
+enh_T7FD8d0	move.w	$7FD8,d0
+		rts
+enh_T8F00a4	movea.l	$8F00,a4
+		rts
+enh_T7FD6a4	adda.w	$7FD6,a4
+		rts
+enh_TView	move.l	$8F00,([ENH_BLOCK.w],$EA5A)
+		rts
+enh_TE550	move.w	$9116,([ENH_BLOCK.w],$E550)
+		rts
+enh_TSwap	move.l	$8F00,$972E
+		rts
+enh_TrampsEnd
+	IFGT	enh_TrampsEnd-enh_Tramps-ENH_TRSIZE
+	FAIL	"the trampolines run into the stack"
+	ENDC
+
+; The PC-relative reads into the block from outside it, at the race's end
+; ($808E-$853F): from the block's copy.
+enh_R808E	move.w	([ENH_BLOCK.w],$E564),d0
+		cmp.w	$7FCA,d0
+		rts
+enh_R8444	move.b	([ENH_BLOCK.w],$E5C1),d6
+		move.w	#-1,d7
+		rts
+enh_R846A	moveq	#0,d7
+		move.b	([ENH_BLOCK.w],$E601),d7
+		rts
+enh_R8538	move.l	([ENH_BLOCK.w],$EA5A),$8F00
+		rts
+
+	INCLUDE	reloc.i
+
 ; The tick clock starts again: the next tick is due now.
 enh_Rebase	move.l	ENH_FIELDS,ENH_DUE.w
 		sf	ENH_SKIP.w
@@ -168,12 +415,12 @@ enh_Rebase	move.l	ENH_FIELDS,ENH_DUE.w
 		move.l	(a7)+,a0
 		rts
 
-enh_Enter	clr.w	$E54E
+enh_Enter	clr.w	([ENH_BLOCK.w],$E54E)
 		bra.b	enh_Rebase
 
 ; Returns the flags of the replaced tst.w $E53E.
 enh_Unpause	bsr.b	enh_Rebase
-		tst.w	$E53E
+		tst.w	([ENH_BLOCK.w],$E53E)
 		rts
 
 ; A pass starts: wait for its tick, decide whether it draws.
@@ -216,8 +463,8 @@ enh_Pass	movem.l	d0-d1,-(a7)
 		moveq	#0,d1
 .count		move.b	d1,ENH_COUNT.w
 .done		movem.l	(a7)+,d0-d1
-		lea	$E566,a5		; the players
-		move.w	$E562,d7		; their count - 1
+		lea	([ENH_BLOCK.w],$E566),a5		; the players
+		move.w	([ENH_BLOCK.w],$E562),d7		; their count - 1
 		rts
 
 ; A view's drawing ($DB04, called from $D6F0 with nothing kept in the
@@ -227,35 +474,37 @@ enh_Pass	movem.l	d0-d1,-(a7)
 ; replaced cmpi.w #1,$11484.
 enh_View	tst.b	ENH_SKIP.w
 		bne.b	.undrawn
-		cmp.w	#1,$11484
+		cmp.w	#1,([ENH_BLOCK.w],$11484)
 		rts
 .undrawn	tst.b	_enh_interp(pc)		; a tick with frames between ticks:
 		beq.b	.queue			; the screen on display taken first
 .shown		tst.l	$972E			; (enh_Hud)
 		bpl.b	.shown
 .queue		jsr	FIX_TRAMP.w		; fix_Queue: a6 = the queue, now idle
-		move.w	$1199C,d7		; the horizon's scroll
-		jsr	$14FA4
+		move.w	([ENH_BLOCK.w],$1199C),d7		; the horizon's scroll
+		jsr	([ENH_BLOCK.w],$14FA4)
 		move.l	#8000,d0		; the ground's top line, clamped to
-		sub.l	$12136,d0		; the view
+		sub.l	([ENH_BLOCK.w],$12136),d0		; the view
 		ble.b	.done
 		divu.w	#40,d0
 		move.w	#199,d2
-		sub.w	$113C8,d2
+		sub.w	([ENH_BLOCK.w],$113C8),d2
 		cmp.w	d2,d0
 		ble.b	.done
-		move.l	$113C4,$12136
-.done		move.l	#$DBD0,(a7)
+		move.l	([ENH_BLOCK.w],$113C4),([ENH_BLOCK.w],$12136)
+.done		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$DBD0,(a7)
 		tst.b	_enh_interp(pc)
 		beq.b	.out
-		move.l	#$DC2E,(a7)		; (a tick: not the panel's copy)
+		move.l	ENH_BLOCK.w,(a7)	; (a tick: not the panel's copy)
+		add.l	#$DC2E,(a7)
 .out		rts
 
 ; The sky and ground clear ($11D2A) queues the horizon, the sky and the
 ; ground, clamps the ground's top line $12136 to the view and starts the
 ; queue; then the CPU fills the ground (enh_Ground) while the blitter runs the
 ; horizon and the sky.
-enh_Clear	jsr	$11D2A
+enh_Clear	jsr	([ENH_BLOCK.w],$11D2A)
 		; (fall through)
 
 ; The ground's fill: the two planes the queue's ground entries fill ($11DDA-
@@ -268,24 +517,24 @@ enh_Clear	jsr	$11D2A
 ; OUT:	-	all registers preserved
 enh_Ground	movem.l	d0-d4/a0-a1,-(a7)
 		move.l	#8000,d0
-		sub.l	$12136,d0
+		sub.l	([ENH_BLOCK.w],$12136),d0
 		ble.b	.out
 		divu.w	#40,d0			; the lines, as $11DC0-$11DD0
 		move.w	#199,d2
-		sub.w	$113C8,d2
+		sub.w	([ENH_BLOCK.w],$113C8),d2
 		cmp.w	d2,d0
 		ble.b	.lines
 		move.w	d2,d0
 .lines		subq.w	#1,d0
 		bmi.b	.out
 		moveq	#$3F,d3			; the words a line
-		and.w	$113D6,d3
+		and.w	([ENH_BLOCK.w],$113D6),d3
 		beq.b	.out
-		move.w	$113D4,d4		; the modulo
+		move.w	([ENH_BLOCK.w],$113D4),d4		; the modulo
 		ext.l	d4
 		move.l	$8F00,a0		; the view's buffer
 		add.l	#16000,a0		; plane 2: 0
-		add.l	$12136,a0
+		add.l	([ENH_BLOCK.w],$12136),a0
 		lea	8000(a0),a1		; plane 3: 1
 		moveq	#-1,d2
 		lsr.w	#1,d3			; in longs, with a last word
@@ -321,7 +570,8 @@ enh_Swap	tst.b	ENH_SKIP.w
 		addq.l	#1,ENH_FRAMES.w
 		cmp.w	#$50,$C8.w
 		rts
-.out		move.l	#$D38C,(a7)
+.out		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$D38C,(a7)
 		rts
 
 ; A blitter start the game waits after itself: start, let Agnus set the busy
@@ -392,7 +642,6 @@ ENH_OSKY	= ENH_RS
 		ENH_R	ENH_SKY,2*$12		; the sky objects
 		dc.l	0
 ENH_RSIZE	= ENH_RS
-ENH_EXPSIZE	= (2*ENH_RSIZE+$FFF)&$FFFFF000	; ws_ExpMem (optional): the snapshots
 
 ; A snapshot of the race state into (a0), or one from it.
 ; IN:	a0 = snapshot
@@ -406,7 +655,12 @@ enh_Copy	lea	_enh_r(pc),a2
 .range		move.l	(a2)+,d0
 		beq.b	.done
 		move.l	d0,a1
-		move.w	(a2)+,d0
+		cmp.l	#ENH_LO,d0		; in the race block: its copy's
+		blo.b	.at
+		cmp.l	#ENH_HI,d0
+		bhs.b	.at
+		add.l	ENH_BLOCK.w,a1
+.at		move.w	(a2)+,d0
 		tst.b	d2
 		bne.b	.load
 .save		move.w	(a1)+,(a0)+
@@ -428,7 +682,7 @@ enh_Snap	movem.l	d0/a0-a2,-(a7)
 		st	_enh_snapped-_enh_bufs(a1)
 		bsr.b	enh_Save
 		lea	_enh_lat(pc),a0		; the cameras' lateral positions (for
-		lea	ENH_OP+8,a2		; CUSTOM3's frames before a landscape)
+		lea	([ENH_BLOCK.w],ENH_OP+8),a2	; CUSTOM3's frames before a landscape)
 		moveq	#4-1,d0
 .lat		move.w	(a2),(a0)+
 		lea	$106(a2),a2
@@ -484,8 +738,8 @@ enh_PassI	move.l	d2,-(a7)
 		addq.b	#1,ENH_SKIPS.w
 .done		move.l	(a7)+,d2
 		movem.l	(a7)+,d0-d1
-		lea	$E566,a5		; the players
-		move.w	$E562,d7		; their count - 1
+		lea	([ENH_BLOCK.w],$E566),a5		; the players
+		move.w	([ENH_BLOCK.w],$E562),d7		; their count - 1
 		rts
 .forced		moveq	#0,d0			; n frames, alpha i/n
 .frame		bsr	enh_Frame
@@ -515,9 +769,9 @@ enh_Frame	movem.l	d0-a6,-(a7)
 		move.l	(a2),a0			; the tick before
 		bsr	enh_Load
 		move.l	4(a2),a1		; this tick
-		move.l	$E518,d7		; the track's length: the ticks wrap
+		move.l	([ENH_BLOCK.w],$E518),d7		; the track's length: the ticks wrap
 					; the distances at the line
-		lea	$E586,a4		; the cars: alpha of the way, distance
+		lea	([ENH_BLOCK.w],$E586),a4		; the cars: alpha of the way, distance
 		lea	($E586-ENH_OB,a1),a5	; (+2) and lateral (+8)
 		moveq	#16-1,d4
 .car		move.l	2(a5),d5
@@ -537,12 +791,13 @@ enh_Frame	movem.l	d0-a6,-(a7)
 		lea	64(a4),a4
 		lea	64(a5),a5
 		dbf	d4,.car
-		lea	$E566,a3		; the players: the camera by alpha of
-		move.w	$E562,d4		; the step, which a frame stops short
-.player		lea	$E586,a4		; of the line
+		lea	([ENH_BLOCK.w],$E566),a3		; the players: the camera by alpha of
+		move.w	([ENH_BLOCK.w],$E562),d4		; the step, which a frame stops short
+.player		lea	([ENH_BLOCK.w],$E586),a4		; of the line
 		add.w	(a3),a4			; the player's car
 		move.l	2(a3),a5		; and block
 		move.l	a5,d1
+		sub.l	ENH_BLOCK.w,d1		; (the copy's addresses)
 		sub.l	#ENH_OP,d1
 		lea	(ENH_OPS,a1,d1.l),a6	; this tick's block
 		moveq	#0,d3
@@ -550,6 +805,7 @@ enh_Frame	movem.l	d0-a6,-(a7)
 		mulu.l	d0,d3
 		divu.l	d2,d3
 		move.l	a4,d5			; (a0 = the tick before)
+		sub.l	ENH_BLOCK.w,d5
 		sub.l	#ENH_OB-2,d5
 		move.l	(a0,d5.l),d6		; the tick before's distance
 		move.l	d7,d5
@@ -583,7 +839,7 @@ enh_Frame	movem.l	d0-a6,-(a7)
 		pea	.back(pc)		; to the swap (enh_Next returns here)
 		lea	_enh_sp(pc),a0
 		move.l	a7,(a0)
-		jmp	$D010
+		jmp	([ENH_BLOCK.w],$D010)
 .back		lea	_enh_bufs(pc),a2
 		move.l	4(a2),a0		; this tick back
 		bsr	enh_Load
@@ -616,6 +872,7 @@ enh_Mix		ext.l	d0
 ; IN:	a5 = a player's block
 ; OUT:	d1.l = 0-3
 enh_Index	move.l	a5,d1
+		sub.l	ENH_BLOCK.w,d1
 		sub.l	#ENH_OP,d1
 		divu.w	#$106,d1
 		ext.l	d1
@@ -711,8 +968,8 @@ enh_Window	movem.l	d0/a0,-(a7)
 enh_Next	tst.b	_enh_frame(pc)
 		bne.b	.frame
 		bsr	enh_Drawn
-		move.b	$E557,d0
-		cmp.b	$E556,d0
+		move.b	([ENH_BLOCK.w],$E557),d0
+		cmp.b	([ENH_BLOCK.w],$E556),d0
 		rts
 .frame		move.l	_enh_sp(pc),a7
 		rts
@@ -731,7 +988,8 @@ ENH_TICK	MACRO			; to \1 unless this pass is such a tick
 		beq.b	\1
 		ENDM
 enh_Marker	ENH_TICK .draw
-		move.l	#$D084,(a7)
+		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$D084,(a7)
 		rts
 .draw		tst.b	_enh_frame(pc)		; a frame's: the CPU draws them into
 		beq.b	.go			; the view's buffer, which may still
@@ -740,27 +998,30 @@ enh_Marker	ENH_TICK .draw
 .go		movea.l	#$4BD9E,a1
 		rts
 enh_Hud		ENH_TICK .draw
-		move.l	#$DE66,(a7)
+		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$DE66,(a7)
 		rts
-.draw		movea.l	$E55A,a5
+.draw		movea.l	([ENH_BLOCK.w],$E55A),a5
 		moveq	#0,d0
 		rts
 enh_Hud0	ENH_TICK .draw
 		addq.l	#4,a7			; out of $13676
 		rts
-.draw		movea.l	$E55A,a5
+.draw		movea.l	([ENH_BLOCK.w],$E55A),a5
 		rts
 enh_Wheel	ENH_TICK .draw
 		addq.l	#4,a7			; out of $12CB0
 		rts
-.draw		jmp	$11FDE
+.draw		jmp	([ENH_BLOCK.w],$11FDE)
 enh_Score	ENH_TICK .draw
-		move.l	#$D2CC,(a7)
+		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$D2CC,(a7)
 		rts
 .draw		lea	$8B98,a0
 		rts
 enh_Time	ENH_TICK .draw
-		move.l	#$D2CC,(a7)
+		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$D2CC,(a7)
 		rts
 .draw		lea	$8D26,a0
 		rts
@@ -770,19 +1031,21 @@ enh_Time	ENH_TICK .draw
 ; move.w $E53E(pc),d0.
 enh_Lights	tst.b	_enh_frame(pc)
 		bne.b	.frame
-		move.w	$E53E,d0
+		move.w	([ENH_BLOCK.w],$E53E),d0
 		blt.b	.out
 		tst.b	_enh_interp(pc)		; a tick that changes the lights draws
 		beq.b	.go			; them ($D0A4): the screen on display
-		cmp.w	#1,$E540		; taken first
+		cmp.w	#1,([ENH_BLOCK.w],$E540)		; taken first
 		bne.b	.go
 .shown		tst.l	$972E
 		bpl.b	.shown
 .go		tst.w	d0
 		rts
-.out		move.l	#$D0D8,(a7)
+.out		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$D0D8,(a7)
 		rts
-.frame		move.l	#$D160,(a7)		; the views
+.frame		move.l	ENH_BLOCK.w,(a7)	; the views
+		add.l	#$D160,(a7)
 		rts
 
 ; A view's landscape ($D3A6; a5 = the player's block, a3 = the car): a tick
@@ -809,7 +1072,8 @@ enh_Turn	tst.b	_enh_frame(pc)
 		tst.w	$D4(a5)
 		blt.b	.d3f0
 		rts
-.d3f0		move.l	#$D3F0,(a7)
+.d3f0		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$D3F0,(a7)
 		rts
 .frame		movem.l	d0-d1/d4-d6/a0-a1/a4,-(a7)
 		bsr	enh_Index
@@ -817,18 +1081,18 @@ enh_Turn	tst.b	_enh_frame(pc)
 		move.w	(a0,d1.w*2),d1
 		moveq	#0,d0
 		bsr	enh_Mix
-		move.w	d1,$1199C
+		move.w	d1,([ENH_BLOCK.w],$1199C)
 		movem.l	_enh_bufs(pc),a4/a1	; the tick before's objects, this
 		lea	(ENH_OSKY,a4),a4	; tick's
 		lea	(ENH_OSKY,a1),a1
 		lea	ENH_SKY,a0
-		tst.w	$1254A			; the view
+		tst.w	([ENH_BLOCK.w],$1254A)			; the view
 		beq.b	.view
 		moveq	#$12,d0
 		add.l	d0,a0
 		add.l	d0,a4
 		add.l	d0,a1
-.view		move.w	$1511A,d5		; the width the objects wrap at
+.view		move.w	([ENH_BLOCK.w],$1511A),d5		; the width the objects wrap at
 		move.w	d5,d6
 		lsr.w	#1,d6
 		moveq	#3-1,d4
@@ -859,16 +1123,17 @@ enh_Turn	tst.b	_enh_frame(pc)
 		addq.l	#6,a1
 		dbf	d4,.obj
 .out		movem.l	(a7)+,d0-d1/d4-d6/a0-a1/a4
-		move.l	#$D6F0,(a7)		; bsr $DB04: the drawing
+		move.l	ENH_BLOCK.w,(a7)	; bsr $DB04: the drawing
+		add.l	#$D6F0,(a7)
 		rts
 
 ; A tick keeps the view's turn ($D3F0, after it is set; d7 = it).
 enh_TurnRec	movem.l	d1/a0,-(a7)
 		bsr	enh_Index
 		lea	_enh_turn(pc),a0
-		move.w	$1199C,(a0,d1.w*2)
+		move.w	([ENH_BLOCK.w],$1199C),(a0,d1.w*2)
 		movem.l	(a7)+,d1/a0
-		move.w	$1199C,d7
+		move.w	([ENH_BLOCK.w],$1199C),d7
 		rts
 
 ; The landscape's pitch ($1187C, from the player's $1C(a5) with the bounce,
@@ -887,11 +1152,12 @@ enh_Pitch	movem.l	d0/d4/a0-a1,-(a7)
 		tst.b	_enh_frame(pc)
 		bne.b	.frame
 		move.w	(a0,d4.w*2),(8,a0,d4.w*2)	; the tick before's
-		move.w	$1187C,d1
+		move.w	([ENH_BLOCK.w],$1187C),d1
 		move.w	d1,(a0,d4.w*2)		; and this tick's
 		bra.b	.out
 .frame		movem.l	_enh_bufs(pc),a0-a1	; the tick before, this tick
 		move.l	a5,d1
+		sub.l	ENH_BLOCK.w,d1
 		sub.l	#ENH_OP-ENH_OPS-$D2,d1
 		move.w	(a0,d1.l),d0
 		move.w	(a1,d1.l),d1
@@ -901,32 +1167,36 @@ enh_Pitch	movem.l	d0/d4/a0-a1,-(a7)
 		move.w	(8,a0,d4.w*2),d0
 		move.w	(a0,d4.w*2),d1
 		bsr	enh_Mix
-		move.w	d1,$1187C
+		move.w	d1,([ENH_BLOCK.w],$1187C)
 .out		movem.l	(a7)+,d0/d4/a0-a1
 		cmp.w	#$5208,d1
 		rts
 
 ; The engine's pitch and the bump's sound per view ($F3F2-$F411, $F644-
 ; $F663): the ticks'. A frame's come from the tick before's revs.
-enh_Engine0	move.w	$1254A,d4
+enh_Engine0	move.w	([ENH_BLOCK.w],$1254A),d4
 		tst.b	_enh_frame(pc)
 		bne.b	.frame
 		tst.w	d4
 		beq.b	.v0
 		rts
-.v0		move.l	#$F406,(a7)
+.v0		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$F406,(a7)
 		rts
-.frame		move.l	#$F412,(a7)
+.frame		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$F412,(a7)
 		rts
-enh_Engine1	move.w	$1254A,d4
+enh_Engine1	move.w	([ENH_BLOCK.w],$1254A),d4
 		tst.b	_enh_frame(pc)
 		bne.b	.frame
 		tst.w	d4
 		beq.b	.v0
 		rts
-.v0		move.l	#$F658,(a7)
+.v0		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$F658,(a7)
 		rts
-.frame		move.l	#$F664,(a7)
+.frame		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$F664,(a7)
 		rts
 
 ; The cars ahead of the camera, sorted by distance ($FB04-$FB7F): a tick
@@ -941,7 +1211,8 @@ enh_Sort	sub.l	d7,d1
 		bpl.b	.ahead
 		tst.b	_enh_frame(pc)
 		beq.b	.ahead
-		move.l	#$FB04,(a7)		; the next car
+		move.l	ENH_BLOCK.w,(a7)	; the next car
+		add.l	#$FB04,(a7)
 		rts
 .ahead		cmp.l	#$7FFF,d1
 		rts
@@ -967,6 +1238,7 @@ _enh_interp	dc.b	0		; frames between ticks now
 		even
 
 _enh_state	dc.b	0		; 0 unknown, -1 off, 1 on
+_enh_moved	dc.b	0		; the block has been copied (or stays)
 		even
 
 ;---------------------------------------------------------------------------
