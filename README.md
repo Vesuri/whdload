@@ -40,6 +40,7 @@ ReadMe and only the files that changed replaced. Install it as you would the ori
 | Star Wars Enhanced | StingRay | [3.0b (16.11.2026)](https://github.com/Vesuri/whdload/releases/tag/StarWarsEnhanced-3.0b-20261116) |
 | Stellar 7 Enhanced | Psygore | [2.0b (07.11.2026)](https://github.com/Vesuri/whdload/releases/tag/Stellar7Enhanced-2.0b-20261107) |
 | Stunt Car Racer Enhanced | Codetapper and StingRay | [2.0b (27.11.2026)](https://github.com/Vesuri/whdload/releases/tag/StuntCarRacerEnhanced-2.0b-20261127) |
+| Stunt Track Racer Enhanced | Codetapper | [2.0b (27.11.2026)](https://github.com/Vesuri/whdload/releases/tag/StuntTrackRacerEnhanced-2.0b-20261127) |
 | Test Drive Enhanced | JOTD | [2.0b (13.11.2026)](https://github.com/Vesuri/whdload/releases/tag/TestDriveEnhanced-2.0b-20261113) |
 | Test Drive II Enhanced | JOTD | released upstream as JOTD's 2.1 (11.10.2026) |
 | TFX Enhanced | JOTD | [2.3b (19.11.2026)](https://github.com/Vesuri/whdload/releases/tag/TFXEnhanced-2.3b-20261119) |
