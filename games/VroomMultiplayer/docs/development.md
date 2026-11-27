@@ -45,9 +45,10 @@ breakpoints, screenshots, with the CPU stopped), `race` (the boot to the menu), 
 pass, for games/Vroom's `tools/statecmp.py`), `frames` (a hash of every line of each drawn
 frame, for games/Vroom's `tools/framecmp.py`), `shown` (frames that changed the screen on
 display) and `span` (the emulated time between two addresses, in raster lines read from the
-beam through the stub: exact, the breakpoints stop the emulation). Developer knobs for A/B
-builds (`DEFINES_x=-D... make build BUILD=x`, then `SLAVE=`): `ENH_NOBLITSITES`, `ENH_NOFMODE`,
-`ENH_NOGROUND`. The first demo race (Adelaide, two views) is the
+beam through the stub: exact, the breakpoints stop the emulation). `bench N now` starts at once (after
+`race`, whose lights may be out by the time the race's VBL hook is seen). Developer knobs
+for A/B builds (`DEFINES_x=-D... make build BUILD=x`, then `SLAVE=`): `ENH_NOBLITSITES`,
+`ENH_NOFMODE`, `ENH_NOGROUND`, `ENH_NOINTERP` (no frames between ticks). The first demo race (Adelaide, two views) is the
 same race on every machine; the second (Monaco) has one view.
 The title and the menu share the VBL hook $ADAC; a race's is $AE64. In the menu the left
 button on START, held until the hook is $AE64, starts a race (about 500 fields).
@@ -60,6 +61,7 @@ button on START, held until the hook is $AE64, starts a race (about 500 fields).
 | `tools/blitstarts.py VMP.bin` | writes `src/blitwait.i` |
 | `tools/blitsites.py VMP.bin` | writes `src/blitsites.i`: the blitter starts the game waits after itself |
 | `tools/vmp.py` | the game server, above |
+| `tools/reloc.py IMAGE PROFILE...` | the race block's relocation census for fast memory (games/Vroom's, with this game's block and tables); PROFILEs from `gdb monitor aprof start`/`stop FILE` on the aprof FS-UAE (`FSUAE=$FSUAE_APROF EXTRA_ARGS=--cpu=68040-NOMMU`) |
 
 Vroom's `tools/smc.py` and `tools/smcscan.py` run on this game's traces and images as they
 are (`python3 ../Vroom/tools/smc.py TRACE.bin ...`).

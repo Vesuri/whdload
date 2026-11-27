@@ -181,28 +181,34 @@ def fields_until(g, test, most, step=5):
 def green_light(g, most=20000):
     """Run fields one at a time until the race clock leaves 0 after the start lights (their
     state $E53E negative: the race clock can tick at a race's setup, before the lights); stops
-    at the first field with it running. False after `most` fields without one."""
+    at the first field with it running. False after `most` fields without one. A field may
+    stop inside a frame between ticks, which holds the tick before's state (the lights not yet
+    out): the lights are read again over the next fields, the race clock still small."""
     prev = longs(g, CLOCK, 1)[0]
     for _ in range(most):
         g.cmd('monitor fields 1')
-        c, lights = longs(g, CLOCK, 1)[0], longs(g, LIGHTS, 1)[0] >> 16
-        if prev == 0 and 0 < c <= 4 and lights & 0x8000:
-            return True
+        c = longs(g, CLOCK, 1)[0]
+        if prev == 0 and 0 < c <= 4:
+            for _ in range(4):
+                if longs(g, LIGHTS, 1)[0] >> 16 & 0x8000:
+                    return True
+                g.cmd('monitor fields 1')
         prev = c
     return False
 
 
 def bench(server, g, rest):
-    """bench [<frames>]: the fields a race takes for its first <frames> frames (default 300)
-    from the green light, one field at a time (read-only). In the first demo race, left alone
+    """bench [<frames>] [now]: the fields a race takes for its first <frames> frames (default
+    300) from the green light (with `now`, from here), one field at a time (read-only). In the first demo race, left alone
     after the boot, that is the same simulation on every machine, so the fps compare between
     machines and builds. Also the distance driven at the last frame's end (a breakpoint at
     $D37C) and the fields-per-frame histogram; with Enhanced framerate the ticks (race loop
     passes), the passes left undrawn and the fields dropped."""
-    n = int(rest.split()[0]) if rest.split() else 300
+    args = rest.split()
+    n = int(args[0]) if args and args[0].isdigit() else 300
     g.stop()
     try:
-        if not green_light(g):
+        if 'now' not in args and not green_light(g):
             return 'no race start within 20000 fields'
         last, p0 = longs(g, FRAME_FIELD, 1)[0], longs(g, POS, 1)[0]
         e0 = longs(g, ENH_VARS, 4)
@@ -244,7 +250,8 @@ def state_log(server, g, rest):
     """statelog <n> <file> [tick]: from the next green light, stop at every frame end ($D37C),
     or with `tick` at every race loop pass ($D38C, after the swap or the pass that left it
     out), for <n> stops, and write one line per stop: number, field counter, race clock, then
-    the long words of STATE in hex. tools/statecmp.py compares two logs (Vroom's)."""
+    the long words of STATE in hex. With Enhanced framerate a `tick` stop is logged only when
+    the ticks (ENH_VARS+4) have moved on: frames between ticks pass $D38C as well. tools/statecmp.py compares two logs (Vroom's)."""
     args = rest.split()
     n, path = int(args[0]), args[1]
     at = TICK_END if args[2:3] == ['tick'] else FRAME_END
@@ -254,13 +261,22 @@ def state_log(server, g, rest):
         if not green_light(g):
             return 'no race start within 20000 fields'
         g.cmd(f'break *{at:#x}')
-        for frame in range(n):
+        enh = at == TICK_END and longs(g, ENH_VARS + 16, 1)[0] >> 16 == 3
+        ticks = longs(g, ENH_VARS + 4, 1)[0]
+        frame = 0
+        while frame < n:
             out = g.cmd('continue', timeout=120)
             if 'Breakpoint' not in out:
                 return f'no stop after {frame}: {out.strip().splitlines()[-1]}'
+            if enh:                         # a frame between ticks passes $D38C too,
+                t = longs(g, ENH_VARS + 4, 1)[0]    # with the tick before's state
+                if t == ticks:
+                    continue
+                ticks = t
             f, c = longs(g, FIELDS, 1)[0], longs(g, CLOCK, 1)[0]
             block = ''.join(f'{v:08x}' for lo, hi in STATE for v in longs(g, lo, (hi - lo) // 4))
             rows.append(f'{frame} {f} {c} {block}')
+            frame += 1
     finally:
         g.cmd('delete')
         g.cont()
@@ -379,32 +395,31 @@ def span(server, g, rest):
 
 
 def to_race(server, g, rest):
-    """race [stay]: from the boot, through the title (right button in its idle loop,
-    repeated until the VBL hook leaves the title) to the menu, then the left button held
-    until a race's VBL hook runs: the menu's first highlight, START, with its settings as
-    they are. Run it in a fresh boot. With `stay` the CPU stays stopped in the race."""
+    """race [stay]: from the boot, through the title (right button in its idle loop, again
+    until the title no longer idles there: the menu shares its VBL hook) to the menu, then the
+    left button held until a race's VBL hook runs: the menu's first highlight, START, with its
+    settings as they are. Run it in a fresh boot. With `stay` the CPU stays stopped in the
+    race."""
     stay = rest.split()[-1:] == ['stay']
     g.stop()
     log = []
+    idle = lambda: TITLE_WAIT[0] <= pc(g) < TITLE_WAIT[1]
     try:
         w = fields_until(g, lambda: vbl_hook(g) == TITLE_VBL, 8000)
         if w is None:
             raise TimeoutError('no title')
         log.append(f'title after {w}')
+        if fields_until(g, idle, 4000, 10) is None:
+            raise TimeoutError('the title does not wait for a click')
         for click in range(40):
-            if fields_until(g, lambda: vbl_hook(g) != TITLE_VBL
-                            or TITLE_WAIT[0] <= pc(g) < TITLE_WAIT[1], 4000, 10) is None:
-                raise TimeoutError('the title does not wait for a click')
-            if vbl_hook(g) != TITLE_VBL:
-                break
             g.cmd('monitor input JOY1_2ND_BUTTON 1')
             g.cmd('monitor fields 20')
             g.cmd('monitor input JOY1_2ND_BUTTON 0')
-            if fields_until(g, lambda: vbl_hook(g) != TITLE_VBL, 300, 10) is not None:
+            if fields_until(g, idle, 200, 10) is None:
                 break
         else:
             raise TimeoutError('no menu after 40 clicks')
-        log.append(f'menu after {click} clicks, field {longs(g, FIELDS, 1)[0]:#x}')
+        log.append(f'menu after {click + 1} clicks, field {longs(g, FIELDS, 1)[0]:#x}')
         g.cmd('monitor fields 400')         # the menu's wipe and load
         g.cmd('monitor input JOY1_FIRE_BUTTON 1')
         held = fields_until(g, lambda: vbl_hook(g) == RACE_VBL, 3000, 10)

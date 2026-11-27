@@ -130,6 +130,7 @@ fields the debt past it is dropped and counted).
 | $D348 (`cmpi.w #$50,$C8`) | a pass that does not draw goes on at $D38C, leaving out the frame end's wait and the swap |
 | the screens' references, $ADEC, $AE48, $AEB4, $AF94, $AFAE | on AGA, the screens move 6 bytes up and the lores modes fetch 64 bits wide (below, "64-bit fetch") |
 | $DB36, $DB54, $DB5C (`jsr $11D2A`); $11DDA-$11E1B (the queue's ground entries) | the entries are left out: after `$11D2A` the CPU fills the ground's planes 2 and 3 (`enh_Ground`) while the blitter runs the horizon and the sky |
+| $D010-$13676, below ("Frames between ticks") | with the ExpMem, the frames between ticks |
 | 94 blitter starts in $1309E-$1B25E (`src/blitsites.i`) | `jsr $10C`-`$124.w` (`src/blitwait.i`'s start-and-wait) become `jsr $1E0`-`$1F8.w`: start, one read of dmaconr, return |
 
 What an undrawn pass still runs: the players' steps, the landscape of every view (it follows
@@ -177,6 +178,56 @@ frames all the same but for the race clock (lines 31-35), the one-view race's to
 build missed the gauge's table, which the operand scan could not see: its piece at lines
 30-32 stayed at the old address, 6 bytes left. `bench 300` on the a1200: 15.74 fps with 17 of
 317 ticks undrawn (14.14 and 53 of 353 before).
+
+**Frames between ticks** (with the slave's optional 8 KB ExpMem, fast or not: two snapshots
+of the race state). As in Vroom, the ticks draw nothing, and while the next tick is early a
+frame shows the race between the last two ticks, mixed by alpha (fields since the last tick
+was due over fields a tick): it loads the tick before's snapshot (`_enh_r`: the globals, the
+16 cars and the order $E52C-$EA53 and $E504-$E51B, after the clock and the view's buffer to
+$EB35, the four player blocks $1254C-$12963, the landscape's variables $11866-$1199F, the
+horizon's scroll per view $15120, the ground's top lines $12130, the ARCADE score $8B94,
+the sky objects $8A7C, and a few more), moves the 16 cars by alpha of their way (distance +2,
+lateral +8) and each player's camera by alpha of the player's step ($4 of the block, the
+landscape's step; Vroom's $10C30), mixes the camera's lateral position ($8, kept as each
+tick's landscape starts), and runs the race loop's drawing from the map markers to the swap
+($D010-$D38B), then loads this tick's snapshot back. In Vroom the landscape's variables are
+globals; here most are in the player block, so the frame's pitch, turn and lateral position
+are kept per player. Not in the snapshot, as they follow the screens or real time: the map
+markers per screen $E51C-$E52B, the race clock and its gate $EA54-$EA59, the view's buffer
+$EA5A, the swap's field $EB36.
+
+| Where | What |
+|---|---|
+| $D010 (`movea.l #$4BD9E,a1`) | the map markers: a tick leaves them out; a frame waits for the VBL to take the last frame first (the CPU draws them) |
+| $D084 (`move.w $E53E(pc),d0`) | the start lights' count and the race end's bonus: the ticks' (a frame goes on at $D160, the views); a tick that changes the lights waits for the screen on display to be taken |
+| $D38C (`move.b $E557(pc),d0`) | after the swap: a frame returns to the scheduler |
+| $D3A6 (`move.l 2(a3),$A(a5)`) | a view's landscape: a tick keeps the camera's lateral position |
+| $D3CA, $D3F0 | the horizon's turn ($1199C) and the view's sky objects: a frame takes alpha of this tick's turn and mixes the objects, then leaves out the view's timers ($D43C-$D6EF) |
+| $10012 (`move.w $1187C(pc),d1`) | the landscape's pitch and height: a frame mixes the two ticks' values (kept per player) |
+| $F3F2, $F644 | the engine's pitch and the bump's sound per view: the ticks' |
+| $FB26 (`sub.l d7,d1`) | the cars ahead, sorted: a frame leaves out a car behind the camera |
+| $DCAA, $13676, $12CB0, $D258, $D282 | a tick leaves out the cockpit, the tyres' marks, the wheel, the score's and the time's digits; it waits for the screen on display before what it still draws (the lights, the crashes, the pit stop) |
+
+A frame takes a tick's drawing plus a view's landscape, so they pay only where a frame takes
+well under a tick. With two views a frame takes about 1.5 fields of work on the a1200-040
+and 2 or more on the a1200-030 and a1200: one frame a tick at best, and on the slower two
+fewer frames than the ticks' own drawing (a1200 8.80 fps against 15.66, a1200-030 13.81
+against 16.70). So the slave switches (`enh_Window`, `enh_Drawn`): every 8 ticks with frames
+between them, 8 frames or fewer go back to the ticks' drawing for 64 ticks (doubled at each
+such try in a row, up to 1024); then 8 drawn ticks in a row of 2 fields or less try the
+frames again.
+
+Checks (`tools/vmp.py`; the tools skip a frame's stops at $D38C):
+- `statelog 300 FILE tick`, the a500 against the a1200-040 with `CUSTOM3=2` (two frames before
+  each tick): all 299 passes agree (`statecmp --align 3`, leaving out $E51C-$E52B).
+- `bench 300`, a player race (one view, `race`, then `bench 300 now` where the lights are out
+  before the menu's button is let go): the a1200-040 25.04 fps and the a1200-030 25.00
+  (1.51 frames a tick; 16.7 before), the a1200 18.59 (16.75). The two-view demo race: the
+  a1200-040 16.61, the a1200-030 16.48, the a1200 15.37 (16.70, 16.70, 15.66 drawing in the
+  ticks: the tries cost a little).
+- `shown 60`: one view, no frame changed the screen on display; two views, 2 of 60 at lines
+  48-59, the original's drawing once the beam has passed line $D0 into the screen the next
+  field replaces (below).
 
 **The ground by the CPU.** As in Vroom: the queue's ground entries fill planes 2 (with 0) and
 3 (with 1) below the ground's top line $12136, as many lines as the view has left, with the

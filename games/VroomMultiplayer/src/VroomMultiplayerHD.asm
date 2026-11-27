@@ -31,7 +31,6 @@
 ;============================================================================
 	
 BASEMEM	= $80000
-EXPMEM	= $0
 
 ;=============================================================================
 
@@ -45,7 +44,7 @@ _base	SLAVE_HEADER						;ws_Security + ws_ID
 		dc.w	0					;ws_DontCache
 _keydebug	dc.b	0					;ws_keydebug
 _keyexit	dc.b	$59					;ws_keyexit = F10
-_expmem		dc.l	EXPMEM					;ws_ExpMem
+_expmem		dc.l	-ENH_EXPSIZE				;ws_ExpMem (optional: src/enhanced.i)
 		dc.w	_name-_base				;ws_name
 		dc.w	_copy-_base				;ws_copy
 		dc.w	_info-_base				;ws_info

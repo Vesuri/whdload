@@ -23,7 +23,8 @@
 ; count passes.
 ; Behind by more than ENH_LIMIT fields, the time past it is dropped. The race's
 ; start and the end of a pause start the tick clock again, with no catch-up.
-; The Multiplayer has no link play.
+; The Multiplayer has no link play. With the ExpMem, frames are drawn between
+; the ticks where they pay (below, "Frames between ticks").
 ;
 ; The scheduler's variables are in low memory, where the tools can read them.
 ;
@@ -95,6 +96,17 @@ Enhanced	movem.l	d0-d1/a0-a2,-(a7)
 	IFND	ENH_NOFMODE			; (for A/B checks)
 		bsr	enh_FmodeInit
 	ENDC
+		move.l	_expmem(pc),d0		; frames between ticks: the snapshots
+		beq.b	.known			; in the ExpMem, fast or not
+		lea	_enh_bufs(pc),a0
+		move.l	d0,(a0)+
+		add.l	#ENH_RSIZE,d0
+		move.l	d0,(a0)
+	IFND	ENH_NOINTERP			; for A/B measurements: the ticks draw
+		lea	_enh_interp(pc),a0
+		st	(a0)
+		st	_enh_avail-_enh_interp(a0)
+	ENDC
 .known		tst.b	(a2)
 		bmi.b	.done
 		lea	ENH_BLT0.w,a0		; jmp enh_Blt0 ... enh_Blt6
@@ -120,6 +132,21 @@ _enh_pl		PL_START
 		PL_PS	$BE86,enh_Unpause	; tst.w $E53E.l: the end of a pause
 		PL_PSS	$DB04,enh_View,2	; cmpi.w #1,$11484.l: a view's drawing
 		PL_PSS	$D348,enh_Swap,2	; cmpi.w #$50,$C8.l: the frame's end
+		PL_PS	$D010,enh_Marker	; movea.l #$4BD9E,a1: the map markers
+		PL_PS	$D084,enh_Lights	; move.w $E53E(pc),d0; blt.s $D0D8
+		PL_PSS	$D38C,enh_Next,2	; move.b $E557(pc),d0; cmp.b $E556(pc),d0
+		PL_PS	$D3A6,enh_Land		; move.l 2(a3),$A(a5): a view's landscape
+		PL_PS	$D3CA,enh_Turn		; tst.w $D4(a5); blt.s $D3F0
+		PL_PS	$D3F0,enh_TurnRec	; move.w $1199C.l,d7
+		PL_PSS	$10012,enh_Pitch,2	; move.w $1187C(pc),d1; cmpi.w #$5208,d1
+		PL_PS	$F3F2,enh_Engine0	; move.w $1254A(pc),d4; beq.s $F406
+		PL_PS	$F644,enh_Engine1	; move.w $1254A(pc),d4; beq.s $F658
+		PL_PSS	$FB26,enh_Sort,2	; sub.l d7,d1; cmpi.l #$7FFF,d1
+		PL_PS	$DCAA,enh_Hud		; movea.l $E55A(pc),a5; moveq #0,d0
+		PL_PS	$13676,enh_Hud0		; movea.l $E55A.l,a5: the tyres' marks
+		PL_PS	$12CB0,enh_Wheel	; jsr $11FDE.l: the wheel's lower part
+		PL_PS	$D258,enh_Score		; lea $8B98.l,a0: the score's digits
+		PL_PS	$D282,enh_Time		; lea $8D26.l,a0: the time's digits
 	IFND	ENH_NOGROUND			; (for A/B measurements)
 		PL_PS	$DB36,enh_Clear		; jsr $11D2A: the sky and ground clear
 		PL_PS	$DB54,enh_Clear
@@ -135,6 +162,10 @@ _enh_pl		PL_START
 enh_Rebase	move.l	ENH_FIELDS,ENH_DUE.w
 		sf	ENH_SKIP.w
 		sf	ENH_SKIPS.w
+		move.l	a0,-(a7)
+		lea	_enh_snapped(pc),a0	; no last tick to draw from
+		sf	(a0)
+		move.l	(a7)+,a0
 		rts
 
 enh_Enter	clr.w	$E54E
@@ -147,6 +178,8 @@ enh_Unpause	bsr.b	enh_Rebase
 
 ; A pass starts: wait for its tick, decide whether it draws.
 enh_Pass	movem.l	d0-d1,-(a7)
+		tst.b	_enh_interp(pc)
+		bne	enh_PassI
 		move.l	ENH_FIELDS,d1
 		sub.l	ENH_DUE.w,d1		; fields since the tick was due
 		bpl.b	.late
@@ -159,7 +192,8 @@ enh_Pass	movem.l	d0-d1,-(a7)
 		add.l	d1,ENH_DROPPED.w	; too far behind: drop the debt
 		move.l	ENH_FIELDS,ENH_DUE.w
 		moveq	#0,d1
-.tick		moveq	#0,d0
+.tick		bsr	enh_Start
+		moveq	#0,d0
 		move.w	ENH_PERIOD.w,d0
 		add.l	d0,ENH_DUE.w
 		addq.l	#1,ENH_TICKS.w
@@ -195,7 +229,11 @@ enh_View	tst.b	ENH_SKIP.w
 		bne.b	.undrawn
 		cmp.w	#1,$11484
 		rts
-.undrawn	jsr	FIX_TRAMP.w		; fix_Queue: a6 = the queue, now idle
+.undrawn	tst.b	_enh_interp(pc)		; a tick with frames between ticks:
+		beq.b	.queue			; the screen on display taken first
+.shown		tst.l	$972E			; (enh_Hud)
+		bpl.b	.shown
+.queue		jsr	FIX_TRAMP.w		; fix_Queue: a6 = the queue, now idle
 		move.w	$1199C,d7		; the horizon's scroll
 		jsr	$14FA4
 		move.l	#8000,d0		; the ground's top line, clamped to
@@ -208,7 +246,10 @@ enh_View	tst.b	ENH_SKIP.w
 		ble.b	.done
 		move.l	$113C4,$12136
 .done		move.l	#$DBD0,(a7)
-		rts
+		tst.b	_enh_interp(pc)
+		beq.b	.out
+		move.l	#$DC2E,(a7)		; (a tick: not the panel's copy)
+.out		rts
 
 ; The sky and ground clear ($11D2A) queues the horizon, the sky and the
 ; ground, clamps the ground's top line $12136 to the view and starts the
@@ -298,6 +339,632 @@ enh_Blt5	move.w	d5,bltsize(a6)
 enh_Blt6	move.w	d6,bltsize(a6)
 enh_Blt		tst.b	_custom+dmaconr
 		rts
+
+;---------------------------------------------------------------------------
+; Frames between ticks (with an ExpMem, fast or not; Vroom's design). No tick
+; draws: every frame comes from here, drawn while the next tick is early.
+; A frame shows the race between the last two ticks: alpha = fields since the
+; last tick was due / fields a tick. It loads the snapshot of the tick before
+; (its state at the pass's start), moves the cars on by alpha of their way to
+; this tick and each player's camera by alpha of the player's step, runs the
+; race loop's drawing from the map markers ($D010) to the swap ($D38B): every
+; view's landscape ($D3A6, which follows the track by the step it is given)
+; and drawing ($DB04), and loads this tick's snapshot back. In a frame the
+; start lights' count and the race end's bonus ($D084-$D15F) and a view's
+; timers ($D43C-$D6EF) are left out, the horizon's turn and the sky objects
+; are mixed (enh_Turn), and so are the landscape's pitch and height
+; (enh_Pitch); the engine's sound is the ticks' (enh_Engine0/1). The
+; snapshots hold the race state (_enh_r) but not what follows the screens:
+; the map markers' positions per screen ($E51C-$E52B), the race clock and its
+; gate ($EA54-$EA59), the view's buffer ($EA5A), the swap's field $EB36, the
+; screens, the blitter queue, the sound, the VBL's variables. A tick waits for
+; the screen on display to be taken before it draws anything (enh_Marker).
+; Behind by ENH_SKIPS_MAX ticks in a row, a frame is drawn anyway, of this
+; tick. CUSTOM3=n (for the checks): n frames before each tick, at alpha 0,
+; 1/n ..., whatever the time.
+;---------------------------------------------------------------------------
+
+ENH_R		MACRO
+		dc.l	\1
+		dc.w	(\2)/2-1
+ENH_RS		SET	ENH_RS+(\2)
+		ENDM
+ENH_RS		SET	0
+ENH_OB		= $E52C			; the globals, the 16 cars, the order...
+ENH_OP		= $1254C		; the four players' blocks ($106 bytes each)
+ENH_OPS		= $E52C-ENH_OB+$EA54-$E52C	; their offset in a snapshot
+ENH_SKY		= $8A7C			; the sky objects, three for each view
+_enh_r		ENH_R	ENH_OB,$EA54-ENH_OB	; to the race clock
+		ENH_R	ENH_OP,4*$106
+		ENH_R	$E504,$E51C-$E504	; before the map markers
+		ENH_R	$EA5E,$EB36-$EA5E	; after the view's buffer, to the swap's field
+		ENH_R	$11866,$119A0-$11866	; the landscape's variables
+		ENH_R	$CC14,6			; the opponents' order work
+		ENH_R	$1134A,$11362-$1134A	; the landscape's track pointers
+		ENH_R	$12B5E,6		; the steering's state
+		ENH_R	$12130,8		; the ground's top lines
+		ENH_R	$149F4,4
+		ENH_R	$15120,$20		; the horizon's scroll per view
+		ENH_R	$1CA80,4
+		ENH_R	$36032,4
+		ENH_R	$8B94,4			; the ARCADE score
+ENH_OSKY	= ENH_RS
+		ENH_R	ENH_SKY,2*$12		; the sky objects
+		dc.l	0
+ENH_RSIZE	= ENH_RS
+ENH_EXPSIZE	= (2*ENH_RSIZE+$FFF)&$FFFFF000	; ws_ExpMem (optional): the snapshots
+
+; A snapshot of the race state into (a0), or one from it.
+; IN:	a0 = snapshot
+; OUT:	-	all registers preserved
+enh_Save	movem.l	d0-d2/a0-a2,-(a7)
+		moveq	#0,d2
+		bra.b	enh_Copy
+enh_Load	movem.l	d0-d2/a0-a2,-(a7)
+		moveq	#1,d2
+enh_Copy	lea	_enh_r(pc),a2
+.range		move.l	(a2)+,d0
+		beq.b	.done
+		move.l	d0,a1
+		move.w	(a2)+,d0
+		tst.b	d2
+		bne.b	.load
+.save		move.w	(a1)+,(a0)+
+		dbf	d0,.save
+		bra.b	.range
+.load		move.w	(a0)+,(a1)+
+		dbf	d0,.load
+		bra.b	.range
+.done		movem.l	(a7)+,d0-d2/a0-a2
+		rts
+
+; At a pass's start: the last snapshot becomes the tick before, and the state
+; now this tick's (both, at the first pass after the race's start or a pause).
+enh_Snap	movem.l	d0/a0-a2,-(a7)
+		lea	_enh_bufs(pc),a1
+		move.l	(a1),a0
+		tst.b	_enh_snapped-_enh_bufs(a1)
+		bne.b	.swap
+		st	_enh_snapped-_enh_bufs(a1)
+		bsr.b	enh_Save
+		lea	_enh_lat(pc),a0		; the cameras' lateral positions (for
+		lea	ENH_OP+8,a2		; CUSTOM3's frames before a landscape)
+		moveq	#4-1,d0
+.lat		move.w	(a2),(a0)+
+		lea	$106(a2),a2
+		dbf	d0,.lat
+		move.l	(a1),a0
+		bra.b	.cur
+.swap		move.l	4(a1),(a1)		; exchange
+		move.l	a0,4(a1)
+.cur		move.l	4(a1),a0
+		bsr.b	enh_Save
+		movem.l	(a7)+,d0/a0-a2
+		rts
+
+; enh_Pass with frames between ticks (d0-d1 saved; returns through it).
+enh_PassI	move.l	d2,-(a7)
+		bsr.b	enh_Snap
+		moveq	#0,d2
+		move.b	ENH_FORCE.w,d2		; CUSTOM3
+		bne.b	.forced
+.wait		move.l	ENH_FIELDS,d1
+		sub.l	ENH_DUE.w,d1		; fields since this tick was due
+		bpl.b	.late
+		move.l	d1,d0			; early: the field the next frame
+		addq.l	#1,d0			; shows in, if it draws within a
+		tst.l	$972E			; field: the next, or the one after
+		bmi.b	.shown			; if a frame waits for the VBL
+		addq.l	#1,d0
+.shown		tst.l	d0
+		bpl.b	.tick			; the tick is due by then: run it now
+		move.w	ENH_PERIOD.w,d2
+		add.w	d2,d0			; fields since the last tick was due
+		bpl.b	.alpha			; (an early tick, then the VBL took
+		moveq	#0,d0			; the frame: one field less to wait)
+.alpha		bsr	enh_Frame
+		bra.b	.wait
+.late		cmp.l	#ENH_LIMIT,d1
+		bls.b	.behind
+		add.l	d1,ENH_DROPPED.w	; too far behind: drop the debt
+		move.l	ENH_FIELDS,ENH_DUE.w
+.behind		cmp.b	#ENH_SKIPS_MAX,ENH_SKIPS.w
+		blo.b	.tick
+		move.w	ENH_PERIOD.w,d0		; ticks in a row without a frame:
+		move.w	d0,d2			; one, of this tick
+		bsr	enh_Frame
+.tick		moveq	#0,d0
+		move.w	ENH_PERIOD.w,d0
+		add.l	d0,ENH_DUE.w
+		addq.l	#1,ENH_TICKS.w
+		st	ENH_SKIP.w		; a tick draws nothing
+		bsr	enh_Window
+		cmp.b	#ENH_SKIPS_MAX,ENH_SKIPS.w
+		bhs.b	.done
+		addq.b	#1,ENH_SKIPS.w
+.done		move.l	(a7)+,d2
+		movem.l	(a7)+,d0-d1
+		lea	$E566,a5		; the players
+		move.w	$E562,d7		; their count - 1
+		rts
+.forced		moveq	#0,d0			; n frames, alpha i/n
+.frame		bsr	enh_Frame
+		addq.w	#1,d0
+		cmp.w	d2,d0
+		blo.b	.frame
+		move.l	ENH_FIELDS,ENH_DUE.w	; no catch-up
+		bra.b	.tick
+
+; A frame between ticks.
+; IN:	d0.w, d2.w = alpha: d0/d2, 0 <= d0 <= d2
+; OUT:	-	all registers preserved
+enh_Frame	movem.l	d0-a6,-(a7)
+		ext.l	d0
+		ext.l	d2
+		cmp.l	d2,d0			; 0 <= alpha <= 1 (outside it the
+		bls.b	.alpha			; camera's step would turn huge)
+		moveq	#0,d0
+		tst.w	2(a7)			; the caller's d0
+		bmi.b	.alpha
+		move.l	d2,d0
+.alpha		lea	_enh_an(pc),a2		; for enh_Mix
+		move.l	d0,(a2)+
+		move.l	d2,(a2)
+		lea	_enh_bufs(pc),a2
+		st	_enh_frame-_enh_bufs(a2)
+		move.l	(a2),a0			; the tick before
+		bsr	enh_Load
+		move.l	4(a2),a1		; this tick
+		move.l	$E518,d7		; the track's length: the ticks wrap
+					; the distances at the line
+		lea	$E586,a4		; the cars: alpha of the way, distance
+		lea	($E586-ENH_OB,a1),a5	; (+2) and lateral (+8)
+		moveq	#16-1,d4
+.car		move.l	2(a5),d5
+		sub.l	2(a4),d5
+		bsr	.part
+		add.l	2(a4),d5
+		cmp.l	d7,d5			; across the line: as the tick before
+		bhs.b	.lateral
+		move.l	d5,2(a4)
+.lateral	move.w	8(a5),d5
+		ext.l	d5
+		move.w	8(a4),d6
+		ext.l	d6
+		sub.l	d6,d5
+		bsr.b	.part
+		add.w	d5,8(a4)
+		lea	64(a4),a4
+		lea	64(a5),a5
+		dbf	d4,.car
+		lea	$E566,a3		; the players: the camera by alpha of
+		move.w	$E562,d4		; the step, which a frame stops short
+.player		lea	$E586,a4		; of the line
+		add.w	(a3),a4			; the player's car
+		move.l	2(a3),a5		; and block
+		move.l	a5,d1
+		sub.l	#ENH_OP,d1
+		lea	(ENH_OPS,a1,d1.l),a6	; this tick's block
+		moveq	#0,d3
+		move.w	4(a6),d3
+		mulu.l	d0,d3
+		divu.l	d2,d3
+		move.l	a4,d5			; (a0 = the tick before)
+		sub.l	#ENH_OB-2,d5
+		move.l	(a0,d5.l),d6		; the tick before's distance
+		move.l	d7,d5
+		subq.l	#1,d5
+		sub.l	d6,d5
+		bmi.b	.short
+		cmp.l	d5,d3
+		bls.b	.step
+.short		move.l	d5,d3
+		bpl.b	.step
+		moveq	#0,d3
+.step		move.w	d3,4(a5)
+		add.l	d6,d3
+		move.l	d3,2(a4)
+		move.w	$CA(a6),$CA(a5)		; this tick's speed and controls
+		move.w	$9C(a6),$9C(a5)
+		move.w	$B2(a6),$B2(a5)
+		divu.w	#$106,d1		; the camera's lateral position: the
+		lea	_enh_lat(pc),a6		; race loop's steering moves it before
+		move.w	(a6,d1.w*2),d1		; the landscape, once a tick
+		move.w	d0,-(a7)
+		move.w	8(a5),d0
+		bsr	enh_Mix
+		move.w	d1,8(a5)
+		move.w	(a7)+,d0
+		addq.l	#8,a3
+		dbf	d4,.player
+		lea	_enh_winf(pc),a0	; (enh_Window)
+		addq.w	#1,(a0)
+		sf	ENH_SKIP.w		; the drawing: from the map markers
+		pea	.back(pc)		; to the swap (enh_Next returns here)
+		lea	_enh_sp(pc),a0
+		move.l	a7,(a0)
+		jmp	$D010
+.back		lea	_enh_bufs(pc),a2
+		move.l	4(a2),a0		; this tick back
+		bsr	enh_Load
+		sf	_enh_frame-_enh_bufs(a2)
+		sf	ENH_SKIPS.w
+		movem.l	(a7)+,d0-a6
+		rts
+; d5 = d5*alpha; a jump of more than 4096 (a restart, the line) none
+.part		move.l	d5,d6
+		bpl.b	.pos
+		neg.l	d6
+.pos		cmp.l	#4096,d6
+		bhi.b	.jump
+		muls.l	d0,d5
+		divs.l	d2,d5
+		rts
+.jump		moveq	#0,d5
+		rts
+
+; d1 = d0 + alpha of the way to d1 (words; d0 and d1 extended).
+enh_Mix		ext.l	d0
+		ext.l	d1
+		sub.l	d0,d1
+		muls.l	_enh_an(pc),d1
+		divs.l	_enh_ad(pc),d1
+		add.l	d0,d1
+		rts
+
+; The player block a5's number.
+; IN:	a5 = a player's block
+; OUT:	d1.l = 0-3
+enh_Index	move.l	a5,d1
+		sub.l	#ENH_OP,d1
+		divu.w	#$106,d1
+		ext.l	d1
+		rts
+
+; Frames between ticks or the ticks' own: the frames pay only where a frame
+; takes less than a tick. Each tick costs as much as without them but for
+; the drawing, and a frame as a tick's drawing plus a view's landscape, so
+; where a frame takes most of a tick, they draw fewer (two views on the
+; a1200 and the a1200-030). Every ENH_WIN ticks with frames between them,
+; ENH_WIN frames or fewer go back to the ticks' drawing, for ENH_HOLD ticks
+; at least (doubled at each such try in a row, up to ENH_HOLDMAX: 20 s); then
+; ENH_WIN drawn ticks in a row of 2 fields or less (from the tick's start to
+; its swap) try the frames again.
+ENH_WIN		= 8
+ENH_HOLD	= 64
+ENH_HOLDMAX	= 1024
+
+; A tick that may draw starts (its wait is over).
+enh_Start	tst.b	_enh_avail(pc)
+		beq.b	.out
+		move.l	a0,-(a7)
+		lea	_enh_start(pc),a0
+		move.l	ENH_FIELDS,(a0)
+		lea	_enh_hold(pc),a0
+		tst.w	(a0)
+		beq.b	.held
+		subq.w	#1,(a0)
+.held		move.l	(a7)+,a0
+.out		rts
+
+; A tick's end without frames between ticks (at $D38C).
+enh_Drawn	tst.b	_enh_avail(pc)
+		beq.b	.out
+		tst.b	_enh_interp(pc)
+		bne.b	.out
+		tst.b	ENH_SKIP.w
+		bne.b	.out
+		movem.l	d0/a0,-(a7)
+		lea	_enh_fits(pc),a0
+		move.l	ENH_FIELDS,d0
+		sub.l	_enh_start(pc),d0
+		cmp.l	#2,d0
+		bls.b	.fits
+		sf	(a0)
+		bra.b	.done
+.fits		addq.b	#1,(a0)
+		cmp.b	#ENH_WIN,(a0)
+		blo.b	.done
+		tst.w	_enh_hold(pc)
+		bne.b	.done
+		sf	(a0)			; try the frames between ticks
+		lea	_enh_wint(pc),a0
+		clr.l	(a0)			; (and _enh_winf)
+		lea	_enh_snapped(pc),a0
+		sf	(a0)
+		lea	_enh_interp(pc),a0
+		st	(a0)
+.done		movem.l	(a7)+,d0/a0
+.out		rts
+
+; A tick with frames between ticks: every ENH_WIN of them, back to the
+; ticks' drawing unless the frames drew more.
+enh_Window	movem.l	d0/a0,-(a7)
+		lea	_enh_wint(pc),a0
+		addq.w	#1,(a0)
+		cmp.w	#ENH_WIN,(a0)
+		blo.b	.out
+		move.w	2(a0),d0		; the window's frames
+		clr.l	(a0)
+		cmp.w	#ENH_WIN,d0
+		bhi.b	.paid
+		lea	_enh_interp(pc),a0
+		sf	(a0)
+		lea	_enh_holdn(pc),a0	; the hold doubles at every failed
+		move.w	(a0),d0			; try, up to ENH_HOLDMAX
+		move.w	d0,_enh_hold-_enh_holdn(a0)
+		add.w	d0,d0
+		cmp.w	#ENH_HOLDMAX,d0
+		bls.b	.next
+		move.w	#ENH_HOLDMAX,d0
+.next		move.w	d0,(a0)
+		lea	_enh_fits(pc),a0
+		sf	(a0)
+		bra.b	.out
+.paid		lea	_enh_holdn(pc),a0
+		move.w	#ENH_HOLD,(a0)
+.out		movem.l	(a7)+,d0/a0
+		rts
+
+; The frame's end ($D38C, after the swap): a frame returns to enh_Frame.
+; Returns the flags of the replaced cmp.b $E556(pc),d0.
+enh_Next	tst.b	_enh_frame(pc)
+		bne.b	.frame
+		bsr	enh_Drawn
+		move.b	$E557,d0
+		cmp.b	$E556,d0
+		rts
+.frame		move.l	_enh_sp(pc),a7
+		rts
+
+; A tick with frames between ticks leaves out what the frames draw: the map
+; markers ($D010-$D083), in each view the panel's copy ($DBD0-$DC2D), the
+; tyres' marks ($13676), the wheel's lower part ($12CB0) and the cockpit, the
+; mirrors, the gear, the speed, the fuel ($DCAA-$DE65), and the score's or
+; the time's digits ($D258-$D2CB). What it still draws (the start lights, the
+; crash sequences, the pit stop) waits for the screen on display to be taken
+; (enh_View): a tick often runs while the last frame waits for the VBL.
+ENH_TICK	MACRO			; to \1 unless this pass is such a tick
+		tst.b	_enh_interp(pc)
+		beq.b	\1
+		tst.b	ENH_SKIP.w
+		beq.b	\1
+		ENDM
+enh_Marker	ENH_TICK .draw
+		move.l	#$D084,(a7)
+		rts
+.draw		tst.b	_enh_frame(pc)		; a frame's: the CPU draws them into
+		beq.b	.go			; the view's buffer, which may still
+.shown		tst.l	$972E			; be on display
+		bpl.b	.shown
+.go		movea.l	#$4BD9E,a1
+		rts
+enh_Hud		ENH_TICK .draw
+		move.l	#$DE66,(a7)
+		rts
+.draw		movea.l	$E55A,a5
+		moveq	#0,d0
+		rts
+enh_Hud0	ENH_TICK .draw
+		addq.l	#4,a7			; out of $13676
+		rts
+.draw		movea.l	$E55A,a5
+		rts
+enh_Wheel	ENH_TICK .draw
+		addq.l	#4,a7			; out of $12CB0
+		rts
+.draw		jmp	$11FDE
+enh_Score	ENH_TICK .draw
+		move.l	#$D2CC,(a7)
+		rts
+.draw		lea	$8B98,a0
+		rts
+enh_Time	ENH_TICK .draw
+		move.l	#$D2CC,(a7)
+		rts
+.draw		lea	$8D26,a0
+		rts
+
+; The start lights' count ($D084-$D0D7) and the race end's bonus ($D0D8-
+; $D15F): the ticks'. Returns d0 and the flags of the replaced
+; move.w $E53E(pc),d0.
+enh_Lights	tst.b	_enh_frame(pc)
+		bne.b	.frame
+		move.w	$E53E,d0
+		blt.b	.out
+		tst.b	_enh_interp(pc)		; a tick that changes the lights draws
+		beq.b	.go			; them ($D0A4): the screen on display
+		cmp.w	#1,$E540		; taken first
+		bne.b	.go
+.shown		tst.l	$972E
+		bpl.b	.shown
+.go		tst.w	d0
+		rts
+.out		move.l	#$D0D8,(a7)
+		rts
+.frame		move.l	#$D160,(a7)		; the views
+		rts
+
+; A view's landscape ($D3A6; a5 = the player's block, a3 = the car): a tick
+; keeps the camera's lateral position as the landscape starts (enh_Frame).
+enh_Land	tst.b	_enh_frame(pc)
+		bne.b	.go
+		movem.l	d1/a0,-(a7)
+		bsr.b	enh_Index
+		lea	_enh_lat(pc),a0
+		move.w	8(a5),(a0,d1.w*2)
+		movem.l	(a7)+,d1/a0
+.go		move.l	2(a3),$A(a5)
+		rts
+
+; The horizon's turn ($1199C, $D3CA-$D3EF: the curve's part and the steering's,
+; with the remainder $34(a5)) moves the horizon's scroll ($14FA4, from the sky
+; and ground clear) and the view's three sky objects ($D3F0-$D43B). A frame
+; moves both by alpha of this tick's turn from the tick before (as Vroom's
+; enh_Sky), and leaves out the view's timers after them ($D43C-$D6EF: the
+; tyres, the fuel, the lap times).
+; IN:	a5 = the player's block
+enh_Turn	tst.b	_enh_frame(pc)
+		bne.b	.frame
+		tst.w	$D4(a5)
+		blt.b	.d3f0
+		rts
+.d3f0		move.l	#$D3F0,(a7)
+		rts
+.frame		movem.l	d0-d1/d4-d6/a0-a1/a4,-(a7)
+		bsr	enh_Index
+		lea	_enh_turn(pc),a0
+		move.w	(a0,d1.w*2),d1
+		moveq	#0,d0
+		bsr	enh_Mix
+		move.w	d1,$1199C
+		movem.l	_enh_bufs(pc),a4/a1	; the tick before's objects, this
+		lea	(ENH_OSKY,a4),a4	; tick's
+		lea	(ENH_OSKY,a1),a1
+		lea	ENH_SKY,a0
+		tst.w	$1254A			; the view
+		beq.b	.view
+		moveq	#$12,d0
+		add.l	d0,a0
+		add.l	d0,a4
+		add.l	d0,a1
+.view		move.w	$1511A,d5		; the width the objects wrap at
+		move.w	d5,d6
+		lsr.w	#1,d6
+		moveq	#3-1,d4
+.obj		tst.w	(a4)
+		bmi.b	.out
+		move.w	2(a4),d0
+		move.w	2(a1),d1
+		sub.w	d0,d1			; the shorter way round
+		cmp.w	d6,d1
+		ble.b	.lo
+		sub.w	d5,d1
+.lo		neg.w	d6
+		cmp.w	d6,d1
+		bge.b	.hi
+		add.w	d5,d1
+.hi		neg.w	d6
+		add.w	d0,d1
+		bsr	enh_Mix
+		tst.w	d1
+		bpl.b	.pos
+		add.w	d5,d1
+.pos		cmp.w	d5,d1
+		blt.b	.in
+		sub.w	d5,d1
+.in		move.w	d1,2(a0)
+		addq.l	#6,a0
+		addq.l	#6,a4
+		addq.l	#6,a1
+		dbf	d4,.obj
+.out		movem.l	(a7)+,d0-d1/d4-d6/a0-a1/a4
+		move.l	#$D6F0,(a7)		; bsr $DB04: the drawing
+		rts
+
+; A tick keeps the view's turn ($D3F0, after it is set; d7 = it).
+enh_TurnRec	movem.l	d1/a0,-(a7)
+		bsr	enh_Index
+		lea	_enh_turn(pc),a0
+		move.w	$1199C,(a0,d1.w*2)
+		movem.l	(a7)+,d1/a0
+		move.w	$1199C,d7
+		rts
+
+; The landscape's pitch ($1187C, from the player's $1C(a5) with the bounce,
+; the jump, the acceleration's tilt and the shake off the road) and height
+; (d3, kept in $D2(a5)): each integrates by the pass, so a frame re-running
+; the landscape from the tick before would get a whole pass of it. A frame
+; takes alpha of the way between the two ticks' values (as Vroom's enh_Pitch);
+; the ticks keep the pitch per player, the last two.
+; IN:	d3.w = the height, a5 = the player's block
+; OUT:	d1.w = the pitch, d3, and the flags of cmpi.w #$5208,d1
+enh_Pitch	movem.l	d0/d4/a0-a1,-(a7)
+		exg	d1,d4
+		bsr	enh_Index
+		exg	d1,d4			; d4 = the player
+		lea	_enh_pitch(pc),a0
+		tst.b	_enh_frame(pc)
+		bne.b	.frame
+		move.w	(a0,d4.w*2),(8,a0,d4.w*2)	; the tick before's
+		move.w	$1187C,d1
+		move.w	d1,(a0,d4.w*2)		; and this tick's
+		bra.b	.out
+.frame		movem.l	_enh_bufs(pc),a0-a1	; the tick before, this tick
+		move.l	a5,d1
+		sub.l	#ENH_OP-ENH_OPS-$D2,d1
+		move.w	(a0,d1.l),d0
+		move.w	(a1,d1.l),d1
+		bsr	enh_Mix
+		move.w	d1,d3
+		lea	_enh_pitch(pc),a0
+		move.w	(8,a0,d4.w*2),d0
+		move.w	(a0,d4.w*2),d1
+		bsr	enh_Mix
+		move.w	d1,$1187C
+.out		movem.l	(a7)+,d0/d4/a0-a1
+		cmp.w	#$5208,d1
+		rts
+
+; The engine's pitch and the bump's sound per view ($F3F2-$F411, $F644-
+; $F663): the ticks'. A frame's come from the tick before's revs.
+enh_Engine0	move.w	$1254A,d4
+		tst.b	_enh_frame(pc)
+		bne.b	.frame
+		tst.w	d4
+		beq.b	.v0
+		rts
+.v0		move.l	#$F406,(a7)
+		rts
+.frame		move.l	#$F412,(a7)
+		rts
+enh_Engine1	move.w	$1254A,d4
+		tst.b	_enh_frame(pc)
+		bne.b	.frame
+		tst.w	d4
+		beq.b	.v0
+		rts
+.v0		move.l	#$F658,(a7)
+		rts
+.frame		move.l	#$F664,(a7)
+		rts
+
+; The cars ahead of the camera, sorted by distance ($FB04-$FB7F): a tick
+; takes them in the car order from the camera on, all ahead of it. A frame
+; mixes the cars and the camera but keeps the tick before's order: a car the
+; player passes in this tick can be behind the camera, and its negative
+; distance would run the sort below its list. A frame leaves such a car out
+; (Vroom's enh_Sort).
+; IN:	d1 = the car's distance, d7 = the camera's
+; OUT:	d1 = the car's distance ahead, the flags as cmpi.l #$7FFF,d1
+enh_Sort	sub.l	d7,d1
+		bpl.b	.ahead
+		tst.b	_enh_frame(pc)
+		beq.b	.ahead
+		move.l	#$FB04,(a7)		; the next car
+		rts
+.ahead		cmp.l	#$7FFF,d1
+		rts
+
+_enh_an		dc.l	0		; a frame's alpha: _enh_an/_enh_ad
+_enh_ad		dc.l	1
+_enh_bufs	dc.l	0,0		; the snapshots: the tick before, this tick
+_enh_sp		dc.l	0		; enh_Frame's stack in the drawing
+_enh_lat	dc.w	0,0,0,0		; each player's $8(a5) as its landscape started
+_enh_turn	dc.w	0,0,0,0		; each player's turn $1199C, this tick
+_enh_pitch	dc.w	0,0,0,0		; each player's pitch $1187C, this tick
+		dc.w	0,0,0,0		; and the tick before
+_enh_start	dc.l	0		; the field a tick that draws started in
+_enh_wint	dc.w	0		; ticks in the window (enh_Window)
+_enh_winf	dc.w	0		; and frames
+_enh_hold	dc.w	0		; ticks before frames between ticks are tried again
+_enh_holdn	dc.w	ENH_HOLD	; and after the next failed try
+_enh_fits	dc.b	0		; drawn ticks in a row that took 2 fields or less
+_enh_avail	dc.b	0		; frames between ticks can be drawn (an ExpMem)
+_enh_snapped	dc.b	0		; the snapshots hold a tick
+_enh_frame	dc.b	0		; a frame between ticks is drawing
+_enh_interp	dc.b	0		; frames between ticks now
+		even
 
 _enh_state	dc.b	0		; 0 unknown, -1 off, 1 on
 		even
