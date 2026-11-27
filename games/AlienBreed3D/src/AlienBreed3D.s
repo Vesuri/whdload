@@ -833,11 +833,11 @@ _showteam
 	move.l	#17301504,(a1)+
 	move.l	#17432576,(a1)+
 	IFND	ORIGINAL		;BPLCON4, BPLCON1, BPLCON2 and DIWHIGH (DIW
-	move.l	#$010c0000,(a1)+	;$2c81-$2cc1: stop H8 and V8), which the list
+	move.l	#$010c0011,(a1)+	;$2c81-$2cc1: stop H8 and V8), which the list
 	move.l	#$01020000,(a1)+	;left as the system had them (a real A1200's
-	move.l	#$01040000,(a1)+	;showed blue garbage; an inherited BPLCON4 XOR
-	move.l	#$01e42100,(a1)+	;remaps every pen)
-	ENDC
+	move.l	#$01040024,(a1)+	;showed blue garbage; an inherited BPLCON4 XOR
+	move.l	#$01e42100,(a1)+	;remaps every pen). The system's values: the
+	ENDC				;menu's list sets neither, its text is sprites
 	lea	270(a3),a0
 	move.w	#224,d1
 	moveq	#7,d7
