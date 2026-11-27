@@ -92,6 +92,12 @@ bytes. Outside the `PL_IFC5` block both slaves' lists patch the same offsets the
   (Psygore's slave too). `_p_waitvb` waits for the next field's line 0 on the beam (V8 set,
   then clear), as `_waitvbl` does. The floppy version's (`_pl_v1`) are not patched: no
   archive holds it.
+- The menu's fades ($49008 in, $4909c out; $48f98 scales each 8-bit channel by the step)
+  wait there through `_p_waitfade`, which then waits for line $20 too: each step writes its
+  colours' high and LOCT low moves into the menu's list, which loads them in its first
+  lines. Writing from line 0 the CPU trailed the copper, which read most colours' old high
+  and new low nibbles: off by 16 for a frame wherever a step carried into the high
+  nibble, a speckle in the dark colours (the original's).
 
 ## Display
 

@@ -484,6 +484,11 @@ _p_waitvb			;the game's field waits poll INTREQR for VERTB, which _level3
 .top	btst	#0,$dff005
 	bne.s	.top
 	rts
+_p_waitfade			;the menu's fades: the same, then to line $20. Each step writes
+	bsr.s	_p_waitvb	;its colours' high and low (LOCT) moves into the list whose
+.l20	cmpi.b	#$20,$dff006	;copper loads them in its first lines: from line 0 the copper
+	blo.s	.l20		;read most colours' old high and new low nibbles (off by 16
+	rts			;for a frame where a step carried, a speckle in dark colours)
 	ENDC
 _pl_v2
 	PL_START
@@ -544,9 +549,9 @@ _pl_v2
 	PL_S	$2868,$c
 	PL_PS	$3176,_p_waitvb
 	PL_S	$317c,$c
-	PL_PS	$49388,_p_waitvb
+	PL_PS	$49388,_p_waitfade
 	PL_S	$4938e,$c
-	PL_PS	$4941c,_p_waitvb
+	PL_PS	$4941c,_p_waitfade
 	PL_S	$49422,$c
 	ENDC
 	IFND	ORIGINAL		;Enhanced resolution: _pl_v3's, mapped (port.s)
@@ -613,9 +618,9 @@ _pl_v3
 	PL_S	$2836,$c
 	PL_PS	$317a,_p_waitvb
 	PL_S	$3180,$c
-	PL_PS	$49020,_p_waitvb
+	PL_PS	$49020,_p_waitfade
 	PL_S	$49026,$c
-	PL_PS	$490b4,_p_waitvb
+	PL_PS	$490b4,_p_waitfade
 	PL_S	$490ba,$c
 	ENDC
 	IFND	ORIGINAL
