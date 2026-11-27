@@ -18,11 +18,15 @@ The Retroplay `Disk.1` is the second version the slave knows (title picture at $
 ## The build
 
 The v1.2 slave shipped without source. `src/EmpireStrikesBack.s` is a reconstruction from
-its disassembly that builds it byte for byte (`release/slaves.sha256` records it): the labels
-and comments are new, the instructions are the slave's. `-devpac` (no optimisation)
+its disassembly that built it byte for byte (commit "Reconstruct the Empire Strikes Back
+slave source"): the labels and comments are new, the instructions are the slave's. `-devpac` (no optimisation)
 matches; the slave has no relocations.
 
 ## Driving it
 
 `make serve WARP=1 WINDOW=none INSTANCE=<name> &`, then `make server INSTANCE=<name> CMD=...`
 (give the server a few seconds to come up). `wait 45` reaches the attract's high-score page.
+`tools/esb.py` adds `fire`, `mouse`, `frames` (fields between frames, from a trace; the
+trace records no PCs on the 68060, so read the frame counter `mem 0x1886 2` there),
+`cover`, `mem` and `hits`. The trigger is the joystick's fire button (`JOY1_FIRE_BUTTON`);
+a game starts from the wave select (state $0b), firing at a planet.
