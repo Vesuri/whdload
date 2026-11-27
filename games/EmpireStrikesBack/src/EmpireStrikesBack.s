@@ -352,4 +352,9 @@ _PL_Game	PL_START
 		PL_PS	$5c5f2,FixDigitStart
 		PL_P	$5c5a6,FixDigitColour	;Flush after the opcode copies
 		PL_PSS	$43858,FixVlineColour,2
+		PL_PSS	$5394a,FixAudioD7,2	;Sound DMA waits by the beam
+		PL_PSS	$53982,FixAudioD7,2
+		PL_PSS	$53864,FixAudioD0,2
+		PL_PSS	$3f63e,FixFadeStep,4	;Pause fade steps by the beam
+		PL_PSS	$3f690,FixFadeStep,4
 		PL_END

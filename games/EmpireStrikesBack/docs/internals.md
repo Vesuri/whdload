@@ -62,6 +62,9 @@ and the few that took two now take three.
 | $5c5ac, $5c5f2 | `PL_PS FixDigitStart` | the HUD digits wait for the blitter |
 | $5c5a6 | `PL_P FixDigitColour` over `movem.l (sp)+,d1/a0-a4; rts` | the digit colour setter flushes the caches after its opcode copy |
 | $43858 | `PL_PSS FixVlineColour,2` over the four moves | the vertical line flushes the caches after its opcode copy |
+| $5394a, $53982 | `PL_PSS FixAudioD7,2` over `move.w #$100,d7; dbf d7,*` | the sound effects' DMA waits: 6 to 7 raster lines by the beam |
+| $53864 | `PL_PSS FixAudioD0,2` over `move.w #$200,d0; dbf d0,*` | 11 to 12 lines |
+| $3f63e, $3f690 | `PL_PSS FixFadeStep,4` over `move.w #$800,d2; subi.w #1,d2; bne` | the pause fade's steps: 86 to 87 lines |
 
 The patches from $1806 on are `src/EmpireStrikesBackFixes.s`, always on.
 
@@ -86,6 +89,20 @@ The patches from $1806 on are `src/EmpireStrikesBackFixes.s`, always on.
   drew the HUD digits in their colours before and after (its cache emulation does not
   show the stale opcodes); a memory dump after play showed these the only code bytes the
   game rewrites.
+- **CPU-timed waits.** The sound effects player $53922 switches a channel's DMA off,
+  counts 257 passes of `dbf` (the wait for Paula to stop), loads the channel and
+  switches DMA on, then counts 257 more before writing the repeat pointer; $53800 counts
+  513 after switching one off. A fast CPU counts them in a fraction of a line, before
+  Paula has taken the new sample. The pause (Esc, the task at $24e2) fades the palette
+  down to $666 and back up in nine steps of $111, each timed by 2048 passes of a
+  `subi`/`bne` loop ($3f63e, $3f690), so it was instant on a fast CPU. All of them wait
+  by the beam's position now (`FixLines`: elapsed lines, so an interrupt cannot shorten
+  them, as it only lengthened the loops), and leave the counter as the loop did. On the
+  a500 (`tools/esb.py span`, `keyspan`): the 257-pass loops took 5.7 to 6.5 lines, the
+  513-pass one 11.4, a fade step 83 to 88 (traced costs); the waits take 6 to 7 (6.4 to 7.0 on the a1200-060), 11 to
+  12 and 86 to 87 (87.2 to 88.7 measured with the stub's overhead). The music player
+  ($52690, from the VBL server) switches DMA off and on in different fields and has no
+  such wait.
 - **Masks.** Unlike Star Wars, every blit that uses the A channel writes BLTAFWM and
   BLTALWM (the line drawer $ffff, the rectangle $43d04 from its tables, $47e40 as a
   long); the shape blits ($47100, $5c1c2) use B, C and D only.

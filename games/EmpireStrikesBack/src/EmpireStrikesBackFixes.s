@@ -88,3 +88,58 @@ FixFlush	move.l	a0,-(sp)
 		jsr	resload_FlushCache(a0)
 		move.l	(sp)+,a0
 		rts
+
+; CPU-timed waits. The sound effects player at $53922 switches a channel's DMA off,
+; counts 257 passes of a dbf loop, loads the channel and switches DMA on, then counts
+; 257 more before writing the repeat pointer; $53800 counts 513 after switching one off.
+; On an A500 these took 5.7 to 6.5 and 11.4 raster lines; a fast CPU counts them in a
+; fraction of a line, before Paula has taken the new sample. The pause (Esc, $24e2)
+; fades the palette down to $666 and back in steps $111 apart, each timed by 2048
+; passes of a loop (83 to 88 lines on an A500); a fast CPU fades in no time. All of
+; them now wait by the beam, as long as on the A500, and leave the counter as the loop
+; did (-1, or 0 for the fade's).
+
+FixLines	movem.l	d0/d2,-(sp)		; d1.w: lines to wait, by the beam's
+		bsr.b	.Line			; position (an interrupt cannot
+		move.w	d0,d2			; shorten it)
+.Wait		bsr.b	.Line
+		sub.w	d2,d0
+		bpl.b	.Same
+		addi.w	#312,d0			; past the end of the frame
+.Same		cmp.w	d1,d0
+		blo.b	.Wait
+		movem.l	(sp)+,d0/d2
+		rts
+
+.Line		move.l	d1,-(sp)		; d0.w: the line (V8-V0), read until
+.Again		move.l	$dff004,d0		; two reads agree: the two words
+		lsr.l	#8,d0			; can straddle a line
+		andi.w	#$1ff,d0
+		move.l	$dff004,d1
+		lsr.l	#8,d1
+		andi.w	#$1ff,d1
+		cmp.w	d1,d0
+		bne.b	.Again
+		move.l	(sp)+,d1
+		rts
+
+FixAudioD7	move.l	d1,-(sp)		; move.w #$100,d7; dbf d7,*
+		moveq	#7,d1			; 5.7 to 6.5 on an A500
+		bsr.b	FixLines
+		move.l	(sp)+,d1
+		move.w	#-1,d7
+		rts
+
+FixAudioD0	move.l	d1,-(sp)		; move.w #$200,d0; dbf d0,*
+		moveq	#12,d1			; 11.4 lines on an A500
+		bsr.b	FixLines
+		move.l	(sp)+,d1
+		move.w	#-1,d0
+		rts
+
+FixFadeStep	move.l	d1,-(sp)		; move.w #$800,d2; subq; bne
+		moveq	#87,d1			; 83 to 88 on an A500
+		bsr.b	FixLines
+		move.l	(sp)+,d1
+		clr.w	d2			; the word the loop leaves
+		rts
