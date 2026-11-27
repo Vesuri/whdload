@@ -112,12 +112,6 @@ _Start						;A0 = resident loader
 		jsr	resload_Patch(a2)
 		jmp	$500.w
 
-_PL_Game	PL_START
-		PL_PS	$175c,_Keybd
-		PL_PS	$455d6,_SaveHighs
-		PL_PS	$1806,FixVblCount	;Timing fix: count the fields
-		PL_PSS	$5dc0c,FixSwapWait,16	;Timing fix: 3 fields a frame at least
-		PL_END
 
 ;======================================================================
 
@@ -329,3 +323,31 @@ _End		move.l	_resload(pc),-(sp)
 ;======================================================================
 
 		INCLUDE	EmpireStrikesBackFixes.s
+
+;======================================================================
+
+_PL_Game	PL_START
+		PL_PS	$175c,_Keybd
+		PL_PS	$455d6,_SaveHighs
+		PL_PS	$1806,FixVblCount	;Timing fix: count the fields
+		PL_PSS	$5dc0c,FixSwapWait,16	;Timing fix: 3 fields a frame at least
+		PL_PSS	$3f738,FixBlitWaitA6,2	;Blitter waits read DMACONR first
+		PL_PSS	$3f748,FixBlitWaitA6,2
+		PL_PSS	$3f76a,FixBlitWaitA6,2
+		PL_PSS	$47e4e,FixBlitWaitA6,2
+		PL_PSS	$47e84,FixBlitWaitA6,2
+		PL_PSS	$47eb0,FixBlitWaitA6,2
+		PL_PSS	$47ed0,FixBlitWaitA6,2
+		PL_PSS	$47f48,FixBlitWaitA6,2
+		PL_PSS	$47f7e,FixBlitWaitA6,2
+		PL_PSS	$47fa4,FixBlitWaitA6,2
+		PL_PSS	$47fc4,FixBlitWaitA6,2
+		PL_PSS	$43650,FixBlitWaitA0,2
+		PL_PSS	$4377c,FixBlitWaitA0,2
+		PL_PSS	$437b4,FixBlitWaitA0,2
+		PL_PSS	$437ec,FixBlitWaitA0,2
+		PL_PSS	$435b2,FixPlotStart,2	;CPU drawing waits for the blitter
+		PL_PS	$438de,FixVlineStart
+		PL_PS	$5c5ac,FixDigitStart
+		PL_PS	$5c5f2,FixDigitStart
+		PL_END

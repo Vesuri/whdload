@@ -55,7 +55,30 @@ and the few that took two now take three.
 | $1806 | `PL_PS FixVblCount` over `jsr $52690`: counts the fields, then the music player |
 | $5dc0c | `PL_PSS FixSwapWait,16` over the COPER wait: three fields a frame at least |
 
-The last two are the timing fix (`src/EmpireStrikesBackFixes.s`), always on. The slave's
+| $3f738, $3f748, $3f76a, $47e4e, $47e84, $47eb0, $47ed0, $47f48, $47f7e, $47fa4, $47fc4 | `PL_PSS FixBlitWaitA6,2` over `btst #6,2(a6); bne.s` | BBUSY polls read DMACONR once first |
+| $43650, $4377c, $437b4, $437ec | `PL_PSS FixBlitWaitA0,2` over `btst #6,2(a0); bne.s` | the same, in the line drawer |
+| $435b2 | `PL_PSS FixPlotStart,2` | the star plot waits for the blitter, then its two instructions |
+| $438de | `PL_PS FixVlineStart` | the CPU vertical line waits for the blitter |
+| $5c5ac, $5c5f2 | `PL_PS FixDigitStart` | the HUD digits wait for the blitter |
+
+The patches from $1806 on are `src/EmpireStrikesBackFixes.s`, always on.
+
+## Fast-CPU fixes
+
+- **Blitter waits.** The game polls BBUSY right after writing BLTSIZE: the line drawer
+  $43624 between its four planes, the shared wait $3f732 that most blits call after
+  theirs, the clear $3f742, the blits at $47e40. A fast CPU can read DMACONR before Agnus
+  sets the bit and then load the next blit over the running one, or draw with the CPU
+  under it. Each poll now reads DMACONR once first (WHDLoad's `BLITWAIT`). The CPU
+  drawing (star plot $435d6, vertical line $43908, HUD digits $5c5ac/$5c5f2) waits for
+  the blitter first: with the game in Chip RAM and BLTPRI set, a 68000 could not run
+  during a blit, while a CPU running from its cache can, and the line drawer returns with
+  its last plane's blit running.
+- **Masks.** Unlike Star Wars, every blit that uses the A channel writes BLTAFWM and
+  BLTALWM (the line drawer $ffff, the rectangle $43d04 from its tables, $47e40 as a
+  long); the shape blits ($47100, $5c1c2) use B, C and D only.
+- **The hit flash** ($462e0) starts colour 0 at $777 and subtracts $111 before each
+  write, so it ends on black: Star Wars' grey background has no counterpart here. The slave's
 `ws_Version` is 17 (Codetapper's was 10), with the header fields that version reads.
 
 The high-score table is 378 bytes at $5b000, stored in `EmpireStrikesBack.highs` with each
