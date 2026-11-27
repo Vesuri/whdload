@@ -204,6 +204,7 @@ $EA5A, the swap's field $EB36.
 | $D3A6 (`move.l 2(a3),$A(a5)`) | a view's landscape: a tick keeps the camera's lateral position |
 | $D3CA, $D3F0 | the horizon's turn ($1199C) and the view's sky objects: a frame takes alpha of this tick's turn and mixes the objects, then leaves out the view's timers ($D43C-$D6EF) |
 | $10012 (`move.w $1187C(pc),d1`) | the landscape's pitch and height: a frame mixes the two ticks' values (kept per player) |
+| $FC2A (`move.w 8(a5),d0`) | the road's projection: a frame mixes the two ticks' lateral position and heading against the road (`$24`; the simulation part clamps and halves them per pass against the road's limit), then goes on at $FCE6 |
 | $F3F2, $F644 | the engine's pitch and the bump's sound per view: the ticks' |
 | $FB26 (`sub.l d7,d1`) | the cars ahead, sorted: a frame leaves out a car behind the camera |
 | $E10C-$E123 | the crash's flying wheel (`enh_WheelXY`; the step $3E of the player's block indexes the table $EAA6): a frame takes alpha of the way from the step before. Reviewed against the original, not yet seen in a crash: the wheel flies only in a hard one (strength $44 of 40 or more; full throttle from the grid gives 9) |

@@ -148,6 +148,7 @@ _enh_pl		PL_START
 		PL_PS	$D3CA,enh_Turn		; tst.w $D4(a5); blt.s $D3F0
 		PL_PS	$D3F0,enh_TurnRec	; move.w $1199C.l,d7
 		PL_PSS	$10012,enh_Pitch,2	; move.w $1187C(pc),d1; cmpi.w #$5208,d1
+		PL_PS	$FC2A,enh_Proj		; move.w 8(a5),d0; cmp.w #$300,d0
 		PL_PS	$F3F2,enh_Engine0	; move.w $1254A(pc),d4; beq.s $F406
 		PL_PS	$F644,enh_Engine1	; move.w $1254A(pc),d4; beq.s $F658
 		PL_PSS	$FB26,enh_Sort,2	; sub.l d7,d1; cmpi.l #$7FFF,d1
@@ -1172,6 +1173,49 @@ enh_Pitch	movem.l	d0/d4/a0-a1,-(a7)
 		move.w	d1,([ENH_BLOCK.w],$1187C)
 .out		movem.l	(a7)+,d0/d4/a0-a1
 		cmp.w	#$5208,d1
+		rts
+
+; The road's projection ($FCE6 on) takes the camera's lateral position
+; 8(a5) and its heading against the road $24(a5) as the landscape's
+; simulation part leaves them. That part steps both by the pass, but not
+; only linearly: against the road's limit ($FCB4) the lateral position is
+; clamped and the heading halved once a pass, so a frame re-running it from
+; the tick before got a whole pass of it, and the road, the roadside
+; objects and the cars jerked sideways in a bend. A frame takes alpha of the
+; way between the two ticks' values instead (they are those their
+; projections took), from $FC2A, the clamp's start on the race's path
+; ($E550 clear), and goes on at $FCE6 with d0 = 2 * the lateral position.
+; IN:	a5 = the player's block
+; OUT:	d0 and the flags of cmp.w #$300,d0 (a tick); d0-d1 (a frame)
+enh_Proj	tst.b	_enh_frame(pc)
+		bne.b	.frame
+		move.w	8(a5),d0
+		cmp.w	#$300,d0
+		rts
+.frame		movem.l	d2/a0-a1,-(a7)
+		move.l	_enh_bufs(pc),a0	; the tick before
+		move.l	_enh_bufs+4(pc),a1	; this tick
+		move.l	a5,d2			; the player's block in them
+		sub.l	ENH_BLOCK.w,d2
+		sub.l	#ENH_OP-ENH_OPS,d2
+		add.l	d2,a0
+		add.l	d2,a1
+		move.l	($24,a0),d0
+		move.l	($24,a1),d1
+		sub.l	d0,d1			; (at most 2*125440: no overflow
+		muls.l	_enh_an(pc),d1		; with alpha's few fields)
+		divs.l	_enh_ad(pc),d1
+		add.l	d0,d1
+		move.l	d1,$24(a5)
+		move.w	(8,a0),d0
+		move.w	(8,a1),d1
+		bsr	enh_Mix
+		move.w	d1,8(a5)
+		move.l	d1,d0
+		add.l	d0,d0
+		movem.l	(a7)+,d2/a0-a1
+		move.l	ENH_BLOCK.w,(a7)
+		add.l	#$FCE6,(a7)
 		rts
 
 ; The engine's pitch and the bump's sound per view ($F3F2-$F411, $F644-
