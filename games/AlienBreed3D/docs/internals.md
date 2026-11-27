@@ -283,7 +283,11 @@ time in the view's scenes:
 
 Not in the view: the level text is its own text screen before the level, and the panel's
 picture is in its own planes. At death or level end, `quitGame` ($8e1c) swaps once, then
-waits for the tune with the last frame shown ($8e9e, $8efa).
+waits for the tune with the last frame shown ($8e9e, $8efa). Its exit to the menu ($9acf4)
+frees the panel's planes (chip, where the menu then loads 64 KB) but sets the blank list
+only for the next field, so a load while the beam was above the panel showed that data in
+the panel's top rows for a field; `_p_setcop2` (at $9ad00, outside ORIGINAL) also jumps
+the copper to the blank list at once.
 
 ### The 1x1 palette
 

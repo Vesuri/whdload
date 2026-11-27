@@ -30,8 +30,9 @@ Version 2.0b (26.11.2026) by Vesuri:
    68020, 11 / 8 at 28 MHz, 18 / 13 on a 50 MHz 68030, 20 / 11 on a 25 MHz
    68040 (the original display: 12, 19, 23 and 26)
  - fixed: the game could stop on a black screen before the menu (the
-   no-music slave on a 28 MHz 68020), and the Team 17 picture could show as
-   garbage on a real A1200
+   no-music slave on a 28 MHz 68020), the Team 17 picture could show as
+   garbage on a real A1200, the menu's fades had off colours and a frame of
+   garbage could show on the way back to the menu
  - the slave's source is included, a reconstruction of Psygore's slave
 
 Version 1.3 (08.01.2020) by Psygore:
