@@ -67,6 +67,14 @@
 		INCLUDE	whdload.i
 		INCLUDE	whdmacros.i
 
+; Enhanced framerate (CUSTOM3, 68020 or better): the main program runs from a copy in
+; ExpMem, relocated with relocTable (src/relocs.s). ExpMem is optional; without it the game
+; keeps its stack in chip memory and the TNT patch goes where its own loader puts it.
+IMG_START	= $e700			;the main program
+IMG_END		= $722e0
+IMG_COPY	= $1000			;its copy, from the start of ExpMem
+EXPMEM		= $70000
+
 		IFD BARFLY
 		OUTPUT	"StuntCarRacer.slave"
 		BOPT	O+			;enable optimizing
@@ -90,7 +98,7 @@ _base		SLAVE_HEADER			;ws_Security + ws_ID
 		dc.w	0			;ws_DontCache
 _keydebug	dc.b	0			;ws_keydebug
 _keyexit	dc.b	$59			;ws_keyexit = F10
-_expmem		dc.l	$1000			;ws_ExpMem
+_expmem		dc.l	-EXPMEM			;ws_ExpMem: optional
 		dc.w	_name-_base		;ws_name
 		dc.w	_copy-_base		;ws_copy
 		dc.w	_info-_base		;ws_info
@@ -102,6 +110,7 @@ _expmem		dc.l	$1000			;ws_ExpMem
 
 .config		dc.b	"C1:B:Infinite Boost;"
 		dc.b	"C2:B:Turbo Mode;"
+		dc.b	"C3:B:Enhanced framerate;"
 		dc.b	"BW"
 		dc.b	0
 
@@ -140,9 +149,11 @@ _Start						;A0 = resident loader
 		lea	_resload(pc),a1
 		move.l	a0,(a1)			;Save for later use
 
-_restart	move.l	_expmem(pc),a0		;Stack to fast memory
-		add.w	#$1000,a0
-		move.l	a0,sp
+_restart	move.l	_expmem(pc),d0		;Stack to fast memory
+		beq.b	.NoExpMem
+		addi.l	#$1000,d0
+		move.l	d0,sp
+.NoExpMem
 
 		lea	_Tags(pc),a0		;Check parameters
 		move.l	_resload(pc),a2
@@ -230,9 +241,13 @@ _RelocateMain	move.l	(a0)+,(a1)+
 _ClearLoop	move.l	d1,(a1)+
 		dbf	d0,_ClearLoop
 
-_CrackedMain	bsr	_PicDelay
+_CrackedMain	cmpi.l	#$207c0000,$e700	;movea.l #$e730,a0: the known
+		bne.w	_WrongVersion		;program, decrypted or cracked
+		bsr	_PicDelay
 
 _GameCommon	movem.l	d0-d1/a0-a2,-(sp)
+
+		bsr	_Enhance
 
 		move.l	_Custom1(pc),d0		;Check for initial infinite
 		;tst.l	d0			;energy cheat
@@ -245,36 +260,107 @@ _CheckStartTurb	move.l	_Custom2(pc),d0		;Check for initial turbo
 		bsr	_ToggleTurbo
 
 _PatchGame	lea	_PL_Game(pc),a0
-		sub.l	a1,a1
+		move.l	_ImgDelta(pc),a1	;The program at IMG_START, or its copy
+		adda.l	#IMG_START,a1
 		move.l	_resload(pc),a2
 		jsr	resload_Patch(a2)
 
 		move.l	_expmem(pc),d0
+		beq.b	.NoExpMem
 		addi.l	#$1000,d0
-		move.l	d0,$e73e		;Stack to fast memory
-		move.l	d0,$5cf42		;Stack to fast memory
-
+		movea.l	_ImgDelta(pc),a0
+		adda.l	#$e73e,a0
+		move.l	d0,(a0)			;Stack to fast memory
+		movea.l	_ImgDelta(pc),a0
+		adda.l	#$5cf42,a0
+		move.l	d0,(a0)			;Stack to fast memory
+		bsr	_FlushCache
+.NoExpMem
 		movem.l	(sp)+,d0-d1/a0-a2
-		jmp	$e700			;Start the fun!
+		move.l	_ImgDelta(pc),-(sp)	;Start the fun!
+		addi.l	#$e700,(sp)
+		rts
 
-_PL_Game	PL_START
-		PL_S	$e70e,$26-$e		;Skip checksum
-		PL_PS	$f036,_Keybd		;Detect quit key: ror.b #1,d0 and eori.b #$ff,d0
-;		PL_W	$1ba42,$0		;Some palette thing?!
-		PL_R	$59846			;Don't ask for floppy!
-		PL_PS	$5b6bc,_SkipPlayerName	;Allow fire to skip name entry
-		PL_L	$5b6c2,$4e714e71
-		PL_PS	$5c960,_Copylock	;Crack in game copylock!
-		PL_S	$5c966,$efa-$966
-		PL_PS	$5dac0,_CheckTurboMode	;Alter delay and write TURBO
-		PL_L	$5dac6,$4e714e71	;into the screen if turbo is
-		PL_PS	$64516,_CheckTurboMode	;on, otherwise clear it
-		PL_L	$6451c,$4e714e71
-		PL_P	$5f2f8,_SaveTimes	;move.b ($1c947).l,(2,a1,d1.w)
-		PL_L	$62d1c,$7a61a		;Change load location from $7a21a to $7a61a for fastest laps/track times
-		PL_P	$62e86,_Loader		;Rob Northen loader
-		PL_PS	$69fea,_24Bit_SwpMv_D0	;swap d0, move.w #$ffff,d0
-		PL_PS	$6a06e,_24Bit_Add_2_A0	;adda.l #2,a0
+;======================================================================
+; Enhanced framerate on a 68020 or better with ExpMem: copy the main program to ExpMem and
+; relocate its references to itself. relocTable lists every site; a value outside the
+; program (the TNT patch's pointers into ExpMem) stays as it is.
+
+_Enhance	move.l	_Custom3(pc),d0
+		beq.w	.Off
+		move.l	_AttnFlags(pc),d0
+		btst	#1,d0			;AFB_68020
+		beq.w	.Off
+		move.l	_expmem(pc),d0
+		beq.b	.Off
+		addi.l	#IMG_COPY,d0
+		movea.l	d0,a1
+		subi.l	#IMG_START,d0
+		lea	_ImgDelta(pc),a0
+		move.l	d0,(a0)
+		lea	_DelayPtr(pc),a0
+		add.l	d0,(a0)
+		lea	IMG_START,a0
+		move.l	#(IMG_END-IMG_START)/4,d1
+.Copy		move.l	(a0)+,(a1)+
+		subq.l	#1,d1
+		bne.b	.Copy
+
+		lea	relocTable(pc),a0
+		movea.l	_ImgDelta(pc),a1
+		adda.l	#IMG_START,a1
+		move.l	_ImgDelta(pc),d1
+.Next		moveq	#0,d0
+		move.w	(a0)+,d0
+		bne.b	.Site
+		move.l	(a0)+,d0
+		beq.b	.Done
+.Site		adda.l	d0,a1
+		move.l	(a1),d2
+		cmpi.l	#IMG_START,d2
+		blo.b	.Next
+		cmpi.l	#$80000,d2
+		bhs.b	.Next
+		add.l	d1,(a1)
+		bra.b	.Next
+.Done
+		IFD	VERIFY			;The original's copy is write protected:
+		move.l	a3,-(sp)		;a write through a reference
+		lea	_Protect(pc),a3		;relocTable misses faults there
+.Range		move.l	(a3)+,d0		;(an MMU is needed)
+		beq.b	.Protected
+		movea.l	d0,a0
+		move.l	(a3)+,d0
+		sub.l	a0,d0
+		movea.l	_resload(pc),a2
+		jsr	resload_ProtectWrite(a2)
+		bra.b	.Range
+.Protected	move.l	(sp)+,a3
+		ENDC
+.Off		rts
+
+		IFD	VERIFY			;The program, less what stays in chip
+_Protect	dc.l	$e700,$e74e,$e836,$f4b4,$1b6ca,$6a594,0
+		ENDC
+
+_PL_Game	PL_START			;Offsets in the main program
+		PL_S	$e70e-IMG_START,$26-$e		;Skip checksum
+		PL_PS	$f036-IMG_START,_Keybd		;Detect quit key: ror.b #1,d0 and eori.b #$ff,d0
+;		PL_W	$1ba42-IMG_START,$0		;Some palette thing?!
+		PL_R	$59846-IMG_START			;Don't ask for floppy!
+		PL_PS	$5b6bc-IMG_START,_SkipPlayerName	;Allow fire to skip name entry
+		PL_L	$5b6c2-IMG_START,$4e714e71
+		PL_PS	$5c960-IMG_START,_Copylock	;Crack in game copylock!
+		PL_S	$5c966-IMG_START,$efa-$966
+		PL_PS	$5dac0-IMG_START,_CheckTurboMode	;Alter delay and write TURBO
+		PL_L	$5dac6-IMG_START,$4e714e71	;into the screen if turbo is
+		PL_PS	$64516-IMG_START,_CheckTurboMode	;on, otherwise clear it
+		PL_L	$6451c-IMG_START,$4e714e71
+		PL_P	$5f2f8-IMG_START,_SaveTimes	;move.b ($1c947).l,(2,a1,d1.w)
+		PL_L	$62d1c-IMG_START,$7a61a		;Change load location from $7a21a to $7a61a for fastest laps/track times
+		PL_P	$62e86-IMG_START,_Loader		;Rob Northen loader
+		PL_PS	$69fea-IMG_START,_24Bit_SwpMv_D0	;swap d0, move.w #$ffff,d0
+		PL_PS	$6a06e-IMG_START,_24Bit_Add_2_A0	;adda.l #2,a0
 		PL_END
 
 ;======================================================================
@@ -285,16 +371,26 @@ _Copylock	move.l	#$9cedcd02,d0		;Rob Northen copylock
 
 ;======================================================================
 
-_WinRace	move.b	#4,($1bb20).l		;Cheating bastard! :)
+_WinRace	move.l	a0,-(sp)
+		lea	$1bb20,a0
+		adda.l	_ImgDelta(pc),a0
+		move.b	#4,(a0)			;Cheating bastard! :)
+		move.l	(sp)+,a0
 		rts
 
 ;======================================================================
 
-_RefreshBoost	cmp.b	#0,$1ca20
+_RefreshBoost	move.l	a0,-(sp)
+		lea	$1ca20,a0
+		adda.l	_ImgDelta(pc),a0
+		tst.b	(a0)
 		bne.b	_ToggleBoost
-		move.b	#$80,($1ca20).l		;Lame trainer
-_ToggleBoost	eor.l	#$65000008~$4e714e71,$60836
-		rts
+		move.b	#$80,(a0)		;Lame trainer
+_ToggleBoost	lea	$60836,a0
+		adda.l	_ImgDelta(pc),a0
+		eori.l	#$65000008~$4e714e71,(a0)
+		move.l	(sp)+,a0
+		bra.w	_FlushCache
 
 ;======================================================================
 
@@ -320,7 +416,10 @@ _CheckTurboMode	movem.l	d0/a0-a1,-(sp)		;Check for turbo mode which
 
 .BlitWait	btst	#6,$dff002		;At least wait for the blitter!
 		bne.b	.BlitWait
-		move.b	#0,$616d8		;Set the delay as ready
+		move.l	a0,-(sp)
+		movea.l	_DelayPtr(pc),a0
+		clr.b	(a0)			;Set the delay as ready
+		move.l	(sp)+,a0
 		rts
 
 _NormalMode	lea	$6a594,a1
@@ -329,8 +428,11 @@ _NormalMode	lea	$6a594,a1
 		bsr.b	_ClearTurboBMap
 		movem.l	(sp)+,d0/a0-a1
 
-.Wait		tst.b	($616d8).l		;$4a39000616d8
-		bne.b	.Wait			;$6600fff8
+		move.l	a0,-(sp)
+		movea.l	_DelayPtr(pc),a0
+.Wait		tst.b	(a0)			;The game's frame delay
+		bne.b	.Wait
+		movea.l	(sp)+,a0
 		rts
 
 ;======================================================================
@@ -406,7 +508,11 @@ _Keybd		ror.b	#1,d0			;Stolen 6 bytes
 
 ;======================================================================
 
-_SaveTimes	move.b	($1c947).l,(2,a1,d1.w)	;Stolen code
+_SaveTimes	move.l	a0,-(sp)
+		lea	$1c947,a0
+		adda.l	_ImgDelta(pc),a0
+		move.b	(a0),(2,a1,d1.w)	;Stolen code
+		move.l	(sp)+,a0
 
 		movem.l	d0-d1/a0-a2,-(sp)
 
@@ -552,8 +658,11 @@ _TNTSpecific	move.l	#$00020113,$2b986	;Correct colours on preview from reds->blu
 
 ;======================================================================
 
-_CopyTNTPatch	move.l	_expmem(pc),a1		;Copy the patches to
-		movea.l	a1,a2			;fast memory
+_CopyTNTPatch	move.l	_expmem(pc),d7		;Copy the patches to
+		bne.b	.Fast			;fast memory, or where
+		move.l	#$7e000,d7		;their own loader puts them
+.Fast		movea.l	d7,a1
+		movea.l	a1,a2
 		move.w	#$9c0>>2,d7
 .CopyTNTLoop	move.l	(a0)+,(a1)+
 		dbra	d7,.CopyTNTLoop
@@ -583,13 +692,21 @@ _ButtonWait	dc.l	0
 _Custom1	dc.l	0
 		dc.l	WHDLTAG_CUSTOM2_GET
 _Custom2	dc.l	0
+		dc.l	WHDLTAG_CUSTOM3_GET
+_Custom3	dc.l	0
+		dc.l	WHDLTAG_ATTNFLAGS_GET
+_AttnFlags	dc.l	0
 		dc.l	TAG_DONE
+_ImgDelta	dc.l	0			;The main program's copy - IMG_START
+_DelayPtr	dc.l	$616d8			;The game's frame delay
 _SaveFileSize	dc.l	0
 ;======================================================================
 
 _exit		pea	(TDREASON_OK).w
 		bra.b	_end
 _debug		pea	(TDREASON_DEBUG).w
+		bra.b	_end
+_WrongVersion	pea	(TDREASON_WRONGVER).w
 _end		move.l	(_resload,pc),-(a7)
 		addq.l	#resload_Abort,(a7)
 		rts
@@ -652,3 +769,7 @@ Wait_Raster_Lines
 	bne.b	.loop
 	move.w	(a7)+,d1
 	rts
+
+;======================================================================
+
+		INCLUDE	relocs.s
