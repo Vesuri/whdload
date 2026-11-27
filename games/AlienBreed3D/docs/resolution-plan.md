@@ -315,6 +315,16 @@ just step further, up to 15 fields.
    draws the same way, with its routines byte for byte or with only their addresses changed
    ([internals](internals.md#display)), so the port is finding them. The floppy version
    ($23d2) is in no archive; it needs the original disks.
+   - Done for the CD32 version (27.11.2026, [internals](internals.md#the-cd32-version)):
+     `tools/port.py` maps every offset the option uses, `_port` translates the code's at
+     the version's choice, and two differences are patched by hand (the wall files'
+     table, a second `COP1LC` write at the level start).
+   - `tools/display.sh` on the CD32 version, both variants, on the a1200-fast, a1200-030,
+     a1200-040 and the 28 MHz 68020: every scene shows its frame. The two-player link
+     plays in both views (a1200-030).
+   - The level's end (`ab3d.py end`) waited for 25 fields without a new frame; without
+     music no tune holds the last frame that long, and on the fast machines the shot
+     showed the fade or the menu. It now waits for twice the longest frame before F1.
 10. **Release**: a dated `$VER` and ReadMe entry, CUSTOM5=1 in the installed icon, the new
     memory figures, and the reconstructed source in place of the encrypted archive (decided).
 

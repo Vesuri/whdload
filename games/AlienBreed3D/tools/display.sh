@@ -6,8 +6,8 @@
 # Two deterministic boots of the release slave on SETUP, the option off (the original's
 # display; CUSTOM1=4: F1 ends the level) and then on (also CUSTOM5=1), each through the
 # same scenes: level 1's start in the small view and full screen, the pause screen in both
-# and the level's end (`ab3d.py end`: F1, then the last frame, which stays while the tune
-# plays). With the option on also a death in both views (level 2, the `fight` script until
+# and the level's end (`ab3d.py end`: F1, then the last frame, once no frame has followed
+# it for twice the frames' time). With the option on also a death in both views (level 2, the `fight` script until
 # the energy is gone; level 1's aliens never get through) and level 2's end.
 # Each scene keeps a screenshot (OUT/RUN/SCENE.png) and the frame on screen (SCENE.frame),
 # ours also the area (OUT/ours/area.bin). Then `tools/display.py` checks each screenshot

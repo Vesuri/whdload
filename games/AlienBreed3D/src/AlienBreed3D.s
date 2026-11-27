@@ -277,6 +277,9 @@ _start
 	cmpi.w	#-15140,d0
 	bne.w	_wrongver
 .version
+	IFND	ORIGINAL
+	bsr.w	_port			;the CD32 version's game offsets (port.s)
+	ENDC
 	add.l	d1,(a0)
 	add.l	d2,4(a0)
 	add.l	d3,8(a0)
@@ -541,6 +544,12 @@ _pl_v2
 	PL_S	$4938e,$c
 	PL_PS	$4941c,_p_waitvb
 	PL_S	$49422,$c
+	ENDC
+	IFND	ORIGINAL		;Enhanced resolution: _pl_v3's, mapped (port.s)
+	INCLUDE	cd32.s
+	PL_IFC5				;and the CD32 version's own: after its CD audio
+	PL_S	$31ec,10		;at the level start, a second COP1LC = template
+	PL_ENDIF			;(_p_cop1's heads stay)
 	ENDC
 	PL_END
 _pl_v3
@@ -1647,6 +1656,7 @@ _resload
 
 	IFND	ORIGINAL
 	CNOP	0,4
+	INCLUDE	port.s
 	INCLUDE	palette.s
 	INCLUDE	display.s
 	ENDC

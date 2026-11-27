@@ -18,18 +18,6 @@
 ; the build's scratch, free once the build is done.
 
 ; game offsets, hunk 0 of the $c4dc version
-G_LOADOBJECTS	= $436d6	;LoadObjects, the last of the game's loads
-G_HOOKRET	= $44aaa	;after its jsr at $44aa4 (PL_PS)
-G_WALLTILES	= $42a66	;a pointer to each loaded wall file
-G_WALLCHUNK	= $42b06	;(name, unpacked size) pairs, ended by zeros
-G_FLOORTILE	= $55cee	;a pointer to the floor texture
-G_FLOORPAL	= $536e6	;floorScaleCols: 15 rows of 256 colour words
-G_TEXPAL	= $3e066	;TexturePal: textured polygons' 15 rows of 256
-G_TEXMAPS	= $2e066	;TextureMaps: their 64 KB of texels
-G_OBJECTS	= $2974a	;18 entries of (wad, ptr, frames, pal); a pal is 15 rows of 32
-G_SKY		= $55d00	;BackPicture: 16416 colour words
-G_BRIGHTEN	= $766d2	;brightentab: 5632 colour words
-G_WATER		= $812d2	;waterfile: the water's 64 KB of texels
 
 N_WALLS		= 14		;the area holds this many walls
 N_OBJECTS	= 18
@@ -89,21 +77,21 @@ PALEA	MACRO			;offset in the area, address register
 	movea.l	a4,\2
 	adda.l	#\1,\2
 	ENDM
-GLEA	MACRO			;game offset, address register
-	movea.l	a5,\2
-	adda.l	#\1,\2
-	ENDM
 
 ; PL_PS at $44aa4: LoadObjects with the game's registers, then the build.
 _p_loaded
 	pea	.loaded(pc)
 	move.l	4(sp),-(sp)
-	subi.l	#G_HOOKRET-G_LOADOBJECTS,(sp)
+	move.l	d0,-(sp)
+	move.l	_gofs+G_HOOKRET(pc),d0
+	sub.l	_gofs+G_LOADOBJECTS(pc),d0
+	sub.l	d0,4(sp)
+	move.l	(sp)+,d0
 	rts
 .loaded
 	movem.l	d0-d7/a0-a6,-(sp)
 	movea.l	60(sp),a5
-	suba.l	#G_HOOKRET,a5
+	suba.l	_gofs+G_HOOKRET(pc),a5
 	movea.l	_expmem(pc),a4
 	adda.l	#PA_OFF,a4
 	bsr.w	_pal_build
@@ -146,17 +134,19 @@ _pal_hist
 	dbf	d0,.clr
 	PALEA	PA_HIST,a2
 	; walls: count them, then each with its texel counts
-	GLEA	G_WALLCHUNK+4,a0
+	GLEA	G_WALLCHUNK,a0
+	addq.l	#4,a0
 	moveq	#0,d1
 .nw	tst.l	(a0)
 	beq.s	.nwd
-	addq.l	#8,a0
+	adda.w	_gwall(pc),a0
 	addq.w	#1,d1
 	cmpi.w	#40,d1
 	bne.s	.nw
 .nwd	moveq	#45,d0
 	bsr.w	_pal_budget
-	GLEA	G_WALLCHUNK+4,a6
+	GLEA	G_WALLCHUNK,a6
+	addq.l	#4,a6
 	GLEA	G_WALLTILES,a3
 .wall	move.l	(a6),d0
 	beq.s	.walld
@@ -171,12 +161,12 @@ _pal_hist
 	moveq	#32,d1
 	PALEA	PA_MD,a1
 	bsr.w	_pal_addtable
-	addq.l	#8,a6
+	adda.w	_gwall(pc),a6
 	bra.s	.wall
 .walld
 	; the floor, the polygons and the water: 256 colours a row, counts from 64 KB of texels
 	movea.l	a5,a0
-	adda.l	#G_FLOORTILE,a0
+	adda.l	_gofs+G_FLOORTILE(pc),a0
 	movea.l	(a0),a0
 	moveq	#30,d0
 	GLEA	G_FLOORPAL,a3
@@ -240,7 +230,8 @@ _pal_hist
 
 ; d5 = entry: d3 = its pal; Z clear when no earlier entry has that pal
 .newpal
-	GLEA	G_OBJECTS+12,a0
+	GLEA	G_OBJECTS,a0
+	lea	12(a0),a0
 	move.w	d5,d0
 	lsl.w	#4,d0
 	move.l	(a0,d0.w),d3
@@ -892,7 +883,8 @@ _pal_map
 
 _pal_remap
 	PALEA	PA_MAP,a2
-	GLEA	G_WALLCHUNK+4,a6
+	GLEA	G_WALLCHUNK,a6
+	addq.l	#4,a6
 	GLEA	G_WALLTILES,a3
 	PALEA	PA_WALLS,a1
 	moveq	#N_WALLS-1,d7
@@ -901,7 +893,7 @@ _pal_remap
 	movea.l	(a3)+,a0
 	move.l	#1024,d0
 	bsr.s	.r
-	addq.l	#8,a6
+	adda.w	_gwall(pc),a6
 	dbf	d7,.w
 .wd	PALEA	PA_FLOOR,a1
 	GLEA	G_FLOORPAL,a0
@@ -910,7 +902,8 @@ _pal_remap
 	GLEA	G_TEXPAL,a0		;PA_POLY
 	move.l	#3840,d0
 	bsr.s	.r
-	GLEA	G_OBJECTS+12,a3		;PA_OBJS
+	GLEA	G_OBJECTS,a3		;PA_OBJS
+	lea	12(a3),a3
 	moveq	#N_OBJECTS-1,d7
 .o	movea.l	(a3),a0
 	lea	16(a3),a3

@@ -122,7 +122,8 @@ def unrnc(data):
 
 
 def flatten(exe):
-    """Hunks end to end, relocated to 0: [(offset, size, memory)], image."""
+    """Hunks end to end, relocated to 0: [(offset, size, memory)], image, and the image
+    offsets of the relocated longs."""
     words = lambda p: struct.unpack('>I', exe[p:p + 4])[0]
     if words(0) != 0x3f3:
         raise ValueError('not a hunk executable')
@@ -161,11 +162,13 @@ def flatten(exe):
             pass
         else:
             raise ValueError('hunk type %#x at %#x' % (kind, p - 4))
+    at_ = []
     for h, at, target in relocs:
         a = hunks[h][0] + at
         v = struct.unpack('>I', image[a:a + 4])[0] + hunks[target][0]
         image[a:a + 4] = struct.pack('>I', v & 0xffffffff)
-    return hunks, bytes(image), len(relocs)
+        at_.append(a)
+    return hunks, bytes(image), sorted(at_)
 
 
 def main():
@@ -174,13 +177,13 @@ def main():
     exe = unrnc(data) if data[:3] == b'RNC' else data
     out = os.path.join(GAME, sys.argv[2] if len(sys.argv) > 2 else 'tmp/exe')
     os.makedirs(out, exist_ok=True)
-    hunks, image, nrelocs = flatten(exe)
+    hunks, image, relocs = flatten(exe)
     open(os.path.join(out, 'abd'), 'wb').write(exe)
     open(os.path.join(out, 'abd.flat'), 'wb').write(image)
     print('%s: %d bytes, CRC16 $%04x' % (os.path.basename(src), len(exe), crc16(exe)))
     for i, (offset, size, memory) in enumerate(hunks):
         print('hunk %d  $%06x-$%06x  %-4s %d bytes' % (i, offset, offset + size, memory, size))
-    print('%d relocations; wrote %s/abd and abd.flat' % (nrelocs, os.path.relpath(out, GAME)))
+    print('%d relocations; wrote %s/abd and abd.flat' % (len(relocs), os.path.relpath(out, GAME)))
 
 
 if __name__ == '__main__':

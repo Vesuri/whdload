@@ -21,7 +21,8 @@ floppy version ($23d2); the original disks through `Install-AlienBreed3D` would.
 executables, and slaves equal to `AlienBreed3D_nomusic.slave`.
 
 The runs boot the AGA drawer; both variants replace its `AlienBreed3DAGA.slave`. The CD32
-version: `make run GAME_DIR=AlienBreed3DCD32 SLAVE_FILE=AlienBreed3DCD32.slave`.
+version: `make run GAME_DIR=AlienBreed3DCD32 SLAVE_FILE=AlienBreed3DCD32.slave`; the same
+two variables run `tools/ab3d.py`, `tools/display.sh` and the other harness scripts on it.
 `python3 tools/exe.py [FILE [OUT]]` unpacks a game executable into `OUT/abd` and
 `OUT/abd.flat` (default the AGA drawer's into `tmp/exe`; the CD32 one into `tmp/exe-cd32` by
 convention).
@@ -39,6 +40,16 @@ compares both with the installed ones (`game.sh`). Named labels are ours; `Lxxxx
 are the code-hunk offsets in `AlienBreed3D.slave` (the no-music slave's are lower after the
 first `IFND NOMUSIC` block). The release build adds Enhanced resolution (CUSTOM5,
 `src/palette.s`, `src/display.s`, `src/c2p.s`; the larger chip and ExpMem); `release/slaves.sha256` records its two slaves.
+
+Enhanced resolution is written in $c4dc offsets; the CD32 version's are mapped
+([internals](internals.md#the-cd32-version)). After a change to the `PL_IFC5` block of
+`_pl_v3`, `src/stride.s`, `src/sites.s`, `src/port.s`'s `GOFS` list or the tables of
+offsets in `display.s` and `hires.s`, run `python3 tools/port.py gen` (it rewrites
+`src/cd32.s` and `src/cd32segs.s`), then `make check`, which fails while they are not
+current or a site does not map (`python3 tools/port.py check` lists every site). It needs
+both executables unpacked (`tools/exe.py`, into `tmp/exe` and `tmp/exe-cd32`); `make check`
+unpacks them when they are not. A code change that needs a new game offset: a `GOFS` entry,
+read through `GLEA`, `HUNK` or `_gofs+G_NAME(pc)`, never an immediate.
 
 ## Driving it
 

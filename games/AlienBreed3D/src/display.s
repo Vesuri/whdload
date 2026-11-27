@@ -107,13 +107,6 @@ DA_C2PFULL	= (DA_LISTS+LIST_OFF+2*LIST_SIZE+15)&-16	;full screen's c2p scratch
 	FAIL	the chunky buffer overlaps the copper lists
 	ENDC
 
-; game offsets, hunk 0 of the $c4dc version
-G_TEMPLATEPTR	= $2ea8			;move.l #template,d0 at $2ea6: the template's address
-G_LEVELCOP	= $31a0			;level start: move.l #template,$dff080 (10 bytes)
-G_VIEWFLAG	= $40279		;keypad Enter's byte: 0 the small view, else full screen
-G_LIST1		= $43c38		;the two copper lists' pointers
-G_LIST2		= $43c3c
-G_COPLISTS	= $4463e		;InitCopperScrn's first AllocMem
 ; chip hunk 1, from the template ($9a080)
 T_DIW		= $9a08c-$9a080		;DIWSTRT, DIWSTOP, DDFSTRT, DDFSTOP
 T_PENS		= $9a09c-$9a080		;pens 0-15 in both nibbles, then SPR0-7PT: 50 moves
@@ -133,13 +126,14 @@ FULL_END	= $1801fffe		;WAIT after $ffdf: display off from line $118, as the game
 ; lists go in the area, past the palette build's scratch. Their FreeMem ($43c40) is an rts.
 _p_coplists
 	move.l	(sp),d0
-	subi.l	#G_COPLISTS+6,d0
+	sub.l	_gofs+G_COPLISTS(pc),d0
+	subq.l	#6,d0
 	movea.l	d0,a0			;hunk 0
 	movea.l	_expmem(pc),a1
 	adda.l	#PA_OFF+DA_LISTS+LIST_OFF,a1
 	move.l	a1,d0
-	adda.l	#G_LIST1,a0
-	move.l	d0,(a0)+		;G_LIST1, G_LIST2
+	adda.l	_gofs+G_LIST1(pc),a0
+	move.l	d0,(a0)+		;the two lists' pointers
 	addi.l	#LIST_SIZE,d0
 	move.l	d0,(a0)
 	movea.l	(4).w,a6		;as after AllocMem
@@ -154,7 +148,7 @@ _ds_stride
 	IFND	LORES
 	bsr.w	_ds_tables
 	ENDC
-	lea	.tables(pc),a1
+	lea	_ds_stridetabs(pc),a1
 .table	move.l	(a1)+,d0		;game offset; 0 ends
 	beq.s	.done
 	lea	(a5,d0.l),a0
@@ -172,7 +166,8 @@ _ds_stride
 	bra.s	.table
 .done	movea.l	_resload(pc),a2
 	jmp	resload_FlushCache(a2)
-.tables	dc.l	$1cbe2			;timeslarge: walls, (y + 1) lines
+_ds_stridetabs				;(port.s: game offsets)
+	dc.l	$1cbe2			;timeslarge: walls, (y + 1) lines
 	dc.w	80
 	dc.l	$1cf6a			;timeslargethru: see-through walls
 	dc.w	80
@@ -189,7 +184,8 @@ _ds_stride
 _p_cop1
 	movem.l	d0-d7/a0-a6,-(sp)
 	movea.l	60(sp),a5
-	suba.l	#G_LEVELCOP+6,a5
+	suba.l	_gofs+G_LEVELCOP(pc),a5
+	subq.l	#6,a5
 	lea	_ds_hunk0(pc),a0
 	move.l	a5,(a0)
 	GLEA	G_TEMPLATEPTR,a0
@@ -325,7 +321,7 @@ _p_show
 .same
 	IFD	HOLES			;debug: $f0f in every pixel of the list drawn next
 	movea.l	_ds_hunk0(pc),a5	;(with PENS pen 1, which no writer writes: ab3d.py
-	GLEA	$5dd40,a0		;shows it as $f0f; HOLES=2: pen PEN0's colour, which
+	GLEA	G_DRAWPT,a0		;shows it as $f0f; HOLES=2: pen PEN0's colour, which
 	movea.l	(a0),a0			;is its pen's exactly, for comparing with WORDS: the
 	lea	10(a0),a0		;water reads pixels not yet drawn)
 	movea.l	_expmem(pc),a4

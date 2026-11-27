@@ -66,7 +66,8 @@ ExpMem+$153000, the level 13 access fault fixed in 1.3); `prefs` saved by
 (`_endpart`: a copper list of its own, scrolled until a button, then quit); music on and off around the end part (`_p_musicon`,
 `_p_musicoff`, not in the no-music slave). Item by item: the `PL_` lists in the source.
 
-Ours adds, with CUSTOM5 and in `_pl_v3` only (a `PL_IFC5` block):
+Ours adds, with CUSTOM5, to `_pl_v3` (a `PL_IFC5` block; the CD32 version's
+`_pl_v2` gets the same, [mapped](#the-cd32-version)):
 
 - `_p_loaded`, a `PL_PS` at $44aa4, the jsr to `LoadObjects` ($436d6, the last of the
   game's loads before the menu): the load, then the 1x1 palette ([below](#the-1x1-palette));
@@ -176,6 +177,36 @@ The rest of what writes into the view is in the [inventory](#display-inventory).
 The CD32 version draws the same way, at other offsets: the small-view builder's loop at
 $501c, the full-screen builder at $5206, keypad Enter at $404c2, and byte for byte `OneBelow` at
 $1ffcc and the colour moves at $90fe.
+
+### The CD32 version
+
+Enhanced resolution is written for the $c4dc version and carried to the CD32 one ($fd78)
+by mapping each offset (plan step 9). `tools/port.py` finds a $c4dc offset in the CD32
+image by the bytes around it (relocated longs masked), or as the n-th of n equal places,
+or from a neighbour with the same bytes between; data by the code that references it. Its
+`check` maps every site the option uses (the `PL_IFC5` block, `stride.s`, `sites.s`,
+`port.s`'s offsets and the tables of offsets in `display.s` and `hires.s`: 691) and compares the bytes each patch
+replaces; `make check` runs it. `port.py gen` writes from the $c4dc sources:
+
+- `src/cd32.s`, `_pl_v2`'s `PL_IFC5` block: `_pl_v3`'s with every offset mapped and
+  `stride.s` inline;
+- `src/cd32segs.s`, segments of (a $c4dc start, its distance to the CD32 offset), one where
+  the distance changes (18).
+
+The code reads its game offsets from `_gofs` (`src/port.s`, one entry a `G_` name, the
+$c4dc value). When the slave picks `_pl_v2`, `_port` translates them through the segments,
+and with them the tables of offsets (`_ds_stridetabs`, `_t_ptrs`, `_t_penptrs`,
+`_t_halve`) and the geometry sites (`_ds_sites`), once, before the game starts.
+
+Two differences are not offsets, and `_pl_v2` has them by hand:
+
+- the wall files' table (`wallchunkdata`, $42d52): (name, unpacked size, packed size), 12
+  bytes an entry where the $c4dc one has 8 (`_gwall`, which `_port` sets to 12);
+- the level start points COP1LC at the template a second time, after the CD audio starts
+  ($31ec): a `PL_S` past it, or it shows the game's template over the heads (black).
+
+Its textured polygons' textures and their palette (`TextureMaps`, `TexturePal`) differ
+from the $c4dc version's; the palette is built from what is loaded either way.
 
 The published AB3D I source (the 1997 Amiga Format cover CD, as
 `Agrigaatti/Alien-Breed-3D-I` on GitHub) names these routines: the view's constants are

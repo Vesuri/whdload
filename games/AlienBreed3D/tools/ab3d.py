@@ -3,8 +3,9 @@
     INSTANCE=x WARP=1 WINDOW=none python3 tools/ab3d.py serve &   boot (common/run.sh options)
     python3 tools/ab3d.py CMD ...                                  one command to the server
 
-Game commands (game offsets as in docs/internals.md, $c4dc version; the CPU is left as it
-was found, running or stopped):
+Game commands (game offsets as in docs/internals.md, $c4dc version, which with the CD32
+version ($fd78) are mapped to its own by tools/port.py; the CPU is left as it was found,
+running or stopped):
     base                  where the hunks are: hunk 0 and the chip hunks' runtime addresses
     peek OFF [N]          N bytes (default 4) at game offset OFF, hex
     level                 from the main menu into the level: once no frame has been drawn for
@@ -14,7 +15,7 @@ was found, running or stopped):
     next                  F1 (WHD_ARGS=CUSTOM1=4: F1 skips the level), then into the next
                           level the same way
     end                   F1 (WHD_ARGS=CUSTOM1=4) and run until the level's last frame stays
-                          (no frame for 25 fields, while the tune plays)
+                          (no frame for twice its longest frame, at least 8 fields)
     full [0|1]            the view: print it, or press keypad Enter until it is the one asked
                           (0 small, 1 full screen)
     frames [N [SCRIPT]]   run N fields (default 500) one at a time, playing SCRIPT, and count
@@ -69,7 +70,9 @@ was found, running or stopped):
                           reads memory: on a 68040 dump again after some play (N=1), as
                           copyback can still hold the build's last writes
 
-The 8-channel ($c4dc) version only, which the AGA drawer installs.
+The 8-channel ($c4dc) version, which the AGA drawer installs, and the CD32 one ($fd78, the
+CD32 drawer: GAME_DIR=AlienBreed3DCD32 SLAVE_FILE=AlienBreed3DCD32.slave); `aprof`'s
+categories, `tables` and `copper template`'s decoding are the $c4dc version's only.
 """
 import os
 import re
@@ -81,8 +84,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'common/tools'))
 from game_server import game_server  # noqa: E402
 
 FLAT = Path(__file__).resolve().parents[1] / 'tmp/exe/abd.flat'
-# hunk sizes of the $c4dc version (tools/exe.py): code and data, then three chip hunks
+# hunk sizes of the $c4dc version (tools/exe.py): code and data, then three chip hunks; the
+# CD32 one's ($fd78), whose offsets addr() maps from the $c4dc ones (tools/port.py)
 HUNKS = (0x912d4, 0x9f64, 0x18, 0x12798)
+HUNKS_CD32 = (0x93654, 0x9f64, 0x18, 0x12798, 0x17fc)
 DRAWPT = 0x5dd40        # drawPt, the copper list being drawn; oldDrawPt follows
 FULL = 0x40279          # nonzero in full screen (flipped by keypad Enter)
 PLR1MOUSE = 0x5d82      # nonzero with mouse control (M; Plr1Control's key test at $401ee)
@@ -135,33 +140,52 @@ class Halted:
 _bases = {}
 
 
-def bases(g):
-    """Runtime address of each hunk's data. The slave relocates the game in LoadSeg layout
-    (each hunk: its allocation size, then the link, a BPTR to the next hunk's link, then the
-    data) at ExpMem+$2000, $3000 further on when HackAB3D is loaded before it; the fake
-    ExecBase is ExpMem+$1000."""
+def layout(g):
+    """The version's hunk sizes and the runtime address of each hunk's data. The slave
+    relocates the game in LoadSeg layout (each hunk: its allocation size, then the link, a
+    BPTR to the next hunk's link, then the data) at ExpMem+$2000, $3000 further on when
+    HackAB3D is loaded before it; the fake ExecBase is ExpMem+$1000. The hunk sizes tell the
+    version."""
     key = _long(g, 4)
     if key in _bases:
         return _bases[key]
     expmem = key - 0x1000
-    for seg in (expmem + 0x2000 + 0x3000, expmem + 0x2000):
-        out, link = [], seg + 4
-        for size in HUNKS:
-            if not link or _long(g, link - 4) != size + 8:
-                break
-            out.append(link + 4)
-            link = _long(g, link) * 4
-        if len(out) == len(HUNKS):
-            _bases[key] = out
-            return out
+    for hunks in (HUNKS, HUNKS_CD32):
+        for seg in (expmem + 0x2000 + 0x3000, expmem + 0x2000):
+            out, link = [], seg + 4
+            for size in hunks:
+                if not link or _long(g, link - 4) != size + 8:
+                    break
+                out.append(link + 4)
+                link = _long(g, link) * 4
+            if len(out) == len(hunks):
+                _bases[key] = hunks, out
+                return hunks, out
     raise RuntimeError(f'game hunks not found from ExecBase {key:#x}: not loaded yet, or '
-                       'not the $c4dc version')
+                       'not the $c4dc or CD32 version')
+
+
+def bases(g):
+    return layout(g)[1]
+
+
+def cd32(g):
+    return layout(g)[0] == HUNKS_CD32
+
+
+_ported = {}
 
 
 def addr(g, off):
-    """Game offset to runtime address."""
+    """Game offset ($c4dc) to runtime address; with the CD32 version, its offset's."""
+    hunks, b = layout(g)
+    if hunks == HUNKS_CD32:
+        if off not in _ported:
+            import port
+            _ported[off] = port.port(off)[0]
+        off = _ported[off]
     start = 0
-    for size, base in zip(HUNKS, bases(g)):
+    for size, base in zip(hunks, b):
         if off < start + size:
             return base + off - start
         start += size
@@ -170,9 +194,10 @@ def addr(g, off):
 
 def cmd_base(server, g, rest):
     with Halted(g):
-        b = bases(g)
-        start, lines = 0, []
-        for i, (size, a) in enumerate(zip(HUNKS, b)):
+        hunks, b = layout(g)
+        start, lines = 0, ['the CD32 version ($fd78; offsets mapped from $c4dc)'
+                           if hunks == HUNKS_CD32 else 'the $c4dc version']
+        for i, (size, a) in enumerate(zip(hunks, b)):
             lines.append(f'hunk {i}  offset ${start:06x}  at ${a:08x}  {size} bytes')
             start += size
         if FLAT.exists():
@@ -297,12 +322,20 @@ def cmd_next(server, g, rest):
 
 
 def cmd_end(server, g, rest):
-    """F1 (with CUSTOM1 bit 2) ends the level; run until its last frame stays (no swap for
-    25 fields, as the tune plays)."""
+    """F1 (with CUSTOM1 bit 2) ends the level; run until its last frame stays: no swap for
+    twice the longest frame of the 60 fields before (at least 8 fields). No longer: the
+    no-music slave plays no tune over it, so soon after the screen fades to the menu."""
     with Halted(g):
         was = _letter(g)
+        last, gap, longest = _drawpt(g), 0, 0
+        for _ in range(60):
+            g.cmd('monitor fields 1')
+            d = _drawpt(g)
+            gap = gap + 1 if d == last else 0
+            longest = max(longest, gap + 1)
+            last = d
         _press(g, KEY_F1, 40)
-        n = _quiet(g, 25, 1000)
+        n = _quiet(g, max(8, 2 * longest), 1000)
         if n is None:
             raise RuntimeError('frames still drawn 1000 fields after F1 (CUSTOM1=4 in WHD_ARGS?)')
         if _letter(g) != was:

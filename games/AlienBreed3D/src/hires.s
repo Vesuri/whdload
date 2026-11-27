@@ -26,20 +26,7 @@ DA_END		= DA_SIDES+4*SIDE_STRIDE
 	FAIL	the 1x1 tables overlap the copper lists
 	ENDC
 
-; game offsets (hunk 0) of the variables read here (G_SKY, G_BRIGHTEN: palette.s)
-G_FROMPT	= $5dd48		;fromPt: the list being drawn
-G_EYE		= $61d54		;the eye's height (long, as the objects' heights)
-G_WALLTOP	= $1ca28		;a wall's top and bottom (longs)
-G_WALLBOT	= $1ca2c
-G_RIGHT		= $1f9f4		;FloorLine: the span's right edge (word)
-G_ANGLE		= $18ff2		;the view's angle (word; the sky's column)
-G_SKYEND	= $5dd40		;the sky's end (G_SKY, palette.s)
-G_XSHIFT	= $5d8c			;the eye's x shift, added to x * 128 (long)
-
-G_FONT		= $4414			;the pause screen's letters, 8x8 colour words each
-G_PAUSETEXT	= $433c			;its text, 12 letters a row
-G_PAUSESRC	= $41aa			;pointers: the frame shown, the list drawn into
-G_PAUSEDST	= $41ae
+; the game offsets read here: port.s (G_)
 
 ; \1 (a data register, long) times S: 2 in the small view, 3 in full screen. Flags not kept.
 TIMESS	MACRO
@@ -63,21 +50,21 @@ BYS	MACRO
 .\@e
 	ENDM
 
-; Jump to a game offset, every register and the flags kept.
+; Jump to a game offset (a G_ name), every register and the flags kept.
 JMPG	MACRO
 	subq.l	#4,sp
 	move.l	a0,-(sp)
 	movea.l	_ds_hunk0(pc),a0
-	adda.l	#\1,a0
+	adda.l	_gofs+\1(pc),a0
 	move.l	a0,4(sp)
 	movea.l	(sp)+,a0
 	rts
 	ENDM
 
-; Game address of a game offset into an address register.
+; Game address of a game offset (a G_ name) into an address register.
 HUNK	MACRO
 	movea.l	_ds_hunk0(pc),\2
-	adda.l	#\1,\2
+	adda.l	_gofs+\1(pc),\2
 	ENDM
 
 ; a pixel: a colour word, or with PENS a pen byte (display.s); PX1 the next pixel's offset in
@@ -99,12 +86,10 @@ PX1		= 4
 ; own 96-wide ones pointed at them.
 _ds_tables
 	lea	_ds_frompt(pc),a0
-	movea.l	a5,a1
-	adda.l	#G_FROMPT,a1
+	GLEA	G_FROMPT,a1
 	move.l	a1,(a0)
 	lea	_ds_eye(pc),a0
-	movea.l	a5,a1
-	adda.l	#G_EYE,a1
+	GLEA	G_EYE,a1
 	move.l	a1,(a0)
 	lea	_ds_slot(pc),a0
 	PALEA	DA_SLOT,a1
@@ -139,7 +124,7 @@ _ds_tables
 	move.w	(a1)+,(a0)+
 	dbf	d1,.across
 	move.w	#$4e75,(a0)		;rts
-	lea	.ptrs(pc),a1
+	lea	_t_ptrs(pc),a1
 .ptr	move.l	(a1)+,d0		;the operand's game offset; 0 ends
 	beq.s	.done
 	move.l	(a1)+,d1		;the table's area offset
@@ -151,7 +136,8 @@ _ds_tables
 	bra.w	_t_pens
 	ENDC
 	rts				;(_ds_stride flushes the caches)
-.ptrs	dc.l	$1f3e8,DA_ACROSS	;SimpleFloorLine: movea.l #doacrossline,a1
+_t_ptrs					;(port.s: game offsets)
+	dc.l	$1f3e8,DA_ACROSS	;SimpleFloorLine: movea.l #doacrossline,a1
 	dc.l	$8af2,DA_SLOT		;light beams: movea.l #the slot table ($21b74),a1
 	dc.l	$2159e,DA_SLOT		;glass
 	dc.l	$219aa,DA_SLOT		;bitmaps
@@ -473,7 +459,7 @@ _t_split
 	moveq	#0,d4
 	sub.w	d7,d3
 	move.w	d3,d7
-	JMPG	$1fcb0
+	JMPG	G_FILLS
 	ENDC
 .bank	cmp.w	#31,d7
 	ble.s	.in
@@ -491,7 +477,7 @@ _t_split
 	moveq	#32,d3
 .last	sub.w	d7,d3
 	move.w	d3,d7
-	JMPG	$1fcb0
+	JMPG	G_FILLS
 
 ; _t_gun's rows of a column, PENS: \1 the packing (0 the low 5 bits, 1 the middle, 2 the
 ; high), \2 = S
@@ -734,7 +720,7 @@ _t_sky
 	ELSE
 	muls.w	#76,d5
 	HUNK	G_SKY,a2		;the first column
-	HUNK	G_SKYEND,a3
+	HUNK	G_DRAWPT,a3		;(the sky's end)
 	lea	(a2,d5.l),a1
 	movea.l	_ds_frompt(pc),a0
 	movea.l	(a0),a0
@@ -948,10 +934,6 @@ _ds_scale	dc.w	2	;S: 2 in the small view, 3 in full screen (_ds_geom)
 ; Pens (resolution plan step 7): the writers write pen bytes from the palette build's pen
 ; tables (palette.s) instead of colour words.
 
-G_WALLPAL	= $55ce6		;the wall's shade table, 32 rows of 32 colour words
-G_SIMPLECOLS	= $1f46c		;SimpleFloorLine's colours: 16 rows of 32 words
-G_SIMPLEBLACK	= $1f3d5		;its moveq #0,d0's byte (detail above 2: black)
-G_PEN_OBJECTS	= $2974a		;18 entries of (wad, ptr, frames, pal)
 DA_WATER	= DA_CHUNKY		;the water's pens (the chunky buffer is unused):
 					;22 rows of 256, by the pen reflected
 DA_FLOOR	= DA_WATER+22*256	;the floors' and textured polygons' pens: their 15
@@ -968,14 +950,14 @@ _t_pens
 	lea	_t_pensdone(pc),a0
 	bset	#0,(a0)
 	bne.w	.done
-	lea	.ptrs(pc),a1
+	lea	_t_penptrs(pc),a1
 .ptr	move.l	(a1)+,d0		;the operand's game offset; 0 ends
 	beq.s	.half
 	move.l	(a1)+,d1		;the table's area offset
 	add.l	a4,d1
 	move.l	d1,(a5,d0.l)
 	bra.s	.ptr
-.half	lea	.halve(pc),a1
+.half	lea	_t_halve(pc),a1
 .hn	move.l	(a1)+,d0		;game offset; 0 ends
 	beq.s	.objs
 	lea	(a5,d0.l),a0
@@ -984,14 +966,15 @@ _t_pens
 .hw	lsr.w	(a0)+
 	dbf	d1,.hw
 	bra.s	.hn
-.objs	lea	G_PEN_OBJECTS+12(a5),a0
+.objs	GLEA	G_OBJECTS,a0
+	lea	12(a0),a0
 	lea	PA_OBJS(a4),a1
 	moveq	#N_OBJECTS-1,d0
 .obj	move.l	a1,(a0)
 	lea	16(a0),a0
 	lea	480(a1),a1
 	dbf	d0,.obj
-	lea	G_SIMPLECOLS(a5),a0
+	GLEA	G_SIMPLECOLS,a0
 	move.w	#16*32-1,d0
 	moveq	#0,d1
 .simple	move.w	(a0),d1
@@ -999,11 +982,12 @@ _t_pens
 	move.b	PA_MAP(a4,d1.w),d1
 	move.w	d1,(a0)+
 	dbf	d0,.simple
-	move.b	PA_MAP(a4),G_SIMPLEBLACK(a5)
-	lea	G_FLOORPAL(a5),a0
+	GLEA	G_SIMPLEBLACK,a0
+	move.b	PA_MAP(a4),(a0)
+	GLEA	G_FLOORPAL,a0
 	lea	DA_FLOOR(a4),a1
 	bsr.w	.rows
-	lea	G_TEXPAL(a5),a0
+	GLEA	G_TEXPAL,a0
 	lea	DA_POLY(a4),a1
 	bsr.w	.rows
 	; the water: row k, pen p: the pen of brightentab's colour k * 256 + p's colour's low
@@ -1022,7 +1006,7 @@ _t_pens
 	move.l	d0,(a1)+
 	addq.b	#1,d1
 	bne.s	.sky
-	lea	G_BRIGHTEN(a5),a0
+	GLEA	G_BRIGHTEN,a0
 	lea	DA_WATER(a4),a1
 	moveq	#22-1,d2
 .wrow	moveq	#0,d3			;p
@@ -1049,7 +1033,8 @@ _t_pens
 	move.b	PA_MAP(a4,d1.w),(a1)+
 	dbf	d0,.rw
 	rts
-.ptrs	dc.l	$1fa2e,DA_FLOOR		;FloorLine: lea floorScaleCols,a1
+_t_penptrs				;(port.s: game offsets)
+	dc.l	$1fa2e,DA_FLOOR		;FloorLine: lea floorScaleCols,a1
 	dc.l	$1f154,DA_FLOOR		;dofloor (FloorLine's overwrites it)
 	dc.l	$1f2ea,DA_FLOOR		;dofloorGOUR
 	dc.l	$1f39a,DA_FLOOR
@@ -1058,7 +1043,8 @@ _t_pens
 	dc.l	$22672,DA_POLY		;dopolyh
 	dc.l	$21086,DA_WATER		;texturedwater: movea.l #brightentab,a1
 	dc.l	0
-.halve	dc.l	$1a4f0			;see-through walls' brightness rows (words)
+_t_halve				;(port.s: game offsets)
+	dc.l	$1a4f0			;see-through walls' brightness rows (words)
 	dc.w	33
 	dc.l	$1a772			;walls'
 	dc.w	65
