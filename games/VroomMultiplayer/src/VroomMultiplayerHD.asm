@@ -36,7 +36,7 @@ EXPMEM	= $0
 ;=============================================================================
 
 _base	SLAVE_HEADER						;ws_Security + ws_ID
-		dc.w	13					;ws_Version
+		dc.w	16					;ws_Version (16: PL_PA, PL_PSS)
 		dc.w	WHDLF_NoError|WHDLF_NoKbd|WHDLF_EmulTrap;ws_flags
 		dc.l	BASEMEM					;ws_BaseMemSize
 		dc.l	0					;ws_ExecInstall
@@ -49,6 +49,9 @@ _expmem		dc.l	EXPMEM					;ws_ExpMem
 		dc.w	_name-_base				;ws_name
 		dc.w	_copy-_base				;ws_copy
 		dc.w	_info-_base				;ws_info
+		dc.w	0					;ws_kickname (version 16 fields)
+		dc.l	0					;ws_kicksize
+		dc.w	0					;ws_kickcrc
 
 ;============================================================================
 
@@ -96,6 +99,8 @@ _start	;	A0 = resident loader
 	bra	.commun
 
 .v1	MOVE.B	#$60,$401EE
+	move.l	#$4E714E71,$401EA	; bsr.w $401FC: the boot block's AGA check
+					; again (move.w #0,$DFF07C: SNOOP), its d0 unused
 	PEA	_PatchV1(PC)
 	MOVE.L	(SP)+,$401F8
 	move.l	#1,$100	; v1
@@ -159,7 +164,10 @@ _cont
 	MOVE.W	#$6052,$1ED06-$1ea84+6(a0)
 
 	bsr	_InstKey	
-	JMP	$3658
+	tst.l	d0			; v1: the fixes (src/fixes.i)
+	bne.b	.v2
+	bsr	Fix
+.v2	JMP	$3658
 
 _InstKey
 	movem.l	a0-a1,-(a7)
@@ -248,6 +256,10 @@ _SaveTrackVx
 
 _SaveDiskName	dc.b	'Disk.1',0
 		even
+; where the init code writes the VBL routine's vectors (src/smc.i), and the fixes
+SMC_VBLW1	= $3ABA		; the address in move.l #x,$B02E
+SMC_VBLW2	= $3AC4		; the address in move.l #x,$B028
+	INCLUDE	fixes.i
 _resload	dc.l	0
 
 _LoadTrack	MOVEM.L	D0/D1/A0-A2,-(SP)
