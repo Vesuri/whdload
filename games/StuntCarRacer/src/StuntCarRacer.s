@@ -61,6 +61,8 @@
 ;		$59fe104b which is incorrect! Harry did it correctly!
 ;---------------------------------------------------------------------------*
 
+; vasm: the nine cmp/add/and #imm,Dn below are written cmpi/addi/andi, the encodings
+; StingRay's assembler emitted; with them the source rebuilds the v1.4 slave byte-identically.
 		INCDIR	SOURCES:Include/
 		INCLUDE	whdload.i
 		INCLUDE	whdmacros.i
@@ -248,7 +250,7 @@ _PatchGame	lea	_PL_Game(pc),a0
 		jsr	resload_Patch(a2)
 
 		move.l	_expmem(pc),d0
-		add.l	#$1000,d0
+		addi.l	#$1000,d0
 		move.l	d0,$e73e		;Stack to fast memory
 		move.l	d0,$5cf42		;Stack to fast memory
 
@@ -369,7 +371,7 @@ _24Bit_Add_2_A0	bsr.b	_24Bit_Fix_A0
 
 _24Bit_Fix_A0	move.l	d0,-(sp)		;Fix 24 bit A0 bug
 		move.l	a0,d0
-		and.l	#$ffffff,d0
+		andi.l	#$ffffff,d0
 		movea.l	d0,a0
 		move.l	(sp)+,d0
 		rts
@@ -394,11 +396,11 @@ _Keybd		ror.b	#1,d0			;Stolen 6 bytes
 		eor.b	#$ff,d0
 		cmp.b	_keyexit(pc),d0
 		beq.w	_exit
-		cmp.b	#$55,d0			;F6 = Refresh boost
+		cmpi.b	#$55,d0			;F6 = Refresh boost
 		beq.w	_RefreshBoost
-		cmp.b	#$56,d0			;F7 = Switch turbo on/off
+		cmpi.b	#$56,d0			;F7 = Switch turbo on/off
 		beq.w	_ToggleTurbo
-		cmp.b	#$5f,d0			;Help = Win the race!
+		cmpi.b	#$5f,d0			;Help = Win the race!
 		beq.w	_WinRace
 		rts
 
@@ -424,9 +426,9 @@ _Loader		movem.l	d1-d4/a0-a3,-(sp)
                 move.l  _resload(pc),a2		;a0 = Address
 		mulu	#$200,d1		;d1 = Offset
 		mulu	#$200,d2		;d2 = Length
-		cmp.l	#$dc00,d1		;Initial game load
+		cmpi.l	#$dc00,d1		;Initial game load
 		beq.b	_DiskLoad
-		cmp.l	#$a00,d1		;When game starts, it loads this
+		cmpi.l	#$a00,d1		;When game starts, it loads this
 		beq.b	_TimesLoad
 
 		move.l	d2,d0			;d0 = Length
@@ -435,7 +437,7 @@ _Loader		movem.l	d1-d4/a0-a3,-(sp)
 		lea	_SaveFileSize(pc),a3	;a3 = Save game file size
 		move.l	d1,d4
 		add.l	d0,d4			;d4 = Minimum file size required
-		cmp.w	#1,d3			;0 = read, 1 = write
+		cmpi.w	#1,d3			;0 = read, 1 = write
 		beq.b	_Save
 
 		move.l	(a3),d3			;Check that the load operation
@@ -469,7 +471,7 @@ _TimesLoad	move.l	a0,a1			;a1 = Source
 		move.l	d0,d3
 		movem.l	(sp)+,d0-d1/a0-a1
 		
-		cmp.l	#$200,d3
+		cmpi.l	#$200,d3
 		bne.b	_DiskOpDone
 
 		jsr	resload_LoadFile(a2)

@@ -1,0 +1,105 @@
+Short:    HD-Installer for Stunt Car Racer V1.3
+Author:   Codetapper/Action (codetapper@hotmail.com), ICQ: 26051687, StingRay
+Uploader: Codetapper/Action (codetapper@hotmail.com)
+Version:  1.4
+Type:     game/patch
+
+This patch applies to "Stunt Car Racer" (c) 1989 Microstyle - 1 disk.
+Supported versions: - Original release (Carlo Pirri)
+                    - TNT (The New Tracks) release (AmiGer)
+
+REQUIREMENTS:
+- Slave requires WHDLoad V10+.
+- Game requires 0.5Mb chip memory (+0.4Mb other memory for preload option)
+
+VERSION 1.0: (14-Jan-1997)
+- Full load from HD
+- Loads and saves driver information to a separate file (which can be
+  unpacked back onto a disk using DiskWiz or a similar utility)
+- Included save file has all 4 super division tracks ready for racing
+- Quit option (default key is '*' on keypad)
+
+VERSION 1.1: (12-Dec-1999)
+- Trainer added (F1 to toggle infinite boost, Help to win the race)
+- Turbo mode included (toggle with F2)
+- ButtonWait tooltype added for loading picture
+- 24 bit access faults fixed (x2)
+
+VERSION 1.2: (20-Feb-2002)
+- Now supports the original (thanks to Harry and Galahad/Fairlight!)
+- Loads and saves fastest lap and track times
+- Loading a non existant save game no longer quits the game
+- Turbo mode code completely rewritten
+- When turbo mode is enabled, the word TURBO will appear in the top left
+  corner of the screen to show that it is active
+- Tooltype CUSTOM1=1 added to automatically start with infinite boost
+- Tooltype CUSTOM2=1 added to automatically start with turbo mode enabled
+- Instructions included
+- Trainer keys changed to F6/F7 since game uses F1 to redefine keys while
+  it is paused
+- Audio filter disabled for clearer sound
+- Beautiful RomIcon, NewIcon and GlowIcon (all created by Frank!) and 2 
+  Exoticons (taken from http://exotica.fix.no)
+- Existing save game renamed from "highs" to "StuntCarRacer.save"
+- Slave heavily optimised
+- Quit key changed to F10
+
+VERSION 1.3: (18-Dec-2004)
+- Supports the TNT version made by AmiGer/CARE
+- Fire button will bypass name entry sequence
+- Slave optimised (due to one of the decryption keys being wrong)
+- Turbo text will no longer corrupt any pictures in the top left corner
+- Icon modifications
+
+VERSION 1.4: (08-Jul-2ß23)
+- Keyboard problems fixed (issue #3512)
+- WHDLoad v17+ features used
+- Source code included
+
+The turbo mode code removes two delays and speeds up the game on most
+systems.  If you use the turbo mode in conjunction with the CACHE tooltype,
+you will be in for a very fast race!  If you also add the NTSC tooltype on
+PAL machines, you will get an even faster game!  The turbo mode code works
+very well on 68030 machines but may cause some graphical glitches or no
+noticable speed improvement on Amigas equipped with a 68040 or 68060 so
+tough luck!  On these later 2 CPU's, treat the turbo mode as an
+experimental patch which may or may not work for you.  Do not report bugs
+with it as it is only a hack and was not in the original game.
+
+The turbo mode code was ripped from an AGA fix of the game by Galahad and
+was improved by me!  It also now displays the word TURBO in the top left
+corner of the screen if the turbo mode is activated.
+
+If you are upgrading from versions 1.0 or 1.1 of the existing hard drive
+installer for this game, please rename your save game file from "highs" to
+"StuntCarRacer.save".
+
+This install now supports the TNT version created by AmiGer/CARE which
+allows you to play the game with 8 new tracks and colours!  A big thank you
+to AmiGer for all his hard work putting the game together!
+
+Greetings to Harry for decrypting the game, Galahad/Fairlight for the turbo
+mode, Carlo for the original and reporting the bug in the install script,
+AmiGer for the new TNT version, Frank for the superb icons (it must have
+taken ages to remove the text from the loading pic!), Angus for testing,
+the Exotica team for the exoticons, Wepl, all Action members and the whole
+WHDLoad team!
+
+
+Codetapper/Action (20-Dec-2004)
+StingRay/[S]carab^Scoopex (08-Jul-2023)
+
+
+         Bug report form, full WHDLoad package and other installs:
+                          http://www.whdload.de/
+
+            ________  ________  ________  ____  ________  ________
+           _)       \_)       \_)       \_)   \_)       \_)       \
+   __ ___ /___/     /   /_____/\  /     /     /   /     /   /     /
+  /_//__// \___    /   /     /CT\/     /     /   /     /   /     /
+        /___/     /___      /   /     /_____/___      /___/     /___ __
+            \____/    \____/    \____/          \____/    \____//__//_/
+
+
+           Visit the Action website for more of our productions:
+                           http://zap.to/action/

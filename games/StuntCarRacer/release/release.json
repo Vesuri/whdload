@@ -1,0 +1,20 @@
+{
+  "archives": [
+    {
+      "input": "StuntCarRacer.lha",
+      "output": "StuntCarRacerEnhanced-{version}-{date}.lha",
+      "replace": {
+        "StuntCarRacerHD/StuntCarRacer.slave": "build:StuntCarRacer",
+        "StuntCarRacerHD/ReadMe": "release/ReadMe"
+      },
+      "add": {},
+      "remove": [],
+      "source": {
+        "dir": "StuntCarRacerHD/Source",
+        "variants": [
+          "StuntCarRacer"
+        ]
+      }
+    }
+  ]
+}
