@@ -19,4 +19,7 @@ on both, against 16.5-16.7).
 2. The crash's flying wheel in the frames between ticks is reviewed, not yet seen: a test
    needs a hard crash (`tools/vmp.py drive` does not get the car going: full throttle from the
    grid crashes it at once, in the original loop too).
-3. A release: a dated `$VER`, a ReadMe entry above CFou's.
+3. The release 2.0b (27.11.2026) is packaged (`make dist`: `release/ReadMe`, and
+   `release/Install`, which sets `CUSTOM1=1` and `CACHE` in the installed icon as Vroom's
+   does; the script itself has not been run under the Installer) and not yet published
+   (`make release PUBLISH=1`).

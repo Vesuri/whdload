@@ -5,7 +5,8 @@
       "output": "VroomMultiplayerEnhanced-{version}-{date}.lha",
       "replace": {
         "VroomMultiplayerHd/VroomMultiplayer.slave": "build:VroomMultiplayer",
-        "VroomMultiplayerHd/ReadMe": "release/ReadMe"
+        "VroomMultiplayerHd/ReadMe": "release/ReadMe",
+        "VroomMultiplayerHd/Install": "release/Install"
       },
       "add": {},
       "remove": [],

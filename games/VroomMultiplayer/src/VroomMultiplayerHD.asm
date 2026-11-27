@@ -55,22 +55,15 @@ _expmem		dc.l	-ENH_EXPSIZE				;ws_ExpMem (optional: src/enhanced.i)
 
 ;============================================================================
 
-	IFD BARFLY
-	DOSCMD	"WDate	>T:date"
-	ENDC
-
 _config	dc.b	"C1:B:Enhanced framerate",0
 _data	dc.b	0
 _name	dc.b	"Vroom Multiplayer",0
 _copy	dc.b	"1993 Lankhor",0
 _info	dc.b	"Install by Mr.Larmer Updated by CFou!",10
-	dc.b	"Version 1.6 "
-	IFD BARFLY
-	INCBIN	"T:date"
-	ELSE
-	dc.b	"(03.06.2006)"	; vasm: the date Barfly's WDate wrote
-	ENDC
+	dc.b	"enhanced by Vesuri",10
+	dc.b	"Version 2.0b (27.11.2026)"
 	dc.b	0
+	dc.b	"$VER: VroomMultiplayer.slave 2.0b (27.11.2026)",0
 
 	even
 
