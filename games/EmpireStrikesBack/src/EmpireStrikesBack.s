@@ -350,4 +350,6 @@ _PL_Game	PL_START
 		PL_PS	$438de,FixVlineStart
 		PL_PS	$5c5ac,FixDigitStart
 		PL_PS	$5c5f2,FixDigitStart
+		PL_P	$5c5a6,FixDigitColour	;Flush after the opcode copies
+		PL_PSS	$43858,FixVlineColour,2
 		PL_END

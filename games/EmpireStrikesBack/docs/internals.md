@@ -60,6 +60,8 @@ and the few that took two now take three.
 | $435b2 | `PL_PSS FixPlotStart,2` | the star plot waits for the blitter, then its two instructions |
 | $438de | `PL_PS FixVlineStart` | the CPU vertical line waits for the blitter |
 | $5c5ac, $5c5f2 | `PL_PS FixDigitStart` | the HUD digits wait for the blitter |
+| $5c5a6 | `PL_P FixDigitColour` over `movem.l (sp)+,d1/a0-a4; rts` | the digit colour setter flushes the caches after its opcode copy |
+| $43858 | `PL_PSS FixVlineColour,2` over the four moves | the vertical line flushes the caches after its opcode copy |
 
 The patches from $1806 on are `src/EmpireStrikesBackFixes.s`, always on.
 
@@ -74,6 +76,16 @@ The patches from $1806 on are `src/EmpireStrikesBackFixes.s`, always on.
   the blitter first: with the game in Chip RAM and BLTPRI set, a 68000 could not run
   during a blit, while a CPU running from its cache can, and the line drawer returns with
   its last plane's blit running.
+- **Self-modified drawing code.** The digit colour setter $5c56a copies a colour's four
+  per-plane opcodes (`or.b d1` sets a plane, `and.b d2` clears it; 14 bytes a colour
+  at $43a8c, the colour's bits in order) into the HUD digit plots at $5c5dc, $5c62c and
+  $5c640, and the vertical line $43832 copies them into its loop at $43908 when the
+  colour ($940) changes: the same pattern as Star Wars' plot. With an instruction cache
+  the CPU can run the previous colour's opcodes. Both now call `resload_FlushCache`
+  after the copy, so the code that runs is still the original's. FS-UAE's a1200-060
+  drew the HUD digits in their colours before and after (its cache emulation does not
+  show the stale opcodes); a memory dump after play showed these the only code bytes the
+  game rewrites.
 - **Masks.** Unlike Star Wars, every blit that uses the A channel writes BLTAFWM and
   BLTALWM (the line drawer $ffff, the rectangle $43d04 from its tables, $47e40 as a
   long); the shape blits ($47100, $5c1c2) use B, C and D only.

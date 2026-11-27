@@ -67,3 +67,24 @@ FixVlineStart	bsr.b	FixBlitIdle		; vertical line: movea.l $936.w,a0
 FixDigitStart	bsr.b	FixBlitIdle		; HUD digits: lea $5c658,a1
 		lea	$5c658,a1
 		rts
+
+; Self-modified drawing code. The digit colour setter $5c56a copies the four per-plane
+; opcodes of a colour (or.b d1 to set a plane, and.b d2 to clear it; the table at
+; $43a8c) into the HUD digit plots at $5c5dc, $5c62c and $5c640, and the vertical line
+; $43832 copies them into its own loop at $43908 when the colour changes. With an
+; instruction cache the CPU can keep running the previous colour's opcodes. Both now
+; flush the caches after the copy (resload_FlushCache keeps every register); the code
+; that runs is the original's.
+
+FixDigitColour	movem.l	(sp)+,d1/a0-a4		; the setter's end
+		bra.b	FixFlush
+
+FixVlineColour	move.w	(a0)+,(a1)+		; the vertical line's copy
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+		move.l	(a0)+,(a1)+
+FixFlush	move.l	a0,-(sp)
+		move.l	_resload(pc),a0
+		jsr	resload_FlushCache(a0)
+		move.l	(sp)+,a0
+		rts
