@@ -304,8 +304,9 @@ just step further, up to 15 fields.
      both views, a1200-030). Only its larger ChipMem and ExpMem remain.
    - The speeds against the original are in
      [performance](performance.md#against-the-original-step-8).
-   - Psygore's no-music slave (and so ours) never reaches the menu on the emulated 28 MHz
-     68020; the music slave does. Not looked into.
+   - Psygore's no-music slave never reaches the menu on the emulated 28 MHz 68020: the
+     game's field waits poll a VERTB that the slave's handler acks first. Ours waits on
+     the beam there instead (`_p_waitvb`, [internals](internals.md#slave-patches)).
    - The option applies on every CPU (decided 27.11.2026); the ReadMe gives each CPU's
      frame rates and suggests the original display on a 14 MHz 68020. Letting the
      installer ask is a possibility (open decisions).

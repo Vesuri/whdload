@@ -73,7 +73,18 @@ Ours adds, with CUSTOM5 and in `_pl_v3` only (a `PL_IFC5` block):
 
 Without `-DORIGINAL` the source assembles these; with it (`BUILD=original`), Psygore's
 bytes. Outside the `PL_IFC5` block both slaves' lists patch the same offsets the same way
-(`python3 -m amigaxdev.patchlist`, which stops at `PL_IFC5`).
+(`python3 -m amigaxdev.patchlist`, which stops at `PL_IFC5`), but for one fix ours adds to
+`_pl_v2` and `_pl_v3`, with or without CUSTOM5:
+
+- `_p_waitvb` at the game's four field waits ($c4dc: $2830, $317a, $49020 and $490b4;
+  $fd78: $2862, $3176, $49388 and $4941c; a `PL_S` past each one's 18 bytes). Each polls
+  INTREQR for VERTB (`btst #5,$dff01f`) and then acks it, but the slave's `_level3` acks
+  VERTB as soon as the interrupt is taken, so a poll sees the bit only if it happens to
+  read it before the CPU takes the interrupt. On the emulated 28 MHz 68020 the no-music
+  slave's never did: the title's fade-in ($49008) waited for ever on a black screen
+  (Psygore's slave too). `_p_waitvb` waits for the next field's line 0 on the beam (V8 set,
+  then clear), as `_waitvbl` does. The floppy version's (`_pl_v1`) are not patched: no
+  archive holds it.
 
 ## Display
 

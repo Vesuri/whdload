@@ -28,9 +28,6 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
    variants, the two-player link and CUSTOM5 off are checked, and the option applies on
    every CPU with the ReadMe's suggestions (27.11.2026). Next step 9, the CD32 version;
    open is whether the installer should ask for the option.
-4. Psygore's no-music slave never reaches the menu on the emulated 28 MHz 68020
-   (`baseline.sh` machine `a1200-28`), with the option off as well; the music slave does.
-   Not looked into.
 
 ## Releases
 

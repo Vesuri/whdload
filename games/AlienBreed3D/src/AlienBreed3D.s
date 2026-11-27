@@ -467,6 +467,17 @@ L06a2
 	btst	#0,$dff005
 	bne.s	L06a2
 	rts
+	IFND	ORIGINAL
+_p_waitvb			;the game's field waits poll INTREQR for VERTB, which _level3
+				;acks as soon as it is set, so a poll sees it only by its
+				;timing (the no-music slave on a 28 MHz 68020: never, and the
+				;title's fade never ended); a wait to the next field's line 0
+.v8	btst	#0,$dff005	;(V8 set, then clear) instead
+	beq.s	.v8
+.top	btst	#0,$dff005
+	bne.s	.top
+	rts
+	ENDC
 _pl_v2
 	PL_START
 	PL_IFC1X	2
@@ -521,6 +532,16 @@ _pl_v2
 	PL_NOP	$b12a4,$4
 	PL_PS	$b12a8,_endcopper
 	PL_P	$b12da,_endpart
+	IFND	ORIGINAL		;the field waits poll INTREQR for VERTB (_p_waitvb)
+	PL_PS	$2862,_p_waitvb
+	PL_S	$2868,$c
+	PL_PS	$3176,_p_waitvb
+	PL_S	$317c,$c
+	PL_PS	$49388,_p_waitvb
+	PL_S	$4938e,$c
+	PL_PS	$4941c,_p_waitvb
+	PL_S	$49422,$c
+	ENDC
 	PL_END
 _pl_v3
 	PL_START
@@ -574,6 +595,16 @@ _pl_v3
 	PL_W	$9b242,$200
 	PL_PS	$9b658,_p_waitlines
 	PL_PS	$9b67c,_p_waitlines
+	IFND	ORIGINAL		;the field waits poll INTREQR for VERTB (_p_waitvb)
+	PL_PS	$2830,_p_waitvb
+	PL_S	$2836,$c
+	PL_PS	$317a,_p_waitvb
+	PL_S	$3180,$c
+	PL_PS	$49020,_p_waitvb
+	PL_S	$49026,$c
+	PL_PS	$490b4,_p_waitvb
+	PL_S	$490ba,$c
+	ENDC
 	IFND	ORIGINAL
 	PL_IFC5
 	PL_PS	$44aa4,_p_loaded	;the palette (palette.s)
