@@ -13,5 +13,11 @@ release 2.0b has the dated `$VER`, the ReadMe entry and the icons' `CUSTOM1=1`.
    (`sweep` reaches them, not every run) and add them to `SM_STATES`, with sites for any
    direct screen writer a mismatch shows (candidates: $1ed8, $1f0c, $461cc, $46220,
    $47108, $49af0, $5c010, $5d342).
-2. Frames cost 170 to 250 lines on the 030/040, mostly blitter lines and the chip bus:
-   fewer redrawn bands (a line's rows, not its bands) would give more in-between frames.
+2. The wave select ($0b) and the high-score roster ($0e): every exact frame differs in
+   the `check` build, so a direct screen writer there is not yet a site. Then the
+   attract's pages ($11-$13).
+3. Frames cost about 250 lines on the 030 (heavy scenes far more): the line drawer
+   blits all four planes of every line (zeros into the planes its colour lacks), which
+   in-between frames could skip with a line routine of their own; and the data cache
+   for ExpMem (CACHE leaves it off; Chip RAM must stay uncached, the blitter writes it).
+4. Late ticks in heavy scenes still put the game into direct mode for 50 ticks.

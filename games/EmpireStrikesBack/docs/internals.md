@@ -74,6 +74,8 @@ framerate's (below, `src/EmpireStrikesBackSmooth.s`):
 |---|---|
 | $226c | `PL_PS SmTick` over `lea $90e.w,a0; move.w (a0)+,d0`: a tick begins (recording) |
 | $5dc02 | `PL_P SmSwap` over `jsr $40ac4`: the tick's frames presented |
+| $1806 | `PL_PS SmVbl` over `jsr $52690` (FixVblCount): the field count, then the queued frame shown from its field |
+| $2256 | `PL_L $2258` in `lea $70000,sp`: the main loop's stack at $60000, below the extra screens |
 | $435f2, $43832, $435a0, $43d04, $3f742 | `PL_P` the line, vertical line, plot, horizontal line and clear: recorded |
 | $5c56a, $5c5ac, $5c5f2 | `PL_P` the text colour and the glyphs: recorded |
 | $47de6, $47f0a, $4630a, $494aa, $5bf90, $5c008, $5b428, $2d04, $470fa, $5c1bc | `PL_P` the sites (code that writes the screen itself): recorded with its registers |
@@ -147,27 +149,49 @@ the attract run as without it). The slave asks for an optional ExpMem of about 8
   pairs each with the previous tick's op of the same key. Pairs that moved more than 40
   pixels (96 for keyed ones) are not interpolated.
 - **Presenting.** At the swap the recording is drawn at 1/3 and 2/3 of the way from the
-  previous one, then exactly, one frame a field, each into the game's screen not on
-  display ($70000/$78000); the exact frame is left as the game's swap would leave it.
-  An in-between frame is drawn only if it makes its field (by the last frame's drawing
-  time) and leaves the exact frame its time after it. When more than half of the recent
-  ticks are late, ticks run as the default runs them (direct) until a direct tick's work
-  plus a frame fits again.
+  previous one, then exactly. The exact frame goes into the game's back screen
+  ($70000/$78000), as the game would have drawn it, and the game's screens are left as
+  its swap leaves them. The in-between frames go into two more screens in free Chip RAM,
+  $60000 and $67d00: the image ends at $5e500 and the stack sat below $70000, and the
+  line drawer adds its offset to the screen's low word, so each screen lies in one 64 KB
+  bank and the main loop's stack moves to $60000 (it used 326 bytes in every state
+  reached). Each frame is drawn for the first field it can make (by the last frame's
+  drawing time) and queued, one at most, while the next is drawn; the VBL server ($1806)
+  shows it from its field, writing BPL1PT-BPL4PT before the display starts (the copper
+  list at $1bc4 loaded the old pointers at line 0) and the copper list's words. So the
+  swap returns once the exact frame is queued, and the next tick's logic overlaps the
+  frames still to be shown. An in-between frame is drawn only if the exact frame still
+  makes its field after it, and only for a recording that starts with the clear. A tick
+  that draws directly (a state not presented, or direct mode) first waits until no frame
+  is queued. When more than half of about the last 16 ticks are late, ticks run as the
+  default runs them (direct) until a direct tick's work plus a frame fits again.
 - **Bands.** A frame is drawn only where it differs from what its screen shows: each of
-  25 bands of 8 rows has a signature (the ops drawn in it, as drawn), and only bands whose
-  signature changed are cleared (blits) and drawn again, with every band of any op drawn.
-  Anything else that draws into the screens (a direct tick, the attract's frames, a
-  draw outside the tick's screen) invalidates the signatures.
+  25 bands of 8 rows of each of the four screens has a signature (the ops drawn in it,
+  as drawn), and only bands whose signature changed are cleared (by the CPU, 32 bits at a
+  time: half the time of the four 16-bit blits) and drawn again, with every band of any
+  op drawn. Anything else that draws into the game's screens (a direct tick, the
+  attract's frames, a draw outside the tick's screen) invalidates their signatures.
+- **Glyphs.** The HUD's glyphs are replayed by the slave's own routine: the font at
+  $5c658, each plane set or cleared by the colour's bit, as the opcodes $5c56a copies
+  from $43a8c do, without copying them or flushing the caches. After the exact frame the
+  game's setter runs once with the tick's last text colour, as the tick would leave it.
 
 Checked with the `check` and `verify` builds (`development.md`): the exact replay
-compared with what the tick drew, and each frame drawn by bands with the same frame
-drawn whole. In waves 1 to 3 (states 0, 1, 2, $0a) every compared frame matched (73 of
-73 in the last wave-3 run; 1388 in a long state-0 run). Measured on the a1200-030 and
-a1200-040 in play: 1.5 to 2.6 frames a tick depending on the scene (the frames cost 170
-to 250 raster lines on average, up to 900 with an explosion: the blitter lines and the
-chip bus, not the CPU), and the game's speed is the default's (fields a tick against
-the `direct` build: 3.13/3.38 on the 030, 3.61/3.58 on the 040, 4.07/4.06 on the
-a1200). A stock A1200 mostly stays direct.
+compared with what the tick drew, and each frame drawn by bands (the extra screens'
+included) with the same frame drawn whole. In state 0 on the a1200-030 all 530 exact
+frames matched; on the a1200-040 (`verify`, wave 1 picked, then its later phases) all
+783, in states 0, 1, 2 and $0a, and all 1289 frames drawn by bands. In $0a one exact
+frame of 85 differs (`open-work.md`).
+
+Measured on the a1200-030 in wave play (`tools/esb.py sm` per 250 fields), with the
+queue: 2.3 to 2.9 frames a tick in most rounds (before it, with only the game's two
+screens, 1.78 over 2008 ticks: half the CPU's time waited for a screen to be free).
+A frame costs about 250 raster lines (the `timing` build: lines 50-90, the clear 42,
+glyphs 52-67, most of them the blitter's line time, SmPrep 20); heavy scenes (large
+models across the screen) still fall to the exact frame only. The a1200-040: 1.75 to
+2.3. The stock a1200 presents some in-between frames in light scenes. The game's speed
+is the default's: fields a tick against the `direct` build, 3.11/3.08 on the 030,
+3.14/3.21 on the a1200 (the same route, different play).
 
 ## Limitations
 

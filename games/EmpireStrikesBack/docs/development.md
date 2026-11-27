@@ -37,7 +37,8 @@ $0b, about 1.5 s with its countdown), firing at a planet: move the mouse at once
 
 ## Enhanced framerate builds
 
-Run with `WHD_ARGS="CUSTOM1=1"` on a 68020 or better setup. game.conf defines:
+`make run` on a 68020 or better setup passes `CACHE` and `CUSTOM1=1`, as the installed
+icon does (`ENHANCED=0` leaves CUSTOM1 out). game.conf defines:
 
 | BUILD | What |
 |---|---|

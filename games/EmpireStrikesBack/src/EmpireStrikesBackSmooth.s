@@ -19,10 +19,13 @@
 ; (a hash table). Unpaired ops, and ops that moved more than SM_T pixels (SM_TID for the
 ; keyed ones), are drawn where they are now.
 ;
-; Screens: the game's two. Each frame is drawn into the one not on display, once the frame
-; before it is shown; the exact frame becomes the game's front screen, as its swap leaves
-; it. An in-between frame is drawn only if it can make its field (by the last frame's
-; drawing time): slow frames thin out the in-between frames, not the game.
+; Screens: the exact frame is drawn into the game's back screen, as the game would have
+; drawn it, and becomes its front screen; the in-between frames into one of two more
+; (SM_X0, SM_X1: free Chip RAM, the stack moved below them). Each frame is drawn for the
+; first field it can make (by the last frame's drawing time) and queued, one at most; the
+; VBL server ($1806) shows it from its field. An in-between frame is drawn only if the
+; exact frame still makes its field after it: slow frames thin out the in-between frames,
+; not the game.
 ;
 ; Direct mode: when more than half of the recent ticks are late, the hooks only pass
 ; through and ticks run as the default runs them, until a direct tick's work and its
@@ -35,10 +38,15 @@ SM_T		= 40			; farther than this (pixels) is not interpolated
 SM_TID		= 96			; the same for keyed ops (objects, stars)
 SM_N		= 3			; fields a tick
 SM_MARGIN	= 12			; raster lines added to the last frame's time
-SM_LATE		= 128			; more of the recent ticks late than this (of 256): direct
+SM_LATE		= 128			; more of the recent ticks late than this (of 256, about
+					; the last 16 ticks): direct
 SM_GO		= 4			; quarters of the tick's fields a smooth tick must fit in
 SM_HOLD		= 50			; direct ticks at least, before trying again
 SM_KEYS		= 16			; code addresses counted a tick (SmSeq)
+SM_X0		= $60000		; the screens for in-between frames: each in one 64 KB
+SM_X1		= $67d00		; bank, as the line drawer's address (low word) needs
+SM_STACK	= $60000		; the main loop's stack ($70000), below them
+SM_VLINE	= $28			; the VBL shows a frame no later than this line
 SM_CALLSZ	= 5			; slots of a CALL op
 	IFD	VERIFY
 SM_TIMING	= 1			; (the costs by op type, sv_tcost)
@@ -103,12 +111,16 @@ sv_ptr		rs.l	1		; next free op
 sv_end		rs.l	1		; where SmNew stops (room for a CALL op after it)
 sv_b0		rs.l	1		; the game's back screen when the tick began
 sv_disp		rs.l	1		; the screen in the copper list
+sv_odisp	rs.l	1		; the one before it (on display until sv_shown)
+sv_ready	rs.l	1		; the queued frame's screen (0: none; the VBL shows it)
 sv_tgt		rs.l	1		; the screen a frame is drawn into
 sv_l0		rs.l	1		; the time a direct tick began
 sv_jmp		rs.l	1		; SmRender: the trampoline of a CALL op
 sv_vret		rs.l	1		; VERIFY: a site's return
 sv_regs		rs.l	15		; SmRender: a CALL op's registers
 sv_shown	rs.w	1		; the field from which sv_disp is on display
+sv_rt		rs.w	1		; the field the queued frame is for
+sv_lastt	rs.w	1		; the field of the last frame queued (or skipped)
 sv_base		rs.w	1		; B: the field the last tick's exact frame was for
 sv_r		rs.w	1		; lines the last frame took to draw, plus SM_MARGIN
 sv_ravg		rs.w	1		; frame drawing time, running average (lines x 8)
@@ -151,14 +163,14 @@ sv_poff		rs.l	1		;  the first differing offset of the last such
 sv_bhist	rs.l	SM_BANDS	;  frames each band was drawn in
 sv_stn		rs.w	32		;  VERIFY: SmCheck's compared, by state,
 sv_stbad	rs.w	32		;  and differing
-sv_tsig		rs.l	2*SM_BANDS	; each screen's bands' signatures, as last drawn
-sv_tclip	rs.l	2		; and the clip window then
+sv_tsig		rs.l	4*SM_BANDS	; each screen's bands' signatures, as last drawn (the
+sv_tclip	rs.l	4		; game's two, SM_X0, SM_X1), and the clip window then
 sv_nsig		rs.l	SM_BANDS	; SmRender: this frame's
 sv_dirty	rs.l	1		; SmRender: the bands to draw (bit 31: always)
 sv_t0		rs.l	1		; SM_TIMING: SmRender's start
 sv_tmax		rs.l	1		; and its longest (lines)
 sv_cws		rs.w	SM_CWORDS	; SmRender: a site's words, while it is replayed
-sv_tok		rs.b	2		; the screen's signatures are valid
+sv_tok		rs.b	4		; the screen's signatures are valid
 sv_full		rs.b	1		; SmRender: the whole screen
 sv_part		rs.b	1		; SmRender: by bands (the recording starts clear)
 sv_SIZE		rs.b	0
@@ -178,6 +190,7 @@ SmInit		lea	SmV(pc),a0
 		move.w	#SM_MARGIN,sv_r(a0)
 		move.w	#$7fff,sv_state(a0)
 		move.l	#$70000,sv_disp(a0)
+		move.l	#$70000,sv_odisp(a0)
 .out		rts
 
 ;----------------------------------------------------------------------------
@@ -198,7 +211,9 @@ SmTick		movem.l	d0-d2/a0-a1,-(sp)
 	ENDC
 		tst.b	sv_direct(a1)
 		beq.b	.smooth
-		bsr	SmNow			; direct: as the default; the time noted
+.dr		tst.l	sv_ready(a1)		; direct: as the default, once the last
+		bne.b	.dr			; frame queued is shown; the time noted
+		bsr	SmNow
 		move.l	d0,sv_l0(a1)
 		bsr	SmInval
 		clr.b	sv_ran(a1)
@@ -209,7 +224,9 @@ SmTick		movem.l	d0-d2/a0-a1,-(sp)
 		move.l	#SM_STATES,d1
 		btst	d0,d1
 		bne.b	.known
-.plain		clr.b	sv_ran(a1)
+.plain		tst.l	sv_ready(a1)		; (once the last frame queued is shown)
+		bne.b	.plain
+		clr.b	sv_ran(a1)
 		bsr	SmInval
 		bra.b	.out
 .known		moveq	#0,d2			; the previous recording pairs if it is the
@@ -259,12 +276,30 @@ SmRec		MACRO
 .y\@
 		ENDM
 
-; The screens' contents are no longer what their band signatures say (drawn directly).
+; The game's screens' contents are no longer what their band signatures say (drawn
+; directly). SM_X0 and SM_X1 only the replay draws into.
 SmInval		move.l	a1,-(sp)
 		lea	SmV+sv_tok(pc),a1
 		clr.b	(a1)+
 		clr.b	(a1)
 		move.l	(sp)+,a1
+		rts
+
+; a3: SmV -> d0.w: sv_tgt's screen (0 $70000, 1 $78000, 2 SM_X0, 3 SM_X1)
+SmSIdx		move.l	sv_tgt(a3),d0
+		cmp.l	#$70000,d0
+		beq.b	.0
+		cmp.l	#$78000,d0
+		beq.b	.1
+		cmp.l	#SM_X0,d0
+		beq.b	.2
+		moveq	#3,d0
+		rts
+.0		moveq	#0,d0
+		rts
+.1		moveq	#1,d0
+		rts
+.2		moveq	#2,d0
 		rts
 
 ; After recording a call: back to the caller. The VERIFY build also runs the original
@@ -740,7 +775,7 @@ SmS5		dc.w	29,53,0,0
 SmSwap		movem.l	d0-d7/a0-a6,-(sp)
 		lea	SmV(pc),a3
 		btst	#0,sv_rec(a3)
-		bne.b	.present
+		bne.w	.present
 		tst.l	sv_mem(a3)
 		beq.b	.orig
 		bsr	SmInval			; a frame the game drew (the attract's too)
@@ -767,8 +802,20 @@ SmSwap		movem.l	d0-d7/a0-a6,-(sp)
 		bhs.b	.orig
 		clr.b	sv_direct(a3)
 .orig		movem.l	(sp)+,d0-d7/a0-a6
-		jsr	$40ac4			; the original
+		jsr	$40ac4			; the original, back here after its rts
+		pea	.swapped(pc)
 		jmp	$5dc08
+.swapped	movem.l	d0/a3,-(sp)		; its front screen is in the copper list,
+		lea	SmV(pc),a3		; shown from the next field
+		tst.l	sv_mem(a3)
+		beq.b	.sx
+		move.l	sv_disp(a3),sv_odisp(a3)
+		move.l	$93a.w,sv_disp(a3)
+		bsr	SmField
+		addq.w	#1,d0
+		move.w	d0,sv_shown(a3)
+.sx		movem.l	(sp)+,d0/a3
+		rts
 
 .present	clr.b	sv_rec(a3)
 		addq.l	#1,sv_ticks(a3)
@@ -789,51 +836,75 @@ SmSwap		movem.l	d0-d7/a0-a6,-(sp)
 	IFD	VERIFY
 		bsr	SmCheck
 	ENDC
-		move.w	sv_late(a3),d1		; late ticks: the share decays by 1/4 a tick
-		lsr.w	#2,d1
+		move.w	sv_late(a3),d1		; late ticks: the share decays by 1/16 a tick
+		lsr.w	#4,d1
 		sub.w	d1,sv_late(a3)
-		bsr	SmField			; B: back in step if the exact frame cannot
-		sub.w	sv_base(a3),d0		; make its field any more, or implausibly
-		cmp.w	#SM_N-1,d0		; early
+		bsr	SmField			; B: back in step if late by more than a
+		sub.w	sv_base(a3),d0		; frame, or implausibly early
+		cmp.w	#SM_N-1,d0
 		bgt.b	.lt
 		cmp.w	#-6,d0
-		bge.b	.go
+		bge.b	.ins
 		bra.b	.rs
 .lt		tst.b	sv_ok(a3)		; (late, unless the state just began)
 		beq.b	.rs
 		bsr	SmLate
 .rs		bsr	SmField
+		move.w	d0,sv_lastt(a3)
+		subq.w	#1,d0
 		move.w	d0,sv_base(a3)
-.go		moveq	#SM_N,d6		; nothing to pair with: the exact frame only
-	IFND	SM_ALLSTATES			; (checking them all: always, at the game's
-		tst.b	sv_ok(a3)		; speed)
-		beq.b	.ex
-		moveq	#1,d6
+.ins		moveq	#OP_TYPE,d0		; in-between frames only for a recording
+		move.l	sv_cur(a3),a0		; that starts with the clear (the others
+		and.b	(a0),d0			; draw over what the game's screen holds)
+		cmp.b	#OP_CLEAR,d0
+		sne	d5
+	IFND	SM_ALLSTATES			; (checking them all: the exact frame only,
+		tst.b	sv_ok(a3)		; at the game's speed)
+		bne.b	.frame
 	ENDC
-.frame		cmp.w	#SM_N,d6
+		st	d5
+.frame		move.w	sv_r(a3),d0		; j: the first field the frame can make, after
+		bsr	SmEta			; its drawing (by the last frame's time) and
+		move.w	sv_lastt(a3),d1		; after the frame queued last
+		addq.w	#1,d1
+		cmp.w	d1,d0
+		bpl.b	.e
+		move.w	d1,d0
+.e		sub.w	sv_base(a3),d0
+		cmp.w	#1,d0
+		bge.b	.a
+		moveq	#1,d0
+.a		cmp.w	#SM_N,d0
+		ble.b	.b
+		moveq	#SM_N,d0
+.b		move.w	d0,d6
+		cmp.w	#SM_N,d6
 		bhs.b	.ex
-		moveq	#SM_N,d0		; an in-between frame if the exact frame
-		sub.w	d6,d0			; still has its time after it (the frame
-		mulu	#313,d0			; after it starts in its field), and if
-		moveq	#0,d1			; it makes its own field: drawn before
-		move.w	sv_r(a3),d1		; that field starts
-		cmp.l	d1,d0
-		blt.b	.drop
-		bsr	SmFree
-		move.w	sv_base(a3),d0
+		tst.b	d5
+		bne.b	.xx
+		move.w	sv_r(a3),d0		; an in-between frame if the exact frame
+		move.w	d0,d1			; still makes its field after it (two frames'
+		lsr.w	#2,d1			; time from now and a quarter more: the
+		add.w	d1,d0			; recording may have grown since)
+		add.w	sv_r(a3),d0
+		bsr	SmEta
+		sub.w	sv_base(a3),d0
+		cmp.w	#SM_N,d0
+		bgt.b	.xx
+		bsr	SmFreeX			; into one of the extra screens
+		tst.l	d0
+		bne.b	.in
+		move.w	sv_base(a3),d0		; none free: skip this frame
 		add.w	d6,d0
-		bsr	SmLeft
-		cmp.l	d1,d0
-		bgt.b	.draw
-.drop		addq.l	#1,sv_dropped(a3)	; no: the next frame
-		addq.w	#1,d6
+		move.w	d0,sv_lastt(a3)
+		addq.l	#1,sv_dropped(a3)
 		bra.b	.frame
-.ex		bsr	SmFree
-.draw		bsr	SmNow
+.xx		moveq	#SM_N,d6		; no: the exact frame now
+.ex		bsr	SmWaitB0
+		move.l	sv_b0(a3),d0
+.in		move.l	d0,sv_tgt(a3)
+		bsr	SmNow
 		move.l	d0,d7
-		move.l	sv_disp(a3),d0		; the screen not on display
-		eor.w	#$8000,d0
-		move.l	d0,sv_tgt(a3)
 		bsr	SmRender
 		bsr	SmNow			; the drawing time in lines
 		sub.l	d7,d0
@@ -855,32 +926,45 @@ SmSwap		movem.l	d0-d7/a0-a6,-(sp)
 	IFD	VERIFY
 		bsr	SmPCheck		; (not timed)
 	ENDC
-		move.w	sv_base(a3),d0		; on display from its field
-		add.w	d6,d0
-		bsr	SmShow
-		addq.w	#1,d6
+.q		tst.l	sv_ready(a3)		; queue it: one frame at most waits
+		bne.b	.q
+		move.w	sv_base(a3),d4		; its field
+		add.w	d6,d4
 		cmp.w	#SM_N,d6
-		bls.w	.frame
-		move.w	sv_base(a3),d0		; the exact frame shown late?
-		addq.w	#SM_N,d0
-		sub.w	sv_shown(a3),d0
-		bpl.b	.ontime
+		bhs.b	.qe
+		bsr	SmField			; an in-between frame that missed its field
+		cmp.w	d0,d4			; (it, or the frame before it, took longer
+		bgt.b	.qe			; than planned) is dropped: queued, it would
+		move.w	d4,sv_lastt(a3)		; hold up the exact frame
+		addq.l	#1,sv_dropped(a3)
+		bra.w	.frame
+.qe		move.w	d4,sv_rt(a3)
+		move.w	d4,sv_lastt(a3)
+		cmp.w	#SM_N,d6
+		blo.b	.qq
+		bsr	SmField			; the exact frame misses its field: late
+		cmp.w	d0,d4
+		bgt.b	.qq
 		tst.b	sv_ok(a3)
-		beq.b	.rb
+		beq.b	.qq
 		bsr	SmLate
-.rb		move.w	sv_shown(a3),d0
-		subq.w	#SM_N,d0
-		move.w	d0,sv_base(a3)
-.ontime		addq.w	#SM_N,sv_base(a3)
+.qq		move.l	sv_tgt(a3),sv_ready(a3)
+		cmp.w	#SM_N,d6
+		blo.w	.frame
+		add.w	#SM_N,sv_base(a3)	; the tick is presented
+		move.w	sv_tcol(a3),d0		; the game's glyph opcodes as its tick would
+		bmi.b	.tc			; have left them (the replay's glyphs do not
+		jsr	$5c56a			; set them)
+		lea	SmV(pc),a3
+.tc
 		st	sv_ran(a3)
 		move.l	sv_tgt(a3),d0		; the game's screens as its swap leaves them:
 		move.l	d0,$936.w		; the exact frame shown, the other drawn next
 		move.w	d0,$93c.w
 		eor.w	#$8000,d0
 		move.w	d0,$938.w
-		lea	_FixFields(pc),a0	; the timing fix counts from the field before
-		lea	_FixLast(pc),a1		; the exact frame's
-		move.w	sv_shown(a3),d0
+		lea	_FixLast(pc),a1		; the timing fix counts from the field before
+		move.w	sv_base(a3),d0		; the exact frame's
 		subq.w	#1,d0
 		move.w	d0,(a1)
 		tst.b	sv_slow(a3)		; too slow for in-between frames: direct ticks
@@ -896,22 +980,15 @@ SmSwap		movem.l	d0-d7/a0-a6,-(sp)
 
 ; a3: SmV. A late tick.
 SmLate		addq.l	#1,sv_lates(a3)
-		add.w	#256/4,sv_late(a3)
+		add.w	#256/16,sv_late(a3)
 		cmp.w	#SM_LATE,sv_late(a3)
 		bls.b	.x
 		st	sv_slow(a3)
 .x		rts
 
-; a3: SmV. Waits until the screen not in the copper list is not on display either.
-SmFree		move.l	d0,-(sp)
-.w		bsr.w	SmField
-		sub.w	sv_shown(a3),d0
-		bmi.b	.w
-		move.l	(sp)+,d0
-		rts
-
-; a3: SmV, d0.w: a field -> d0.l: the lines left before it starts (negative: past)
-SmLeft		movem.l	d1-d2,-(sp)
+; a3: SmV, d0.w: a drawing time (lines) -> d0.w: the first field a frame drawn from now
+; for that long can be shown from (the VBL shows it at the field's start)
+SmEta		movem.l	d1-d2,-(sp)
 		move.w	d0,d2
 .a		bsr.w	SmField
 		move.w	d0,d1
@@ -921,31 +998,115 @@ SmLeft		movem.l	d1-d2,-(sp)
 		bsr.w	SmField
 		cmp.w	(sp)+,d0
 		bne.b	.a
-		sub.w	d0,d2			; (fields to go - 1) * 313 + 313 - line
-		subq.w	#1,d2
-		muls	#313,d2
-		add.l	#313,d2
-		ext.l	d1
-		sub.l	d1,d2
-		move.l	d2,d0
+		add.w	d2,d1
+		and.l	#$ffff,d1
+		divu	#313,d1
+		add.w	d1,d0
+		addq.w	#1,d0
 		movem.l	(sp)+,d1-d2
 		rts
 
-; a3: SmV, d0.w: the field. Puts sv_tgt into the copper list, on display from that field
-; (or the next one it can make): during the field before it, once the copper has loaded
-; the pointers (line 2). sv_shown: the field it shows from.
-SmShow		movem.l	d0-d2,-(sp)
+; a3: SmV, d0.l: a screen -> Z clear if it is on display, about to be, or queued
+SmBusy		movem.l	d1,-(sp)
+		cmp.l	sv_ready(a3),d0
+		beq.b	.y
+		cmp.l	sv_disp(a3),d0
+		beq.b	.y
+		cmp.l	sv_odisp(a3),d0
+		bne.b	.n
+		move.l	d0,-(sp)
+		bsr.w	SmField
+		sub.w	sv_shown(a3),d0
+		movem.l	(sp)+,d0		; (flags kept)
+		bmi.b	.y
+.n		moveq	#0,d1			; Z set: free
+		movem.l	(sp)+,d1
+		rts
+.y		moveq	#1,d1
+		movem.l	(sp)+,d1
+		rts
+
+; d0.w <- INTENAR; the interrupts off
+SmDi		move.w	$dff01c,d0
+		move.w	#$4000,$dff09a
+		rts
+; d0.w: SmDi's INTENAR: the interrupts on again if they were
+SmEi		btst	#14,d0
+		beq.b	.x
+		move.w	#$c000,$dff09a
+.x		rts
+
+; a3: SmV -> d0.l: SM_X0 or SM_X1, whichever is neither on display nor queued, waiting
+; for the queued frame to be shown if both are; 0 if there is none (one is shown and the
+; other queued: a frame skipped, not waited for).
+SmFreeX		movem.l	d1-d2,-(sp)
+.again		bsr	SmDi			; (no VBL between the tests)
 		move.w	d0,d2
-		subq.w	#1,d2
-.w		bsr.w	SmField
-		sub.w	d2,d0
-		bmi.b	.w
-.l		bsr.w	SmLine0
-		cmp.w	#2,d0
-		blo.b	.l
-		move.l	sv_tgt(a3),d1		; as the swap writes them
+		move.l	#SM_X0,d0
+		bsr	SmBusy
+		beq.b	.ok
+		move.l	#SM_X1,d0
+		bsr	SmBusy
+		beq.b	.ok
+		move.w	d2,d0
+		bsr	SmEi
+		moveq	#0,d0
+		bra.b	.x
+.ok		move.l	d0,d1
+		move.w	d2,d0
+		bsr	SmEi
+		move.l	d1,d0
+.x		movem.l	(sp)+,d1-d2
+		rts
+
+; a3: SmV. Waits until the game's back screen (sv_b0) is neither on display nor queued.
+SmWaitB0	move.l	d0,-(sp)
+.w		move.l	sv_b0(a3),d0
+		bsr	SmBusy
+		bne.b	.w
+		move.l	(sp)+,d0
+		rts
+
+; a3: SmV. Waits until no frame is queued (the display is the game's front screen
+; then): before the game draws into its back screen itself.
+SmDrain		tst.l	sv_ready(a3)
+		bne.b	SmDrain
+		rts
+
+; $1806 in the VBL server (every register saved): the timing fix's field count, then the
+; queued frame shown from its field (or late: at once). Its bitplane pointers go into
+; the copper list, which loaded the old ones at line 0, and into BPL1PT-BPL4PT, before
+; the display starts; after SM_VLINE only into the copper list, shown from the next field.
+SmVbl		lea	_FixFields(pc),a0
+		addq.w	#1,(a0)
+		lea	SmV(pc),a3
+		move.l	sv_ready(a3),d1
+		beq.b	.x
+		move.w	(a0),d0
+		sub.w	sv_rt(a3),d0
+		bpl.b	.show
+		cmp.w	#-6,d0			; (implausibly far ahead)
+		bge.b	.x
+.show		clr.l	sv_ready(a3)
+		move.l	sv_disp(a3),sv_odisp(a3)
 		move.l	d1,sv_disp(a3)
-		move.w	#8000,d0
+		move.w	(a0),d2			; on display from this field, or the next
+		bsr.w	SmLine0
+		cmp.w	#SM_VLINE,d0
+		bhi.b	.late
+		lea	$dff0e0,a1
+		move.l	d1,d0
+		move.l	d0,(a1)+
+		add.l	#8000,d0
+		move.l	d0,(a1)+
+		add.l	#8000,d0
+		move.l	d0,(a1)+
+		add.l	#8000,d0
+		move.l	d0,(a1)
+		bra.b	.cop
+.late		addq.w	#1,d2
+.cop		move.w	d2,sv_shown(a3)
+		move.w	#8000,d0		; as the swap writes them
 		move.w	d1,$1bca.w
 		add.w	d0,d1
 		move.w	d1,$1bd2.w
@@ -958,11 +1119,7 @@ SmShow		movem.l	d0-d2,-(sp)
 		move.w	d1,$1bce.w
 		move.w	d1,$1bd6.w
 		move.w	d1,$1bde.w
-		bsr.w	SmField			; (a write at line 0-1 could already show:
-		addq.w	#1,d0			; counted from the next field, the earliest
-		move.w	d0,sv_shown(a3)		; the other screen is free)
-		movem.l	(sp)+,d0-d2
-		rts
+.x		jmp	$52690			; the original call, returns to the VBL server
 
 ; d0.w: this field: the timing fix's count, plus one while the VBL server has not
 ; counted it yet (VERTB pending)
@@ -1155,7 +1312,6 @@ SmRender	movem.l	d0-d7/a0-a6,-(sp)
 		mulu	d6,d0
 		divu	#SM_N,d0
 		move.w	d0,sv_f(a3)
-		move.w	#-1,sv_tcol(a3)
 	IFD	SM_TIMING
 		bsr	SmCC
 		move.l	d0,-(sp)
@@ -1223,20 +1379,17 @@ SmRender	movem.l	d0-d7/a0-a6,-(sp)
 .tab		dc.w	.nop-.tab,.line-.tab,.vline-.tab,.plot-.tab,.hline-.tab
 		dc.w	.glyph-.tab,.clear-.tab,.call-.tab
 .nop		rts
-.done		move.w	sv_tgt+2(a3),d0		; what sv_tgt now shows
-		rol.w	#1,d0
-		and.w	#1,d0
+.done		bsr	SmSIdx			; what sv_tgt now shows
 		lea	sv_tok(a3),a0
 		move.b	sv_part(a3),(a0,d0.w)
 		beq.b	.r
 		bsr	SmClip
+		lsl.w	#2,d0
 		lea	sv_tclip(a3),a0
+		move.l	d1,(a0,d0.w)
+		mulu	#SM_BANDS,d0
 		lea	sv_tsig(a3),a1
-		tst.w	d0
-		beq.b	.t
-		addq.l	#4,a0
-		lea	SM_BANDS*4(a1),a1
-.t		move.l	d1,(a0)
+		add.l	d0,a1
 		lea	sv_nsig(a3),a0
 		moveq	#SM_BANDS-1,d0
 .ts		move.l	(a0)+,(a1)+
@@ -1281,21 +1434,14 @@ SmRender	movem.l	d0-d7/a0-a6,-(sp)
 		move.b	1(a5),$947.w
 		jmp	$43d04
 .clear		jmp	$3f742
-.glyph		moveq	#0,d0
-		move.b	1(a5),d0
-		cmp.w	sv_tcol(a3),d0
-		beq.b	.g
-		move.w	d0,sv_tcol(a3)
-		jsr	$5c56a
-.g		move.l	6(a5),a0
+.glyph		move.l	6(a5),a0
 		btst	#OPF_ABS,(a5)
 		bne.b	.ga
 		add.l	sv_tgt(a3),a0
 .ga		move.w	4(a5),d0
-		tst.w	2(a5)
-		bne.b	.g1
-		jmp	$5c5ac
-.g1		jmp	$5c5f2
+		move.b	1(a5),d3
+		move.w	2(a5),d1
+		bra.w	SmGlyphD
 .call		move.l	68(a5),sv_jmp(a3)
 		move.w	2(a5),d2		; the registers, those in the screen relative
 		lea	4(a5),a0
@@ -1337,6 +1483,163 @@ SmRender	movem.l	d0-d7/a0-a6,-(sp)
 .cs		move.l	sv_jmp(a3),-(sp)	; the site, back after its rts
 		movem.l	sv_regs(a3),d0-d7/a0-a6
 		rts				; into its trampoline
+
+; The replay's glyph ($5c5ac, $5c5f2, without their self-modified opcodes): a0 the
+; address, d0.w the character, d1.w 0 (at a byte) or 1 (half a byte on), d3.b the text
+; colour. A plane whose colour bit is set gets the glyph's pixels set, the others clear
+; (the opcodes $5c56a copies from $43a8c). d0-d7/a0-a1 trashed.
+SmGlyphD	bsr	FixBlitIdle		; (as FixDigitStart)
+		lea	$5c658,a1
+		cmp.b	#32,d0
+		bne.b	.c
+		moveq	#58,d0
+.c		sub.b	#48,d0
+		ext.w	d0
+		lsl.w	#3,d0
+		adda.w	d0,a1
+		move.l	(a1)+,d4		; the 8 rows
+		move.l	(a1),d5
+		moveq	#4-1,d7
+		tst.w	d1
+		bne.w	.h
+.p0		lsr.b	#1,d3
+		bcc.w	.c0
+		move.l	d4,d6
+		rol.l	#8,d6
+		or.b	d6,(a0)
+		rol.l	#8,d6
+		or.b	d6,40(a0)
+		rol.l	#8,d6
+		or.b	d6,80(a0)
+		rol.l	#8,d6
+		or.b	d6,120(a0)
+		move.l	d5,d6
+		rol.l	#8,d6
+		or.b	d6,160(a0)
+		rol.l	#8,d6
+		or.b	d6,200(a0)
+		rol.l	#8,d6
+		or.b	d6,240(a0)
+		rol.l	#8,d6
+		or.b	d6,280(a0)
+		bra.w	.n0
+.c0
+		move.l	d4,d6
+		not.l	d6
+		rol.l	#8,d6
+		and.b	d6,(a0)
+		rol.l	#8,d6
+		and.b	d6,40(a0)
+		rol.l	#8,d6
+		and.b	d6,80(a0)
+		rol.l	#8,d6
+		and.b	d6,120(a0)
+		move.l	d5,d6
+		not.l	d6
+		rol.l	#8,d6
+		and.b	d6,160(a0)
+		rol.l	#8,d6
+		and.b	d6,200(a0)
+		rol.l	#8,d6
+		and.b	d6,240(a0)
+		rol.l	#8,d6
+		and.b	d6,280(a0)
+.n0		lea	8000(a0),a0
+		dbf	d7,.p0
+		rts
+.h		move.l	d4,d1			; firsts: the high halves; seconds: the
+		lsl.l	#4,d1			; low halves, shifted up
+		and.l	#$f0f0f0f0,d1
+		move.l	d5,d2
+		lsl.l	#4,d2
+		and.l	#$f0f0f0f0,d2
+		lsr.l	#4,d4
+		and.l	#$0f0f0f0f,d4
+		lsr.l	#4,d5
+		and.l	#$0f0f0f0f,d5
+.p1		lsr.b	#1,d3
+		bcc.w	.c1
+		move.l	d4,d6
+		rol.l	#8,d6
+		or.b	d6,(a0)
+		rol.l	#8,d6
+		or.b	d6,40(a0)
+		rol.l	#8,d6
+		or.b	d6,80(a0)
+		rol.l	#8,d6
+		or.b	d6,120(a0)
+		move.l	d5,d6
+		rol.l	#8,d6
+		or.b	d6,160(a0)
+		rol.l	#8,d6
+		or.b	d6,200(a0)
+		rol.l	#8,d6
+		or.b	d6,240(a0)
+		rol.l	#8,d6
+		or.b	d6,280(a0)
+		move.l	d1,d6
+		rol.l	#8,d6
+		or.b	d6,1(a0)
+		rol.l	#8,d6
+		or.b	d6,41(a0)
+		rol.l	#8,d6
+		or.b	d6,81(a0)
+		rol.l	#8,d6
+		or.b	d6,121(a0)
+		move.l	d2,d6
+		rol.l	#8,d6
+		or.b	d6,161(a0)
+		rol.l	#8,d6
+		or.b	d6,201(a0)
+		rol.l	#8,d6
+		or.b	d6,241(a0)
+		rol.l	#8,d6
+		or.b	d6,281(a0)
+		bra.w	.n1
+.c1
+		move.l	d4,d6
+		not.l	d6
+		rol.l	#8,d6
+		and.b	d6,(a0)
+		rol.l	#8,d6
+		and.b	d6,40(a0)
+		rol.l	#8,d6
+		and.b	d6,80(a0)
+		rol.l	#8,d6
+		and.b	d6,120(a0)
+		move.l	d5,d6
+		not.l	d6
+		rol.l	#8,d6
+		and.b	d6,160(a0)
+		rol.l	#8,d6
+		and.b	d6,200(a0)
+		rol.l	#8,d6
+		and.b	d6,240(a0)
+		rol.l	#8,d6
+		and.b	d6,280(a0)
+		move.l	d1,d6
+		not.l	d6
+		rol.l	#8,d6
+		and.b	d6,1(a0)
+		rol.l	#8,d6
+		and.b	d6,41(a0)
+		rol.l	#8,d6
+		and.b	d6,81(a0)
+		rol.l	#8,d6
+		and.b	d6,121(a0)
+		move.l	d2,d6
+		not.l	d6
+		rol.l	#8,d6
+		and.b	d6,161(a0)
+		rol.l	#8,d6
+		and.b	d6,201(a0)
+		rol.l	#8,d6
+		and.b	d6,241(a0)
+		rol.l	#8,d6
+		and.b	d6,281(a0)
+.n1		lea	8000(a0),a0
+		dbf	d7,.p1
+		rts
 
 ; a3: SmV, d6.w: the frame. SmRender's first pass: each op's coordinates as drawn, 16
 ; bytes an op at em_scr (+0 four words, +12 the mask of its bands: 0 none, bit 31 always),
@@ -1517,18 +1820,16 @@ SmPrep		lea	sv_nsig(a3),a2
 		tst.b	sv_full(a3)
 		bne.w	.x
 		bsr	SmClip
-		move.w	sv_tgt+2(a3),d0
-		rol.w	#1,d0
-		and.w	#1,d0
+		bsr	SmSIdx
 		lea	sv_tok(a3),a0
 		tst.b	(a0,d0.w)
 		beq.w	.x
-		lea	sv_tsig(a3),a0
+		lsl.w	#2,d0
 		lea	sv_tclip(a3),a1
-		tst.w	d0
-		beq.b	.ts
-		lea	SM_BANDS*4(a0),a0
-		addq.l	#4,a1
+		add.w	d0,a1
+		mulu	#SM_BANDS,d0
+		lea	sv_tsig(a3),a0
+		add.l	d0,a0
 .ts		cmp.l	(a1),d1
 		bne.b	.x
 		moveq	#0,d7			; the bands whose signature changed
@@ -1607,11 +1908,11 @@ SmBClr		movem.l	d0-d4/a0/a6,-(sp)
 		move.w	#0,$66(a6)
 		moveq	#0,d0
 .n		cmp.w	#SM_BANDS,d0
-		bhs.b	.x
+		bhs.w	.x
 		btst	d0,d7
 		bne.b	.run
 		addq.w	#1,d0
-		bra.b	.n
+		bra.w	.n
 .run		move.w	d0,d1			; bands d0 to d1 - 1
 .e		addq.w	#1,d1
 		cmp.w	#SM_BANDS,d1
@@ -1640,14 +1941,42 @@ SmBClr		movem.l	d0-d4/a0/a6,-(sp)
 		add.w	d4,d3
 		move.l	sv_tgt(a3),a0
 		add.w	d3,a0
+	IFD	SM_BLITCLR
 		moveq	#4-1,d4
 .p		bsr	FixBlitWaitA6
 		move.l	a0,$54(a6)
 		move.w	d2,$58(a6)
 		lea	8000(a0),a0
 		dbf	d4,.p
+	ELSE
+		bsr	FixBlitIdle		; by the CPU, 32 bits at a time (the AGA
+		movem.l	d0-d1/d5-d7/a1,-(sp)	; blitter writes 16)
+		move.w	d1,d4			; bands * 10 blocks of 32 bytes
+		sub.w	d0,d4
+		mulu	#10,d4
+		subq.w	#1,d4
+		moveq	#0,d0
+		moveq	#0,d1
+		moveq	#0,d5
+		moveq	#0,d6
+		moveq	#4-1,d7
+.p		move.l	a0,a1
+		move.w	d4,d2
+.b		move.l	d0,(a1)+
+		move.l	d1,(a1)+
+		move.l	d5,(a1)+
+		move.l	d6,(a1)+
+		move.l	d0,(a1)+
+		move.l	d1,(a1)+
+		move.l	d5,(a1)+
+		move.l	d6,(a1)+
+		dbf	d2,.b
+		lea	8000(a0),a0
+		dbf	d7,.p
+		movem.l	(sp)+,d0-d1/d5-d7/a1
+	ENDC
 		move.w	d1,d0
-		bra.b	.n
+		bra.w	.n
 .x		movem.l	(sp)+,d0-d4/a0/a6
 		rts
 
@@ -1783,6 +2112,8 @@ SmPCheck	tst.b	sv_part(a3)
 _PL_Smooth	PL_START
 		PL_PS	$226c,SmTick		; lea $90e.w,a0; move.w (a0)+,d0
 		PL_P	$5dc02,SmSwap		; jsr $40ac4
+		PL_PS	$1806,SmVbl		; jsr $52690 (FixVblCount)
+		PL_L	$2258,SM_STACK		; lea $70000,sp
 		PL_P	$435f2,SmLine		; move.w $774,$77a
 		PL_P	$43832,SmVline		; move.w $946,d0; cmp.w $940,d0
 		PL_P	$435a0,SmPlot		; move.w d0,d4; lea $43b74,a0
