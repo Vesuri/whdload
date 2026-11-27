@@ -108,11 +108,10 @@ program).
 | intro +$124 | `_PatchMain` before the main program |
 | intro +$570 | Rob Northen loader to `_Loader` |
 | $e70e | the checksum skipped |
-| $f036 | keyboard: quit key, F6 infinite boost, F7 turbo, Help wins the race |
+| $f036 | keyboard: quit key, F6 infinite boost, Help wins the race |
 | $59846 | the "insert disk" request removed |
 | $5b6bc | fire skips the name entry (`Player`) |
 | $5c960 | the copylock's result ($9cedcd02 to $24) |
-| $5dac0, $64516 | turbo: the frame delay at $616d8 skipped, `TURBO` drawn in the panel (not with the copy) |
 | $5f2f8 | the lap and track times saved to `StuntCarRacer.times` after a race |
 | $62d1c | the times loaded to $7a61a instead of $7a21a |
 | $62e86 | the game's loader to `_Loader` (save slots in `StuntCarRacer.save`) |

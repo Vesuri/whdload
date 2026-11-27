@@ -5,7 +5,8 @@
       "output": "StuntCarRacerEnhanced-{version}-{date}.lha",
       "replace": {
         "StuntCarRacerHD/StuntCarRacer.slave": "build:StuntCarRacer",
-        "StuntCarRacerHD/ReadMe": "release/ReadMe"
+        "StuntCarRacerHD/ReadMe": "release/ReadMe",
+        "StuntCarRacerHD/Install": "release/Install"
       },
       "add": {},
       "remove": [],

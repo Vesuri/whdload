@@ -46,7 +46,12 @@
 ;                        - Source can be assembled with ASM-One/Pro (routine
 ;                          _ToggleBoost had to be modified)
 ;                        - WHDLoad v17+ features used (config) 
-; Requires:	WHDLoad 10+
+;		27.11.26 - v2.0b (Vesuri)
+;		         - Enhanced framerate (CUSTOM3=1) on a 68020 or later with Stunt Car
+;		           Racer Unleashed 1.1's code: 50 frames a second at the original speed
+;		         - Unknown disks stop with a clean error
+;		         - Turbo mode removed (F7, CUSTOM2)
+; Requires:	WHDLoad 17+
 ; Copyright:	Public Domain
 ; Language:	68000 Assembler
 ; Translator:	Barfly 2.9, Asm-Pro 1.16d
@@ -109,7 +114,6 @@ _expmem		dc.l	-EXPMEM			;ws_ExpMem: optional
 
 
 .config		dc.b	"C1:B:Infinite Boost;"
-		dc.b	"C2:B:Turbo Mode;"
 		dc.b	"C3:B:Enhanced framerate;"
 		dc.b	"BW"
 		dc.b	0
@@ -119,27 +123,18 @@ _expmem		dc.l	-EXPMEM			;ws_ExpMem: optional
 _name		dc.b	"Stunt Car Racer",0
 _copy		dc.b	"1989 Geoff Crammond/Microstyle",0
 _info		dc.b	"Installed by Codetapper/Action! & StingRay",10
-		dc.b	"Version 1.4 "
-		IFD	BARFLY
-		IFND	.passchk
-		DOSCMD	"WDate >T:date"
-.passchk
-		ENDC
-		INCBIN	"T:date"
-		ELSE
-		dc.b	"(08.07.2023)"
-		ENDC
+		dc.b	"Enhanced by Vesuri",10
+		dc.b	"Version 2.0b (27.11.2026)"
 		dc.b	-1,"Keys:   F6 - Toggle infinite boost   "
-		dc.b	10,"        F7 - Toggle turbo mode on/off"
 		dc.b	10,"      Help - Win race                "
 		dc.b	-1,"Thanks to Harry, Carlo Pirri, AmiGer/CARE,"
 		dc.b	10,"Galahad and Frank for the great icons!"
 		dc.b	0
+		dc.b	"$VER: StuntCarRacer.slave 2.0b (27.11.2026)",0
 _PlayerName	dc.b	"Player      ",0
 _TNTName	dc.b	"SCR-TNT",0
 _TimesName	dc.b	"StuntCarRacer.times",0
 _SaveName	dc.b	"StuntCarRacer.save",0
-_TurboFlag	dc.b	0
 		EVEN
 
 ;======================================================================
@@ -251,13 +246,8 @@ _GameCommon	movem.l	d0-d1/a0-a2,-(sp)
 
 		move.l	_Custom1(pc),d0		;Check for initial infinite
 		;tst.l	d0			;energy cheat
-		beq.b	_CheckStartTurb
-		bsr	_RefreshBoost
-
-_CheckStartTurb	move.l	_Custom2(pc),d0		;Check for initial turbo
-		;tst.l	d0			;mode
 		beq.b	_PatchGame
-		bsr	_ToggleTurbo
+		bsr	_RefreshBoost
 
 _PatchGame	lea	_PL_Game(pc),a0
 		move.l	_ImgDelta(pc),a1	;The program at IMG_START, or its copy
@@ -303,8 +293,6 @@ _Enhance	move.l	_Custom3(pc),d0
 		subi.l	#IMG_START,d0
 		lea	_ImgDelta(pc),a0
 		move.l	d0,(a0)
-		lea	_DelayPtr(pc),a0
-		add.l	d0,(a0)
 		lea	IMG_START,a0
 		move.l	#(IMG_END-IMG_START)/4,d1
 .Copy		move.l	(a0)+,(a1)+
@@ -388,10 +376,6 @@ _PL_Game	PL_START			;Offsets in the main program
 _PL_Original	PL_START			;Not with the enhanced framerate
 		PL_PS	$69fea-IMG_START,_24Bit_SwpMv_D0	;swap d0, move.w #$ffff,d0
 		PL_PS	$6a06e-IMG_START,_24Bit_Add_2_A0	;adda.l #2,a0
-		PL_PS	$5dac0-IMG_START,_CheckTurboMode	;Alter delay and write TURBO
-		PL_L	$5dac6-IMG_START,$4e714e71	;into the screen if turbo is
-		PL_PS	$64516-IMG_START,_CheckTurboMode	;on, otherwise clear it
-		PL_L	$6451c-IMG_START,$4e714e71
 		PL_END
 
 ;======================================================================
@@ -434,75 +418,6 @@ _ToggleBoost	lea	$60836,a0
 
 ;======================================================================
 
-_ToggleTurbo	move.l	a0,-(sp)
-		lea	_TurboFlag(pc),a0
-		not.b	(a0)
-		move.l	(sp)+,a0
-		rts
-
-;======================================================================
-
-_CheckTurboMode	movem.l	d0/a0-a1,-(sp)		;Check for turbo mode which
-
-		move.b	_TurboFlag(pc),d0	;is at $5dac0 and $64516
-		;tst.b	d0
-		beq.b	_NormalMode
-
-		lea	$6a594,a1
-		bsr.b	_WriteTurboBMap
-		lea	$72294,a1
-		bsr.b	_WriteTurboBMap
-		movem.l	(sp)+,d0/a0-a1
-
-.BlitWait	btst	#6,$dff002		;At least wait for the blitter!
-		bne.b	.BlitWait
-		move.l	a0,-(sp)
-		movea.l	_DelayPtr(pc),a0
-		clr.b	(a0)			;Set the delay as ready
-		move.l	(sp)+,a0
-		rts
-
-_NormalMode	lea	$6a594,a1
-		bsr.b	_ClearTurboBMap
-		lea	$72294,a1
-		bsr.b	_ClearTurboBMap
-		movem.l	(sp)+,d0/a0-a1
-
-		move.l	a0,-(sp)
-		movea.l	_DelayPtr(pc),a0
-.Wait		tst.b	(a0)			;The game's frame delay
-		bne.b	.Wait
-		movea.l	(sp)+,a0
-		rts
-
-;======================================================================
-
-_WriteTurboBMap	lea	_TurboText(pc),a0	;Paste TURBO writing into
-		move.l	(a0)+,d0		;the bitmap
-		cmp.l	#$fff3f3f,4(a1)		;Only paste during game when
-		bne.b	_Rts			;the car frame is showing
-		or.l	d0,(a1)
-		move.l	(a0)+,d0
-		or.l	d0,40(a1)
-		move.l	(a0)+,d0
-		or.l	d0,80(a1)
-		move.l	(a0)+,d0
-		or.l	d0,120(a1)
-		move.l	(a0)+,d0
-		or.l	d0,160(a1)
-_Rts		rts
-
-_ClearTurboBMap	cmp.l	#$fff3f3f,4(a1)
-		bne.b	_Rts
-		and.l	#$ff,(a1)		;Clear TURBO writing from
-		and.l	#$ff,40(a1)		;the bitmap
-		and.l	#$ff,80(a1)
-		and.l	#$ff,120(a1)
-		and.l	#$ff,160(a1)
-		rts
-
-;======================================================================
-
 _24Bit_SwpMv_D0	swap	d0			;Stolen code
 		move.w	#$FFFF,d0
 		bra.b	_24Bit_Fix_A0
@@ -540,8 +455,6 @@ _Keybd		ror.b	#1,d0			;Stolen 6 bytes
 		beq.w	_exit
 		cmpi.b	#$55,d0			;F6 = Refresh boost
 		beq.w	_RefreshBoost
-		cmpi.b	#$56,d0			;F7 = Switch turbo on/off
-		beq.w	_ToggleTurbo
 		cmpi.b	#$5f,d0			;Help = Win the race!
 		beq.w	_WinRace
 		rts
@@ -658,14 +571,6 @@ _ButtonWaitDone	movem.l	(sp)+,d0-d1/a0-a2
 
 ;======================================================================
 
-_TurboText	dc.l	$F4B9C600		;This 32x5 bitmap says TURBO
-		dc.l	$14A52900
-		dc.l	$14B9C900
-		dc.l	$14A52900
-		dc.l	$1325C600
-
-;======================================================================
-
 _TNTVersion	lea	$1000.w,a1
 		move.l	a1,a5
 		move.l	_resload(pc),a2
@@ -730,15 +635,12 @@ _Tags		dc.l	WHDLTAG_BUTTONWAIT_GET
 _ButtonWait	dc.l	0
 		dc.l	WHDLTAG_CUSTOM1_GET
 _Custom1	dc.l	0
-		dc.l	WHDLTAG_CUSTOM2_GET
-_Custom2	dc.l	0
 		dc.l	WHDLTAG_CUSTOM3_GET
 _Custom3	dc.l	0
 		dc.l	WHDLTAG_ATTNFLAGS_GET
 _AttnFlags	dc.l	0
 		dc.l	TAG_DONE
 _ImgDelta	dc.l	0			;The main program's copy - IMG_START
-_DelayPtr	dc.l	$616d8			;The game's frame delay
 _UlBase		dc.l	0			;The Unleashed blob, when it runs
 _SaveFileSize	dc.l	0
 ;======================================================================
