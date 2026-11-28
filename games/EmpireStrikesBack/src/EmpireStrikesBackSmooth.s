@@ -61,7 +61,7 @@ SM_LIVE		= $80000000		; a site's word read as it is
 	IFD	SM_ALLSTATES
 SM_STATES	= -1			; (to check them all)
 	ELSE
-SM_STATES	= 1<<$00|1<<$01|1<<$02|1<<$0a ; the game states ($73a) presented smooth
+SM_STATES	= 1<<$00|1<<$01|1<<$02|1<<$0a|1<<$0b|1<<$0e|1<<$11|1<<$12|1<<$13|1<<$14 ; smooth states ($73a)
 	ENDC
 
 ; ExpMem: the two recordings, each its hash table, a next index per op (the hash
@@ -127,6 +127,7 @@ sv_ravg		rs.w	1		; frame drawing time, running average (lines x 8)
 sv_late		rs.w	1		; share of recent ticks late (256 = all), running average
 sv_hold		rs.w	1		; direct ticks before smooth is tried again
 sv_state	rs.w	1		; the game state ($73a) of the last recording
+sv_dstate	rs.w	1		; and the one direct mode started in
 sv_tcol		rs.w	1		; the text colour last set ($5c56a)
 sv_f		rs.w	1		; SmRender: the step (0..32768)
 sv_nkeys	rs.w	1		; SmSeq: code addresses counted this tick
@@ -211,6 +212,15 @@ SmTick		movem.l	d0-d2/a0-a1,-(sp)
 	ENDC
 		tst.b	sv_direct(a1)
 		beq.b	.smooth
+	IFND	SM_DIRECT
+		move.w	$73a.w,d0		; direct mode is the scene's: another state
+		cmp.w	sv_dstate(a1),d0	; tries smooth again
+		beq.b	.dr
+		clr.b	sv_direct(a1)
+		clr.w	sv_late(a1)
+		clr.w	sv_hold(a1)
+		bra.b	.smooth
+	ENDC
 .dr		tst.l	sv_ready(a1)		; direct: as the default, once the last
 		bne.b	.dr			; frame queued is shown; the time noted
 		bsr	SmNow
@@ -559,6 +569,9 @@ SmGlyph		bsr	SmNew			; (the saved d0 at 4(sp), a0 at 12(sp))
 		bset	#OPF_ABS,(a0)
 		add.l	SmV+sv_b0(pc),d0
 .rel		move.l	d0,6(a0)
+		swap	d2			; $5c5f2's first mask for its second bytes
+		move.b	d2,10(a0)
+		swap	d2
 .x		rts
 
 ;----------------------------------------------------------------------------
@@ -737,6 +750,64 @@ SmBlitRows	move.l	#199,d4			; a0: d0-a6 -> d4, d5: rows 199-y to 199-y+h
 		ext.l	d5
 		add.l	d4,d5
 		rts
+
+; The roster's badge ($5d2c0, by $45308 and $45400): 6 rows of planes 1 and 3 at a0.
+SmC10		pea	SmS10(pc)
+		bra.w	SmCall
+SmS10		dc.w	-2,.rows-SmS10,1<<8,0
+		dc.l	0
+		lea	$5afe6,a1
+		jmp	$5d2c6
+.rows		move.l	8*4(a0),d4		; a0: d0-a6 -> d4, d5: its 6 rows
+		divu	#40,d4
+		and.l	#$ffff,d4
+		moveq	#5,d5
+		add.l	d4,d5
+		rts
+
+; The wave select's documents ($44ccc, by $44c84 and $44c96): 43 rows of 3 words ORed
+; at a0 (in plane 1).
+SmC12		pea	SmS12(pc)
+		bra.w	SmCall
+SmS12		dc.w	-2,.rows-SmS12,1<<8,0
+		dc.l	0
+		lea	$40904,a1
+		jmp	$44cd2
+.rows		move.l	8*4(a0),d4		; a0: d0-a6 -> d4, d5: its 43 rows
+		divu	#40,d4
+		and.l	#$ffff,d4
+.pl		cmp.w	#200,d4			; (in whichever plane)
+		blo.b	.y
+		sub.w	#200,d4
+		bra.b	.pl
+.y		moveq	#42,d5
+		add.l	d4,d5
+		rts
+
+; The scoring page's scrolling table ($1ed0, state $12): its strings by $1cae, the
+; scroll. The drawing is followed by the scroll's step (at $1efa), so the site is a copy
+; of the drawing only.
+SmC11		bsr.b	.s
+		jmp	$1efa
+.s		pea	SmS11(pc)
+		bra.w	SmCall
+SmS11		dc.w	0,199,0,0
+		dc.l	$1cae,0
+		lea	$1cb0.w,a4		; $1ed0-$1ef8
+		move.w	#7920,d5
+		move.l	$936.w,d6
+		addi.w	#7920,d6
+.l		movea.l	(a4)+,a2
+		cmpa.l	#0,a2
+		beq.b	.x
+		adda.w	$1cae.w,a2
+		move.l	(a4)+,d3
+		movea.l	(a4)+,a3
+		cmpa.w	d5,a2
+		bgt.b	.l
+		jsr	$1f0c
+		bra.b	.l
+.x		rts
 
 ; The four icons ($5c008): rows 29 to 53, by their states at $5c004. The drawing is
 ; followed by their animation (at $5c046), so the site is a copy of the drawing only.
@@ -973,6 +1044,7 @@ SmSwap		movem.l	d0-d7/a0-a6,-(sp)
 		clr.w	sv_late(a3)
 	IFND	SM_ALLSTATES			; (checking them all: never)
 		st	sv_direct(a3)
+		move.w	$73a.w,sv_dstate(a3)
 	ENDC
 		move.w	#SM_HOLD,sv_hold(a3)
 .out		movem.l	(sp)+,d0-d7/a0-a6
@@ -1441,6 +1513,7 @@ SmRender	movem.l	d0-d7/a0-a6,-(sp)
 .ga		move.w	4(a5),d0
 		move.b	1(a5),d3
 		move.w	2(a5),d1
+		move.b	10(a5),d2
 		bra.w	SmGlyphD
 .call		move.l	68(a5),sv_jmp(a3)
 		move.w	2(a5),d2		; the registers, those in the screen relative
@@ -1547,7 +1620,8 @@ SmGlyphD	bsr	FixBlitIdle		; (as FixDigitStart)
 .n0		lea	8000(a0),a0
 		dbf	d7,.p0
 		rts
-.h		move.l	d4,d1			; firsts: the high halves; seconds: the
+.h		move.b	d2,d0			; (the first row's mask)
+		move.l	d4,d1			; firsts: the high halves; seconds: the
 		lsl.l	#4,d1			; low halves, shifted up
 		and.l	#$f0f0f0f0,d1
 		move.l	d5,d2
@@ -1557,6 +1631,22 @@ SmGlyphD	bsr	FixBlitIdle		; (as FixDigitStart)
 		and.l	#$0f0f0f0f,d4
 		lsr.l	#4,d5
 		and.l	#$0f0f0f0f,d5
+		ror.l	#8,d0			; the seconds' clear masks, as $5c5f2 has
+		and.l	#$ff000000,d0		; them: row 0 the caller's d2 bits 16-23,
+		move.l	d4,d6			; then each row the previous row's first's
+		not.l	d6			; (d0 rows 0-3, a1 rows 4-7)
+		lsr.l	#8,d6
+		or.l	d6,d0
+		move.l	d5,d6
+		not.l	d6
+		lsr.l	#8,d6
+		move.l	d6,a1
+		move.l	d4,d6
+		not.l	d6
+		ror.l	#8,d6
+		and.l	#$ff000000,d6
+		add.l	a1,d6
+		move.l	d6,a1
 .p1		lsr.b	#1,d3
 		bcc.w	.c1
 		move.l	d4,d6
@@ -1617,8 +1707,7 @@ SmGlyphD	bsr	FixBlitIdle		; (as FixDigitStart)
 		and.b	d6,240(a0)
 		rol.l	#8,d6
 		and.b	d6,280(a0)
-		move.l	d1,d6
-		not.l	d6
+		move.l	d0,d6
 		rol.l	#8,d6
 		and.b	d6,1(a0)
 		rol.l	#8,d6
@@ -1627,8 +1716,7 @@ SmGlyphD	bsr	FixBlitIdle		; (as FixDigitStart)
 		and.b	d6,81(a0)
 		rol.l	#8,d6
 		and.b	d6,121(a0)
-		move.l	d2,d6
-		not.l	d6
+		move.l	a1,d6
 		rol.l	#8,d6
 		and.b	d6,161(a0)
 		rol.l	#8,d6
@@ -2132,6 +2220,9 @@ _PL_Smooth	PL_START
 		PL_P	$2d04,SmC7		; movea.l $936,a0; adda.w #8000,a0
 		PL_P	$470fa,SmC8		; lea $43b74,a2
 		PL_P	$5c1bc,SmC9		; lea $43b74,a2
+		PL_P	$5d2c0,SmC10		; lea $5afe6,a1
+		PL_P	$1ed0,SmC11		; lea $1cb0.w,a4; move.w #7920,d5
+		PL_P	$44ccc,SmC12		; lea $40904,a1
 		PL_END
 
 SmV		ds.b	sv_SIZE

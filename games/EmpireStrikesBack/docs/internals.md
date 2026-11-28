@@ -78,7 +78,7 @@ framerate's (below, `src/EmpireStrikesBackSmooth.s`):
 | $2256 | `PL_L $2258` in `lea $70000,sp`: the main loop's stack at $60000, below the extra screens |
 | $435f2, $43832, $435a0, $43d04, $3f742 | `PL_P` the line, vertical line, plot, horizontal line and clear: recorded |
 | $5c56a, $5c5ac, $5c5f2 | `PL_P` the text colour and the glyphs: recorded |
-| $47de6, $47f0a, $4630a, $494aa, $5bf90, $5c008, $5b428, $2d04, $470fa, $5c1bc | `PL_P` the sites (code that writes the screen itself): recorded with its registers |
+| $47de6, $47f0a, $4630a, $494aa, $5bf90, $5c008, $5b428, $2d04, $470fa, $5c1bc, $5d2c0, $1ed0, $44ccc | `PL_P` the sites (code that writes the screen itself): recorded with its registers |
 
 ## Fast-CPU fixes
 
@@ -128,9 +128,10 @@ byte eor'd with its count down from 378 (`_Crypt`), loaded before the game start
 ## Enhanced framerate
 
 CUSTOM1 (the icons set it), on a 68020 or better: 50 frames a second at the game's own
-speed, in the waves (states 0, 1, 2 and $0a; the others, the wave select, the roster and
-the attract run as without it). The slave asks for an optional ExpMem of about 88 KB
-(two recordings and a work area); without it, or on a 68000, nothing is patched.
+speed, in the waves (states 0, 1, 2 and $0a), the wave select ($0b), the roster ($0e)
+and the attract's pages ($11 to $14); the later phases of a wave run as without it. The
+slave asks for an optional ExpMem of about 88 KB (two recordings and a work area);
+without it, or on a 68000, nothing is patched.
 
 - **Recording.** Each tick (one pass of the main loop, from $226c to the swap) still runs
   once, but the drawing routines record their calls instead of drawing (a 16-byte op:
@@ -140,7 +141,10 @@ the attract run as without it). The slave asks for an optional ExpMem of about 8
   with them put back. A site declares its rows (or a routine that works them out from
   the registers: the shape blits), its input registers, and a fixup for what it does
   besides drawing when it is not run (the shield gauge sets the star colour $76a). The
-  icons at $5c008 animate after drawing, so their site is a copy of the drawing loop.
+  icons at $5c008 animate after drawing, and the scoring page's scrolling table ($1ed0,
+  state $12) steps its scroll $1cae after drawing, so their sites are copies of the
+  drawing loops. The roster's badges ($5d2c0) and the wave select's documents ($44ccc)
+  work out their rows from a0.
   The cannons read the crosshair ($47db6, $47db8) as it is at the replay: they follow
   it at 50 frames a second, as the crosshair (a sprite) does.
 - **Pairing.** Ops are keyed by the object drawn and the place in its model's display
@@ -164,7 +168,10 @@ the attract run as without it). The slave asks for an optional ExpMem of about 8
   makes its field after it, and only for a recording that starts with the clear. A tick
   that draws directly (a state not presented, or direct mode) first waits until no frame
   is queued. When more than half of about the last 16 ticks are late, ticks run as the
-  default runs them (direct) until a direct tick's work plus a frame fits again.
+  default runs them (direct) until a direct tick's work plus a frame fits again, or the
+  state changes: direct mode is the scene's (the logo's flight, $14, is late at first;
+  the roster after it, smooth, would otherwise have stayed direct: its direct ticks,
+  with the game's own glyphs, take about 680 lines).
 - **Bands.** A frame is drawn only where it differs from what its screen shows: each of
   25 bands of 8 rows of each of the four screens has a signature (the ops drawn in it,
   as drawn), and only bands whose signature changed are cleared (by the CPU, 32 bits at a
@@ -175,13 +182,19 @@ the attract run as without it). The slave asks for an optional ExpMem of about 8
   $5c658, each plane set or cleared by the colour's bit, as the opcodes $5c56a copies
   from $43a8c do, without copying them or flushing the caches. After the exact frame the
   game's setter runs once with the tick's last text colour, as the tick would leave it.
+  The half-byte glyphs ($5c5f2) clear their second byte, in the planes the colour lacks,
+  by the previous row's first byte (`not.b d2` complements only the low byte, and the
+  swaps bring the old one back; row 0 by the caller's d2 bits 16-23, recorded): stars
+  next to text are cleared as the game clears them.
 
 Checked with the `check` and `verify` builds (`development.md`): the exact replay
 compared with what the tick drew, and each frame drawn by bands (the extra screens'
 included) with the same frame drawn whole. In state 0 on the a1200-030 all 530 exact
 frames matched; on the a1200-040 (`verify`, wave 1 picked, then its later phases) all
-783, in states 0, 1, 2 and $0a, and all 1289 frames drawn by bands. In $0a one exact
-frame of 85 differs (`open-work.md`).
+783, in states 0, 1, 2 and $0a, and all 1289 frames drawn by bands. On the a1200-030
+all 1247 exact frames from the boot through the wave select into wave 1 and $0a, and all of the attract's 1394 ($0e, $11,
+$12, $13, $14); the a1200-040 (`verify`) all 259, in states 0, 1, 2, $0a, $0b, $0e, $12
+and $13.
 
 Measured on the a1200-030 in wave play (`tools/esb.py sm` per 250 fields), with the
 queue: 2.3 to 2.9 frames a tick in most rounds (before it, with only the game's two
@@ -193,9 +206,14 @@ models across the screen) still fall to the exact frame only. The a1200-040: 1.7
 is the default's: fields a tick against the `direct` build, 3.11/3.08 on the 030,
 3.14/3.21 on the a1200 (the same route, different play).
 
+The attract on the a1200-030 (`tools/esb.py sm`, release build): the pages $11 to $14
+2.8 to 3.0 frames a tick, the roster 1.2 to 1.7 (before, as the default: 1, every third
+field). A roster frame (the `timing` build) costs about 390 lines, 250 of them glyphs
+(1.2 lines each). The stock a1200 falls to direct mode in many scenes, as before.
+
 ## Limitations
 
 The game runs from chip memory as the original. The game is capped at 16.7 frames a
 second; scenes the A500 drew slower stay slower there. The enhanced framerate covers the
-states checked (0, 1, 2, $0a); the later phases of a wave ($03, $08, $09, $0d, $15) were
-reached in play but not compared, so they run as without it.
+states checked (0, 1, 2, $0a, $0b, $0e, $11 to $14); the later phases of a wave ($03,
+$08, $09, $0d, $15) were reached in play but not compared, so they run as without it.
