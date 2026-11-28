@@ -340,9 +340,37 @@ The original's work a frame is 72 / 45 / 33-35 / 26 ms on the four. A 28 MHz 680
 small view at more than half the original's rate and full screen at 40%; the 14 MHz one
 at half and 30%.
 
+## The dark room fight
+
+Level 1's dark room with the aliens, in full screen, measured 28.11.2026 on the 68030
+aprof machine with the release build (`WHD_ARGS='CUSTOM1=1 CUSTOM5=1'`, unlimited energy):
+`ab3d.py play door` from the level's start (through the first door into the room's
+middle), then `ab3d.py aprof 250 OUT turn720` (two full turns on the mouse firing, then 40
+fields firing). The shots hit the aliens and set off a barrel on the second turn.
+
+| | fps | work a frame, mean / p50 / p95 (ms) |
+|---|---|---|
+| Dark room fight | 10.41 | 96.2 / 100.2 / 140.2 |
+| The turn scene (start room, step 8) | 13.22 | 75.7 |
+
+ms a frame (mean, MEASURED):
+
+| Walls | Floors | c2p | Objects | Sky | Geometry | Logic |
+|---|---|---|---|---|---|---|
+| 30.4 | 20.9 | 19.3 | 11.3 | 2.1 | 3.1 | 2.9 |
+
+- **Walls:** our strip loops `_t_wdraw` 17.0 ms and `_t_wsimple` 4.9 ms, plus the game's
+  set-up 8.3 ms (`pastscrinto`, `CalcAndDraw`).
+- **Floors:** the Gouraud spans `backbeforegour` and `acrossscrngour` take most of them.
+- **The slowest frames (7 fields, 138 ms):** they look back through the door into the lit
+  corridor, once a turn. Floors then take 43-49 ms and walls 13-15 ms of the game's set-up.
+- **Objects:** 4 ms a frame facing away from the aliens, 18-25 ms with the aliens in view
+  and the explosion. 25 ms is the explosion frame.
+- **The c2p:** the same 19-20 ms in every frame (288x240).
+
 ## Not measured
 
-- The heaviest scene: a barrel shot close by, through level 1's first door and to the
-  left or right (the user's). Not yet scripted. The starts of levels 2-6 (reached with
-  CUSTOM1=4 and F1) had nothing heavier than level 1's start corridor.
+- A barrel shot point-blank. The dark room's barrels stand at the far ends of its side
+  aisles. The starts of levels 2-6 (reached with CUSTOM1=4 and F1) had nothing heavier
+  than level 1's start corridor.
 - A real 68030 or 68040, and the a1200 without fast memory (it cannot run the game).

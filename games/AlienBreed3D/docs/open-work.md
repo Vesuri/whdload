@@ -21,9 +21,9 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
    fight, pause, a death, its end). Steps 0-6 are done
    ([internals](internals.md#the-1x1-renderer)); the costs are in
    [performance](performance.md).
-2. A heavy scene for the baseline: in level 1, through the first door, turn left or right,
-   and shoot a barrel close by; a near explosion is the most taxing (the user's). Not yet
-   scripted.
+2. The dark room fight is scripted (`ab3d.py` SCRIPTS `door`, `turn720`) and measured on
+   the 68030 ([performance](performance.md#the-dark-room-fight)). A barrel shot
+   point-blank is not.
 3. Plan step 8 is done ([resolution-plan](resolution-plan.md#steps)): the machines, both
    variants, the two-player link and CUSTOM5 off are checked, and the option applies on
    every CPU with the ReadMe's suggestions (27.11.2026). Step 9 is done for the CD32

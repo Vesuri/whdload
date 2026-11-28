@@ -93,7 +93,9 @@ category and the hot routines by source label.
 By hand: in the menu RETURN (raw `44`) selects PLAY GAME; RETURN again on the text screen
 starts the level. In the game M (`37`) switches to mouse control: mouse left/right turns,
 up/down moves, the left button fires (`gdb monitor mouse DX DY`, `gdb monitor input
-JOY1_FIRE_BUTTON 1`). Keypad Enter (`43`) switches the view; F10 quits.
+JOY1_FIRE_BUTTON 1`). Keypad Enter (`43`) switches the view; F10 quits. A door opens on a Space tap in a frame where the player
+touches its wall, so hold forward while tapping (`play door`). Space pressed while
+standing still does nothing. `pos` prints player 1's x, z and angle.
 
 ## The colour census and the palette
 

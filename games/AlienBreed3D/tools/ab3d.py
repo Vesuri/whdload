@@ -28,6 +28,7 @@ running or stopped):
                           OUT.json holds each field's time by category (CATEGORIES), whether
                           drawPt swapped, and the time per game offset; tools/frametime.py
                           reports it
+    pos                   player 1's x, z and view angle
     play SCRIPT           run an input script: steps separated by ';', each
                           `F [mx MX] [my MY] [fire] [key CODE]`: F fields with the mouse
                           moved MX, MY a field (forward is my -N), the button held and raw
@@ -373,6 +374,12 @@ SCRIPTS = {
              '60 mx 40 fire; 120 my -12 fire; 60 mx 40 fire; 120 my -12 fire',
     # level 1 with keyboard control (K): to the middle of the start room (tools/turn.sh)
     'centre': '30 key 4c',
+    # level 1 from its start (mouse control): to the first door, Space while walking into it
+    # (a door opens on a tap in a frame the player touches its wall), into the dark room
+    # with the aliens, to its middle (x -720, z 1870)
+    'door': '300 my -10; 20 my -6 key 40; 50; 35 my -10; 15',
+    # there: two full turns firing (the barrels explode, the aliens take hits), then firing
+    'turn720': '210 mx 20 fire; 40 fire',
 }
 KEY_K, KEY_UP, KEY_RIGHT = 0x27, 0x4c, 0x4e
 ANGLE = 0x61d78         # player 1's view angle (word, 0-8191 a full circle; right adds)
@@ -752,6 +759,20 @@ def cmd_palette(server, g, rest):
     return f'palette done at field {i}, {seen}; area at ${area:08x} into {out}'
 
 
+POS_X, POS_Z = 0x61d7c, 0x61d88    # player 1's x and z (longs, 16.16; forward is +sin, +cos)
+
+
+def _pos(g):
+    x, z = (struct.unpack('>i', _bytes(g, addr(g, o), 4))[0] / 65536 for o in (POS_X, POS_Z))
+    return x, z, _angle(g, addr(g, ANGLE))
+
+
+def cmd_pos(server, g, rest):
+    with Halted(g):
+        x, z, a = _pos(g)
+    return f'x {x:.0f} z {z:.0f} angle {a}'
+
+
 def cmd_play(server, g, rest):
     inputs = script_fields(rest)
     with Halted(g):
@@ -991,7 +1012,7 @@ server = game_server('ab3d', commands={
     'frames': cmd_frames, 'play': cmd_play, 'aprof': cmd_aprof, 'copper': cmd_copper,
     'batch': cmd_batch, 'next': cmd_next, 'grab': cmd_grab, 'holes': cmd_holes, 'tables': cmd_tables,
     'palette': cmd_palette, 'frame': cmd_frame, 'key': cmd_key, 'pause': cmd_pause, 'die': cmd_die, 'chunky': cmd_chunky,
-    'end': cmd_end})
+    'end': cmd_end, 'pos': cmd_pos})
 
 if __name__ == '__main__':
     server.main(sys.argv[1:])
