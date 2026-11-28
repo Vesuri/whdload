@@ -21,9 +21,43 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
    fight, pause, a death, its end). Steps 0-6 are done
    ([internals](internals.md#the-1x1-renderer)); the costs are in
    [performance](performance.md).
-2. The dark room fight is scripted (`ab3d.py` SCRIPTS `door`, `turn720`) and measured on
-   the 68030 ([performance](performance.md#the-dark-room-fight)). A barrel shot
-   point-blank is not.
+2. Speed on the 68030: the dark room fight (`ab3d.py` SCRIPTS `door`, `turn720`;
+   [performance](performance.md#where-the-time-can-still-go)), largest first. Each
+   step's estimate is a count of the clocks removed, not a measurement.
+   1. **The measure:** `tools/frametime.py` reports pixels a frame and clocks a pixel for
+      each pixel loop, and the c2p's ms and clocks a Chip store. Compare builds on those,
+      since the frame totals drift between runs.
+   2. **Gouraud floor spans** ($20fd0-$21016, 28.3 clocks a pixel): our own loop through
+      `PL_P`, as the walls'. Eight pixels a pass at displacements, entered by a jump.
+      Keep the game's stepping, but as two unrolled tracks (the next pixel steps by d6
+      after a carry, else by d2), with one branch a pixel in place of the `dbcs`/`dbcc`
+      pair (6.9 clocks). Mask with a register in place of `andi.w #$3f3f` (4.1 clocks).
+      Estimate: about 22 clocks a pixel, 3 ms a frame. The flat spans ($20f4c) and
+      the water's (patched at $2110a and $2112e) have the same loop.
+   3. **Wall strips** (21.7 clocks a pixel, 360 strips of about 140 pixels a frame): a
+      variant without the `and.w` wrap for strips that do not wrap, and the two `mulu.w`
+      of each strip's entry from a table (0.35 ms). Then unpack the walls to a byte a
+      texel at each level's load (about 264 KB more ExpMem for the 176 KB of packed
+      walls), with one loop for all three packings and no `lsr`/`andi` a pixel.
+      Estimate: 17-18 clocks a pixel, 3-5 ms a frame.
+   4. **The object search** (3.1 ms): put the objects in zone lists once a frame, and
+      clear only the sort list's used entries. Estimate: 2-2.5 ms. The drawing order must
+      stay the same (compare frames with `ab3d.py chunky`).
+   5. **Bitmap columns** (25.9 clocks a pixel visited): our own loops, eight rows a pass
+      at displacements, no `adda` or `dbf` a pixel. Estimate: a quarter less, 2 ms a frame
+      here and about 5 ms in an explosion's frames.
+   6. **The c2p at FMODE 3 below the 68040:** Kalms' loop with a row counter that adds 4
+      to the destination every 9 longs of a plane, so that one call writes 36 of each
+      40-byte row. Estimate: 1.3 ms, from the measured 8% cheaper Chip stores.
+      Anything more needs fewer bytes to Chip, such as 7 planes and 128 colours, which
+      changes the picture.
+   7. **The set-up code:** the game's wall columns (8.8 ms) and floor spans (7.8 ms), after
+      steps 2 and 3. Not yet looked into.
+   8. **Small:** skip the game's SuperState/UserState calls (our exec's are RTS) with
+      `PL_S`: 0.15 ms, and no Chip read of ExecBase.
+
+   Steps 2-6 together: about 12 ms of the 96-100 ms a frame, 10.0 to about 11.5 fps.
+   A barrel shot point-blank is not yet scripted.
 3. Plan step 8 is done ([resolution-plan](resolution-plan.md#steps)): the machines, both
    variants, the two-player link and CUSTOM5 off are checked, and the option applies on
    every CPU with the ReadMe's suggestions (27.11.2026). Step 9 is done for the CD32

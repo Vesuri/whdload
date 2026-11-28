@@ -368,6 +368,46 @@ ms a frame (mean, MEASURED):
   and the explosion. 25 ms is the explosion frame.
 - **The c2p:** the same 19-20 ms in every frame (288x240).
 
+### Where the time can still go
+
+Measured 28.11.2026: four builds of the same scene on the same machine. CPU clocks are
+the 68030's at 50 MHz (MEASURED, aprof).
+
+| Code | Pixels a frame | Clocks a pixel | ms a frame |
+|---|---|---|---|
+| Our wall strip loops (`_t_wdraw`, `_t_wsimple`) | 49900 | 21.7 | 21.7 |
+| The game's Gouraud floor spans ($20fd0-$21016) | 24600 | 28.3 | 13.9 |
+| The game's bitmap columns ($21a0e-$21a82), per pixel visited | 16200 | 25.9 | 8.4 |
+| The c2p, 17280 longs to Chip | | 36.4 a store | 20.0 |
+
+- **Code without a pixel loop:** the game's wall set-up 8.8 ms a frame (618 columns,
+  `pastscrinto` the largest) and its floor span set-up 7.8 ms (`noclipleftGOUR` $1f200-$1f33f
+  3.1 ms).
+- **The object search:** 3.1 ms a frame. For each of 32 zones a frame the game walks
+  every object (64-byte entries, $2121a-$21232: 2.6 ms) and clears an 80-entry sort list
+  ($2120e: 0.5 ms).
+- **Run-to-run noise:** the game's time follows the frame rate, so a faster build plays a
+  different fight. Two runs of the same build gave 96.2 and 99.8 ms a frame of work. The
+  clocks a pixel held within 1% (21.9 / 21.7, 28.5 / 28.3, 25.8 / 25.9), so compare those.
+- **Placement:** all the code and data the frame uses is in fast memory: the game, the
+  slave, the music player, the stacks, the lists, the c2p's scratch and the textures. The
+  only Chip-bus time outside the c2p is 0.8 ms a frame: the music player's Paula writes
+  (0.55 ms) and the game reading ExecBase at $4 around its no-op SuperState/UserState calls
+  (0.12 ms, $6e4a and $6e84).
+- **Caches:** CACR stays $2111 on the 68030: instruction cache and burst, data cache, write
+  allocation. Every level's start has the same value. The game's own CACR writes did not
+  run in this scene or any level's start (`SimpleFloorLine` $1f3d8, the bump-map floors'
+  instruction-cache freeze at 27 sites from $1fdbc).
+- **Without write allocation** (`WCPUF_NWA`, CACR $0111): the clocks a pixel were the same.
+- **Data burst:** WHDLoad never enables it. A slave that sets CACR bit 12 itself is stopped
+  at its next resload call ("Installed program has modified the CACR").
+- **FMODE 3 on the 68030** (40-byte rows, a row at a time as from the 68040 on): a Chip
+  store took 33.4 clocks instead of 36.4, but the 240 calls made the c2p 22.0 ms instead
+  of 20.0.
+- **The c2p is at its known speed:** Kalms gives this routine 1.22 frames for 320x256 with
+  all DMA off on a Blizzard 1230-IV at 50 MHz, which is 20.6 ms at 288x240. FS-UAE measures
+  20.0 ms with the display on. Only fewer bytes to Chip would make it faster.
+
 ## Not measured
 
 - A barrel shot point-blank. The dark room's barrels stand at the far ends of its side
