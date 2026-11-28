@@ -18,7 +18,7 @@ the dated `$VER`, the ReadMe entry and the icons' `CUSTOM1=1` (it had the waves 
    frames (not interpolated), and at 1:50 play ran at about 12.5 frames a second with
    little on screen: find the scene (a state not presented, or direct mode) and the dots'
    key (unpaired, or moved more than SM_T).
-3. Frames cost about 250 lines on the 030 (heavy scenes far more; the roster about 390,
+3. Frames cost about 250 lines on the 030 (heavy scenes far more; the roster about 330,
    most of it glyphs, each a few chip-RAM writes per plane and row): the line drawer
    blits all four planes of every line (zeros into the planes its colour lacks), which
    in-between frames could skip with a line routine of their own; and the data cache

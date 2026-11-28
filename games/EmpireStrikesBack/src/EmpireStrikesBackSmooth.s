@@ -21,7 +21,7 @@
 ;
 ; Screens: the exact frame is drawn into the game's back screen, as the game would have
 ; drawn it, and becomes its front screen; the in-between frames into one of two more
-; (SM_X0, SM_X1: free Chip RAM, the stack moved below them). Each frame is drawn for the
+; (SM_X0, SM_X1: free Chip RAM; the stack moved to ExpMem). Each frame is drawn for the
 ; first field it can make (by the last frame's drawing time) and queued, one at most; the
 ; VBL server ($1806) shows it from its field. An in-between frame is drawn only if the
 ; exact frame still makes its field after it: slow frames thin out the in-between frames,
@@ -45,7 +45,7 @@ SM_HOLD		= 50			; direct ticks at least, before trying again
 SM_KEYS		= 16			; code addresses counted a tick (SmSeq)
 SM_X0		= $60000		; the screens for in-between frames: each in one 64 KB
 SM_X1		= $67d00		; bank, as the line drawer's address (low word) needs
-SM_STACK	= $60000		; the main loop's stack ($70000), below them
+SM_STKSZ	= 4096			; the main loop's stack (from $70000), in ExpMem
 SM_VLINE	= $28			; the VBL shows a frame no later than this line
 SM_CALLSZ	= 5			; slots of a CALL op
 	IFD	VERIFY
@@ -71,7 +71,8 @@ em_next		= -SM_OPS*2
 em_HDR		= SM_HASH*2+SM_OPS*2
 em_RECSIZE	= em_HDR+SM_OPS*SM_OPSZ
 em_scr		= 2*em_RECSIZE		; SmRender: 16 bytes an op (SmPrep)
-em_cmp		= em_scr+SM_OPS*16	; VERIFY: a screen to compare with (SmPCheck),
+em_stk		= em_scr+SM_OPS*16+SM_STKSZ ; the main loop's stack's top
+em_cmp		= em_stk		; VERIFY: a screen to compare with (SmPCheck),
 em_tick		= em_cmp+32000		; the screen as the tick drew it (SmCheck), and
 em_rep		= em_tick+32000		; as replayed, when they differed
 	IFD	VERIFY
@@ -192,6 +193,9 @@ SmInit		lea	SmV(pc),a0
 		move.w	#$7fff,sv_state(a0)
 		move.l	#$70000,sv_disp(a0)
 		move.l	#$70000,sv_odisp(a0)
+		move.l	sv_mem(a0),d0		; the main loop's stack, out of Chip RAM:
+		add.l	#em_stk,d0		; lea $70000,sp at $2256 (resload_Patch
+		move.l	d0,$2258.w		; flushes the caches after)
 .out		rts
 
 ;----------------------------------------------------------------------------
@@ -1510,6 +1514,7 @@ SmRender	movem.l	d0-d7/a0-a6,-(sp)
 		btst	#OPF_ABS,(a5)
 		bne.b	.ga
 		add.l	sv_tgt(a3),a0
+		bra.w	SmGlyphRun
 .ga		move.w	4(a5),d0
 		move.b	1(a5),d3
 		move.w	2(a5),d1
@@ -1561,6 +1566,136 @@ SmRender	movem.l	d0-d7/a0-a6,-(sp)
 ; address, d0.w the character, d1.w 0 (at a byte) or 1 (half a byte on), d3.b the text
 ; colour. A plane whose colour bit is set gets the glyph's pixels set, the others clear
 ; (the opcodes $5c56a copies from $43a8c). d0-d7/a0-a1 trashed.
+;Replay of a glyph op in the screen (from SmRender's dispatch: 4(sp) its a1, 12(sp)
+; its a4). The glyphs after it of the same routine and colour in the next bytes (a string)
+; are drawn with it, by longs, up to the four bytes from its even address: on each plane
+; every glyph of a colour only sets or only clears, so their masks combine. The loop's
+; a1 and a4 skip the ops drawn. a0: its address, a5: its op, a1: its scratch, a3: SmV.
+SmGlyphRun	moveq	#1,d7			; d7: the run
+		move.l	6(a5),d6		; d6: the first's offset
+		moveq	#3,d5			; d5: how many more fit (mode 0 four bytes,
+		tst.w	2(a5)			; mode 1 one more each)
+		beq.b	.m0
+		moveq	#2,d5
+.m0		btst	#0,d6
+		beq.b	.al
+		subq.w	#1,d5
+.al		move.l	a5,a2
+		move.l	a1,a6
+.n		tst.w	d5
+		beq.b	.go
+		lea	SM_OPSZ(a2),a2
+		lea	16(a6),a6
+		cmpa.l	sv_ptr(a3),a2
+		bhs.b	.go
+		move.l	(a5),d0			; the type and flags, colour, routine
+		cmp.l	(a2),d0
+		bne.b	.go
+		move.l	6(a2),d0		; the next byte
+		sub.l	6-SM_OPSZ(a2),d0
+		subq.l	#1,d0
+		bne.b	.go
+		move.l	12(a1),d0		; the same bands
+		cmp.l	12(a6),d0
+		bne.b	.go
+		addq.w	#1,d7
+		subq.w	#1,d5
+		bra.b	.n
+.go		cmp.w	#1,d7
+		bne.b	.run
+		move.w	4(a5),d0		; one alone
+		move.b	1(a5),d3
+		move.w	2(a5),d1
+		move.b	10(a5),d2
+		bra.w	SmGlyphD
+.run		move.l	d7,d0			; the loop skips the others
+		subq.l	#1,d0
+		lsl.l	#4,d0
+		add.l	d0,4(sp)
+		add.l	d0,12(sp)
+		moveq	#1,d4			; d4: the first's byte in the long
+		and.w	d6,d4
+		sub.l	d4,a0
+		moveq	#16-1,d0		; the rows' set masks at 0(sp), clear masks
+		moveq	#0,d1			; at 32(sp)
+.z		move.l	d1,-(sp)
+		dbf	d0,.z
+		move.l	a5,a2
+		move.w	d7,d5
+		subq.w	#1,d5
+.g		lea	$5c658,a6		; its font
+		move.w	4(a2),d0
+		cmp.b	#32,d0
+		bne.b	.c
+		moveq	#58,d0
+.c		sub.b	#48,d0
+		ext.w	d0
+		lsl.w	#3,d0
+		adda.w	d0,a6
+		moveq	#3,d1			; d1: its byte's shift, d6: the next's
+		sub.w	d4,d1
+		lsl.w	#3,d1
+		move.w	d1,d6
+		subq.w	#8,d6
+		move.l	sp,a4
+		moveq	#8-1,d2
+		tst.w	2(a2)
+		bne.b	.g1
+.r0		moveq	#0,d0			; mode 0: the glyph's row, set or cleared
+		move.b	(a6)+,d0
+		lsl.l	d1,d0
+		or.l	d0,(a4)
+		or.l	d0,32(a4)
+		addq.l	#4,a4
+		dbf	d2,.r0
+		bra.b	.gn
+.g1		moveq	#0,d3			; mode 1 ($5c5f2): sets the row's high half
+		move.b	10(a2),d3		; in the low half of its byte, the low half
+		not.b	d3			; in the high half of the next; clears the
+.r1		moveq	#0,d0			; first's, and in the next byte the previous
+		move.b	(a6)+,d0		; row's first's (row 0: the caller's d2
+		lsl.l	#4,d0			; bits 16-23, the mask)
+		lsl.l	d6,d0
+		or.l	d0,(a4)
+		moveq	#0,d7
+		move.b	-1(a6),d7
+		lsr.b	#4,d7
+		move.l	d7,d0
+		lsl.l	d1,d0
+		or.l	d0,32(a4)
+		move.l	d3,d0
+		lsl.l	d6,d0
+		or.l	d0,32(a4)
+		move.l	d7,d3
+		addq.l	#4,a4
+		dbf	d2,.r1
+.gn		addq.w	#1,d4
+		lea	SM_OPSZ(a2),a2
+		dbf	d5,.g
+		move.b	1(a5),d3		; the planes
+		bsr	FixBlitIdle
+		moveq	#4-1,d7
+.p		move.l	a0,a6
+		moveq	#8-1,d2
+		lsr.b	#1,d3
+		bcc.b	.pc
+		move.l	sp,a4
+.ps		move.l	(a4)+,d0
+		or.l	d0,(a6)
+		lea	40(a6),a6
+		dbf	d2,.ps
+		bra.b	.pn
+.pc		lea	32(sp),a4
+.pz		move.l	(a4)+,d0
+		not.l	d0
+		and.l	d0,(a6)
+		lea	40(a6),a6
+		dbf	d2,.pz
+.pn		lea	8000(a0),a0
+		dbf	d7,.p
+		lea	64(sp),sp
+		rts
+
 SmGlyphD	bsr	FixBlitIdle		; (as FixDigitStart)
 		lea	$5c658,a1
 		cmp.b	#32,d0
@@ -2201,7 +2336,6 @@ _PL_Smooth	PL_START
 		PL_PS	$226c,SmTick		; lea $90e.w,a0; move.w (a0)+,d0
 		PL_P	$5dc02,SmSwap		; jsr $40ac4
 		PL_PS	$1806,SmVbl		; jsr $52690 (FixVblCount)
-		PL_L	$2258,SM_STACK		; lea $70000,sp
 		PL_P	$435f2,SmLine		; move.w $774,$77a
 		PL_P	$43832,SmVline		; move.w $946,d0; cmp.w $940,d0
 		PL_P	$435a0,SmPlot		; move.w d0,d4; lea $43b74,a0

@@ -75,7 +75,7 @@ framerate's (below, `src/EmpireStrikesBackSmooth.s`):
 | $226c | `PL_PS SmTick` over `lea $90e.w,a0; move.w (a0)+,d0`: a tick begins (recording) |
 | $5dc02 | `PL_P SmSwap` over `jsr $40ac4`: the tick's frames presented |
 | $1806 | `PL_PS SmVbl` over `jsr $52690` (FixVblCount): the field count, then the queued frame shown from its field |
-| $2256 | `PL_L $2258` in `lea $70000,sp`: the main loop's stack at $60000, below the extra screens |
+| $2256 | `lea $70000,sp`: `SmInit` writes the main loop's new stack top into $2258 before the patch list (4 KB at the end of ExpMem) |
 | $435f2, $43832, $435a0, $43d04, $3f742 | `PL_P` the line, vertical line, plot, horizontal line and clear: recorded |
 | $5c56a, $5c5ac, $5c5f2 | `PL_P` the text colour and the glyphs: recorded |
 | $47de6, $47f0a, $4630a, $494aa, $5bf90, $5c008, $5b428, $2d04, $470fa, $5c1bc, $5d2c0, $1ed0, $44ccc | `PL_P` the sites (code that writes the screen itself): recorded with its registers |
@@ -130,8 +130,8 @@ byte eor'd with its count down from 378 (`_Crypt`), loaded before the game start
 CUSTOM1 (the icons set it), on a 68020 or better: 50 frames a second at the game's own
 speed, in the waves (states 0, 1, 2 and $0a), the wave select ($0b), the roster ($0e)
 and the attract's pages ($11 to $14); the later phases of a wave run as without it. The
-slave asks for an optional ExpMem of about 88 KB (two recordings and a work area);
-without it, or on a 68000, nothing is patched.
+slave asks for an optional ExpMem of about 90 KB (two recordings, a work area and the
+main loop's stack); without it, or on a 68000, nothing is patched.
 
 - **Recording.** Each tick (one pass of the main loop, from $226c to the swap) still runs
   once, but the drawing routines record their calls instead of drawing (a 16-byte op:
@@ -158,8 +158,9 @@ without it, or on a 68000, nothing is patched.
   its swap leaves them. The in-between frames go into two more screens in free Chip RAM,
   $60000 and $67d00: the image ends at $5e500 and the stack sat below $70000, and the
   line drawer adds its offset to the screen's low word, so each screen lies in one 64 KB
-  bank and the main loop's stack moves to $60000 (it used 326 bytes in every state
-  reached). Each frame is drawn for the first field it can make (by the last frame's
+  bank. The main loop's stack moves to the end of ExpMem (4 KB; it used 326 bytes in
+  every state reached): in Chip RAM, with no data cache, every call and `movem` of the
+  replay waited for the chip bus. Each frame is drawn for the first field it can make (by the last frame's
   drawing time) and queued, one at most, while the next is drawn; the VBL server ($1806)
   shows it from its field, writing BPL1PT-BPL4PT before the display starts (the copper
   list at $1bc4 loaded the old pointers at line 0) and the copper list's words. So the
@@ -185,14 +186,18 @@ without it, or on a 68000, nothing is patched.
   The half-byte glyphs ($5c5f2) clear their second byte, in the planes the colour lacks,
   by the previous row's first byte (`not.b d2` complements only the low byte, and the
   swaps bring the old one back; row 0 by the caller's d2 bits 16-23, recorded): stars
-  next to text are cleared as the game clears them.
+  next to text are cleared as the game clears them. The glyphs of a string (same
+  routine and colour, the next byte) are drawn together, up to the four bytes from the
+  first's even address, by longs: in each plane every glyph of a colour only sets or
+  only clears, so their masks combine.
 
 Checked with the `check` and `verify` builds (`development.md`): the exact replay
 compared with what the tick drew, and each frame drawn by bands (the extra screens'
 included) with the same frame drawn whole. In state 0 on the a1200-030 all 530 exact
 frames matched; on the a1200-040 (`verify`, wave 1 picked, then its later phases) all
-783, in states 0, 1, 2 and $0a, and all 1289 frames drawn by bands. On the a1200-030
-all 1247 exact frames from the boot through the wave select into wave 1 and $0a, and all of the attract's 1394 ($0e, $11,
+783, in states 0, 1, 2 and $0a, and all 1289 frames drawn by bands. With the stack in
+ExpMem and the glyph runs, on the a1200-030 all 1247 exact frames from the boot
+through the wave select into wave 1 and $0a, and all of the attract's 1394 ($0e, $11,
 $12, $13, $14); the a1200-040 (`verify`) all 259, in states 0, 1, 2, $0a, $0b, $0e, $12
 and $13.
 
@@ -207,9 +212,13 @@ is the default's: fields a tick against the `direct` build, 3.11/3.08 on the 030
 3.14/3.21 on the a1200 (the same route, different play).
 
 The attract on the a1200-030 (`tools/esb.py sm`, release build): the pages $11 to $14
-2.8 to 3.0 frames a tick, the roster 1.2 to 1.7 (before, as the default: 1, every third
-field). A roster frame (the `timing` build) costs about 390 lines, 250 of them glyphs
-(1.2 lines each). The stock a1200 falls to direct mode in many scenes, as before.
+2.93 to 3.0 frames a tick, the roster 2.69 to 2.73 over three visits (before, as the
+default: 1, every third field; with the stack in Chip RAM and each glyph drawn alone,
+1.2 to 1.7). A roster frame (the `timing` build) costs about 330 lines, 200 to 220 of
+them glyphs: 1.1 lines a glyph alone, 1.54 a run of about two; before, 390 lines, with
+SmPrep twice as long. In wave play: 2.42 to 2.82 frames a tick. The stock a1200 falls
+to direct mode in many scenes, as before (the build before, the same route: 0.5 to 2.1
+frames a smooth tick).
 
 ## Limitations
 
