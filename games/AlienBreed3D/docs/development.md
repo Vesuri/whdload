@@ -79,7 +79,11 @@ the walk, as [performance](performance.md) describes; MACHINE is a1200-fast, a12
 a1200-040. `frames` counts swaps on the machine's own setup; `aprof` profiles every field
 (`ab3d.py aprof`) on `$FSUAE_APROF` and writes a report beside each capture with
 `python3 tools/frametime.py OUT.json`: frames, work a frame (mean, p50, p95), the shares by
-category and the hot routines by source label.
+category, the hot routines by source label, and the pixel loops' pixels a frame and clocks
+a pixel. Compare builds on the clocks a pixel: `python3 tools/frametime.py --loops A.json
+B.json` (the frame totals drift between runs, since the game's timing follows the frame
+rate). A capture records its BUILD and `uae_cpu_frequency`, so the slave's loops are found in
+that build's listing.
 
 - aprof runs only a CPU without an MMU model, so the profile machines are the a1200-fast
   setup with `EXTRA_ARGS` (`baseline.sh` has them). The a1200-030 setup's

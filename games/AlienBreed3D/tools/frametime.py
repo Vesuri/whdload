@@ -14,7 +14,18 @@ routines. Prints:
   states and per-instruction tax wait_memory_cycles() adds after each instruction; on the
   040/060 core, instructions that advanced no time. It is charged to no PC, so the last
   column (DERIVED) shares it out by each category's instruction count;
-- the routines with the most time.
+- the routines with the most time;
+- the pixel loops (LOOPS): pixels a frame, CPU clocks a pixel and ms a frame, and the c2p's
+  ms a frame and clocks a Chip store. The frame totals drift between runs of one build (the
+  game's timing follows the frame rate, so a faster build plays a different fight); the
+  clocks a pixel hold within about 1%, so compare builds on those.
+
+    python3 tools/frametime.py --loops OUT.json...
+
+prints only the loops, a block a capture. The clocks are the instructions' own (no gap); the
+CPU clock is the capture's (`uae_cpu_frequency` in EXTRA_ARGS at capture time), else CPU_MHZ
+(default 50). Slave offsets come from the capture's build listing (BUILD at capture time,
+else the BUILD environment variable, else release).
 """
 import bisect
 import re
@@ -47,7 +58,93 @@ def labels(path):
     return out
 
 
+# The pixel loops: (name, parts); a part is ('game', lo, hi, pixel PCs) in game code-hunk
+# offsets, or ('slave', first label, end label, pattern) where the pattern matches the
+# listing text of the instructions that run once a pixel. A loop that moves into the slave
+# keeps its name and gets a slave part beside the game's.
+LOOPS = [
+    ('walls', [('slave', '_t_wdraw', '_t_walltop', r'K\*DS_STRIDE\(a3\)')]),
+    ('gouraud spans', [('game', 0x20fd0, 0x21016, (0x20fe0, 0x21004))]),
+    ('bitmap columns, a pixel visited', [('game', 0x21a0e, 0x21a82, (0x21a0e, 0x21a36, 0x21a60))]),
+]
+
+
+def listing(build):
+    """The slave listing's labels {name: offset} and first instruction text {offset: text}."""
+    path = os.path.join(GAME, 'tmp/build', build, 'AlienBreed3D.lst')
+    labs, code = {}, {}
+    if not os.path.exists(path):
+        return labs, code
+    for line in open(path, errors='replace'):
+        m = re.match(r'^00:([0-9A-F]{8}) ([0-9A-F]+)\s+\t\s*\d+M?\s*(.*)$', line)
+        if m:
+            code.setdefault(int(m.group(1), 16), m.group(3).strip())
+            continue
+        m = re.match(r'^([0-9A-F]{8}) (\w+)$', line.rstrip())
+        if m:
+            labs[m.group(2)] = int(m.group(1), 16)
+    return labs, code
+
+
+def loops(d):
+    """[(name, pixels a frame, clocks a pixel, ms a frame)] and the c2p's (ms a frame, clocks
+    a Chip store), or None for a part the capture or listing lacks."""
+    m = d['meta']
+    build = m.get('build') or os.environ.get('BUILD', 'release')
+    hz = m.get('cpu_hz') or float(os.environ.get('CPU_MHZ', 50)) * 1e6
+    unit = 1 / (m['colorclock_hz'] * m['CYCLE_UNIT'])          # seconds a unit
+    frames = max(1, sum(f['swap'] for f in d['fields']))
+    gp = {int(k, 16): v for k, v in d['pcs'].items()}
+    sp = {int(k, 16): v for k, v in d.get('slave_pcs', {}).items() if not k.startswith('-')}
+    labs, code = listing(build)
+    out = []
+    for name, parts in LOOPS:
+        px = units = 0
+        ok = True
+        for part in parts:
+            if part[0] == 'game':
+                _, lo, hi, pcs = part
+                units += sum(v[0] for o, v in gp.items() if lo <= o < hi)
+                px += sum(gp.get(o, [0, 0])[1] for o in pcs)
+            else:
+                _, a, b, pat = part
+                if a not in labs or b not in labs:
+                    ok = False
+                    continue
+                lo, hi = labs[a], labs[b]
+                units += sum(v[0] for o, v in sp.items() if lo <= o < hi)
+                px += sum(v[1] for o, v in sp.items()
+                          if lo <= o < hi and re.search(pat, code.get(o, '')))
+        out.append((name, px / frames if ok else None, units * unit * hz / px if ok and px else None,
+                    units * unit * 1000 / frames if ok else None))
+    c2 = [v for v in sp.values() if v[3] == 'c2p']
+    st = [v for v in c2 if v[2] > v[0] / 2]                    # mostly Chip time: the stores
+    c2p = (sum(v[0] for v in c2) * unit * 1000 / frames,
+           sum(v[0] for v in st) * unit * hz / sum(v[1] for v in st) if st else None)
+    return build, hz, frames, out, c2p
+
+
+def print_loops(d):
+    build, hz, frames, out, (c2ms, c2st) = loops(d)
+    print(f'pixel loops ({frames} frames, build {build}, {hz / 1e6:g} MHz; instruction clocks, no gap):')
+    print(f"  {'loop':32} {'px/frame':>9} {'clk/px':>7} {'ms/frame':>9}")
+    for name, px, clk, msf in out:
+        if px is None:
+            print(f'  {name:32} not in the listing of build {build}')
+            continue
+        print(f"  {name:32} {px:9.0f} {clk if clk is not None else float('nan'):7.2f} {msf:9.2f}")
+    st = f'{c2st:.1f} clocks a Chip store' if c2st else 'no Chip stores'
+    print(f"  {'c2p':32} {'':9} {'':7} {c2ms:9.2f}  ({st})")
+
+
 def main():
+    if sys.argv[1] == '--loops':
+        for i, path in enumerate(sys.argv[2:]):
+            if i:
+                print()
+            print(path)
+            print_loops(json.load(open(path)))
+        return
     d = json.load(open(sys.argv[1]))
     lab = labels(sys.argv[2] if len(sys.argv) > 2 else os.path.join(GAME, 'tmp/srcmatch.txt'))
     m, fields = d['meta'], d['fields']
@@ -140,7 +237,8 @@ def main():
         print(f'  {100 * u / allpc:5.1f}%  chip {100 * c / max(u, 1):3.0f}%  {name}')
     # the slave's own code by the profiled build's labels (BUILD, as ab3d.py aprof's slave_pcs)
     spcs = d.get('slave_pcs')
-    lst = os.path.join(GAME, 'tmp/build', os.environ.get('BUILD', 'release'), 'AlienBreed3D.lst')
+    lst = os.path.join(GAME, 'tmp/build', m.get('build') or os.environ.get('BUILD', 'release'),
+                       'AlienBreed3D.lst')
     if spcs and os.path.exists(lst):
         slab = sorted((int(m.group(1), 16), m.group(2)) for m in
                       (re.match(r'^([0-9A-F]{8}) (\w+)$', l.rstrip()) for l in open(lst, errors='replace'))
@@ -154,6 +252,7 @@ def main():
         print('the slave\'s routines, ms a frame (category, nearest label at or below):')
         for name, u in sorted(sby.items(), key=lambda kv: -kv[1])[:12]:
             print(f'  {u * ms / n:8.2f}  {name}')
+    print_loops(d)
 
 
 if __name__ == '__main__':

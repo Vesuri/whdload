@@ -24,9 +24,11 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
 2. Speed on the 68030: the dark room fight (`ab3d.py` SCRIPTS `door`, `turn720`;
    [performance](performance.md#where-the-time-can-still-go)), largest first. Each
    step's estimate is a count of the clocks removed, not a measurement.
-   1. **The measure:** `tools/frametime.py` reports pixels a frame and clocks a pixel for
-      each pixel loop, and the c2p's ms and clocks a Chip store. Compare builds on those,
-      since the frame totals drift between runs.
+   1. **The measure** (done): `tools/frametime.py --loops A.json B.json` prints each
+      capture's pixels a frame, clocks a pixel and ms a frame for each pixel loop (its
+      `LOOPS`), and the c2p's ms and clocks a Chip store. Compare builds on those, since
+      the frame totals drift between runs. A loop moved into the slave gets a slave part
+      in `LOOPS` beside the game's.
    2. **Gouraud floor spans** ($20fd0-$21016, 28.3 clocks a pixel): our own loop through
       `PL_P`, as the walls'. Eight pixels a pass at displacements, entered by a jump.
       Keep the game's stepping, but as two unrolled tracks (the next pixel steps by d6
@@ -34,7 +36,7 @@ in [resolution-plan.md](resolution-plan.md); how the original draws is in
       pair (6.9 clocks). Mask with a register in place of `andi.w #$3f3f` (4.1 clocks).
       Estimate: about 22 clocks a pixel, 3 ms a frame. The flat spans ($20f4c) and
       the water's (patched at $2110a and $2112e) have the same loop.
-   3. **Wall strips** (21.7 clocks a pixel, 360 strips of about 140 pixels a frame): a
+   3. **Wall strips** (21.3 clocks a pixel, 360 strips of about 140 pixels a frame): a
       variant without the `and.w` wrap for strips that do not wrap, and the two `mulu.w`
       of each strip's entry from a table (0.35 ms). Then unpack the walls to a byte a
       texel at each level's load (about 264 KB more ExpMem for the 176 KB of packed

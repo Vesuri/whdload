@@ -940,6 +940,11 @@ def cmd_aprof(server, g, rest):
         raise RuntimeError(f'no full turn in {n} fields (keyboard control, K?)')
     h = st['header']
     meta = {k: h[k] for k in ('cycleunit', 'CYCLE_UNIT', 'colorclock_hz', 'cpu_model', 'cacr')}
+    # the slave listing's build and the CPU clock, for frametime.py's clocks a pixel
+    meta['build'] = os.environ.get('BUILD', 'release')
+    hz = re.search(r'uae_cpu_frequency=(\d+)', os.environ.get('EXTRA_ARGS', ''))
+    if hz:
+        meta['cpu_hz'] = int(hz.group(1))
     out.write_text(json.dumps({'meta': meta, 'layout': lay, 'fields': fields,
                                'pcs': {f'{k:x}': v for k, v in sorted(pcs.items())},
                                'slave_pcs': {f'{k:x}': v for k, v in sorted(spcs.items())}}))

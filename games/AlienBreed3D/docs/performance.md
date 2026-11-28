@@ -371,14 +371,15 @@ ms a frame (mean, MEASURED):
 ### Where the time can still go
 
 Measured 28.11.2026: four builds of the same scene on the same machine. CPU clocks are
-the 68030's at 50 MHz (MEASURED, aprof).
+the 68030's at 50 MHz, the instructions' own (MEASURED, aprof; `tools/frametime.py
+--loops OUT.json` prints this table for a capture).
 
 | Code | Pixels a frame | Clocks a pixel | ms a frame |
 |---|---|---|---|
-| Our wall strip loops (`_t_wdraw`, `_t_wsimple`) | 49900 | 21.7 | 21.7 |
+| Our wall strip loops (`_t_wdraw`, `_t_wsimple`) | 49900 | 21.3 | 21.3 |
 | The game's Gouraud floor spans ($20fd0-$21016) | 24600 | 28.3 | 13.9 |
 | The game's bitmap columns ($21a0e-$21a82), per pixel visited | 16200 | 25.9 | 8.4 |
-| The c2p, 17280 longs to Chip | | 36.4 a store | 20.0 |
+| The c2p, 17280 longs to Chip | | 36.5 a store | 20.0 |
 
 - **Code without a pixel loop:** the game's wall set-up 8.8 ms a frame (618 columns,
   `pastscrinto` the largest) and its floor span set-up 7.8 ms (`noclipleftGOUR` $1f200-$1f33f
@@ -388,7 +389,8 @@ the 68030's at 50 MHz (MEASURED, aprof).
   ($2120e: 0.5 ms).
 - **Run-to-run noise:** the game's time follows the frame rate, so a faster build plays a
   different fight. Two runs of the same build gave 96.2 and 99.8 ms a frame of work. The
-  clocks a pixel held within 1% (21.9 / 21.7, 28.5 / 28.3, 25.8 / 25.9), so compare those.
+  clocks a pixel held within about 1% (21.6 / 21.3, 28.6 / 28.3, 25.8 / 25.9), so compare
+  those.
 - **Placement:** all the code and data the frame uses is in fast memory: the game, the
   slave, the music player, the stacks, the lists, the c2p's scratch and the textures. The
   only Chip-bus time outside the c2p is 0.8 ms a frame: the music player's Paula writes
