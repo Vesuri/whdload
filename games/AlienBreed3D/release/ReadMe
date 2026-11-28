@@ -21,20 +21,13 @@ It requires:
 
 
 Version 2.0b (27.11.2026) by Vesuri:
- - Enhanced resolution (CUSTOM5): the game is drawn at 1x1 pixels, 192x160
-   in the small view and 288x240 in full screen, on 256-colour screens
-   (the installed, the Aminet 8-channel and the CD32 version; not the
-   floppy one)
- - the installed icon sets CUSTOM5=1; remove it for the original display
- - frames a second, small view / full screen (emulated): 6 / 4 on a 14 MHz
-   68020, 11 / 8 at 28 MHz, 18 / 13 on a 50 MHz 68030, 20 / 11 on a 25 MHz
-   68040 (the original display: 12, 19, 23 and 26)
- - fixed: the game could stop on a black screen before the menu (the
-   no-music slave on a 28 MHz 68020), the Team 17 picture could show as
-   garbage on a real A1200, the menu's fades had off colours, a frame of
-   garbage could show on the way back to the menu, and an object right
-   beside the player could fill the view with a block of colour
- - the slave's source is included, a reconstruction of Psygore's slave
+ - new option Enhanced resolution (CUSTOM5): the game is drawn in full
+   detail, 192x160 in the small view and 288x240 in full screen, in 256
+   colours. The icon turns it on; it is not available for the floppy version
+ - fixed: the game could hang on a black screen before the menu, the menu's
+   fades had wrong colours, garbage could flash on the way back to the menu,
+   and an object right beside the player could fill the view with colour
+ - the slave's source is included
 
 Version 1.3 (08.01.2020) by Psygore:
  - An access fault removed (level 13), thanks to Angus for the bug report
